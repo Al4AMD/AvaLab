@@ -24,6 +24,13 @@ from avalab_api.upload_limit import UploadLimitMiddleware
 API_PREFIX = "/api/v1"
 API_VERSION = "0.1.0"
 
+# Statuses raised by framework internals (FileResponse ranges, routing) that
+# must surface as specific machine-readable codes instead of invalid_request.
+_HTTP_STATUS_TO_ERROR_CODE = {
+    404: ErrorCode.not_found,
+    416: ErrorCode.range_not_satisfiable,
+}
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -86,7 +93,7 @@ def create_app() -> FastAPI:
     async def http_exception_handler(
         request: Request, exc: StarletteHTTPException
     ) -> JSONResponse:
-        code = ErrorCode.not_found if exc.status_code == 404 else ErrorCode.invalid_request
+        code = _HTTP_STATUS_TO_ERROR_CODE.get(exc.status_code, ErrorCode.invalid_request)
         return JSONResponse(
             status_code=exc.status_code,
             content={"error": {"code": code.value, "message": str(exc.detail)}},

@@ -50,3 +50,11 @@
 - Context: AGENTS.md §16 Q5.
 - Decision: Keep the escape hatch only. Optimize TypeScript first (typed arrays, precomputed twiddles, in-place). WASM is added ONLY after a recorded benchmark shows the §9 budgets are missed.
 - Consequences: No WASM in Wave 1. Benchmarks run when a budget fails or during M5.
+
+## D-007 — Range serving semantics deviate from the Task 8 brief wording
+
+- Date: 2026-10-19
+- Status: accepted (agent, empirically verified against installed starlette 1.9.0)
+- Context: Task 8 brief expected malformed ranges (`bytes=50-10`, `bytes=abc`) → 416 `range_not_satisfiable`, and multi-range → "first range only". Empirical testing of `FileResponse` showed: malformed/inverted → plain-text 400 raised inside the send phase (bypasses FastAPI exception handlers); multi-range → RFC 9110 `multipart/byteranges` (206, all ranges); unsatisfiable → correct 416 + `Content-Range: bytes */<size>` but as a bare text response with no API error envelope.
+- Decision: keep starlette's native behavior where it is better or harmless. Valid single ranges and multi-ranges are delegated to `FileResponse` (multi-range stays RFC-compliant multipart). Malformed/inverted ranges keep starlette's plain-text 400, pinned by test. Unsatisfiable well-formed single ranges (start >= size, suffix 0) are pre-validated in the route and raised as 416 `range_not_satisfiable` with the `Content-Range` header; `main.py` maps 416 → `range_not_satisfiable`.
+- Consequences: `GET /audio/{id}` error bodies are envelopes except malformed/inverted Range requests (plain text, status still correct); clients must not parse the body there. Tests pin the exact starlette behavior so dependency upgrades force re-verification.
