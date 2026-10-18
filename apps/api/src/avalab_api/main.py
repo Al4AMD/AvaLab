@@ -11,6 +11,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from avalab_api.config import get_settings
 from avalab_api.errors import ApiError, ErrorCode
+from avalab_api.routes.ingest import router as ingest_router
 
 API_PREFIX = "/api/v1"
 API_VERSION = "0.1.0"
@@ -74,6 +75,7 @@ def create_app() -> FastAPI:
         )
 
     api_router = APIRouter(prefix=API_PREFIX)
+    api_router.include_router(ingest_router)
 
     @api_router.get("/health")
     def health() -> HealthResponse:
