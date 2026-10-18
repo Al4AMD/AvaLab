@@ -1,2 +1,30 @@
-opencode.json
+# Node / JS
+node_modules/
+dist/
+coverage/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Test output
+playwright-report/
+test-results/
+
+# Runtime storage (uploaded/processed audio)
+apps/api/storage/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# SDD harness artifacts
 .superpowers/
+
+# Local opencode config
+opencode.json
