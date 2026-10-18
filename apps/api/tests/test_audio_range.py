@@ -254,6 +254,62 @@ def test_malformed_ranges_are_400_envelope(
     assert response.json()["error"]["message"]
 
 
+@pytest.mark.parametrize(
+    "range_header",
+    [
+        "bytes=-" + "9" * 4301,
+        "bytes=" + "9" * 4301 + "-",
+        "bytes=0-" + "9" * 4301,
+        "bytes=0-9," + "9" * 19 + "-",
+    ],
+)
+def test_overlong_digit_runs_are_400_envelope(
+    storage_root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    wav_1s_44k1_mono: Path,
+    range_header: str,
+) -> None:
+    """A >18-digit value would hit CPython's 4300-digit int() limit: in the route
+    as an uncaught ValueError, in Starlette as a ValueError-skip that collapses
+    to a plain-text 400. The digit cap must turn every shape into a 400 envelope."""
+    with make_client(storage_root, monkeypatch) as client:
+        audio_id = ingest(client, wav_1s_44k1_mono)
+        response = get(client, audio_id, range_header)
+
+    assert response.status_code == 400
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.json()["error"]["code"] == "invalid_request"
+    assert response.json()["error"]["message"]
+
+
+def test_eighteen_digit_open_range_is_416_envelope(
+    storage_root: Path, monkeypatch: pytest.MonkeyPatch, wav_1s_44k1_mono: Path
+) -> None:
+    """The cap boundary: 18 digits parses fine and is unsatisfiable -> 416, not 400."""
+    with make_client(storage_root, monkeypatch) as client:
+        audio_id = ingest(client, wav_1s_44k1_mono)
+        size_bytes = len(canonical_bytes(storage_root, audio_id))
+        response = get(client, audio_id, "bytes=" + "9" * 18 + "-")
+
+    assert response.status_code == 416
+    assert response.headers["content-range"] == f"bytes */{size_bytes}"
+    assert response.json()["error"]["code"] == "range_not_satisfiable"
+
+
+def test_stat_oserror_is_404_envelope(
+    storage_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A plain file where the id's directory belongs makes stat raise
+    NotADirectoryError; the route must answer the 404 envelope, not a 500."""
+    with make_client(storage_root, monkeypatch) as client:
+        storage_root.mkdir(parents=True, exist_ok=True)
+        (storage_root / ("c" * 32)).write_bytes(b"not a directory")
+        response = get(client, "c" * 32)
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
+
+
 def test_more_than_max_ranges_is_400_envelope(
     storage_root: Path, monkeypatch: pytest.MonkeyPatch, wav_1s_44k1_mono: Path
 ) -> None:

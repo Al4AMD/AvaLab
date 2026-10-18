@@ -14,6 +14,10 @@ Range semantics (all error bodies use the API envelope):
   non-empty group, or a comma-joined list of such specs (no whitespace inside
   the spec list); any other header is rejected with 400 envelope
   ``invalid_request``, as is a list longer than ``FileResponse.max_ranges``;
+- any spec with a digit run longer than 18 characters is rejected with 400
+  envelope ``invalid_request`` before the first ``int()`` call, so every
+  parsed value is <= 10**18 and CPython's 4300-digit ``int()`` limit is
+  unreachable from both this route and Starlette's parser;
 - a grammar-valid header whose parts include an inverted range (both numbers
   present, end < start), a start beyond the file, or a zero suffix is
   rejected as a whole with 416 envelope ``range_not_satisfiable`` and
@@ -38,15 +42,20 @@ router = APIRouter()
 
 _RANGE_PREFIX = "bytes="
 _RANGE_SPEC_PATTERN = re.compile(r"(\d*)-(\d*)\Z")
+_MAX_RANGE_DIGITS = 18
 
 
 def _validate_range_header(range_header: str, size_bytes: int) -> None:
     """Reject malformed, inverted and unsatisfiable Range headers with envelopes.
 
-    Grammar-invalid headers raise 400 ``invalid_request``. Grammar-valid
-    headers with any non-servable part (end < start checked before start >=
-    size, so inverted ranges classify independently of the file size) raise
-    416 ``range_not_satisfiable`` with the ``Content-Range`` header; servable
+    Grammar-invalid headers and specs with a digit run longer than
+    ``_MAX_RANGE_DIGITS`` raise 400 ``invalid_request``. Capping digit length
+    keeps every later ``int()`` — and the ones inside Starlette's range parser
+    — far below CPython's 4300-digit conversion limit, so no ValueError can
+    escape as a 500 or degrade to a plain-text response. Grammar-valid headers
+    with any non-servable part (end < start checked before start >= size, so
+    inverted ranges classify independently of the file size) raise 416
+    ``range_not_satisfiable`` with the ``Content-Range`` header; servable
     headers return without raising and are delegated to FileResponse.
     """
     header = range_header.strip()
@@ -57,6 +66,8 @@ def _validate_range_header(range_header: str, size_bytes: int) -> None:
         match = _RANGE_SPEC_PATTERN.fullmatch(part)
         if match is None or (match.group(1) == "" and match.group(2) == ""):
             raise ApiError(ErrorCode.invalid_request, "Malformed Range header", 400)
+        if len(match.group(1)) > _MAX_RANGE_DIGITS or len(match.group(2)) > _MAX_RANGE_DIGITS:
+            raise ApiError(ErrorCode.invalid_request, "Range value too long", 400)
         specs.append((match.group(1), match.group(2)))
     if len(specs) > FileResponse.max_ranges:
         raise ApiError(ErrorCode.invalid_request, "Too many ranges requested", 400)
@@ -87,7 +98,9 @@ def get_audio(
     path = storage.canonical_path(audio_id)
     try:
         size_bytes = path.stat().st_size
-    except FileNotFoundError:
+    except OSError:
+        # Any stat failure (missing file, tampered tree) is a 404 envelope,
+        # never an uncaught 500.
         raise ApiError(ErrorCode.not_found, "Unknown audio id", 404) from None
     if range_header is not None:
         _validate_range_header(range_header, size_bytes)
