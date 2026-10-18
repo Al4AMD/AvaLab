@@ -1,6 +1,10 @@
 """FastAPI application factory. All routes live under the /api/v1 prefix."""
 
+import asyncio
+import contextlib
 import shutil
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -11,11 +15,34 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from avalab_api.config import get_settings
 from avalab_api.errors import ApiError, ErrorCode
+from avalab_api.routes.audio import router as audio_router
 from avalab_api.routes.ingest import router as ingest_router
+from avalab_api.storage import Storage
+from avalab_api.ttl import SWEEPER_TASK_NAME, sweep_loop
 from avalab_api.upload_limit import UploadLimitMiddleware
 
 API_PREFIX = "/api/v1"
 API_VERSION = "0.1.0"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Start the TTL sweeper on startup; cancel and await it on shutdown."""
+    settings = get_settings()
+    sweeper = asyncio.create_task(
+        sweep_loop(
+            Storage(settings.storage_dir),
+            ttl_seconds=settings.ttl_minutes * 60,
+            interval_seconds=settings.ttl_sweep_interval_seconds,
+        ),
+        name=SWEEPER_TASK_NAME,
+    )
+    try:
+        yield
+    finally:
+        sweeper.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await sweeper
 
 
 class HealthResponse(BaseModel):
@@ -34,6 +61,7 @@ def create_app() -> FastAPI:
         title="AvaLab API",
         version=API_VERSION,
         servers=[{"url": API_PREFIX}],
+        lifespan=lifespan,
     )
 
     # Starlette wraps user middleware in reverse registration order, so the
@@ -81,6 +109,7 @@ def create_app() -> FastAPI:
 
     api_router = APIRouter(prefix=API_PREFIX)
     api_router.include_router(ingest_router)
+    api_router.include_router(audio_router)
 
     @api_router.get("/health")
     def health() -> HealthResponse:
