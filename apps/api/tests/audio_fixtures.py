@@ -54,6 +54,16 @@ def wav_2s_44k1_mono(audio_fixture_dir: Path) -> Path:
 
 
 @pytest.fixture(scope="session")
+def wav_2s_44k1_mono_with_title_metadata(audio_fixture_dir: Path) -> Path:
+    """2 s 44.1 kHz mono WAV carrying a source ``title`` tag (metadata stripping)."""
+    return generate_with_ffmpeg(
+        audio_fixture_dir / "sine_2s_44100_mono_title.wav",
+        "sine=frequency=440:sample_rate=44100:duration=2",
+        ["-ac", "1", "-c:a", "pcm_s16le", "-metadata", "title=SECRET"],
+    )
+
+
+@pytest.fixture(scope="session")
 def wav_2s_192k_mono(audio_fixture_dir: Path) -> Path:
     """2 s mono at 192 kHz — above the 96000 Hz cap, must be resampled."""
     return generate_with_ffmpeg(

@@ -79,7 +79,12 @@ def probe(path: Path) -> ProbeResult:
 def transcode_to_canonical_wav(
     src: Path, dst: Path, sample_rate_hz: int, channels: int
 ) -> None:
-    """Decode the first audio stream of ``src`` into canonical float32 WAV at ``dst``."""
+    """Decode the first audio stream of ``src`` into canonical float32 WAV at ``dst``.
+
+    Source metadata tags and chapters are stripped (``-map_metadata -1`` /
+    ``-map_chapters -1``): the canonical file must not carry tags copied from
+    an untrusted upload.
+    """
     try:
         subprocess.run(
             [
@@ -93,6 +98,10 @@ def transcode_to_canonical_wav(
                 str(src),
                 "-map",
                 "0:a:0",
+                "-map_metadata",
+                "-1",
+                "-map_chapters",
+                "-1",
                 "-c:a",
                 "pcm_f32le",
                 "-ar",
@@ -155,6 +164,6 @@ def _parse_int(value: object) -> int | None:
     if not isinstance(value, (str, int, float)):
         return None
     try:
-        return int(str(value))
-    except ValueError:
+        return int(float(value))
+    except (ValueError, OverflowError):
         return None

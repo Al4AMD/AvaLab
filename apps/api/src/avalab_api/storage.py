@@ -69,9 +69,13 @@ class Storage:
         os.replace(tmp_path, meta_path)
 
     def delete(self, audio_id: str) -> bool:
-        """Remove the ``audio_id`` directory tree; True when something was deleted."""
+        """Remove the ``audio_id`` directory tree; True when it is gone afterwards.
+
+        ``rmtree(ignore_errors=True)`` must not be trusted to have succeeded:
+        the caller uses the result to decide whether cleanup completed.
+        """
         directory = self.audio_dir(audio_id)
         if not directory.exists():
             return False
         shutil.rmtree(directory, ignore_errors=True)
-        return True
+        return not directory.exists()

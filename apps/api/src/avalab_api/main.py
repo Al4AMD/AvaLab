@@ -12,6 +12,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from avalab_api.config import get_settings
 from avalab_api.errors import ApiError, ErrorCode
 from avalab_api.routes.ingest import router as ingest_router
+from avalab_api.upload_limit import UploadLimitMiddleware
 
 API_PREFIX = "/api/v1"
 API_VERSION = "0.1.0"
@@ -35,6 +36,10 @@ def create_app() -> FastAPI:
         servers=[{"url": API_PREFIX}],
     )
 
+    # Starlette wraps user middleware in reverse registration order, so the
+    # upload cap is registered first to keep CORSMiddleware outermost — its
+    # headers must appear on the middleware's own 413 responses.
+    app.add_middleware(UploadLimitMiddleware, max_upload_bytes=settings.max_upload_bytes)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
