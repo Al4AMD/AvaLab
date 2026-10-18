@@ -83,6 +83,26 @@ def test_invalid_request_emits_stable_error_envelope() -> None:
     }
 
 
+def test_method_not_allowed_emits_stable_error_envelope_and_allow_header() -> None:
+    test_app = create_app()
+    router = APIRouter()
+
+    @router.post("/post-only")
+    def post_only() -> None:
+        return None
+
+    test_app.include_router(router, prefix=API_PREFIX)
+    with TestClient(test_app) as test_client:
+        response = test_client.get(f"{API_PREFIX}/post-only")
+
+    assert response.status_code == 405
+    body = response.json()
+    assert "error" in body
+    assert body["error"]["code"] == "invalid_request"
+    assert "allow" in response.headers
+    assert "POST" in response.headers["allow"]
+
+
 def test_error_code_values_are_stable() -> None:
     assert {code.value for code in ErrorCode} == EXPECTED_ERROR_CODES
 
