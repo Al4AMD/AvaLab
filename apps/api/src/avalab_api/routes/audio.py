@@ -4,20 +4,23 @@ Unknown and malformed ids are both 404 ``not_found``: the storage layer
 validates the id pattern before any path is built, so a hostile id can never
 address files outside the storage root.
 
-Range semantics (verified empirically against installed starlette 1.9.0):
+Range semantics (all error bodies use the API envelope):
 
-- valid single ranges (``bytes=start-end``, ``bytes=start-``, ``bytes=-suffix``)
-  and multi-ranges are delegated to Starlette's ``FileResponse``; a
-  multi-range request is answered with RFC 9110 ``multipart/byteranges``
-  (not "first range only");
-- well-formed unsatisfiable single ranges (start >= size, suffix 0) are
-  rejected in the route with 416 ``range_not_satisfiable`` and
-  ``Content-Range: bytes */<size>`` because FileResponse's own 416 is a bare
-  text response emitted in the send phase, bypassing FastAPI exception
-  handlers and thus the API error envelope;
-- malformed or inverted ranges are rejected by FileResponse itself with a
-  plain-text 400 (no JSON envelope); spacing oddities in the header also fall
-  through to FileResponse, which classifies them itself.
+- the route validates every Range header before ``FileResponse`` sees it,
+  because FileResponse classifies malformed/unsatisfiable ranges with a
+  plain-text 400/416 emitted in the send phase, bypassing FastAPI exception
+  handlers (verified empirically against installed starlette 1.9.0);
+- accepted grammar: a single ``bytes=(\\d*)-(\\d*)`` spec with at least one
+  non-empty group, or a comma-joined list of such specs (no whitespace inside
+  the spec list); any other header is rejected with 400 envelope
+  ``invalid_request``, as is a list longer than ``FileResponse.max_ranges``;
+- a grammar-valid header whose parts include an inverted range (both numbers
+  present, end < start), a start beyond the file, or a zero suffix is
+  rejected as a whole with 416 envelope ``range_not_satisfiable`` and
+  ``Content-Range: bytes */<size>``;
+- valid single ranges and valid multi-ranges pass through to Starlette's
+  ``FileResponse``: single range → 206, multi-range → RFC 9110
+  ``multipart/byteranges`` (not "first range only").
 """
 
 import re
@@ -33,28 +36,40 @@ from avalab_api.storage import Storage
 
 router = APIRouter()
 
-_SINGLE_RANGE_PATTERN = re.compile(r"^\s*bytes=(\d*)-(\d*)\s*$", re.IGNORECASE)
+_RANGE_PREFIX = "bytes="
+_RANGE_SPEC_PATTERN = re.compile(r"(\d*)-(\d*)\Z")
 
 
-def _reject_unsatisfiable_range(range_header: str, size_bytes: int) -> None:
-    """Raise the 416 API envelope for unsatisfiable well-formed single ranges.
+def _validate_range_header(range_header: str, size_bytes: int) -> None:
+    """Reject malformed, inverted and unsatisfiable Range headers with envelopes.
 
-    Only ``bytes=<start>-`` / ``bytes=<start>-<end>`` with start >= size and
-    ``bytes=-0`` are intercepted; anything else (multi-range, malformed, odd
-    spacing) is left to FileResponse, which classifies those cases itself.
+    Grammar-invalid headers raise 400 ``invalid_request``. Grammar-valid
+    headers with any non-servable part (end < start checked before start >=
+    size, so inverted ranges classify independently of the file size) raise
+    416 ``range_not_satisfiable`` with the ``Content-Range`` header; servable
+    headers return without raising and are delegated to FileResponse.
     """
-    match = _SINGLE_RANGE_PATTERN.fullmatch(range_header)
-    if match is None:
-        return
-    start_text, end_text = match.group(1), match.group(2)
-    suffix_is_empty = start_text == "" and end_text == "0"
-    start_beyond_file = start_text != "" and int(start_text) >= size_bytes
-    if suffix_is_empty or start_beyond_file:
-        raise StarletteHTTPException(
-            status_code=416,
-            detail="Requested range is not satisfiable",
-            headers={"Content-Range": f"bytes */{size_bytes}"},
-        )
+    header = range_header.strip()
+    if header[: len(_RANGE_PREFIX)].lower() != _RANGE_PREFIX:
+        raise ApiError(ErrorCode.invalid_request, "Malformed Range header", 400)
+    specs: list[tuple[str, str]] = []
+    for part in header[len(_RANGE_PREFIX) :].split(","):
+        match = _RANGE_SPEC_PATTERN.fullmatch(part)
+        if match is None or (match.group(1) == "" and match.group(2) == ""):
+            raise ApiError(ErrorCode.invalid_request, "Malformed Range header", 400)
+        specs.append((match.group(1), match.group(2)))
+    if len(specs) > FileResponse.max_ranges:
+        raise ApiError(ErrorCode.invalid_request, "Too many ranges requested", 400)
+    for start_text, end_text in specs:
+        end_before_start = start_text != "" and end_text != "" and int(end_text) < int(start_text)
+        start_beyond_file = start_text != "" and int(start_text) >= size_bytes
+        suffix_unsatisfiable = start_text == "" and (end_text == "0" or size_bytes == 0)
+        if end_before_start or start_beyond_file or suffix_unsatisfiable:
+            raise StarletteHTTPException(
+                status_code=416,
+                detail="Requested range is not satisfiable",
+                headers={"Content-Range": f"bytes */{size_bytes}"},
+            )
 
 
 @router.get("/audio/{audio_id}")
@@ -70,10 +85,12 @@ def get_audio(
     """
     storage = Storage(settings.storage_dir)
     path = storage.canonical_path(audio_id)
-    if not path.is_file():
-        raise ApiError(ErrorCode.not_found, "Unknown audio id", 404)
+    try:
+        size_bytes = path.stat().st_size
+    except FileNotFoundError:
+        raise ApiError(ErrorCode.not_found, "Unknown audio id", 404) from None
     if range_header is not None:
-        _reject_unsatisfiable_range(range_header, path.stat().st_size)
+        _validate_range_header(range_header, size_bytes)
     return FileResponse(path, media_type="audio/wav")
 
 

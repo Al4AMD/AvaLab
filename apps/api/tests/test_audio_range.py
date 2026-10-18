@@ -1,16 +1,16 @@
 """GET /api/v1/audio/{audio_id} contract tests: full body and HTTP Range edges.
 
-Range semantics pinned here, verified empirically against installed
-starlette 1.9.0:
+Range semantics pinned here (route-side validation; see routes/audio.py):
 
 - valid single ranges -> 206 with exact ``Content-Range`` and the body slice;
-- well-formed unsatisfiable single ranges (start >= size, suffix 0) -> 416
-  ``range_not_satisfiable`` envelope plus ``Content-Range: bytes */<size>``;
-  the route raises these itself because FileResponse's own 416 is a bare
-  text response emitted in the send phase, bypassing the API error envelope;
-- malformed or inverted ranges -> plain-text 400 straight from FileResponse
-  (pinned below so a dependency upgrade forces re-verification);
-- multi-range -> RFC 9110 ``multipart/byteranges`` (starlette native).
+- valid multi-range -> RFC 9110 ``multipart/byteranges`` (starlette native);
+- grammar-valid but non-servable ranges (start >= size, suffix 0, inverted
+  ``end < start``) -> 416 ``range_not_satisfiable`` envelope plus
+  ``Content-Range: bytes */<size>``; the route raises these itself because
+  FileResponse's own 416 is a bare text response emitted in the send phase,
+  bypassing the API error envelope;
+- every other header shape -> 400 ``invalid_request`` envelope, so no
+  plain-text error path remains for this endpoint.
 
 Every test ingests into a storage root inside pytest's tmp tree.
 """
@@ -27,9 +27,6 @@ from httpx import Response
 from avalab_api.config import Settings, get_settings
 from avalab_api.main import API_PREFIX, create_app
 from avalab_api.storage import Storage
-
-INVERTED_RANGE_BODY = "Range header: start must be less than end"
-MALFORMED_RANGE_BODY = "Range header: range must be requested"
 
 
 @pytest.fixture(scope="module")
@@ -82,6 +79,15 @@ def ingest(client: TestClient, wav_path: Path) -> str:
 def canonical_bytes(storage_root: Path, audio_id: str) -> bytes:
     """The stored canonical WAV bytes: ground truth for every body assertion."""
     return Storage(storage_root).canonical_path(audio_id).read_bytes()
+
+
+def store_raw_canonical(storage_root: Path, payload: bytes) -> str:
+    """Place raw bytes at a valid id's canonical path, bypassing ingest."""
+    audio_id = "b" * 32
+    path = Storage(storage_root).canonical_path(audio_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(payload)
+    return audio_id
 
 
 def get(client: TestClient, audio_id: str, range_header: str | None = None) -> Response:
@@ -162,7 +168,16 @@ def test_single_range_suffix(
     assert response.content == full[-100:]
 
 
-@pytest.mark.parametrize("range_header", ["bytes=99999999-", "bytes={size}-", "bytes=-0"])
+@pytest.mark.parametrize(
+    "range_header",
+    [
+        "bytes=99999999-",
+        "bytes={size}-",
+        "bytes=-0",
+        "bytes=0-9,99999999-",
+        "bytes=0-9,50-10",
+    ],
+)
 def test_unsatisfiable_ranges_are_416_envelope(
     storage_root: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -179,30 +194,89 @@ def test_unsatisfiable_ranges_are_416_envelope(
     assert response.json()["error"]["code"] == "range_not_satisfiable"
 
 
-def test_inverted_range_is_400_from_fileresponse(
+def test_inverted_range_is_416_envelope(
     storage_root: Path, monkeypatch: pytest.MonkeyPatch, wav_1s_44k1_mono: Path
 ) -> None:
-    """starlette classifies ``start > end`` as malformed: plain-text 400, pinned as is."""
+    """``end < start`` on a file larger than ``start``: 416 envelope, not starlette's 400."""
     with make_client(storage_root, monkeypatch) as client:
         audio_id = ingest(client, wav_1s_44k1_mono)
+        size_bytes = len(canonical_bytes(storage_root, audio_id))
         response = get(client, audio_id, "bytes=50-10")
 
-    assert response.status_code == 400
-    assert response.headers["content-type"].startswith("text/plain")
-    assert response.text == INVERTED_RANGE_BODY
+    assert response.status_code == 416
+    assert response.headers["content-range"] == f"bytes */{size_bytes}"
+    assert response.json()["error"]["code"] == "range_not_satisfiable"
 
 
-def test_malformed_range_is_400_from_fileresponse(
-    storage_root: Path, monkeypatch: pytest.MonkeyPatch, wav_1s_44k1_mono: Path
+def test_inverted_range_is_416_on_file_smaller_than_start(
+    storage_root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Non-numeric range: starlette ignores the spec, then rejects: plain-text 400."""
+    """``bytes=50-10`` must classify as inverted even when 50 >= file size (10 B)."""
+    with make_client(storage_root, monkeypatch) as client:
+        audio_id = store_raw_canonical(storage_root, b"0123456789")
+        response = get(client, audio_id, "bytes=50-10")
+
+    assert response.status_code == 416
+    assert response.headers["content-range"] == "bytes */10"
+    assert response.json()["error"]["code"] == "range_not_satisfiable"
+
+
+@pytest.mark.parametrize(
+    "range_header",
+    [
+        "bytes=abc",
+        "bytes=",
+        "bytes=-",
+        "bytes=1-2-3",
+        "bytes=0-9,abc",
+        "bytes=0-9,",
+        "bytes=,0-9",
+        "bytes=0-9,,20-29",
+        "bytes=0-9, 20-29",
+        "items=0-9",
+        "bytes=0 - 9",
+    ],
+)
+def test_malformed_ranges_are_400_envelope(
+    storage_root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    wav_1s_44k1_mono: Path,
+    range_header: str,
+) -> None:
+    """Anything outside the strict grammar ends in the 400 envelope, never plain text."""
     with make_client(storage_root, monkeypatch) as client:
         audio_id = ingest(client, wav_1s_44k1_mono)
-        response = get(client, audio_id, "bytes=abc")
+        response = get(client, audio_id, range_header)
 
     assert response.status_code == 400
-    assert response.headers["content-type"].startswith("text/plain")
-    assert response.text == MALFORMED_RANGE_BODY
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.json()["error"]["code"] == "invalid_request"
+    assert response.json()["error"]["message"]
+
+
+def test_more_than_max_ranges_is_400_envelope(
+    storage_root: Path, monkeypatch: pytest.MonkeyPatch, wav_1s_44k1_mono: Path
+) -> None:
+    """Grammar-valid but excessive multi-ranges would go plain-text in starlette."""
+    with make_client(storage_root, monkeypatch) as client:
+        audio_id = ingest(client, wav_1s_44k1_mono)
+        response = get(client, audio_id, "bytes=" + ",".join(["0-0"] * 101))
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_request"
+
+
+def test_suffix_range_on_empty_file_is_416_envelope(
+    storage_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A zero-byte canonical file must still answer suffix ranges with the envelope."""
+    with make_client(storage_root, monkeypatch) as client:
+        audio_id = store_raw_canonical(storage_root, b"")
+        response = get(client, audio_id, "bytes=-5")
+
+    assert response.status_code == 416
+    assert response.headers["content-range"] == "bytes */0"
+    assert response.json()["error"]["code"] == "range_not_satisfiable"
 
 
 def test_multi_range_serves_multipart_byteranges(
