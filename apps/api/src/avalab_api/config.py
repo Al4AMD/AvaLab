@@ -12,7 +12,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Runtime configuration read from AVALAB_* environment variables."""
 
-    model_config = SettingsConfigDict(env_prefix="AVALAB_")
+    model_config = SettingsConfigDict(env_prefix="AVALAB_", env_file=".env")
 
     max_upload_bytes: int = 104857600
     max_duration_seconds: int = 300

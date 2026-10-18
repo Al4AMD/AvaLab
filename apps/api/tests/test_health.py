@@ -59,12 +59,47 @@ def test_api_error_handler_emits_stable_body() -> None:
     assert response.json() == {"error": {"code": "invalid_request", "message": "bad request"}}
 
 
+def test_unknown_route_emits_stable_error_envelope(client: TestClient) -> None:
+    response = client.get(f"{API_PREFIX}/no-such-route")
+    assert response.status_code == 404
+    assert response.json() == {"error": {"code": "not_found", "message": "Not Found"}}
+
+
+def test_invalid_request_emits_stable_error_envelope() -> None:
+    test_app = create_app()
+    router = APIRouter()
+
+    @router.get("/needs-param")
+    def needs_param(required_value: int) -> int:
+        return required_value
+
+    test_app.include_router(router, prefix=API_PREFIX)
+    with TestClient(test_app) as test_client:
+        response = test_client.get(f"{API_PREFIX}/needs-param")
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {"code": "invalid_request", "message": "Request validation failed"}
+    }
+
+
 def test_error_code_values_are_stable() -> None:
     assert {code.value for code in ErrorCode} == EXPECTED_ERROR_CODES
 
 
-def test_settings_defaults() -> None:
-    settings = Settings()
+def test_settings_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key in (
+        "AVALAB_MAX_UPLOAD_BYTES",
+        "AVALAB_MAX_DURATION_SECONDS",
+        "AVALAB_MAX_SAMPLE_RATE_HZ",
+        "AVALAB_MAX_CHANNELS",
+        "AVALAB_TTL_MINUTES",
+        "AVALAB_TTL_SWEEP_INTERVAL_SECONDS",
+        "AVALAB_STORAGE_DIR",
+        "AVALAB_CORS_ORIGINS",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    settings = Settings(_env_file=None)
     assert settings.max_upload_bytes == 104857600
     assert settings.max_duration_seconds == 300
     assert settings.max_sample_rate_hz == 96000

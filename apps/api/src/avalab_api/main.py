@@ -3,12 +3,14 @@
 import shutil
 
 from fastapi import APIRouter, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from avalab_api.config import get_settings
-from avalab_api.errors import ApiError
+from avalab_api.errors import ApiError, ErrorCode
 
 API_PREFIX = "/api/v1"
 API_VERSION = "0.1.0"
@@ -35,8 +37,8 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Range"],
     )
 
     @app.exception_handler(ApiError)
@@ -44,6 +46,30 @@ def create_app() -> FastAPI:
         return JSONResponse(
             status_code=exc.status_code,
             content={"error": {"code": exc.code.value, "message": exc.message}},
+        )
+
+    @app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(
+        request: Request, exc: StarletteHTTPException
+    ) -> JSONResponse:
+        code = ErrorCode.not_found if exc.status_code == 404 else ErrorCode.invalid_request
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"error": {"code": code.value, "message": str(exc.detail)}},
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": {
+                    "code": ErrorCode.invalid_request.value,
+                    "message": "Request validation failed",
+                }
+            },
         )
 
     api_router = APIRouter(prefix=API_PREFIX)
