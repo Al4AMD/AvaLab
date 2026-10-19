@@ -26,7 +26,7 @@ Verified at close-out: `pnpm check` green; `uv run --directory apps/api pytest -
 
 ## Wave 1 · Plan 01 — Fourier transforms (complete)
 
-**Status:** complete. Commits `9a980e6..HEAD` (reviewed head `5874f46`) plus this close-out commit, on `feat/wave-1-fourier`.
+**Status:** complete. Commits `71b3d64..ff812d7` (reviewed head `5874f46`) plus this close-out commit, on `feat/wave-1-fourier`.
 
 **Built** (`packages/dsp`, pure TS, golden-verified): naive DFT/IFFT (teaching O(N²) path); iterative radix-2 Cooley–Tukey FFT/IFFT; Bluestein FFT for arbitrary N behind the `fft`/`ifft` dispatcher; real-input `rfft`/`irfft` with Hermitian reconstruction; periodic and symmetric windows (rect, hann, hamming, blackman) plus symmetric Kaiser and the exported `i0` series; STFT/ISTFT with weighted overlap-add (COLA) normalization.
 
@@ -43,9 +43,15 @@ Verified at close-out: `pnpm check` green; `uv run --directory apps/api pytest -
 - FFT dispatcher tests: no explicit odd-N assertion.
 - Goldens: no symmetric L = 2 windows case.
 - `windows.ts`: kaiser large-β accuracy documented but not tested at the boundary.
+- `tools/golden`: no mypy config (outside gated packages).
+- Goldens: no cosine (nonzero-phase) case.
+- `bluestein.ts`: m up to 4N memory note and n·n < 2^53 exactness bound undocumented.
+- `rfft.ts`: irfft makes three O(N) passes.
+- Window tests: symmetric assertions duplicated.
+- STFT tests: redundant hand-built H≤L case; error-message regexes substring-based.
 - `tools/golden/.../stft.py`: docstring padding description corrected in this close-out commit (closed).
 
-**Needs owner review:** none for code; golden data totals 6.6 MB, accepted by the plan.
+**Needs owner review:** none for code; Wave 1 fixtures ≈6.3 MB (all golden fixtures ≈7.7 MB), accepted by the plan.
 
 ## What's left
 
