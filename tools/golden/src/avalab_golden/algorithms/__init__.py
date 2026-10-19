@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from avalab_golden.algorithms import dft, energy
+from avalab_golden.algorithms import dft, energy, fft
 from avalab_golden.fixtures import GoldenCase
 
 GENERATORS: dict[str, Callable[[], list[GoldenCase]]] = {
     "dft": dft.cases,
     "energy": energy.cases,
+    "fft": fft.cases,
 }
 
 __all__ = ["GENERATORS"]
