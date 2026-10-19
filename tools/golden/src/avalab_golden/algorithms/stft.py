@@ -20,9 +20,13 @@ return_onesided=False)``; SciPy's "spectrum" scaling divides by
 ``window.sum()``, so multiplying by ``window.sum()`` restores the unnormalized
 DFT. The two paths must agree to rtol = 1e-12, atol = 1e-12 (asserted below).
 The signal fed to ``scipy.signal.stft`` is padded to
-``(frames - 1) * hop + frame_length`` samples so that exactly ``frames``
-windows fit; the extra zero-padding from ``frame_length`` to ``fft_length`` is
-performed by the ``nfft`` argument.
+``(frames - 1) * hop + fft_length`` samples, exactly the length used by the
+pinned framing procedure. Because SciPy counts its own windows with
+``frame_length`` (not ``fft_length``), when ``fft_length > frame_length`` it
+may produce more than ``frames`` windows; only the first ``frames`` are
+compared, and those are exactly the frames the pinned procedure stores. The
+extra zero-padding from ``frame_length`` to ``fft_length`` is performed by the
+``nfft`` argument.
 
 ``expected.reconstruction`` stores the original N samples. With the synthesis
 window and the per-sample squared-window normalization, inverse STFT of these

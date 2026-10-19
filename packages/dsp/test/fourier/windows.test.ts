@@ -267,6 +267,12 @@ describe("window edge cases", () => {
     },
   );
 
+  it("throws RangeError for an unknown runtime window kind", () => {
+    const bogus = "bogus" as unknown as WindowKind;
+    expect(() => window(bogus, 8)).toThrow(RangeError);
+    expect(() => windowSymmetric(bogus, 8)).toThrow(RangeError);
+  });
+
   it("returns a fresh array on every call", () => {
     for (const make of [() => window("hann", 8), () => windowSymmetric("hann", 8)]) {
       const first = make();

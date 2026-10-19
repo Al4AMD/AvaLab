@@ -39,9 +39,10 @@
  * Complexity: O(L) time, O(L) space for every function.
  *
  * Edge cases: `length` must be an integer >= 2 -> RangeError otherwise
- * (including NaN, +/-Infinity and non-integers). `beta` and the `i0`
- * argument must be finite -> TypeError otherwise. No input arrays, no
- * mutation; each call returns a fresh Float64Array.
+ * (including NaN, +/-Infinity and non-integers). An unknown runtime `kind`
+ * (outside the union) -> RangeError. `beta` and the `i0` argument must be
+ * finite -> TypeError otherwise. No input arrays, no mutation; each call
+ * returns a fresh Float64Array.
  */
 
 export type WindowKind = "rect" | "hann" | "hamming" | "blackman";
@@ -79,18 +80,23 @@ export function windowSymmetric(kind: WindowKind, length: number): Float64Array 
 
 function fillWindow(kind: WindowKind, length: number, denominator: number): Float64Array {
   const values = new Float64Array(length);
-  if (kind === "rect") {
-    values.fill(1);
-    return values;
-  }
   for (let n = 0; n < length; n += 1) {
     const angle = (2 * Math.PI * n) / denominator;
-    if (kind === "hann") {
-      values[n] = 0.5 - 0.5 * Math.cos(angle);
-    } else if (kind === "hamming") {
-      values[n] = 0.54 - 0.46 * Math.cos(angle);
-    } else {
-      values[n] = 0.42 - 0.5 * Math.cos(angle) + 0.08 * Math.cos(2 * angle);
+    switch (kind) {
+      case "rect":
+        values[n] = 1;
+        break;
+      case "hann":
+        values[n] = 0.5 - 0.5 * Math.cos(angle);
+        break;
+      case "hamming":
+        values[n] = 0.54 - 0.46 * Math.cos(angle);
+        break;
+      case "blackman":
+        values[n] = 0.42 - 0.5 * Math.cos(angle) + 0.08 * Math.cos(2 * angle);
+        break;
+      default:
+        throw new RangeError(`unknown window kind: ${String(kind)}`);
     }
   }
   return values;
