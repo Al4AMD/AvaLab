@@ -65,6 +65,10 @@ describe("windows fixture", () => {
       "periodic_hann_len2",
       "periodic_hamming_len2",
       "periodic_blackman_len2",
+      "symmetric_rect_len64",
+      "symmetric_hann_len64",
+      "symmetric_hamming_len64",
+      "symmetric_blackman_len64",
       "kaiser_len64_beta8.6",
       "kaiser_len2_beta8.6",
       "i0_probe_x0.0",
@@ -84,7 +88,9 @@ describe("window / kaiser / i0 (golden)", () => {
       const actual =
         kindValue === "kaiser"
           ? kaiser(length, paramNumber(goldenCase, "beta"))
-          : window(asWindowKind(kindValue), length);
+          : goldenCase.params.sym === true
+            ? windowSymmetric(asWindowKind(kindValue), length)
+            : window(asWindowKind(kindValue), length);
 
       expect(actual.length).toBe(expected.length);
       expected.forEach((value, n) => {
@@ -101,6 +107,34 @@ describe("window / kaiser / i0 (golden)", () => {
       `i0(${x})`,
     );
   });
+});
+
+describe("windowSymmetric (golden)", () => {
+  const symmetricCases = golden.cases.filter((goldenCase) => goldenCase.params.sym === true);
+
+  it("covers all four kinds at length 64", () => {
+    expect(symmetricCases.map((goldenCase) => goldenCase.name)).toEqual([
+      "symmetric_rect_len64",
+      "symmetric_hann_len64",
+      "symmetric_hamming_len64",
+      "symmetric_blackman_len64",
+    ]);
+  });
+
+  it.each(symmetricCases)(
+    "matches the scipy sym=True values for $name",
+    (goldenCase: GoldenCase) => {
+      const kind = asWindowKind(goldenCase.params.kind);
+      const length = paramNumber(goldenCase, "length");
+      const expected = asNumberArray(goldenCase.expected.w, "expected.w");
+      const actual = windowSymmetric(kind, length);
+
+      expect(actual.length).toBe(expected.length);
+      expected.forEach((value, n) => {
+        expectClose(valueAt(actual, n), value, goldenCase.tolerance, `w[${n}]`);
+      });
+    },
+  );
 });
 
 describe("window properties", () => {

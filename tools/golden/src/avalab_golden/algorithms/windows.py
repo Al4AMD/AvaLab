@@ -8,7 +8,9 @@ by the STFT::
     blackman[n] = 0.42 - 0.5*cos(2*pi*n/L) + 0.08*cos(4*pi*n/L)
 
 The symmetric variant (denominator ``L-1``, SciPy default ``sym=True``) is
-used by FIR filter design. The Kaiser window is symmetric::
+used by FIR filter design; all four kinds are stored for both variants so
+the symmetric formula is pinned directly, not only through symmetry checks.
+The Kaiser window is symmetric::
 
     w[n] = I0(beta * sqrt(1 - (2*n/(L-1) - 1)^2)) / I0(beta)
 
@@ -42,27 +44,47 @@ PERIODIC_WINDOWS: tuple[tuple[str, int], ...] = (
 
 KAISER_CASES: tuple[tuple[int, float], ...] = ((64, 8.6), (2, 8.6))
 
+SYMMETRIC_WINDOWS: tuple[tuple[str, int], ...] = (
+    ("rect", 64),
+    ("hann", 64),
+    ("hamming", 64),
+    ("blackman", 64),
+)
+
 I0_PROBES: tuple[float, ...] = (0.0, 1.0, 8.6, 12.0)
 
 
-def _periodic(name: str, length: int) -> np.ndarray:
+def _periodic(name: str, length: int, sym: bool) -> np.ndarray:
     if name == "rect":
-        return scipy_windows.boxcar(length, sym=False)
+        return scipy_windows.boxcar(length, sym=sym)
     function = {
         "hann": scipy_windows.hann,
         "hamming": scipy_windows.hamming,
         "blackman": scipy_windows.blackman,
     }[name]
-    return function(length, sym=False)
+    return function(length, sym=sym)
 
 
 def _window_case(kind: str, length: int) -> GoldenCase:
-    values = _periodic(kind, length)
+    values = _periodic(kind, length, sym=False)
     return GoldenCase(
         name=f"periodic_{kind}_len{length}",
         samples=[],
         sample_rate_hz=None,
         params={"kind": kind, "length": length},
+        expected={"w": values.tolist()},
+        rtol=WINDOW_RTOL,
+        atol=WINDOW_ATOL,
+    )
+
+
+def _symmetric_case(kind: str, length: int) -> GoldenCase:
+    values = _periodic(kind, length, sym=True)
+    return GoldenCase(
+        name=f"symmetric_{kind}_len{length}",
+        samples=[],
+        sample_rate_hz=None,
+        params={"kind": kind, "length": length, "sym": True},
         expected={"w": values.tolist()},
         rtol=WINDOW_RTOL,
         atol=WINDOW_ATOL,
@@ -98,6 +120,7 @@ def cases() -> list[GoldenCase]:
     """Return the window fixture case set in stable order."""
     return [
         *(_window_case(kind, length) for kind, length in PERIODIC_WINDOWS),
+        *(_symmetric_case(kind, length) for kind, length in SYMMETRIC_WINDOWS),
         *(_kaiser_case(length, beta) for length, beta in KAISER_CASES),
         *(_i0_case(x) for x in I0_PROBES),
     ]
