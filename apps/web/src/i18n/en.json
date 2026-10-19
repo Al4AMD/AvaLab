@@ -1,0 +1,18 @@
+{
+  "app": {
+    "title": "AvaLab",
+    "subtitle": "An audio laboratory for Signals and Systems and Multimedia Systems courses",
+    "language": {
+      "switchLabel": "Switch language"
+    },
+    "health": {
+      "loading": "Checking server connection…",
+      "ok": "Server available",
+      "offline": "Server unavailable",
+      "offlineDetail": "Browser-side tools still work; server-side features (codecs and models) are disabled."
+    },
+    "privacy": {
+      "ttlNotice": "Uploaded files are deleted from the server automatically after 60 minutes."
+    }
+  }
+}
