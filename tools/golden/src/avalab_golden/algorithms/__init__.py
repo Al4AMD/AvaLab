@@ -7,6 +7,7 @@ from collections.abc import Callable
 from avalab_golden.algorithms import (
     dft,
     energy,
+    extent,
     fft,
     fft_arbitrary,
     fourier_series,
@@ -20,6 +21,7 @@ from avalab_golden.fixtures import GoldenCase
 GENERATORS: dict[str, Callable[[], list[GoldenCase]]] = {
     "dft": dft.cases,
     "energy": energy.cases,
+    "extent": extent.cases,
     "fft": fft.cases,
     "fft_arbitrary": fft_arbitrary.cases,
     "fourier_series": fourier_series.cases,
