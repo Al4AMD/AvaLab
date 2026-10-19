@@ -174,8 +174,12 @@ def test_single_range_suffix(
         "bytes=99999999-",
         "bytes={size}-",
         "bytes=-0",
+        "bytes=-00",
+        "bytes=-000",
+        "bytes=-" + "0" * 18,
         "bytes=0-9,99999999-",
         "bytes=0-9,50-10",
+        "bytes=0-9,-00",
     ],
 )
 def test_unsatisfiable_ranges_are_416_envelope(

@@ -19,9 +19,10 @@ Range semantics (all error bodies use the API envelope):
   parsed value is <= 10**18 and CPython's 4300-digit ``int()`` limit is
   unreachable from both this route and Starlette's parser;
 - a grammar-valid header whose parts include an inverted range (both numbers
-  present, end < start), a start beyond the file, or a zero suffix is
+  present, end < start), a start beyond the file, or a zero-valued suffix is
   rejected as a whole with 416 envelope ``range_not_satisfiable`` and
-  ``Content-Range: bytes */<size>``;
+  ``Content-Range: bytes */<size>``; suffix values are compared numerically,
+  so every zero-padding (``-0``, ``-00``, ``-000``) is equally unsatisfiable;
 - valid single ranges and valid multi-ranges pass through to Starlette's
   ``FileResponse``: single range → 206, multi-range → RFC 9110
   ``multipart/byteranges`` (not "first range only").
@@ -74,7 +75,7 @@ def _validate_range_header(range_header: str, size_bytes: int) -> None:
     for start_text, end_text in specs:
         end_before_start = start_text != "" and end_text != "" and int(end_text) < int(start_text)
         start_beyond_file = start_text != "" and int(start_text) >= size_bytes
-        suffix_unsatisfiable = start_text == "" and (end_text == "0" or size_bytes == 0)
+        suffix_unsatisfiable = start_text == "" and (int(end_text) == 0 or size_bytes == 0)
         if end_before_start or start_beyond_file or suffix_unsatisfiable:
             raise StarletteHTTPException(
                 status_code=416,
