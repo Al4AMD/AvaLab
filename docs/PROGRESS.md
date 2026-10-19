@@ -24,9 +24,38 @@
 
 Verified at close-out: `pnpm check` green; `uv run --directory apps/api pytest -q` green; `pnpm e2e` 4/4 green; docker compose smoke reproduced by the verifier (host 8080 was occupied by Homebrew Apache during dev, override port used for the local smoke — committed compose keeps `8080:80`).
 
+## Wave 1 · Plan 01 — Fourier transforms (complete)
+
+**Status:** complete. Commits `71b3d64..ff812d7` (reviewed head `5874f46`) plus this close-out commit, on `feat/wave-1-fourier`.
+
+**Built** (`packages/dsp`, pure TS, golden-verified): naive DFT/IFFT (teaching O(N²) path); iterative radix-2 Cooley–Tukey FFT/IFFT; Bluestein FFT for arbitrary N behind the `fft`/`ifft` dispatcher; real-input `rfft`/`irfft` with Hermitian reconstruction; periodic and symmetric windows (rect, hann, hamming, blackman) plus symmetric Kaiser and the exported `i0` series; STFT/ISTFT with weighted overlap-add (COLA) normalization.
+
+**Verification:** `pnpm check` green; 229 dsp tests at reviewed head `5874f46`; all golden fixtures byte-deterministic (generator run twice → `git status` clean, no golden value changes).
+
+**Known issues / deferred (still open):**
+- `dft.ts`: finiteness check sits in the inner loop; hoist if profiling ever shows it matters.
+- `dft.test.ts`: no Re-only reconstruction test for non-Hermitian spectra.
+- `fft.test.ts`: no non-power-of-two test for `ifftRadix2` (the dispatcher path covers it).
+- Fourier modules: error-label wording not fully uniform.
+- Fourier test files: `valueAt` helper duplicated per file.
+- `bluestein.ts`: plan caching deferred until profiled.
+- `rfft.test.ts`: irfft tolerance-boundary case not covered.
+- FFT dispatcher tests: no explicit odd-N assertion.
+- Goldens: no symmetric L = 2 windows case.
+- `windows.ts`: kaiser large-β accuracy documented but not tested at the boundary.
+- `tools/golden`: no mypy config (outside gated packages).
+- Goldens: no cosine (nonzero-phase) case.
+- `bluestein.ts`: m up to 4N memory note and n·n < 2^53 exactness bound undocumented.
+- `rfft.ts`: irfft makes three O(N) passes.
+- Window tests: symmetric assertions duplicated.
+- STFT tests: redundant hand-built H≤L case; error-message regexes substring-based.
+- `tools/golden/.../stft.py`: docstring padding description corrected in this close-out commit (closed).
+
+**Needs owner review:** none for code; Wave 1 fixtures ≈6.3 MB (all golden fixtures ≈7.7 MB), accepted by the plan.
+
 ## What's left
 
-- **Wave 1** — `docs/plans/wave-1/` (4 executable plans: `01-fourier-transforms.md`, `02-signals-and-metrics.md`, `03-systems-and-filters.md`, `04-codecs-and-time.md`). Pure-TS DSP + golden vectors; no UI, no router (see D-015).
+- **Wave 1** — `docs/plans/wave-1/` (4 executable plans; see D-015). Plan `01-fourier-transforms.md` complete (above); next `02-signals-and-metrics.md`, then `03-systems-and-filters.md`, `04-codecs-and-time.md`. Pure-TS DSP + golden vectors; no UI, no router.
 - Wave 2+ — not planned yet; see `docs/plans/README.md` for the wave map.
 
 ## Known issues / deferred minors (carried out of Wave 0)
@@ -56,7 +85,7 @@ From the T1–T12 ledgers; none blocking, each has an upgrade path:
 
 ## Next recommended step
 
-Start **Wave 1, plan `01-fourier-transforms.md`** via the subagent-driven-development workflow (fresh session, ledger under `.superpowers/sdd/01-fourier-transforms/`). Do not begin later plans while an earlier one has failing checks.
+Start **Wave 1, plan `02-signals-and-metrics.md`** via the subagent-driven-development workflow (fresh session, ledger under `.superpowers/sdd/02-signals-and-metrics/`). Do not begin later plans while an earlier one has failing checks.
 
 ## Session log
 

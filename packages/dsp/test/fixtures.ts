@@ -11,8 +11,22 @@ export interface GoldenCase {
   name: string;
   input: GoldenCaseInput;
   params: Record<string, unknown>;
-  expected: Record<string, number>;
+  expected: Record<string, unknown>;
   tolerance: { rtol: number; atol: number };
+}
+
+export function asNumber(value: unknown, label: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`golden fixture value ${label} is not a finite number`);
+  }
+  return value;
+}
+
+export function asNumberArray(value: unknown, label: string): number[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`golden fixture value ${label} is not an array`);
+  }
+  return value.map((item: unknown, index: number) => asNumber(item, `${label}[${index}]`));
 }
 
 export interface GoldenFile {
