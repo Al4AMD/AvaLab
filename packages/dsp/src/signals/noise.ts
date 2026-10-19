@@ -45,7 +45,7 @@
  *
  * Reference: J. McCartney, "Generating Pink Noise" (1999), describing the
  * Voss–McCartney algorithm; R. F. Voss and J. Clarke, "1/f noise in music and
- * speech", Nature 258 (1978) for the octave-source construction. mulberry32
+ * speech", Nature 258, 317–318 (1975) for the octave-source construction. mulberry32
  * is Tommy Ettinger's public-domain 32-bit generator (2017).
  *
  * Complexity: O(N) time and O(N) output space for both generators; pink noise
@@ -53,14 +53,13 @@
  * peak-normalization pass is a second O(N) scan.
  *
  * Edge cases: sampleRateHz must be a positive finite number and
- * durationSeconds a non-negative finite number -> RangeError for finite
- * out-of-domain values, TypeError for NaN/Infinity (R6: non-finite numeric
- * parameters are type errors). The rounded sample count must be a safe
- * integer -> RangeError otherwise; duration 0 returns an empty Float64Array.
- * seed must be a finite integer -> RangeError otherwise (the explicit seed
- * contract). amplitude must be finite -> TypeError otherwise; a negative
- * amplitude is accepted and mirrors the output. No input is mutated and every
- * call returns a fresh array.
+ * durationSeconds a non-negative finite number -> RangeError otherwise,
+ * including NaN/Infinity (R6: every numeric parameter must be finite). The
+ * rounded sample count must be a safe integer -> RangeError otherwise;
+ * duration 0 returns an empty Float64Array. seed must be a finite integer ->
+ * RangeError otherwise (the explicit seed contract). amplitude must be finite
+ * -> RangeError otherwise; a negative amplitude is accepted and mirrors the
+ * output. No input is mutated and every call returns a fresh array.
  */
 
 import type { SignalSpec } from "./generators.js";
@@ -71,7 +70,7 @@ const PINK_OCTAVE_COUNT = 16;
 
 function assertFiniteParam(value: number, label: string): void {
   if (!Number.isFinite(value)) {
-    throw new TypeError(`${label} must be finite (got ${value})`);
+    throw new RangeError(`${label} must be finite (got ${value})`);
   }
 }
 
