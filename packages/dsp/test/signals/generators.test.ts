@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  type Complex,
+  fft,
   generateAm,
   generateChirp,
   generateFm,
@@ -37,6 +39,51 @@ function expectClose(
     difference,
     `${label}: |${actual} - ${expected}| = ${difference} exceeds ${allowed}`,
   ).toBeLessThanOrEqual(allowed);
+}
+
+function dominantFrequencyHz(window: Float64Array, sampleRateHz: number): number {
+  const spectrum: Complex = fft(window);
+  const binCount = spectrum.re.length;
+  let peakBin = 0;
+  let peakPower = Number.NEGATIVE_INFINITY;
+  for (let bin = 1; bin < binCount / 2; bin += 1) {
+    const re = valueAt(spectrum.re, bin, "chirp spectrum re");
+    const im = valueAt(spectrum.im, bin, "chirp spectrum im");
+    const power = re * re + im * im;
+    if (power > peakPower) {
+      peakPower = power;
+      peakBin = bin;
+    }
+  }
+  return (peakBin * sampleRateHz) / binCount;
+}
+
+function expectChirpEndpoints(sweep: "linear" | "logarithmic"): void {
+  const sampleRateHz = 8000;
+  const durationSeconds = 4;
+  const windowLength = 512;
+  const startFrequencyHz = 500;
+  const endFrequencyHz = 2000;
+  const toleranceHz = (2 * sampleRateHz) / windowLength;
+
+  const chirp = generateChirp({
+    durationSeconds,
+    sampleRateHz,
+    startFrequencyHz,
+    endFrequencyHz,
+    sweep,
+  });
+  const startPeakHz = dominantFrequencyHz(chirp.slice(0, windowLength), sampleRateHz);
+  const endPeakHz = dominantFrequencyHz(chirp.slice(chirp.length - windowLength), sampleRateHz);
+
+  expect(
+    Math.abs(startPeakHz - startFrequencyHz),
+    `${sweep} start peak ${startPeakHz} Hz`,
+  ).toBeLessThanOrEqual(toleranceHz);
+  expect(
+    Math.abs(endPeakHz - endFrequencyHz),
+    `${sweep} end peak ${endPeakHz} Hz`,
+  ).toBeLessThanOrEqual(toleranceHz);
 }
 
 function paramNumber(goldenCase: GoldenCase, key: string): number {
@@ -293,79 +340,11 @@ describe("generator boundary samples", () => {
   });
 
   it("chirp sweeps between the requested endpoint frequencies (linear)", () => {
-    const sampleRateHz = 1000;
-    const durationSeconds = 1;
-    const startFrequencyHz = 100;
-    const endFrequencyHz = 400;
-    const phaseCycles = (t: number): number =>
-      startFrequencyHz * t + ((endFrequencyHz - startFrequencyHz) * t * t) / (2 * durationSeconds);
-    // phaseCycles is measured in cycles, so Δcycles/Δt is the frequency in Hz.
-    const frequencyFromPhase = (fromTime: number, toTime: number): number =>
-      (phaseCycles(toTime) - phaseCycles(fromTime)) / (toTime - fromTime);
-
-    // A 2-sample phase difference at the edges estimates the instantaneous
-    // frequency there; the average over one sample interval is within 0.2 %
-    // of the endpoint value for these parameters.
-    expect(Math.abs(frequencyFromPhase(0, 1 / sampleRateHz) - startFrequencyHz)).toBeLessThan(0.5);
-    expect(
-      Math.abs(
-        frequencyFromPhase(durationSeconds - 1 / sampleRateHz, durationSeconds) - endFrequencyHz,
-      ),
-    ).toBeLessThan(0.5);
-
-    const chirp = generateChirp({
-      durationSeconds,
-      sampleRateHz,
-      startFrequencyHz,
-      endFrequencyHz,
-      sweep: "linear",
-    });
-    expectClose(
-      valueAt(chirp, 1),
-      Math.sin(TAU * phaseCycles(1 / sampleRateHz)),
-      {
-        rtol: 0,
-        atol: 1e-15,
-      },
-      "linear x[1]",
-    );
+    expectChirpEndpoints("linear");
   });
 
   it("chirp sweeps between the requested endpoint frequencies (logarithmic)", () => {
-    const sampleRateHz = 1000;
-    const durationSeconds = 1;
-    const startFrequencyHz = 100;
-    const endFrequencyHz = 400;
-    const alpha = Math.log(endFrequencyHz) - Math.log(startFrequencyHz);
-    const phaseCycles = (t: number): number =>
-      (startFrequencyHz * durationSeconds * Math.expm1((alpha * t) / durationSeconds)) / alpha;
-    // phaseCycles is measured in cycles, so Δcycles/Δt is the frequency in Hz.
-    const frequencyFromPhase = (fromTime: number, toTime: number): number =>
-      (phaseCycles(toTime) - phaseCycles(fromTime)) / (toTime - fromTime);
-
-    expect(Math.abs(frequencyFromPhase(0, 1 / sampleRateHz) - startFrequencyHz)).toBeLessThan(0.5);
-    expect(
-      Math.abs(
-        frequencyFromPhase(durationSeconds - 1 / sampleRateHz, durationSeconds) - endFrequencyHz,
-      ),
-    ).toBeLessThan(0.5);
-
-    const chirp = generateChirp({
-      durationSeconds,
-      sampleRateHz,
-      startFrequencyHz,
-      endFrequencyHz,
-      sweep: "logarithmic",
-    });
-    expectClose(
-      valueAt(chirp, 1),
-      Math.sin(TAU * phaseCycles(1 / sampleRateHz)),
-      {
-        rtol: 0,
-        atol: 1e-15,
-      },
-      "logarithmic x[1]",
-    );
+    expectChirpEndpoints("logarithmic");
   });
 
   it("two-tone is bounded by the amplitude and does not mutate the frequency pair", () => {
