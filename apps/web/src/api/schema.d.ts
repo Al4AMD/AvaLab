@@ -175,6 +175,15 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            /** @description Malformed, oversized or too many Range specs (invalid_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Unknown audio id (not_found) */
             404: {
                 headers: {

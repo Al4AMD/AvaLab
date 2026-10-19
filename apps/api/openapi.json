@@ -247,6 +247,16 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Malformed, oversized or too many Range specs (invalid_request)"
+          },
           "404": {
             "content": {
               "application/json": {

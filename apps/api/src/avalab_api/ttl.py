@@ -71,7 +71,13 @@ def _is_expired(directory: Path, ttl_seconds: float, now: float) -> bool:
     # OverflowError and leave the object un-swept (fail open).
     if isinstance(created_at_unix, float) and not math.isfinite(created_at_unix):
         return True
-    return now - created_at_unix > ttl_seconds
+    try:
+        return now - created_at_unix > ttl_seconds
+    except OverflowError:
+        # A JSON int with more digits than a float can hold (CPython's int to
+        # float conversion limit) makes the subtraction raise; this is
+        # unusable bookkeeping, so it expires the object (fail closed).
+        return True
 
 
 async def sweep_loop(storage: Storage, ttl_seconds: float, interval_seconds: float) -> None:

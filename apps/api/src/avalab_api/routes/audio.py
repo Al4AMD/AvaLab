@@ -87,6 +87,10 @@ def _validate_range_header(range_header: str, size_bytes: int) -> None:
 @router.get(
     "/audio/{audio_id}",
     responses={
+        400: {
+            "model": ErrorResponse,
+            "description": "Malformed, oversized or too many Range specs (invalid_request)",
+        },
         404: {
             "model": ErrorResponse,
             "description": "Unknown audio id (not_found)",

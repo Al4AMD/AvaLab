@@ -133,6 +133,18 @@ def test_sweep_expired_deletes_non_finite_created_at(storage_root: Path) -> None
         assert not (storage_root / audio_id).exists()
 
 
+def test_sweep_expired_deletes_huge_integer_created_at(storage_root: Path) -> None:
+    now = time.time()
+    huge_int_id = store_object(
+        storage_root, meta_text=json.dumps({"created_at_unix": 10**400})
+    )
+
+    deleted = sweep_expired(Storage(storage_root), ttl_seconds=3600, now=now)
+
+    assert deleted == [huge_int_id]
+    assert not (storage_root / huge_int_id).exists()
+
+
 def test_sweep_expired_tolerates_missing_storage_root(tmp_path: Path) -> None:
     assert sweep_expired(Storage(tmp_path / "absent"), ttl_seconds=3600) == []
 
