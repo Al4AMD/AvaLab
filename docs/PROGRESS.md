@@ -4,7 +4,7 @@
 
 ## Wave 0 (M0 Foundation) — **done**, 2026-10-19
 
-13/13 tasks complete. Commit range `c56fbe2..d907e7e` + the T13 close-out commit on `feat/wave-0-foundation`. Per-task ledger: `.superpowers/sdd/foundation/progress.md` (scratch, not committed).
+13/13 tasks complete. Commit range `c56fbe2..ea68089` (T13) plus a follow-up docs fix on top, on `feat/wave-0-foundation`. Per-task ledger: `.superpowers/sdd/foundation/progress.md` (scratch, not committed).
 
 | Task | Result | Commit(s) |
 |---|---|---|

@@ -48,6 +48,7 @@
 | ast-serialize | 0.13.1 | MIT |
 | certifi | 2026.10.18 | MPL-2.0 |
 | click | 8.5.0 | BSD-3-Clause |
+| colorama | 0.4.6 | BSD-3-Clause |
 | fastapi | 0.146.0 | MIT |
 | h11 | 0.16.0 | MIT |
 | httpcore | 1.0.9 | BSD-3-Clause |
