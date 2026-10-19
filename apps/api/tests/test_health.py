@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from avalab_api.config import Settings, get_settings
 from avalab_api.errors import ApiError, ErrorCode
+from avalab_api.export_openapi import build_schema
 from avalab_api.main import API_PREFIX, API_VERSION, create_app
 
 EXPECTED_ERROR_CODES = {
@@ -37,10 +38,21 @@ def test_health_reports_ffmpeg_missing(client: TestClient, monkeypatch: pytest.M
     assert response.json()["ffmpeg"] is False
 
 
-def test_openapi_declares_versioned_server_and_health_path(client: TestClient) -> None:
+def test_openapi_declares_versioned_server_and_server_relative_paths(client: TestClient) -> None:
     schema = client.app.openapi()
     assert schema["servers"] == [{"url": API_PREFIX}]
-    assert f"{API_PREFIX}/health" in schema["paths"]
+    assert "/health" in schema["paths"]
+    assert f"{API_PREFIX}/health" not in schema["paths"]
+
+
+def test_served_openapi_paths_match_exporter(client: TestClient) -> None:
+    served = client.get("/openapi.json")
+    assert served.status_code == 200
+    served_paths = set(served.json()["paths"])
+    exported_paths = set(build_schema()["paths"])
+    assert served_paths == exported_paths
+    assert "/health" in served_paths
+    assert f"{API_PREFIX}/health" not in served_paths
 
 
 def test_api_error_handler_emits_stable_body() -> None:

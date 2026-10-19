@@ -70,4 +70,18 @@ describe("api client", () => {
     const sent = fetchStub.mock.calls[0]?.[0] as unknown as { rawUrl?: string };
     expect(sent.rawUrl).toBe("http://example.test/v9/health");
   });
+
+  it("falls back to the default when VITE_API_BASE_URL is empty", async () => {
+    vi.stubGlobal("Request", RelativeUrlRequest);
+    vi.stubEnv("VITE_API_BASE_URL", "");
+    const fetchStub = vi.fn(async (_request: Request) => jsonResponse(healthBody));
+    vi.stubGlobal("fetch", fetchStub);
+
+    const { createApiClient, DEFAULT_API_BASE_URL } = await import("../src/api/client");
+    const client = createApiClient();
+    await client.GET("/health");
+
+    const sent = fetchStub.mock.calls[0]?.[0] as unknown as { rawUrl?: string };
+    expect(sent.rawUrl).toBe(`${DEFAULT_API_BASE_URL}/health`);
+  });
 });

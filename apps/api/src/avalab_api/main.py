@@ -5,6 +5,7 @@ import contextlib
 import shutil
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -15,6 +16,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from avalab_api.config import get_settings
 from avalab_api.errors import ApiError, ErrorCode
+from avalab_api.openapi_utils import server_relative_schema
 from avalab_api.routes.audio import router as audio_router
 from avalab_api.routes.ingest import router as ingest_router
 from avalab_api.storage import Storage
@@ -70,6 +72,20 @@ def create_app() -> FastAPI:
         servers=[{"url": API_PREFIX}],
         lifespan=lifespan,
     )
+
+    # Paths are relative to the declared server URL, so the served spec must
+    # not repeat the router prefix (see avalab_api.openapi_utils). The same
+    # helper runs in export_openapi, keeping served and committed specs equal.
+    original_openapi = app.openapi
+
+    def server_relative_openapi() -> dict[str, Any]:
+        schema = app.openapi_schema
+        if schema is None:
+            schema = server_relative_schema(original_openapi(), API_PREFIX)
+            app.openapi_schema = schema
+        return schema
+
+    app.openapi = server_relative_openapi  # type: ignore[method-assign]
 
     # Starlette wraps user middleware in reverse registration order, so the
     # upload cap is registered first to keep CORSMiddleware outermost — its

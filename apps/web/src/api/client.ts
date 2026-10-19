@@ -23,8 +23,11 @@ export type IngestResponse = components["schemas"]["IngestResponse"];
 export const DEFAULT_API_BASE_URL = "/api/v1";
 
 function resolveBaseUrl(): string {
-  const fromEnv: string | undefined = import.meta.env.VITE_API_BASE_URL;
-  return fromEnv ?? DEFAULT_API_BASE_URL;
+  // `import.meta.env` is undefined outside a Vite/Node-with-env context
+  // (e.g. plain Node importing this module), and an empty string from the
+  // build environment must fall back too — hence `?.` plus `||`.
+  const fromEnv: string | undefined = import.meta.env?.VITE_API_BASE_URL;
+  return fromEnv || DEFAULT_API_BASE_URL;
 }
 
 /** Build a client; the base URL default is read from the environment now. */
