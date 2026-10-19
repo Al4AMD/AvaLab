@@ -15,6 +15,7 @@ export { fftBluestein } from "./fourier/bluestein.js";
 export type { Complex } from "./fourier/complex.js";
 export { dftNaive, idftNaive } from "./fourier/dft.js";
 export { fftRadix2, ifftRadix2 } from "./fourier/fft.js";
+export { irfft, rfft } from "./fourier/rfft.js";
 export { fft, ifft } from "./fourier/transform.js";
 export { averagePowerOf, energyOf } from "./utils/energy.js";
 export { samplesToSeconds, secondsToSamples } from "./utils/time.js";

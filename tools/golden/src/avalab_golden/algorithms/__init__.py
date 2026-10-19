@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from avalab_golden.algorithms import dft, energy, fft, fft_arbitrary
+from avalab_golden.algorithms import dft, energy, fft, fft_arbitrary, rfft
 from avalab_golden.fixtures import GoldenCase
 
 GENERATORS: dict[str, Callable[[], list[GoldenCase]]] = {
@@ -12,6 +12,7 @@ GENERATORS: dict[str, Callable[[], list[GoldenCase]]] = {
     "energy": energy.cases,
     "fft": fft.cases,
     "fft_arbitrary": fft_arbitrary.cases,
+    "rfft": rfft.cases,
 }
 
 __all__ = ["GENERATORS"]
