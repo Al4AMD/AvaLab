@@ -20,10 +20,11 @@
  *   zeroPad(x, p, q)           y = [0]*p ++ x ++ [0]*q
  *   support(x, {threshold})    first and last n with |x[n]| > threshold;
  *                              empty support is {start: N, end: N - 1}
- *   classifySignalType(x)      "energy" if the nonzero support is strictly
- *                              inside the window (at least one leading or
- *                              trailing zero); otherwise "power" (a constant
- *                              spanning the whole window, silence, or empty)
+ *   classifySignalType(x)      "energy" ONLY if the nonzero support is strictly
+ *                              inside the window: at least one leading zero
+ *                              AND at least one trailing zero. Otherwise
+ *                              "power" (one-sided support, a constant, silence
+ *                              or empty input).
  *   signalEnergy(x)            E = sum_{n=0}^{N-1} x[n]^2, empty -> 0
  *   averagePower(x)            P = E / N, empty -> 0
  *
@@ -276,25 +277,19 @@ export function support(samples: FloatArray, options: SupportOptions): SupportRa
 
 /**
  * Pedagogical energy/power classification over one finite observation window.
- * A signal whose nonzero support is strictly inside the window (at least one
- * leading or trailing zero sample) is treated as an energy signal: its energy
- * is finite and its average power over the infinite line is zero. A signal
- * that spans the whole window (support reaches both edges, e.g. a constant),
- * or that is silent/empty, is treated as a power signal. Uses support with
- * threshold 0, so any nonzero sample counts.
+ * A signal is classified as an energy signal ONLY when its nonzero support is
+ * strictly inside the window: at least one leading zero AND at least one
+ * trailing zero (support.startSampleIndex > 0 and support.endSampleIndex < N-1).
+ * A one-sided support (touching either edge), a constant spanning the window,
+ * silence, empty input and length-1 input are all treated as power signals.
+ * Uses support with threshold 0, so any nonzero sample counts.
  */
 export function classifySignalType(samples: FloatArray): SignalType {
   const nonzeroSupport = support(samples, { threshold: 0 });
-  if (nonzeroSupport.startSampleIndex > nonzeroSupport.endSampleIndex) {
-    return "power";
+  if (nonzeroSupport.startSampleIndex > 0 && nonzeroSupport.endSampleIndex < samples.length - 1) {
+    return "energy";
   }
-  if (
-    nonzeroSupport.startSampleIndex === 0 &&
-    nonzeroSupport.endSampleIndex === samples.length - 1
-  ) {
-    return "power";
-  }
-  return "energy";
+  return "power";
 }
 
 /**

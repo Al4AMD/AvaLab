@@ -127,6 +127,18 @@ def cases() -> list[GoldenCase]:
             _time_scale(ramp, 2.0),
         ),
         _samples_case(
+            "time_scale_half_up_ramp5",
+            np.array([1.0, 2.0, 3.0, 4.0, 5.0]),
+            {"operation": "timeScale", "factor": 2.0},
+            _time_scale(np.array([1.0, 2.0, 3.0, 4.0, 5.0]), 2.0),
+        ),
+        _samples_case(
+            "time_scale_half_up_single_sample",
+            np.array([7.0]),
+            {"operation": "timeScale", "factor": 2.0},
+            _time_scale(np.array([7.0]), 2.0),
+        ),
+        _samples_case(
             "reverse_ramp10",
             ramp,
             {"operation": "reverse"},

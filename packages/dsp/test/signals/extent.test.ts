@@ -94,6 +94,8 @@ describe("extent fixture", () => {
       "time_shift_minus3_ramp10",
       "time_scale_half_ramp10",
       "time_scale_double_ramp10",
+      "time_scale_half_up_ramp5",
+      "time_scale_half_up_single_sample",
       "reverse_ramp10",
       "truncate_ramp10_start2_length5",
       "truncate_ramp10_start8_length5_clamped",
@@ -217,6 +219,18 @@ describe("timeScale", () => {
     expect(Array.from(compressed)).toEqual([0, 2, 4, 6, 8]);
   });
 
+  it("rounds a non-integer output length half up (N = 5, factor 2 -> 3)", () => {
+    const compressed = timeScale(Float64Array.from([1, 2, 3, 4, 5]), 2);
+    expect(compressed.length).toBe(3);
+    expect(Array.from(compressed)).toEqual([1, 3, 5]);
+  });
+
+  it("rounds the N = 1, factor 2 output length 0.5 half up to 1", () => {
+    const compressed = timeScale(Float64Array.from([7]), 2);
+    expect(compressed.length).toBe(1);
+    expect(Array.from(compressed)).toEqual([7]);
+  });
+
   it("clamps positions past the last input sample instead of wrapping", () => {
     const stretched = timeScale(Float64Array.from([0, 10]), 0.25);
     // positions 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75 -> last two clamp to 10.
@@ -237,6 +251,12 @@ describe("timeScale", () => {
 
   it.each(invalidFactors)("throws RangeError for factor = %s", (_label, factor) => {
     expect(() => timeScale(ramp, factor)).toThrow(RangeError);
+  });
+
+  it("names the output-length guard for factor = 1e-300", () => {
+    expect(() => timeScale(ramp, 1e-300)).toThrow(
+      /output length must be a non-negative safe integer/,
+    );
   });
 });
 
@@ -326,6 +346,12 @@ describe("zeroPad", () => {
   it.each(invalidPads)("throws RangeError for %s", (_label, start, end) => {
     expect(() => zeroPad(ramp, start, end)).toThrow(RangeError);
   });
+
+  it("reaches and names the safe-output-length guard", () => {
+    expect(() => zeroPad(ramp, Number.MAX_SAFE_INTEGER, 1)).toThrow(
+      /output length must be a non-negative safe integer/,
+    );
+  });
 });
 
 describe("support", () => {
@@ -407,10 +433,73 @@ describe("classifySignalType, signalEnergy and averagePower", () => {
     expect(classifySignalType(transient)).toBe("energy");
   });
 
+  it("requires both edges strictly inside the window for energy", () => {
+    expect(classifySignalType(Float64Array.from([0, 0, 1, 0]))).toBe("energy");
+    expect(classifySignalType(Float64Array.from([0, 1, 2, 0]))).toBe("energy");
+  });
+
+  it("classifies one-sided support as power", () => {
+    expect(classifySignalType(Float64Array.from([1, 0, 0]))).toBe("power");
+    expect(classifySignalType(Float64Array.from([0, 1, 0, -1]))).toBe("power");
+  });
+
+  it("classifies a length-1 signal as power", () => {
+    expect(classifySignalType(Float64Array.from([1]))).toBe("power");
+    expect(classifySignalType(Float64Array.from([0]))).toBe("power");
+  });
+
   it("accepts Float32 input and accumulates in Float64", () => {
     const samples = Float32Array.from([0.5, -0.5, 1]);
     expect(signalEnergy(samples)).toBeCloseTo(1.5, 15);
     expect(averagePower(samples)).toBeCloseTo(0.5, 15);
+  });
+});
+
+describe("extent operations on length-1 input", () => {
+  const single = Float64Array.from([5]);
+
+  it("timeShift keeps or zero-fills the single sample", () => {
+    expect(Array.from(timeShift(single, 0))).toEqual([5]);
+    expect(Array.from(timeShift(single, 1))).toEqual([0]);
+    expect(Array.from(timeShift(single, -1))).toEqual([0]);
+  });
+
+  it("timeScale keeps one sample (half-up lengths)", () => {
+    expect(Array.from(timeScale(single, 1))).toEqual([5]);
+    expect(Array.from(timeScale(single, 2))).toEqual([5]);
+    expect(timeScale(single, 2).length).toBe(1);
+    expect(Array.from(timeScale(single, 0.5))).toEqual([5, 5]);
+  });
+
+  it("reverse is the identity", () => {
+    expect(Array.from(reverse(single))).toEqual([5]);
+  });
+
+  it("truncate returns the sample or an empty window", () => {
+    expect(Array.from(truncate(single, 0, 1))).toEqual([5]);
+    expect(truncate(single, 0, 0).length).toBe(0);
+    expect(truncate(single, 1, 1).length).toBe(0);
+  });
+
+  it("support reports the single nonzero sample or empty support", () => {
+    expect(support(single, { threshold: 0 })).toEqual({
+      startSampleIndex: 0,
+      endSampleIndex: 0,
+    });
+    expect(support(Float64Array.from([0]), { threshold: 0 })).toEqual({
+      startSampleIndex: 1,
+      endSampleIndex: 0,
+    });
+  });
+
+  it("energy and power are both the squared sample", () => {
+    expect(signalEnergy(single)).toBe(25);
+    expect(averagePower(single)).toBe(25);
+  });
+
+  it("classifySignalType is power (no room for both zero edges)", () => {
+    expect(classifySignalType(single)).toBe("power");
+    expect(classifySignalType(Float64Array.from([0]))).toBe("power");
   });
 });
 

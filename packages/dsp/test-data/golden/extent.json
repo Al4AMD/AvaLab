@@ -169,6 +169,56 @@
     {
       "expected": {
         "samples": [
+          1.0,
+          3.0,
+          5.0
+        ]
+      },
+      "input": {
+        "sample_rate_hz": null,
+        "samples": [
+          1.0,
+          2.0,
+          3.0,
+          4.0,
+          5.0
+        ]
+      },
+      "name": "time_scale_half_up_ramp5",
+      "params": {
+        "factor": 2.0,
+        "operation": "timeScale"
+      },
+      "tolerance": {
+        "atol": 0.0,
+        "rtol": 1e-12
+      }
+    },
+    {
+      "expected": {
+        "samples": [
+          7.0
+        ]
+      },
+      "input": {
+        "sample_rate_hz": null,
+        "samples": [
+          7.0
+        ]
+      },
+      "name": "time_scale_half_up_single_sample",
+      "params": {
+        "factor": 2.0,
+        "operation": "timeScale"
+      },
+      "tolerance": {
+        "atol": 0.0,
+        "rtol": 1e-12
+      }
+    },
+    {
+      "expected": {
+        "samples": [
           9.0,
           8.0,
           7.0,
