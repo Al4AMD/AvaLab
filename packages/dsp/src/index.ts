@@ -21,5 +21,18 @@ export { istft, stft } from "./fourier/stft.js";
 export { fft, ifft } from "./fourier/transform.js";
 export type { WindowKind } from "./fourier/windows.js";
 export { i0, kaiser, window, windowSymmetric } from "./fourier/windows.js";
+export type { SignalSpec } from "./signals/generators.js";
+export {
+  generateAm,
+  generateChirp,
+  generateFm,
+  generateImpulse,
+  generateSawtooth,
+  generateSine,
+  generateSquare,
+  generateStep,
+  generateTriangle,
+  generateTwoTone,
+} from "./signals/generators.js";
 export { averagePowerOf, energyOf } from "./utils/energy.js";
 export { samplesToSeconds, secondsToSamples } from "./utils/time.js";
