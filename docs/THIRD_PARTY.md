@@ -60,4 +60,4 @@
 
 | Component | Version | License | Usage |
 |---|---|---|---|
-| ffmpeg / ffprobe | deployment-provided (validated at runtime by `GET /health`) | LGPL/GPL depending on build | Invoked as a **separate process**, never linked; not bundled in the repository |
+| ffmpeg / ffprobe | deployment-provided (validated at runtime by `GET /health`); Debian slim-package build in `docker/api.Dockerfile` | LGPL/GPL depending on build | Invoked as a **separate process**, never linked or bundled into our code; not bundled in the repository |
