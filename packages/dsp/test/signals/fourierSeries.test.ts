@@ -3,6 +3,7 @@ import {
   type FourierSeriesKind,
   type FourierSeriesSpec,
   fourierSeriesPartialSum,
+  generateSawtooth,
   generateSquare,
   generateTriangle,
   measureGibbsOvershoot,
@@ -120,6 +121,54 @@ describe("fourierSeriesPartialSum (golden)", () => {
   });
 });
 
+describe("sawtooth series phase", () => {
+  // Two 50 Hz periods at 4.8 kHz: 192 samples, 96 per period, 48 per half.
+  const spec: FourierSeriesSpec = {
+    kind: "sawtooth",
+    durationSeconds: 0.04,
+    sampleRateHz: 4800,
+    frequencyHz: 50,
+    harmonics: 2001,
+    amplitude: 1,
+  };
+  const series = fourierSeriesPartialSum(spec);
+  const periodSamples = spec.sampleRateHz / spec.frequencyHz;
+  const halfPeriodSamples = periodSamples / 2;
+  const reference = generateSawtooth({
+    durationSeconds: spec.durationSeconds,
+    sampleRateHz: spec.sampleRateHz,
+    frequencyHz: spec.frequencyHz,
+    amplitude: spec.amplitude,
+  });
+
+  it("equals generateSawtooth(t - T/2) away from the jump", () => {
+    // Walk the reference by half a period modulo T; the two arrays then
+    // represent the same instant except at the jump sample, where the series
+    // takes the midpoint 0 and generateSawtooth pins -a.
+    for (let n = 0; n < series.length; n += 1) {
+      const referenceIndex = (n + halfPeriodSamples) % periodSamples;
+      const phase = referenceIndex / periodSamples;
+      const distanceToJump = Math.min(phase, Math.abs(phase - 0.5));
+      if (distanceToJump < 5 / periodSamples) {
+        continue;
+      }
+      expectClose(
+        valueAt(series, n),
+        valueAt(reference, referenceIndex),
+        { rtol: 0, atol: 0.01 },
+        `sawtooth series x[${n}] vs generateSawtooth[${referenceIndex}]`,
+      );
+    }
+  });
+
+  it("starts at 0 and jumps from +a to -a at the half period", () => {
+    expect(Math.abs(valueAt(series, 0))).toBeLessThan(1e-12);
+    expect(Math.abs(valueAt(series, halfPeriodSamples))).toBeLessThan(1e-12);
+    expect(valueAt(series, halfPeriodSamples - 1)).toBeGreaterThan(0.9);
+    expect(valueAt(series, halfPeriodSamples + 1)).toBeLessThan(-0.9);
+  });
+});
+
 describe("Gibbs phenomenon", () => {
   // 48 kHz resolves the narrow overshoot lobe; the infinite-series limit is
   // 0.1789797..., and this partial sum (h = 51) reaches ~0.1784.
@@ -210,6 +259,8 @@ describe("fourier series guards", () => {
       "harmonics = Infinity",
       () => fourierSeriesPartialSum({ ...base, harmonics: Number.POSITIVE_INFINITY }),
     ],
+    ["harmonics = 10 001", () => fourierSeriesPartialSum({ ...base, harmonics: 10_001 })],
+    ["harmonics = 1e9", () => fourierSeriesPartialSum({ ...base, harmonics: 1e9 })],
     ["amplitude = NaN", () => fourierSeriesPartialSum({ ...base, amplitude: Number.NaN })],
     [
       "amplitude = Infinity",
@@ -244,6 +295,16 @@ describe("fourier series guards", () => {
   it("returns an empty array for zero duration", () => {
     const empty = fourierSeriesPartialSum({ ...base, durationSeconds: 0 });
     expect(empty.length).toBe(0);
+  });
+
+  it("accepts exactly 10 000 harmonics", () => {
+    const atCap = fourierSeriesPartialSum({
+      ...base,
+      durationSeconds: 1 / 1000,
+      harmonics: 10_000,
+    });
+    expect(atCap.length).toBe(1);
+    expect(Number.isFinite(valueAt(atCap, 0))).toBe(true);
   });
 });
 

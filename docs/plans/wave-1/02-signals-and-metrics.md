@@ -64,11 +64,11 @@ Sample count = `Math.round(durationSeconds * sampleRateHz)`; time base `n / samp
 
 **Interfaces:**
 - `fourierSeriesPartialSum(spec: SignalSpec & { kind: "square" | "sawtooth" | "triangle"; frequencyHz: number; harmonics: number; amplitude: number }): Float64Array` — harmonics ≥ 1 integer; k-th term with the standard coefficients (square: odd 4a/(πk); sawtooth: 2a/(πk) alternating; triangle: odd 8a/(π²k²) alternating)
-- `measureGibbsOvershoot(samples: Float64Array, amplitude: number): number` — max(|x|)/a − 1
+- `measureGibbsOvershoot(samples: Float64Array, amplitude: number): number` — max(|x|)/a − 1 (≈0.179 at h=51; 0.0895 is this overshoot relative to the 2a jump)
 
 **Golden cases (NumPy direct series):** square h=1,3,5,51 (three cases), sawtooth h=10, triangle h=9; fs=1000 T=0.02. Tolerance rtol 1e-9.
 
-**Tests:** goldens; Gibbs: square h=51 overshoot ≈ 0.0895 ± 0.002; MSE vs ideal square decreases monotonically as harmonics 1→3→5→51; triangle converges faster than square (MSE ratio assertion) — the pedagogical property.
+**Tests:** goldens; Gibbs: square h=51 gives max(|x|)/a − 1 ≈ 0.179 ± 0.002 (0.0895 is the same overshoot relative to the peak-to-peak jump 2a); MSE vs ideal square decreases monotonically as harmonics 1→3→5→51; triangle converges faster than square (MSE ratio assertion) — the pedagogical property.
 
 - [ ] Commit `feat(F12): fourier series reconstruction and gibbs measurement`
 

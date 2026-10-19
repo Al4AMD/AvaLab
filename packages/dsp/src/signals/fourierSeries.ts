@@ -17,9 +17,12 @@
  *     +a on the first half cycle and -a on the second. At a discontinuity the
  *     series converges to the midpoint 0, whereas generateSquare pins the
  *     samples exactly on a transition to +a (sign(sin) with sign(0) = +1).
- *   - The sawtooth series rises: at t -> 0+ it approaches -a and the series
- *     ramp increases through the period, matching generateSawtooth's rising
- *     convention. Again, the value exactly at the jump is the midpoint 0.
+ *   - The sawtooth series has the same rising slope as generateSawtooth but
+ *     is phase shifted by -T/2: it starts at 0, rises 0 -> +a over the first
+ *     half period, and takes the -a branch just after t = T/2, whereas
+ *     generateSawtooth starts at -a. The value exactly at the jump t = T/2 is
+ *     the midpoint 0 for every partial sum (all sine terms vanish there);
+ *     generateSawtooth instead pins its transition sample to -a.
  *   - The triangle series starts at 0, rises to +a at a quarter period and
  *     falls to -a at three quarters, matching generateTriangle. The (-1)^((k-1)/2)
  *     factor is the one that produces that phase (k = 1, 5, 9, ... positive;
@@ -47,7 +50,9 @@
  * durationSeconds a non-negative finite number -> RangeError otherwise
  * (R6: every numeric parameter must be finite). The rounded sample count must
  * be a safe integer -> RangeError otherwise; duration 0 returns an empty
- * Float64Array. harmonics must be a positive integer -> RangeError otherwise.
+ * Float64Array. harmonics must be a positive integer no greater than
+ * MAX_FOURIER_HARMONICS (10 000) -> RangeError otherwise; the cap keeps the
+ * O(N * harmonics) loop from being driven by an absurd index.
  * The waveform `kind` is a TS union; an unknown runtime value -> RangeError.
  * A non-finite frequencyHz or amplitude -> RangeError. A negative amplitude
  * is accepted and mirrors the waveform. measureGibbsOvershoot requires a
@@ -60,6 +65,13 @@
 import type { SignalSpec } from "./generators.js";
 
 const TAU = 2 * Math.PI;
+
+/**
+ * Largest accepted harmonic index. The partial sum is O(N * harmonics), so an
+ * unbounded index (e.g. 1e9) would hang the caller; 10 000 is far beyond any
+ * teaching reconstruction and still runs in a few milliseconds per sample.
+ */
+const MAX_FOURIER_HARMONICS = 10_000;
 
 export type FourierSeriesKind = "square" | "sawtooth" | "triangle";
 
@@ -105,8 +117,8 @@ function assertKind(kind: string, caller: string): asserts kind is FourierSeries
 
 /**
  * Partial Fourier series of a square, sawtooth or triangle wave. `harmonics`
- * is the highest harmonic index included (>= 1); the square and triangle
- * series use only odd indices, the sawtooth uses every index.
+ * is the highest harmonic index included (>= 1, <= 10 000); the square and
+ * triangle series use only odd indices, the sawtooth uses every index.
  */
 export function fourierSeriesPartialSum(spec: FourierSeriesSpec): Float64Array {
   const sampleCount = sampleCountOf(spec, "fourierSeriesPartialSum");
@@ -117,6 +129,11 @@ export function fourierSeriesPartialSum(spec: FourierSeriesSpec): Float64Array {
   if (!Number.isFinite(harmonics) || !Number.isInteger(harmonics) || harmonics < 1) {
     throw new RangeError(
       `fourierSeriesPartialSum: harmonics must be a positive integer (got ${harmonics})`,
+    );
+  }
+  if (harmonics > MAX_FOURIER_HARMONICS) {
+    throw new RangeError(
+      `fourierSeriesPartialSum: harmonics must not exceed ${MAX_FOURIER_HARMONICS} (got ${harmonics})`,
     );
   }
 
