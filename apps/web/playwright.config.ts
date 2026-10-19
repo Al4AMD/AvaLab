@@ -11,7 +11,7 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "vite preview --port 4173",
+    command: "vite preview --port 4173 --strictPort",
     url: "http://localhost:4173",
     reuseExistingServer: false,
   },

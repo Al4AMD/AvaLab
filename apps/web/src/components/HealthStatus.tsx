@@ -24,7 +24,7 @@ export function HealthStatus() {
   useEffect(() => {
     let cancelled = false;
     api
-      .GET("/health")
+      .GET("/health", { signal: AbortSignal.timeout(5000) })
       .then(({ data, response }) => {
         if (!cancelled) {
           setState(response.ok && data?.status === "ok" ? "ok" : "offline");

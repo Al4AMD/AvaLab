@@ -55,6 +55,21 @@ test("language toggle switches to English LTR and back to Persian RTL", async ({
   expect(errors).toEqual([]);
 });
 
+test("persisted English preference is applied on boot with no console errors", async ({ page }) => {
+  const errors = watchForErrors(page);
+  await page.addInitScript(() => {
+    localStorage.setItem("avalab.language", "en");
+  });
+  await page.goto("/");
+
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
+  await expect(page).toHaveTitle(ENGLISH_TITLE);
+  await expect(page.getByRole("heading", { name: ENGLISH_TITLE })).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
+
 test("API offline state is translated and no raw error text reaches the page", async ({ page }) => {
   const errors = watchForErrors(page);
   await page.goto("/");
@@ -62,7 +77,7 @@ test("API offline state is translated and no raw error text reaches the page", a
   // No API in the e2e environment: the health widget must show the
   // translated offline state with its detail line.
   await expect(page.getByText("سرور در دسترس نیست")).toBeVisible();
-  await expect(page.getByText("ابزارهای مرورگری بدون سرور هم کار می‌کنند")).toBeVisible();
+  await expect(page.getByText("ابزارهای سمت مرورگر بدون سرور هم کار می‌کنند")).toBeVisible();
 
   const bodyText = await page.locator("body").innerText();
   for (const raw of ["Fetch", "fetch", "TypeError", "NetworkError", "SyntaxError"]) {
