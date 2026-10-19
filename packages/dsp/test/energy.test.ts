@@ -1,15 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { averagePowerOf, energyOf } from "../src/index.js";
-import { type GoldenCase, loadGolden } from "./fixtures.js";
+import { asNumber, type GoldenCase, loadGolden } from "./fixtures.js";
 
 const golden = loadGolden("energy");
 
-function expectedValue(expected: Record<string, number>, key: string): number {
-  const value = expected[key];
-  if (value === undefined) {
-    throw new Error(`fixture is missing expected["${key}"]`);
-  }
-  return value;
+function expectedValue(expected: Record<string, unknown>, key: string): number {
+  return asNumber(expected[key], `expected["${key}"]`);
 }
 
 function goldenCaseNamed(name: string): GoldenCase {
