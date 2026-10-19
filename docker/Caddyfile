@@ -1,0 +1,16 @@
+# AvaLab web: API traffic goes to the api service, everything else is the SPA.
+# `handle` blocks are mutually exclusive and evaluated in written order, so the
+# /api/* matcher never falls through to the SPA fallback.
+:80 {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

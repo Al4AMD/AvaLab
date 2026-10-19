@@ -1,0 +1,23 @@
+# Build contexts copy only what the images need; keep caches, VCS and
+# artifacts out. `apps/api/openapi.json` and `apps/web/src/api/schema.d.ts`
+# are intentionally NOT ignored (the web build consumes the generated client).
+.git
+.superpowers
+
+**/node_modules
+**/.venv
+**/dist
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/playwright-report
+**/test-results
+
+apps/api/storage
+storage
+
+.env
+.env.*
+!.env.example

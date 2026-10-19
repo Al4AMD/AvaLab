@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/*
+ * Vazirmatn (OFL-1.1), self-hosted from the v33.003 release archive.
+ * Weights bundled: 400 regular, 500 medium, 600 semibold, 700 bold.
+ */
+@font-face {
+  font-family: "Vazirmatn";
+  src: url("/fonts/Vazirmatn-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Vazirmatn";
+  src: url("/fonts/Vazirmatn-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Vazirmatn";
+  src: url("/fonts/Vazirmatn-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Vazirmatn";
+  src: url("/fonts/Vazirmatn-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/*
+ * Design tokens. Scientific-instrument feel: near-black blue-grey
+ * surfaces, warm white text, one teal accent (oscilloscope readout).
+ * Available as Tailwind utilities: bg-bg, bg-surface, text-text,
+ * text-muted, bg-accent, border-surface, font-sans, font-mono, ...
+ */
+@theme {
+  --color-bg: oklch(0.18 0.012 250);
+  --color-surface: oklch(0.24 0.014 250);
+  --color-text: oklch(0.92 0.008 90);
+  --color-muted: oklch(0.67 0.015 250);
+  --color-accent: oklch(0.78 0.12 195);
+  --font-sans: "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}

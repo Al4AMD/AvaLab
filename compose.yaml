@@ -1,0 +1,40 @@
+name: avalab
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    environment:
+      AVALAB_STORAGE_DIR: /data
+      AVALAB_TTL_MINUTES: "60"
+      AVALAB_TTL_SWEEP_INTERVAL_SECONDS: "60"
+      AVALAB_MAX_UPLOAD_BYTES: "104857600"
+      AVALAB_MAX_DURATION_SECONDS: "300"
+    volumes:
+      - avalab-storage:/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health').status==200 else 1)
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  avalab-storage:
