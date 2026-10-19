@@ -77,6 +77,27 @@ export interface components {
             /** File */
             file: string;
         };
+        /**
+         * ErrorBody
+         * @description Nested error payload: stable machine-readable code plus developer message.
+         */
+        ErrorBody: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+        };
+        /**
+         * ErrorResponse
+         * @description The shared error envelope every non-2xx JSON body uses.
+         *
+         *     Referenced from each route's ``responses={...}`` declaration so the
+         *     OpenAPI document (and the generated TypeScript client) match the runtime
+         *     shape instead of FastAPI's HTTPValidationError default.
+         */
+        ErrorResponse: {
+            error: components["schemas"]["ErrorBody"];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -154,6 +175,24 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            /** @description Unknown audio id (not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requested range is not satisfiable (range_not_satisfiable) */
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -182,6 +221,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Unknown audio id (not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -236,13 +284,31 @@ export interface operations {
                     "application/json": components["schemas"]["IngestResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Malformed request body (invalid_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Upload exceeds the size cap (file_too_large) */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Decode failure, duration above the cap, or request validation error (decode_failed, duration_too_long, invalid_request) */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

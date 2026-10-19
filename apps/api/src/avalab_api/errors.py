@@ -7,6 +7,8 @@ code and never shows the message text directly (AGENTS.md sections 7 and 12).
 
 from enum import StrEnum
 
+from pydantic import BaseModel
+
 
 class ErrorCode(StrEnum):
     """Stable error codes shared with the frontend."""
@@ -17,6 +19,7 @@ class ErrorCode(StrEnum):
     not_found = "not_found"
     range_not_satisfiable = "range_not_satisfiable"
     invalid_request = "invalid_request"
+    internal_error = "internal_error"
 
 
 class ApiError(Exception):
@@ -31,3 +34,21 @@ class ApiError(Exception):
         self.code = code
         self.message = message
         self.status_code = status_code
+
+
+class ErrorBody(BaseModel):
+    """Nested error payload: stable machine-readable code plus developer message."""
+
+    code: str
+    message: str
+
+
+class ErrorResponse(BaseModel):
+    """The shared error envelope every non-2xx JSON body uses.
+
+    Referenced from each route's ``responses={...}`` declaration so the
+    OpenAPI document (and the generated TypeScript client) match the runtime
+    shape instead of FastAPI's HTTPValidationError default.
+    """
+
+    error: ErrorBody

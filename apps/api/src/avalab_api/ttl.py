@@ -2,9 +2,10 @@
 
 Every stored object carries ``meta.json`` with ``created_at_unix``. Objects
 older than the TTL must disappear even when their bookkeeping is broken: a
-missing meta.json, unreadable or invalid JSON, and a missing/non-numeric
-``created_at_unix`` all count as expired (fail closed: the promise is deletion
-after the TTL, so an unreadable object is deleted, not kept forever).
+missing meta.json, unreadable or invalid JSON, and a missing/non-numeric or
+non-finite ``created_at_unix`` all count as expired (fail closed: the promise
+is deletion after the TTL, so an unreadable object is deleted, not kept
+forever).
 
 ``sweep_expired`` is a pure synchronous function with an injectable ``now``,
 so it is unit-testable without a clock or event loop. ``sweep_loop`` is the
@@ -16,6 +17,7 @@ all future sweeps until the next restart.
 import asyncio
 import json
 import logging
+import math
 import time
 from pathlib import Path
 
@@ -32,9 +34,10 @@ def sweep_expired(storage: Storage, ttl_seconds: float, now: float | None = None
     Only direct subdirectories whose name is a valid audio id are considered,
     so loose files and foreign directories are never touched. An object is
     expired when its meta.json is missing, unreadable, invalid JSON, or lacks a
-    numeric ``created_at_unix``, or when ``now - created_at_unix > ttl_seconds``
-    (strictly greater, so an object exactly at the boundary survives one more
-    sweep). Ids are returned only when their directory is actually gone.
+    finite numeric ``created_at_unix``, or when
+    ``now - created_at_unix > ttl_seconds`` (strictly greater, so an object
+    exactly at the boundary survives one more sweep). Ids are returned only
+    when their directory is actually gone.
     """
     if now is None:
         now = time.time()
@@ -62,6 +65,11 @@ def _is_expired(directory: Path, ttl_seconds: float, now: float) -> bool:
         return True
     created_at_unix = meta.get("created_at_unix")
     if isinstance(created_at_unix, bool) or not isinstance(created_at_unix, (int, float)):
+        return True
+    # Only floats can be non-finite. Checking by type first keeps
+    # ``math.isfinite`` away from absurdly large ints, where it would raise
+    # OverflowError and leave the object un-swept (fail open).
+    if isinstance(created_at_unix, float) and not math.isfinite(created_at_unix):
         return True
     return now - created_at_unix > ttl_seconds
 

@@ -36,7 +36,7 @@ from fastapi.responses import FileResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from avalab_api.config import Settings, get_settings
-from avalab_api.errors import ApiError, ErrorCode
+from avalab_api.errors import ApiError, ErrorCode, ErrorResponse
 from avalab_api.storage import Storage
 
 router = APIRouter()
@@ -84,7 +84,19 @@ def _validate_range_header(range_header: str, size_bytes: int) -> None:
             )
 
 
-@router.get("/audio/{audio_id}")
+@router.get(
+    "/audio/{audio_id}",
+    responses={
+        404: {
+            "model": ErrorResponse,
+            "description": "Unknown audio id (not_found)",
+        },
+        416: {
+            "model": ErrorResponse,
+            "description": "Requested range is not satisfiable (range_not_satisfiable)",
+        },
+    },
+)
 def get_audio(
     audio_id: str,
     settings: Annotated[Settings, Depends(get_settings)],
@@ -108,7 +120,16 @@ def get_audio(
     return FileResponse(path, media_type="audio/wav")
 
 
-@router.delete("/audio/{audio_id}", status_code=204)
+@router.delete(
+    "/audio/{audio_id}",
+    status_code=204,
+    responses={
+        404: {
+            "model": ErrorResponse,
+            "description": "Unknown audio id (not_found)",
+        },
+    },
+)
 def delete_audio(audio_id: str, settings: Annotated[Settings, Depends(get_settings)]) -> Response:
     """Delete the stored object; 204 on success, 404 when it does not exist."""
     storage = Storage(settings.storage_dir)

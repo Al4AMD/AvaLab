@@ -18,6 +18,7 @@ EXPECTED_ERROR_CODES = {
     "not_found",
     "range_not_satisfiable",
     "invalid_request",
+    "internal_error",
 }
 
 
@@ -53,6 +54,54 @@ def test_served_openapi_paths_match_exporter(client: TestClient) -> None:
     assert served_paths == exported_paths
     assert "/health" in served_paths
     assert f"{API_PREFIX}/health" not in served_paths
+
+
+def test_openapi_declares_error_envelope_responses(client: TestClient) -> None:
+    schema = client.get("/openapi.json").json()
+    components = schema["components"]["schemas"]
+    assert components["ErrorResponse"]["properties"]["error"] == {
+        "$ref": "#/components/schemas/ErrorBody"
+    }
+    assert components["ErrorBody"]["properties"]["code"]["type"] == "string"
+    assert components["ErrorBody"]["properties"]["message"]["type"] == "string"
+
+    def envelope_ref(path: str, method: str, status: str) -> str:
+        response = schema["paths"][path][method]["responses"][status]
+        return response["content"]["application/json"]["schema"]["$ref"]
+
+    assert envelope_ref("/ingest", "post", "413") == "#/components/schemas/ErrorResponse"
+    assert envelope_ref("/audio/{audio_id}", "get", "416") == "#/components/schemas/ErrorResponse"
+
+
+def test_openapi_422_on_declared_route_is_envelope_not_validation_error(
+    client: TestClient,
+) -> None:
+    schema = client.get("/openapi.json").json()
+    ingest_422 = schema["paths"]["/ingest"]["post"]["responses"]["422"]
+    assert ingest_422["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ErrorResponse"
+    }
+
+
+def test_unhandled_exception_emits_500_envelope() -> None:
+    test_app = create_app()
+    router = APIRouter()
+
+    @router.get("/boom")
+    def boom() -> None:
+        raise OSError("simulated internal failure")
+
+    test_app.include_router(router, prefix=API_PREFIX)
+    # The handler sends the 500 envelope; starlette's ServerErrorMiddleware
+    # re-raises afterwards, so the client must not re-raise the test exception.
+    with TestClient(test_app, raise_server_exceptions=False) as test_client:
+        response = test_client.get(f"{API_PREFIX}/boom")
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "error": {"code": "internal_error", "message": "Internal server error"}
+    }
+    assert "simulated" not in response.text
 
 
 def test_api_error_handler_emits_stable_body() -> None:

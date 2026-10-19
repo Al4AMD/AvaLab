@@ -121,6 +121,18 @@ def test_sweep_expired_deletes_malformed_metadata(storage_root: Path) -> None:
         assert not (storage_root / audio_id).exists()
 
 
+def test_sweep_expired_deletes_non_finite_created_at(storage_root: Path) -> None:
+    now = time.time()
+    nan_id = store_object(storage_root, meta_text='{"created_at_unix": NaN}')
+    inf_id = store_object(storage_root, meta_text='{"created_at_unix": Infinity}')
+
+    deleted = sweep_expired(Storage(storage_root), ttl_seconds=3600, now=now)
+
+    assert set(deleted) == {nan_id, inf_id}
+    for audio_id in deleted:
+        assert not (storage_root / audio_id).exists()
+
+
 def test_sweep_expired_tolerates_missing_storage_root(tmp_path: Path) -> None:
     assert sweep_expired(Storage(tmp_path / "absent"), ttl_seconds=3600) == []
 

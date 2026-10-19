@@ -2,6 +2,7 @@
 
 import asyncio
 import contextlib
+import logging
 import shutil
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -25,6 +26,8 @@ from avalab_api.upload_limit import UploadLimitMiddleware
 
 API_PREFIX = "/api/v1"
 API_VERSION = "0.1.0"
+
+LOGGER = logging.getLogger(__name__)
 
 # Statuses raised by framework internals (FileResponse ranges, routing) that
 # must surface as specific machine-readable codes instead of invalid_request.
@@ -126,6 +129,21 @@ def create_app() -> FastAPI:
                 "error": {
                     "code": ErrorCode.invalid_request.value,
                     "message": "Request validation failed",
+                }
+            },
+        )
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        # Log the exception type and stack only: never request content, audio
+        # bytes or uploaded filenames (privacy promise, AGENTS.md section 7).
+        LOGGER.error("Unhandled %s", type(exc).__name__, exc_info=exc)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": {
+                    "code": ErrorCode.internal_error.value,
+                    "message": "Internal server error",
                 }
             },
         )

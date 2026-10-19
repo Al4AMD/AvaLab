@@ -4,7 +4,7 @@
 
 ## Wave 0 (M0 Foundation) — **done**, 2026-10-19
 
-13/13 tasks complete. Commit range `c56fbe2..ea68089` (T13) plus a follow-up docs fix on top, on `feat/wave-0-foundation`. Per-task ledger: `.superpowers/sdd/foundation/progress.md` (scratch, not committed).
+13/13 tasks complete. Commit range `c56fbe2..ea68089` (T13) plus follow-up docs fixes and M0 close-out fixes (see git log), on `feat/wave-0-foundation`. Per-task ledger: `.superpowers/sdd/foundation/progress.md` (scratch, not committed).
 
 | Task | Result | Commit(s) |
 |---|---|---|
@@ -36,9 +36,9 @@ From the T1–T12 ledgers; none blocking, each has an upgrade path:
 - T2: `biome.json` `$schema` pinned `2.5.15` vs caret devDependency — bump together at final review.
 - T3: `tools/golden/tests/test_fixtures.py:22` dead `REPO_ROOT` constant; `energy.json` 1.4 MiB one-float-per-line (compact only if Wave 1 fixtures get heavy).
 - T4: `packages/dsp/test/fixtures.ts:33` `JSON.parse` outside try/catch (error lacks path); per-case shape unvalidated before cast (fixtures.ts:42).
-- T5: `.env.example` sits at repo root while `Settings` `env_file=".env"` is CWD-relative (`apps/api` CWD) — document or relocate; ambient-env test isolation; CORS methods/headers not restricted; 405 lacks `Allow` header + test; 500s bypass the error envelope; no-body statuses (204/304) would get JSON bodies (no such routes today).
+- T5: `.env.example` sits at repo root while `Settings` `env_file=".env"` is CWD-relative (`apps/api` CWD) — document or relocate; ambient-env test isolation; no-body statuses (204/304) would get JSON bodies (no such routes today).
 - T6: `_parse_int` accepts bools (paranoia only); chunked-upload test delivers a single ASGI message (TestClient joins generator bodies; disclosed).
-- T7: `ttl.py:66` NaN/Infinity `created_at_unix` fails open (file leaks) — one-line `isfinite` guard + test; `make_client` helper duplicated in `test_ttl.py` vs `test_ingest.py` — hoist to conftest at cleanup.
+- T7: `make_client` helper duplicated in `test_ttl.py` vs `test_ingest.py` — hoist to conftest at cleanup.
 - T8: multi-range with one non-servable part → whole set 416 (mirrors starlette); `If-Range` ignored by route validation; reverse TOCTOU delete-between-stat-and-send (starlette send phase, inherent).
 - T9: `app.openapi()` override short-circuits FastAPI route-version cache (latent; no post-boot route registration today); `openapi_utils` strips paths only (webhooks = future scope).
 - T11: checker raw-scan counts `t("k")` inside comments/strings (false-negative-safe); misses `t ("k")`/static backticks (fails loud); CLI symlink realpath edge.

@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from pydantic import BaseModel
 
 from avalab_api.config import Settings, get_settings
-from avalab_api.errors import ApiError, ErrorCode
+from avalab_api.errors import ApiError, ErrorCode, ErrorResponse
 from avalab_api.ffmpeg import probe, transcode_to_canonical_wav
 from avalab_api.storage import Storage
 
@@ -43,7 +43,26 @@ class IngestResponse(BaseModel):
     size_bytes: int
 
 
-@router.post("/ingest")
+@router.post(
+    "/ingest",
+    responses={
+        400: {
+            "model": ErrorResponse,
+            "description": "Malformed request body (invalid_request)",
+        },
+        413: {
+            "model": ErrorResponse,
+            "description": "Upload exceeds the size cap (file_too_large)",
+        },
+        422: {
+            "model": ErrorResponse,
+            "description": (
+                "Decode failure, duration above the cap, or request validation error "
+                "(decode_failed, duration_too_long, invalid_request)"
+            ),
+        },
+    },
+)
 def ingest(
     file: Annotated[UploadFile, File()],
     settings: Annotated[Settings, Depends(get_settings)],
