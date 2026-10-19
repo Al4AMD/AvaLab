@@ -21,6 +21,8 @@ export { istft, stft } from "./fourier/stft.js";
 export { fft, ifft } from "./fourier/transform.js";
 export type { WindowKind } from "./fourier/windows.js";
 export { i0, kaiser, window, windowSymmetric } from "./fourier/windows.js";
+export type { FourierSeriesKind, FourierSeriesSpec } from "./signals/fourierSeries.js";
+export { fourierSeriesPartialSum, measureGibbsOvershoot } from "./signals/fourierSeries.js";
 export type { SignalSpec } from "./signals/generators.js";
 export {
   generateAm,
