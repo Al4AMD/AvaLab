@@ -5,7 +5,7 @@ Statuses: `planned` → `executing` → `done`.
 
 | Wave | Folder | Plans | Status |
 |---|---|---|---|
-| 0 | `wave-0/` | `foundation.md` | executing |
+| 0 | `wave-0/` | `foundation.md` | done (2026-10-19; per-task commits `c56fbe2..d907e7e` + T13 close-out — see `docs/PROGRESS.md`) |
 | 1 | `wave-1/` | `01-fourier-transforms.md`, `02-signals-and-metrics.md`, `03-systems-and-filters.md`, `04-codecs-and-time.md` | planned |
 | 2 | `wave-2/` | (Core visuals: F01 UI, F02 waveform/spectrogram, F08 basic, F12 generator UI) | not planned yet |
 | 3 | `wave-3/` | (Signals & Systems labs: F03, F07, F09, F10, F06 speed) | not planned yet |
