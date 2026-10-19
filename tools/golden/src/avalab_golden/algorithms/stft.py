@@ -99,9 +99,17 @@ def _assert_scipy_stft_agrees(
     hop_length: int,
     fft_length: int,
 ) -> None:
-    """Prove the direct FFT path matches scipy.signal.stft (spectrum scaling undone)."""
+    """Prove the direct FFT path matches scipy.signal.stft (spectrum scaling undone).
+
+    The signal is padded to ``(frame_count - 1) * hop_length + fft_length``,
+    exactly the length used by the pinned framing procedure. Because SciPy
+    counts its own windows with ``frame_length`` (not ``fft_length``), when
+    ``fft_length > frame_length`` it may produce more than ``frame_count``
+    windows; only the first ``frame_count`` are compared, and those are exactly
+    the frames the pinned procedure stores.
+    """
     frame_count = spectrum.shape[0]
-    padded_length = (frame_count - 1) * hop_length + frame_length
+    padded_length = (frame_count - 1) * hop_length + fft_length
     padded = np.zeros(padded_length, dtype=np.float64)
     padded[: len(samples)] = samples
     _, _, scaled = scipy_signal.stft(
@@ -116,9 +124,10 @@ def _assert_scipy_stft_agrees(
         scaling="spectrum",
         return_onesided=False,
     )
-    assert scaled.shape == (fft_length, frame_count), scaled.shape
+    assert scaled.shape[0] == fft_length, scaled.shape
+    assert scaled.shape[1] >= frame_count, scaled.shape
     np.testing.assert_allclose(
-        scaled.T * window.sum(),
+        scaled[:, :frame_count].T * window.sum(),
         spectrum,
         rtol=CROSS_CHECK_RTOL,
         atol=CROSS_CHECK_ATOL,

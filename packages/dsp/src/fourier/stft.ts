@@ -38,15 +38,20 @@
  * same window-energy normalization used here.
  *
  * Complexity: O(M * F * log F) time and O(M * F) space for `stft`;
- * `istft` uses O(M * F) time for the inverse transforms plus O(M * L) for the
- * overlap-add, and O(originalLengthSamples) output space.
+ * `istft` uses O(M * F * log F) time for the inverse transforms plus O(M * L)
+ * for the overlap-add, and O(originalLengthSamples) output space.
  *
  * Edge cases: M = 0 for empty input (no frames; `istft` then returns an empty
  * array). The last frame is zero-padded beyond N, and its spectrum is still
  * stored. `frameLengthSamples`, `hopLengthSamples` and `fftLengthSamples` must
  * be integers with L >= 1, H >= 1 and F >= L -> RangeError otherwise; the
  * window length must equal L -> RangeError. `istft` additionally requires
- * H <= L and every frame to hold exactly F bins -> RangeError. A NaN or
+ * H <= L, every frame to hold exactly F bins, and originalLengthSamples to be
+ * a non-negative integer that does not exceed the covered length
+ * (M - 1) * H + L, where M = 0 covers 0 samples -> RangeError. The coverage
+ * check runs before the empty-frames fast path, so zero frames with a
+ * positive originalLengthSamples is rejected instead of silently returning
+ * empty. A NaN or
  * +/-Infinity sample, window value or spectrum value -> TypeError. Window
  * energy S[n] = 0 yields 0 for that sample instead of a division by zero
  * (periodic hann has w[0] = 0, so the first output sample of a single-frame
@@ -180,15 +185,15 @@ export function istft(result: StftResult): Float64Array {
   }
   assertFiniteValues(analysisWindow, "istft: window");
 
-  if (frames.length === 0) {
-    return new Float64Array(0);
-  }
-
-  const paddedLength = (frames.length - 1) * hopLengthSamples + frameLengthSamples;
+  const paddedLength =
+    frames.length === 0 ? 0 : (frames.length - 1) * hopLengthSamples + frameLengthSamples;
   if (originalLengthSamples > paddedLength) {
     throw new RangeError(
       `istft: originalLengthSamples (${originalLengthSamples}) exceeds the ${paddedLength} samples covered by ${frames.length} frames`,
     );
+  }
+  if (frames.length === 0) {
+    return new Float64Array(0);
   }
 
   const accumulated = new Float64Array(paddedLength);

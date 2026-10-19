@@ -197,6 +197,35 @@ describe("stft / istft properties", () => {
     },
   );
 
+  it("supports odd frame lengths and a non-power-of-two fft length (Bluestein path)", () => {
+    const oddFrameLength = 9;
+    const oddFftLength = 15;
+    const oddHopLength = 3;
+    const result = stft(samples, {
+      frameLengthSamples: oddFrameLength,
+      hopLengthSamples: oddHopLength,
+      fftLengthSamples: oddFftLength,
+      window: window("rect", oddFrameLength),
+    });
+
+    expect(result.frames.length).toBe(Math.ceil(signalLength / oddHopLength));
+    for (const frame of result.frames) {
+      expect(frame.re.length).toBe(oddFftLength);
+      expect(frame.im.length).toBe(oddFftLength);
+    }
+
+    const restored = istft(result);
+    const energy = windowEnergyPerSample(result);
+    expect(restored.length).toBe(signalLength);
+    let maxError = 0;
+    for (let n = 0; n < signalLength; n += 1) {
+      if (valueAt(energy, n) > 0) {
+        maxError = Math.max(maxError, Math.abs(valueAt(restored, n) - valueAt(samples, n)));
+      }
+    }
+    expect(maxError).toBeLessThanOrEqual(1e-10);
+  });
+
   it("outputs 0 where the squared-window sum is zero (R16)", () => {
     const impulse = new Float64Array(256);
     impulse[0] = 1;
@@ -289,7 +318,11 @@ describe("stft / istft properties", () => {
     });
 
     expect(result.frames.length).toBe(4);
-    expect(() => istft(result)).toThrow(RangeError);
+    // Message-specific so removing the H <= L branch cannot pass through the
+    // coverage guard's RangeError (covered 896 < originalLengthSamples 1024).
+    expect(() => istft(result)).toThrow(
+      /hopLengthSamples \(256\) must be <= frameLengthSamples \(128\)/,
+    );
   });
 
   it("returns no frames for empty input and an empty inverse", () => {
@@ -315,25 +348,51 @@ describe("stft / istft validation", () => {
   };
   const samples = deterministicSignal(32);
 
-  it("rejects non-positive or non-integer frame, hop and fft lengths", () => {
-    for (const bad of [
-      { ...validParams, frameLengthSamples: 0 },
-      { ...validParams, frameLengthSamples: 8.5 },
-      { ...validParams, hopLengthSamples: 0 },
-      { ...validParams, hopLengthSamples: 2.5 },
-      { ...validParams, fftLengthSamples: 0 },
-      { ...validParams, fftLengthSamples: 7.5 },
-    ]) {
-      expect(() => stft(samples, bad)).toThrow(RangeError);
-    }
+  it.each([
+    {
+      label: "frameLengthSamples = 0",
+      params: { ...validParams, frameLengthSamples: 0 },
+      message: /frameLengthSamples must be an integer >= 1 \(got 0\)/,
+    },
+    {
+      label: "frameLengthSamples = 8.5",
+      params: { ...validParams, frameLengthSamples: 8.5 },
+      message: /frameLengthSamples must be an integer >= 1 \(got 8\.5\)/,
+    },
+    {
+      label: "hopLengthSamples = 0",
+      params: { ...validParams, hopLengthSamples: 0 },
+      message: /hopLengthSamples must be an integer >= 1 \(got 0\)/,
+    },
+    {
+      label: "hopLengthSamples = 2.5",
+      params: { ...validParams, hopLengthSamples: 2.5 },
+      message: /hopLengthSamples must be an integer >= 1 \(got 2\.5\)/,
+    },
+    {
+      label: "fftLengthSamples = 0",
+      params: { ...validParams, fftLengthSamples: 0 },
+      message: /fftLengthSamples must be an integer >= 1 \(got 0\)/,
+    },
+    {
+      label: "fftLengthSamples = 7.5",
+      params: { ...validParams, fftLengthSamples: 7.5 },
+      message: /fftLengthSamples must be an integer >= 1 \(got 7\.5\)/,
+    },
+  ])("rejects $label with the integer branch's error", ({ params, message }) => {
+    expect(() => stft(samples, params)).toThrow(message);
   });
 
   it("rejects fftLength < frameLength", () => {
-    expect(() => stft(samples, { ...validParams, fftLengthSamples: 4 })).toThrow(RangeError);
+    expect(() => stft(samples, { ...validParams, fftLengthSamples: 4 })).toThrow(
+      /fftLengthSamples \(4\) must be >= frameLengthSamples \(8\)/,
+    );
   });
 
   it("rejects a window whose length differs from frameLength", () => {
-    expect(() => stft(samples, { ...validParams, window: window("hann", 7) })).toThrow(RangeError);
+    expect(() => stft(samples, { ...validParams, window: window("hann", 7) })).toThrow(
+      /window length 7 does not match frameLengthSamples 8/,
+    );
   });
 
   it("rejects non-finite input samples", () => {
@@ -347,7 +406,9 @@ describe("stft / istft validation", () => {
   it("rejects non-finite window values", () => {
     const badWindow = window("hann", 8);
     badWindow[3] = Number.NaN;
-    expect(() => stft(samples, { ...validParams, window: badWindow })).toThrow(TypeError);
+    expect(() => stft(samples, { ...validParams, window: badWindow })).toThrow(
+      /window\[3\] is not finite/,
+    );
   });
 
   it("rejects a frame whose bin count differs from fftLength", () => {
@@ -356,16 +417,80 @@ describe("stft / istft validation", () => {
     if (frame === undefined) {
       throw new Error("missing frame 0");
     }
+    // originalLengthSamples 8 equals the length covered by the single frame,
+    // so the coverage guard passes and the bin-count branch is under test.
     const broken: StftResult = {
       ...result,
       frames: [{ re: frame.re.slice(0, 4), im: frame.im.slice(0, 4) }],
+      originalLengthSamples: 8,
     };
-    expect(() => istft(broken)).toThrow(RangeError);
+    expect(() => istft(broken)).toThrow(
+      /frame 0 holds 4 re and 4 im bins, expected fftLengthSamples 8/,
+    );
   });
 
-  it("rejects hop > frameLength in istft", () => {
-    const result = stft(samples, { ...validParams, hopLengthSamples: 16 });
-    expect(result.frames.length).toBe(2);
-    expect(() => istft(result)).toThrow(RangeError);
+  it("rejects hop > frameLength in istft with the H <= L branch's error", () => {
+    const frames = stft(samples, { ...validParams, hopLengthSamples: 16 }).frames;
+    // Covered length (2 - 1) * 16 + 8 = 24 >= originalLengthSamples, so the
+    // coverage guard passes first and only the H <= L branch can throw.
+    const inconsistent: StftResult = {
+      frames,
+      frameLengthSamples: 8,
+      hopLengthSamples: 16,
+      fftLengthSamples: 8,
+      window: window("hann", 8),
+      originalLengthSamples: 24,
+    };
+    expect(frames.length).toBe(2);
+    expect(() => istft(inconsistent)).toThrow(
+      /hopLengthSamples \(16\) must be <= frameLengthSamples \(8\)/,
+    );
+  });
+
+  it("rejects an istft window whose length differs from frameLength", () => {
+    const result = stft(samples, validParams);
+    const broken: StftResult = {
+      ...result,
+      window: window("hann", 7),
+      originalLengthSamples: 0,
+    };
+    expect(() => istft(broken)).toThrow(/window length 7 does not match frameLengthSamples 8/);
+  });
+
+  it("rejects non-finite istft window values", () => {
+    for (const badValue of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      const result = stft(samples, validParams);
+      const badWindow = result.window.slice();
+      badWindow[2] = badValue;
+      expect(() => istft({ ...result, window: badWindow })).toThrow(/window\[2\] is not finite/);
+    }
+  });
+
+  it.each([
+    { label: "negative", value: -1 },
+    { label: "non-integer", value: 8.5 },
+    { label: "NaN", value: Number.NaN },
+  ])("rejects $label originalLengthSamples in istft", ({ value }) => {
+    const result = stft(samples, validParams);
+    expect(() => istft({ ...result, originalLengthSamples: value })).toThrow(
+      /originalLengthSamples must be an integer >= 0/,
+    );
+  });
+
+  it("rejects originalLengthSamples beyond the covered length", () => {
+    // 8 frames at hop 4 with frame length 8 cover (8 - 1) * 4 + 8 = 36 samples.
+    const result = stft(samples, validParams);
+    expect(result.frames.length).toBe(8);
+    expect(() => istft({ ...result, originalLengthSamples: 37 })).toThrow(
+      /originalLengthSamples \(37\) exceeds the 36 samples covered by 8 frames/,
+    );
+  });
+
+  it("rejects a hand-built empty result with non-zero originalLengthSamples", () => {
+    const result = stft(new Float64Array(0), validParams);
+    expect(result.frames).toEqual([]);
+    expect(() => istft({ ...result, originalLengthSamples: 1 })).toThrow(
+      /originalLengthSamples \(1\) exceeds the 0 samples covered by 0 frames/,
+    );
   });
 });
