@@ -443,6 +443,10 @@ describe("classifySignalType, signalEnergy and averagePower", () => {
     expect(classifySignalType(Float64Array.from([0, 1, 0, -1]))).toBe("power");
   });
 
+  it("classifies a sine excerpt whose support spans both edges as power", () => {
+    expect(classifySignalType(Float64Array.from([1, 0, -1]))).toBe("power");
+  });
+
   it("classifies a length-1 signal as power", () => {
     expect(classifySignalType(Float64Array.from([1]))).toBe("power");
     expect(classifySignalType(Float64Array.from([0]))).toBe("power");
