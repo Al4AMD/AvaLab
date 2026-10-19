@@ -34,5 +34,6 @@ export {
   generateTriangle,
   generateTwoTone,
 } from "./signals/generators.js";
+export { generatePinkNoise, generateWhiteNoise, mulberry32 } from "./signals/noise.js";
 export { averagePowerOf, energyOf } from "./utils/energy.js";
 export { samplesToSeconds, secondsToSamples } from "./utils/time.js";
