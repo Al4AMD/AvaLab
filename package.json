@@ -7,11 +7,11 @@
   },
   "packageManager": "pnpm@11.21.0",
   "scripts": {
-    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm i18n:check",
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "pnpm -r --if-present typecheck",
-    "test": "pnpm -r --if-present test",
+    "test": "pnpm -r --if-present test && node --test \"scripts/**/*.test.mjs\"",
     "i18n:check": "node scripts/i18n-check.mjs",
     "e2e": "pnpm --filter @avalab/web e2e",
     "gen:golden": "uv run --directory tools/golden python -m avalab_golden generate",

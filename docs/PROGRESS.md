@@ -17,3 +17,10 @@
 - Notes: Vite 8 `preview` inherits `server.proxy`; the preview proxy is explicitly disabled (`preview.proxy: {}`) so the no-API e2e path gets the SPA fallback (200 HTML) instead of a proxy 502 that would log a browser console error — `HealthStatus` maps any non-`{status:"ok"}` payload to offline.
 - Needs owner review: Persian copy of `apps/web/src/i18n/fa.json` (8 keys) — natural academic phrasing requested.
 - Next: Task 11 (i18n key checker), then the remaining Wave 0 tasks.
+
+## 2026-10-19 — Wave 0, Task 11 (F17 i18n key checker)
+
+- Done: `scripts/i18n-check.mjs` — dependency-free checker with `checkI18n({root, localesDir, sourcesGlob, dynamicAllowlistPath})`: locale parity (`fa`↔`en`, nested keys flattened to dot paths), literal `t("key")`/`t('key')` scan over `apps/web/src/**/*.{ts,tsx}`, unused-key check with segment-aware dynamic allowlist; returns `{file, key, reason}` findings; throws only on unusable input; CLI exits 1 on findings / 0 clean / 2 on crash (`--root/--locales-dir/--sources-glob/--allowlist` flags). `scripts/i18n-dynamic-keys.json` lists the 3 `app.health.*` keys reached via `t(labelKey)` in `HealthStatus.tsx` (brief assumed an empty allowlist; the tree has dynamic usage). `scripts/i18n-check.test.mjs` — 13 node:test cases, fixture trees in `os.tmpdir()`. Root `package.json`: `check` now ends with `&& pnpm i18n:check`; `test` now ends with `&& node --test "scripts/**/*.test.mjs"`.
+- Verified: `node --test "scripts/**/*.test.mjs"` 13/13 ✓ · `pnpm i18n:check` → `i18n-check: OK` exit 0 ✓ · CLI on a failing temp fixture → 1 finding, exit 1 ✓ · CLI on malformed locale → exit 2 ✓ · `pnpm check` exit 0 (biome 36 files, dsp 23 + web 3 + scripts 13 tests).
+- Notes: `node --test scripts/` (directory form) is broken on Node 21+ — the dir is glob-matched and spawned as a module (`MODULE_NOT_FOUND`, nodejs/node#64555); wired with an explicit `scripts/**/*.test.mjs` glob instead. Locale JSON untouched by the checker (read-only).
+- Next: Task 12 (docker compose), then Task 13 (docs/clips).
