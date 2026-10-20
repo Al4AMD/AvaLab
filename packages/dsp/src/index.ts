@@ -21,6 +21,16 @@ export { istft, stft } from "./fourier/stft.js";
 export { fft, ifft } from "./fourier/transform.js";
 export type { WindowKind } from "./fourier/windows.js";
 export { i0, kaiser, window, windowSymmetric } from "./fourier/windows.js";
+export type { PsnrOptions, SegmentalSnrOptions } from "./metrics/basic.js";
+export {
+  bitrateKbps,
+  compressionRatio,
+  mse,
+  psnrDb,
+  segmentalSnrDb,
+  snrDb,
+} from "./metrics/basic.js";
+export { entropyBitsPerSymbol } from "./metrics/entropy.js";
 export type {
   FloatArray,
   SignalType,
