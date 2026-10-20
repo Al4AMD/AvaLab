@@ -38,6 +38,13 @@ export {
   quantizeWithTpdfDither,
 } from "./metrics/quantize.js";
 export type {
+  ResampleFilter,
+  ResampleRationalOptions,
+} from "./resample/resample.js";
+export { resampleRational } from "./resample/resample.js";
+export type { LowpassSincOptions } from "./resample/windowedSinc.js";
+export { designLowpassSinc } from "./resample/windowedSinc.js";
+export type {
   FloatArray,
   SignalType,
   SupportOptions,
