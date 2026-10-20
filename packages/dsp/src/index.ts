@@ -31,6 +31,12 @@ export {
   snrDb,
 } from "./metrics/basic.js";
 export { entropyBitsPerSymbol } from "./metrics/entropy.js";
+export type { TpdfDitherOptions, UniformQuantizeOptions } from "./metrics/quantize.js";
+export {
+  quantizationError,
+  quantizeUniform,
+  quantizeWithTpdfDither,
+} from "./metrics/quantize.js";
 export type {
   FloatArray,
   SignalType,
