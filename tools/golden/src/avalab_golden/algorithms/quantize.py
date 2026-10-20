@@ -7,9 +7,12 @@ The NumPy reference pins the same definition as
     delta  = 2 / (levels - 1)
     y[n]   = clip(delta * round_half_up(x[n] / delta), -1, 1)
 
-``Math.round`` is floor(v + 0.5) (half up toward +infinity), so the reference
-uses ``np.floor(v + 0.5)`` explicitly; NumPy's ``np.round`` would use banker's
-rounding and is NOT the pinned tie rule. The clip is applied after rounding.
+``Math.round`` is exact half-up toward +infinity. The reference implements
+that exactly as ``f = floor(v); f + 1 where v - f >= 0.5 else f``. It does NOT
+use ``np.floor(v + 0.5)``: adding 0.5 can round a value within 1 ulp below a
+half-integer up to the tie and disagree with ``Math.round``. NumPy's
+``np.round`` uses banker's rounding and is also NOT the pinned tie rule. The
+clip is applied after rounding.
 
 Dither is deliberately absent: the TPDF noise comes from the TypeScript
 mulberry32 PRNG and is not reproducible in NumPy (documented in the module
@@ -31,7 +34,11 @@ QUANTIZE_RTOL = 1e-12
 
 def _quantize_uniform(samples: np.ndarray, bits: int) -> np.ndarray:
     delta = 2.0 / (float(2**bits) - 1.0)
-    codes = np.floor(samples / delta + 0.5)
+    quotient = samples / delta
+    floored = np.floor(quotient)
+    # Exact half-up (ties toward +infinity), matching ECMAScript Math.round.
+    # floor(q + 0.5) is not equivalent for q within 1 ulp below a half-integer.
+    codes = np.where(quotient - floored >= 0.5, floored + 1.0, floored)
     return np.clip(delta * codes, -1.0, 1.0)
 
 

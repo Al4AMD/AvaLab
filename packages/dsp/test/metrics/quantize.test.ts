@@ -237,6 +237,43 @@ describe("quantizeWithTpdfDither", () => {
     expect(ditheredRho).toBeLessThan(0.05);
   });
 
+  it("decorrelates the error at the full-scale-with-dither-headroom amplitude 1 − Δ", () => {
+    // R11: TPDF support is (−Δ, Δ). At amplitude 1 − Δ the largest dithered
+    // sample is still strictly below +1, so the post-round clip never fires and
+    // the dither can decorrelate the error honestly.
+    const step = 2 / (2 ** 4 - 1);
+    const reference = generateSine({
+      durationSeconds: 1,
+      sampleRateHz: 48000,
+      frequencyHz: 440,
+      amplitude: 1 - step,
+    });
+    const unditheredError = quantizationError(reference, quantizeUniform(reference, { bits: 4 }));
+    const ditheredError = quantizationError(
+      reference,
+      quantizeWithTpdfDither(reference, { bits: 4, seed: 20261020 }),
+    );
+
+    const unditheredRho = Math.abs(correlationCoefficient(reference, unditheredError));
+    const ditheredRho = Math.abs(correlationCoefficient(reference, ditheredError));
+
+    expect(unditheredRho, `undithered rho = ${unditheredRho}`).toBeGreaterThan(0.3);
+    expect(ditheredRho, `dithered rho = ${ditheredRho}`).toBeLessThan(0.05);
+  });
+
+  it("shows the known headroom requirement: full-scale dither clips and correlates", () => {
+    // At amplitude 1 the TPDF excursions push samples past ±1; the post-round
+    // clip makes the error correlate with the signal again. This is pinned as
+    // honest behavior, not a bug: back off to ≤ 1 − Δ for decorrelation.
+    const reference = fullScaleTestTone();
+    const error = quantizationError(
+      reference,
+      quantizeWithTpdfDither(reference, { bits: 4, seed: 20261020 }),
+    );
+    const rho = Math.abs(correlationCoefficient(reference, error));
+    expect(rho, `full-scale rho = ${rho}`).toBeGreaterThan(0.1);
+  });
+
   it("keeps SNR within ±0.5 dB of the dithered theoretical value at b = 8", () => {
     // Total error with TPDF dither is dither (Δ²/6) + quantizer error
     // (Δ²/12) = Δ²/4, i.e. 10·log10(3) ≈ 4.77 dB below the undithered curve.
@@ -265,6 +302,25 @@ describe("quantizeWithTpdfDither", () => {
 
     expect(Array.from(first)).toEqual(Array.from(second));
     expect(Array.from(other)).not.toEqual(Array.from(first));
+  });
+
+  it("avoids seed aliasing by deriving stream 2 with an additive offset", () => {
+    // With the old XOR derivation, seeds s and s XOR 0x9E3779B9 swapped the two
+    // streams and produced byte-identical dither. Pin two distinct pairs that
+    // must diverge under the additive derivation.
+    const offsetConstant = 0x9e3779b9;
+    const seedPairs: Array<[number, number]> = [
+      [12345, 12345 ^ offsetConstant],
+      [20261020, (20261020 + offsetConstant) >>> 0],
+    ];
+    const input = new Float64Array(256);
+    for (const [firstSeed, secondSeed] of seedPairs) {
+      const first = quantizeWithTpdfDither(input, { bits: 4, seed: firstSeed });
+      const second = quantizeWithTpdfDither(input, { bits: 4, seed: secondSeed });
+      expect(Array.from(second), `seeds ${firstSeed} and ${secondSeed} must not alias`).not.toEqual(
+        Array.from(first),
+      );
+    }
   });
 
   it("never mutates the input and returns a fresh array", () => {

@@ -20,11 +20,23 @@
  *
  * The quantizer is mid-tread (a code at zero) with the pinned step
  * Δ = 2/(2^bits − 1), so the codes are Δ·k. `round` is JavaScript Math.round
- * (half up toward +∞); the Python golden reference uses floor(v + 0.5) for the
- * identical tie rule, NOT NumPy's banker's rounding. The clip is applied
- * AFTER rounding — the brief's pinned order — so a full-scale +1 input maps to
- * +1 while −1 maps to −(2^(bits−1) − 1)·Δ (the tie at −(2^(bits−1) − 0.5)
- * rounds toward +∞); both boundaries stay inside [−1, 1] by construction.
+ * (half up toward +∞); the Python golden reference uses exact half-up
+ * (floor then compare the fractional part with 0.5) for the identical tie
+ * rule, NOT floor(v + 0.5) (which can differ within 1 ulp below a half
+ * integer) and NOT NumPy's banker's rounding. The clip is applied AFTER
+ * rounding — the brief's pinned order — so a full-scale +1 input maps to +1
+ * while −1 maps to −(2^(bits−1) − 1)·Δ (the tie at −(2^(bits−1) − 0.5) rounds
+ * toward +∞); both boundaries stay inside [−1, 1] by construction.
+ *
+ * Clipping headroom (controller ruling R11): the TPDF dither has support
+ * (−Δ, Δ), so a sample at full scale ±1 is pushed outside the representable
+ * range by the dither and the post-round clip correlates the error with the
+ * signal. That is honest behavior, not a defect: dither decorrelation holds
+ * WITHOUT clipping. Operating point for the decorrelation demo: amplitude
+ * ≤ 1 − Δ (the largest dithered sample stays strictly below +1), or accept
+ * the clip-induced correlation at amplitude 1 (tested: |ρ| > 0.1 at b = 4).
+ * The dithered SNR test at b = 8 uses a full-scale tone and still matches the
+ * Δ²/4 theory within ±0.5 dB.
  *
  * Dither (controller ruling R3): the TPDF noise has support (−Δ, Δ), zero
  * mean and variance Δ²/6, i.e. twice the Δ²/12 power of undithered
@@ -38,10 +50,13 @@
  * Seed derivation: two independent mulberry32 streams are used for the two
  * uniforms of each TPDF draw:
  *   stream 1 : mulberry32(seed)
- *   stream 2 : mulberry32(seed XOR 0x9E3779B9)
- * Both streams run the same 32-bit counter recurrence, so stream 2 is the
- * stream-1 cycle advanced by 613 683 765 steps; over the ≤ 2^32 period the two
- * draws are effectively independent. Same seed -> byte-identical output;
+ *   stream 2 : mulberry32((seed + 0x9E3779B9) >>> 0)
+ * The streams run the same 32-bit counter recurrence, so stream 2 is the
+ * stream-1 cycle advanced by 613 683 765 steps; over the ≤ 2^32 period the
+ * two draws are effectively independent. The offset is added (not XORed):
+ * XOR is an involution, so seeds s and s XOR 0x9E3779B9 would swap the two
+ * streams and produce byte-identical dither. Addition modulo 2^32 is
+ * asymmetric and avoids that aliasing. Same seed -> byte-identical output;
  * mulberry32 reduces the seed modulo 2^32 (its pinned state width).
  *
  * References: U. Zölzer, "Digital Audio Signal Processing", 2nd ed., section
@@ -66,8 +81,8 @@ import { mulberry32 } from "../signals/noise.js";
 
 const MIN_BITS = 1;
 const MAX_BITS = 24;
-/** Golden-ratio XOR constant; see the module header for the seed derivation. */
-const TPDF_SECOND_STREAM_XOR = 0x9e3779b9;
+/** Golden-ratio offset; see the module header for the seed derivation. */
+const TPDF_SECOND_STREAM_OFFSET = 0x9e3779b9;
 
 export interface UniformQuantizeOptions {
   /** Quantizer resolution in bits; integer in [1, 24]. */
@@ -138,7 +153,9 @@ export function quantizeWithTpdfDither(x: Float64Array, options: TpdfDitherOptio
   const step = stepForBits(options?.bits, "quantizeWithTpdfDither");
   // mulberry32 validates the seed (finite integer) before the first draw.
   const firstStream = mulberry32(options.seed);
-  const secondStream = mulberry32(options.seed ^ TPDF_SECOND_STREAM_XOR);
+  // Additive, not XOR: XOR is an involution and would swap the streams for
+  // seeds s and s XOR offset, producing byte-identical dither.
+  const secondStream = mulberry32((options.seed + TPDF_SECOND_STREAM_OFFSET) >>> 0);
   assertFiniteSamples(x, "quantizeWithTpdfDither");
 
   const output = new Float64Array(x.length);

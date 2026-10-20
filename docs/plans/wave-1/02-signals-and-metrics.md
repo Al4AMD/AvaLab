@@ -12,7 +12,7 @@
 
 ## Review Focus
 
-1. **Dither honesty** — TPDF dither at Δ-step scale: test must show decorrelation (cross-corr with signal ≈ 0) and that SNR-vs-theoretical still holds within ±0.5 dB at b=8 for a full-scale sine; a dither test that only checks "noise was added" fails the review.
+1. **Dither honesty** — TPDF dither at Δ-step scale: test must show decorrelation (cross-corr with signal ≈ 0) and that SNR-vs-theoretical still holds within ±0.5 dB at b=8 for a full-scale sine; a dither test that only checks "noise was added" fails the review. Clipping is honest, not a defect: TPDF excursions of ±Δ push full-scale samples past ±1 and the post-round clip correlates the error. Pin `|ρ| < 0.05` at amplitude `1 − Δ` (the full-scale-with-dither-headroom operating point, no clipping) and at 0.6, and `|ρ| > 0.1` at amplitude 1 as the known headroom requirement: back off to ≤ `1 − Δ` or accept clip correlation (R11).
 2. **Aliasing exactness (no-filter resample)** — a sine at 0.8×Nyquist decimated 2× without filter must land at the exact folded frequency `|f − fs|`, not approximately: this is F03's whole teaching point.
 3. **Generator closed-form exactness at boundaries** — sine at exactly phase 0 first sample = 0; square at half-period transitions defined by sign(sin) (value at zeros pinned to +1, documented); sawtooth range pinned [−1,1). Tests assert first/last samples.
 4. **Segmental SNR silence handling** — frames of pure silence must not divide by zero: pinned behavior = frame contributes nothing (skipped), result over active frames only, silence in ALL frames → `Infinity`; test asserts.
@@ -118,7 +118,7 @@ Sample count = `Math.round(durationSeconds * sampleRateHz)`; time base `n / samp
 
 **Golden cases (NumPy same pinned definition):** ramp quantize b=3 exact values; sine b=8; clipping case |x|>1. Tolerance rtol 1e-12.
 
-**Tests:** goldens; measured SNR of full-scale sine ≈ 6.02·b + 1.76 dB within ±0.5 dB for b∈{4,8,12}; SNR monotone in b; dither: cross-correlation coefficient of error with signal |ρ| < 0.05 for b=4 (undithered same case |ρ| > 0.3 — asserts the pedagogical contrast); dither determinism per seed; clipping bounded to [−1,1].
+**Tests:** goldens; measured SNR of full-scale sine ≈ 6.02·b + 1.76 dB within ±0.5 dB for b∈{4,8,12}; SNR monotone in b; dither: cross-correlation coefficient of error with signal |ρ| < 0.05 for b=4 at amplitude `1 − Δ` and at 0.6 (undithered same cases |ρ| > 0.3 — asserts the pedagogical contrast); amplitude 1 gives |ρ| > 0.1 (clipping correlation, known headroom requirement: back off to ≤ `1 − Δ` or accept clip correlation, R11); dither determinism per seed and distinct dither for distinct seed pairs; clipping bounded to [−1,1].
 
 - [ ] Commit `feat(F03): uniform quantization with tpdf dither and snr verification`
 
