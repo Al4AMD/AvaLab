@@ -30,6 +30,8 @@ export {
   segmentalSnrDb,
   snrDb,
 } from "./metrics/basic.js";
+export type { CompandingOptions } from "./metrics/companding.js";
+export { alawDecode, alawEncode, mulawDecode, mulawEncode } from "./metrics/companding.js";
 export { entropyBitsPerSymbol } from "./metrics/entropy.js";
 export type { TpdfDitherOptions, UniformQuantizeOptions } from "./metrics/quantize.js";
 export {
