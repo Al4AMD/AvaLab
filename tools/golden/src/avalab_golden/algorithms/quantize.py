@@ -5,7 +5,14 @@ The NumPy reference pins the same definition as
 
     levels = 2**bits
     delta  = 2 / (levels - 1)
-    y[n]   = clip(delta * round_half_up(x[n] / delta), -1, 1)
+    y[n]   = clip(delta * round_half_up(x[n] / delta), -1, 1)   for bits >= 2
+    y[n]   = -1 if x[n] < 0 else +1                            for bits == 1
+
+The one-bit case is the mid-rise bipolar exception (F03 1-bit lab): the
+mid-tread rule gives delta = 2, and half-up rounding maps every negative
+sample to -0, i.e. a unipolar {0, +1} output. Cumulative golden cases do not
+include bits == 1; the pinned exception is tested by
+``packages/dsp/test/metrics/quantize.test.ts``.
 
 ``Math.round`` is exact half-up toward +infinity. The reference implements
 that exactly as ``f = floor(v); f + 1 where v - f >= 0.5 else f``. It does NOT
@@ -33,6 +40,9 @@ QUANTIZE_RTOL = 1e-12
 
 
 def _quantize_uniform(samples: np.ndarray, bits: int) -> np.ndarray:
+    if bits == 1:
+        # Mid-rise bipolar exception; +0 and -0 both pin to +1.
+        return np.where(samples < 0, -1.0, 1.0)
     delta = 2.0 / (float(2**bits) - 1.0)
     quotient = samples / delta
     floored = np.floor(quotient)

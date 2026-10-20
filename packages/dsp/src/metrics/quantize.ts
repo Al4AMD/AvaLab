@@ -18,7 +18,16 @@
  *     d[n] = (u1[n] + u2[n] − 1) * Δ, u1, u2 independent uniform in [0, 1)
  *   quantizationError(original, quantized)[n] = original[n] − quantized[n]
  *
- * The quantizer is mid-tread (a code at zero) with the pinned step
+ * One-bit exception (F03 1-bit lab): bits = 1 uses a mid-rise bipolar
+ * quantizer
+ *   Q1(v) = −1 for v < 0, +1 for v >= 0,
+ * so the output is bipolar {−1, +1}; exact zero (including −0) pins to +1.
+ * The generic mid-tread rule is used for bits >= 2. It cannot be used at one
+ * bit: Δ = 2 and half-up Math.round map every negative sample to −0, which is
+ * a unipolar {0, +1} output. Both quantizeUniform (v = x[n]) and
+ * quantizeWithTpdfDither (v = x[n] + d[n]) use Q1 at one bit.
+ *
+ * For bits >= 2 the quantizer is mid-tread (a code at zero) with the pinned step
  * Δ = 2/(2^bits − 1), so the codes are Δ·k. `round` is JavaScript Math.round
  * (half up toward +∞); the Python golden reference uses exact half-up
  * (floor then compare the fractional part with 0.5) for the identical tie
@@ -41,7 +50,8 @@
  * Dither (controller ruling R3): the TPDF noise has support (−Δ, Δ), zero
  * mean and variance Δ²/6, i.e. twice the Δ²/12 power of undithered
  * quantization error. It is added to the sample BEFORE rounding and the sum
- * goes through the same mid-tread quantizer Q. Because the dither is TPDF,
+ * goes through the same quantizer Q (the mid-rise Q1 at bits = 1). Because
+ * the dither is TPDF,
  * the total error becomes approximately signal-independent (white and
  * uncorrelated with x); its power is Δ²/6 + Δ²/12 = Δ²/4, so the SNR is
  * 10·log10(3) ≈ 4.77 dB below the undithered curve. That decorrelation and
@@ -115,8 +125,19 @@ function stepForBits(bits: number, caller: string): number {
   return 2 / (2 ** bits - 1);
 }
 
+/**
+ * One-bit mid-rise bipolar quantizer Q1(v) = −1 for v < 0, +1 for v >= 0.
+ * Exact zero (including −0) pins to +1.
+ */
+function quantizeOneBit(value: number): number {
+  return value < 0 ? -1 : 1;
+}
+
 /** Mid-tread quantizer Q(v) = clip(Δ·round(v/Δ), −1, 1) for one sample. */
-function quantizeValue(value: number, step: number): number {
+function quantizeValue(value: number, step: number, bits: number): number {
+  if (bits === 1) {
+    return quantizeOneBit(value);
+  }
   const quantized = step * Math.round(value / step);
   if (quantized > 1) {
     return 1;
@@ -128,29 +149,34 @@ function quantizeValue(value: number, step: number): number {
 }
 
 /**
- * Mid-tread uniform quantization: y[n] = clip(Δ·round(x[n]/Δ), −1, 1) with
- * Δ = 2/(2^bits − 1). `bits` must be an integer in [1, 24]; non-finite sample
- * -> TypeError. Returns a fresh array; the input is never mutated.
+ * Uniform quantization: for bits = 1 the mid-rise bipolar Q1 (see the module
+ * header), otherwise mid-tread
+ * y[n] = clip(Δ·round(x[n]/Δ), −1, 1) with Δ = 2/(2^bits − 1). `bits` must be
+ * an integer in [1, 24]; non-finite sample -> TypeError. Returns a fresh
+ * array; the input is never mutated.
  */
 export function quantizeUniform(x: Float64Array, options: UniformQuantizeOptions): Float64Array {
-  const step = stepForBits(options?.bits, "quantizeUniform");
+  const bits = options?.bits;
+  const step = stepForBits(bits, "quantizeUniform");
   assertFiniteSamples(x, "quantizeUniform");
 
   const output = new Float64Array(x.length);
   for (let n = 0; n < x.length; n += 1) {
-    output[n] = quantizeValue(x[n] ?? 0, step);
+    output[n] = quantizeValue(x[n] ?? 0, step, bits);
   }
   return output;
 }
 
 /**
  * Uniform quantization with additive TPDF dither:
- * y[n] = Q(x[n] + (u1[n] + u2[n] − 1)·Δ), the dither added before rounding.
- * Same seed -> identical output; seed must be a finite integer (RangeError
- * otherwise). Returns a fresh array; the input is never mutated.
+ * y[n] = Q(x[n] + (u1[n] + u2[n] − 1)·Δ), the dither added before rounding
+ * (at bits = 1, Q is the mid-rise bipolar Q1 and the sum is sliced at zero).
+ * Same seed -> identical output; seed must be a finite integer
+ * (RangeError otherwise). Returns a fresh array; the input is never mutated.
  */
 export function quantizeWithTpdfDither(x: Float64Array, options: TpdfDitherOptions): Float64Array {
-  const step = stepForBits(options?.bits, "quantizeWithTpdfDither");
+  const bits = options?.bits;
+  const step = stepForBits(bits, "quantizeWithTpdfDither");
   // mulberry32 validates the seed (finite integer) before the first draw.
   const firstStream = mulberry32(options.seed);
   // Additive, not XOR: XOR is an involution and would swap the streams for
@@ -161,7 +187,7 @@ export function quantizeWithTpdfDither(x: Float64Array, options: TpdfDitherOptio
   const output = new Float64Array(x.length);
   for (let n = 0; n < x.length; n += 1) {
     const dither = (firstStream() + secondStream() - 1) * step;
-    output[n] = quantizeValue((x[n] ?? 0) + dither, step);
+    output[n] = quantizeValue((x[n] ?? 0) + dither, step, bits);
   }
   return output;
 }

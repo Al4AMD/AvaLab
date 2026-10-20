@@ -33,14 +33,14 @@ generateImpulse(spec & { impulseSampleIndex: number; amplitude }): Float64Array
 generateStep(spec & { stepSampleIndex: number; amplitudeBefore: number; amplitudeAfter: number }): Float64Array
 generateChirp(spec & { startFrequencyHz, endFrequencyHz, sweep: "linear" | "logarithmic" }): Float64Array   // phase = 2π∫f(t)dt closed form both sweeps
 generateTwoTone(spec & { frequenciesHz: [number, number]; amplitude }): Float64Array
-generateAm(spec & { carrierHz, modulationHz, modulationIndex }): Float64Array
-generateFm(spec & { carrierHz, modulationHz, frequencyDeviationHz }): Float64Array
+generateAm(spec & { carrierHz, modulationHz, modulationIndex, amplitude }): Float64Array
+generateFm(spec & { carrierHz, modulationHz, frequencyDeviationHz, amplitude }): Float64Array
 ```
 Sample count = `Math.round(durationSeconds * sampleRateHz)`; time base `n / sampleRateHz`. Guards: `sampleRateHz ≤ 0`, `durationSeconds < 0`, `amplitude` NaN → `RangeError`/`TypeError`; duration 0 → empty array.
 
 **Golden cases (NumPy formulas):** each generator, duration T=0.01 s, fs=1000 (N=10, readable values); chirp both sweeps; square duty 0.25; impulse index 3; step index 4. Tolerance rtol 1e-9, atol 1e-12.
 
-**Tests:** goldens; boundary samples asserted explicitly (sine[0]=0; square at zeros = +1; sawtooth in [−a, a)); chirp instantaneous frequency endpoints via 2-sample phase difference ≈ 2πf/fs; full-cycle sine energy = N/2·a² (property); guards throw.
+**Tests:** goldens; boundary samples asserted explicitly (sine[0]=0; square at zeros = +1; sawtooth in [−a, a)); chirp endpoint frequencies via the dominant FFT peak of the first/last 512-sample windows (per R10); full-cycle sine energy = N/2·a² (property); guards throw.
 
 - [ ] Commit `feat(F12): closed-form signal generators with golden tests`
 
@@ -82,8 +82,8 @@ Sample count = `Math.round(durationSeconds * sampleRateHz)`; time base `n / samp
 - `reverse(x): Float64Array`
 - `truncate(x, startSampleIndex, lengthSamples): Float64Array` — out-of-range start → `RangeError`; clamps end with zero-fill? NO — clamps to available, documented
 - `zeroPad(x, padStartSamples, padEndSamples): Float64Array`
-- `support(x, { threshold: number }): { startSampleIndex: number; endSampleIndex: number }` — first/last |x| > threshold (inclusive); all-below → length-0 support `{start: N, end: N−1}` documented
-- `classifySignalType(x): "energy" | "power"` — finite nonzero support → energy, else power, documented rule
+- `support(x, { threshold: number }): { startSampleIndex: number; endSampleIndex: number }` — first/last |x| > threshold (strict; equality excluded); all-below → length-0 support `{start: N, end: N−1}` documented
+- `classifySignalType(x): "energy" | "power"` — energy only when the nonzero support is strictly inside both window edges (finite excerpt), else power; documented rule
 
 **Golden cases (NumPy reference implementations of the same pinned definitions):** shift ±3 on N=10 ramp; timeScale 0.5 and 2 on N=10 ramp; reverse; truncate; zeroPad. Tolerance rtol 1e-12 (exact arithmetic expected).
 
@@ -112,13 +112,13 @@ Sample count = `Math.round(durationSeconds * sampleRateHz)`; time base `n / samp
 **Files:** Create `packages/dsp/src/metrics/quantize.ts`, golden `algorithms/quantize.py` → `golden/quantize.json`, test `packages/dsp/test/metrics/quantize.test.ts`; ALGORITHMS.md entry (mid-tread, formula, dither definition, reference: Zölzer).
 
 **Interfaces:**
-- `quantizeUniform(x: Float64Array, { bits: number }): Float64Array` — pinned: mid-tread, `levels = 2**bits`, step `Δ = 2 / (2**bits − 1)`, value = Δ·round(x/Δ), clip to [−1, 1] after; bits 1..24 → else `RangeError`
+- `quantizeUniform(x: Float64Array, { bits: number }): Float64Array` — pinned: mid-tread, `levels = 2**bits`, step `Δ = 2 / (2**bits − 1)`, value = Δ·round(x/Δ), clip to [−1, 1] after; bits 1..24 → else `RangeError`. **1-bit exception:** `bits = 1` is a mid-rise bipolar quantizer, `−1` for `x < 0` and `+1` for `x ≥ 0` (exact zero pins to `+1`); the mid-tread rule would make every negative sample `−0`, i.e. a unipolar `{0, +1}` output
 - `quantizeWithTpdfDither(x, { bits, seed }): Float64Array` — additive TPDF noise of width Δ (±Δ each uniform) then quantify with same quantizer (the sum is applied before rounding — formula documented)
 - `quantizationError(original, quantized): Float64Array` — original − quantized (observation convention, UI labels it)
 
 **Golden cases (NumPy same pinned definition):** ramp quantize b=3 exact values; sine b=8; clipping case |x|>1. Tolerance rtol 1e-12.
 
-**Tests:** goldens; measured SNR of full-scale sine ≈ 6.02·b + 1.76 dB within ±0.5 dB for b∈{4,8,12}; SNR monotone in b; dither: cross-correlation coefficient of error with signal |ρ| < 0.05 for b=4 at amplitude `1 − Δ` and at 0.6 (undithered same cases |ρ| > 0.3 — asserts the pedagogical contrast); amplitude 1 gives |ρ| > 0.1 (clipping correlation, known headroom requirement: back off to ≤ `1 − Δ` or accept clip correlation, R11); dither determinism per seed and distinct dither for distinct seed pairs; clipping bounded to [−1,1].
+**Tests:** goldens; bits = 1 mid-rise bipolar `[−1, −0.5, −1e−9, 0, 1e−9, 0.5, 1] → [−1, −1, −1, +1, +1, +1, +1]` plus out-of-range clipping; measured SNR of full-scale sine ≈ 6.02·b + 1.76 dB within ±0.5 dB for b∈{4,8,12}; SNR monotone in b; dither: cross-correlation coefficient of error with signal |ρ| < 0.05 for b=4 at amplitude `1 − Δ` and at 0.6 (undithered same cases |ρ| > 0.3 — asserts the pedagogical contrast); amplitude 1 gives |ρ| > 0.1 (clipping correlation, known headroom requirement: back off to ≤ `1 − Δ` or accept clip correlation, R11); dither determinism per seed and distinct dither for distinct seed pairs; clipping bounded to [−1,1].
 
 - [ ] Commit `feat(F03): uniform quantization with tpdf dither and snr verification`
 

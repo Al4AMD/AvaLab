@@ -13,9 +13,12 @@ The NumPy reference implementations pin the same definitions as
                 {startSampleIndex: N, endSampleIndex: N-1}
 
 The round-half-up helper is explicit because Python's built-in round uses
-banker's rounding, while the TypeScript implementation uses Math.round
-(half up for non-negative values). All cases use exact binary values, so
-rtol = 1e-12 (atol = 0) is expected to hold to machine precision.
+banker's rounding, while the TypeScript implementation uses Math.round (ties
+toward +infinity). It uses floor plus a fractional comparison, NOT
+``floor(value + 0.5)``: adding 0.5 can round a value within 1 ulp below a
+half-integer up to the tie. This mirrors ``quantize.py``. All cases use exact
+binary values, so rtol = 1e-12 (atol = 0) is expected to hold to machine
+precision.
 """
 
 from __future__ import annotations
@@ -29,7 +32,9 @@ EXTENT_ATOL = 0.0
 
 
 def _round_half_up(value: float) -> int:
-    return int(np.floor(value + 0.5))
+    floored = float(np.floor(value))
+    # Exact half-up (ties toward +infinity), matching ECMAScript Math.round.
+    return int(floored + 1.0 if value - floored >= 0.5 else floored)
 
 
 def _ramp(sample_count: int = 10) -> np.ndarray:

@@ -162,6 +162,16 @@ describe("quantizeUniform", () => {
     }
   });
 
+  it("uses the mid-rise bipolar quantizer at 1 bit, pinning exact zero to +1", () => {
+    const input = Float64Array.from([-1, -0.5, -1e-9, 0, 1e-9, 0.5, 1]);
+    expect(Array.from(quantizeUniform(input, { bits: 1 }))).toEqual([-1, -1, -1, 1, 1, 1, 1]);
+  });
+
+  it("clips 1-bit inputs outside [−1, 1] to the bipolar codes", () => {
+    const input = Float64Array.from([-2.5, -1, -1e-9, 0, 1e-9, 1, 2.5]);
+    expect(Array.from(quantizeUniform(input, { bits: 1 }))).toEqual([-1, -1, -1, 1, 1, 1, 1]);
+  });
+
   it("rejects bits outside the integer range [1, 24]", () => {
     const input = Float64Array.from([0.25]);
     for (const bits of [0, 25, -1, 4.5, Number.NaN, Number.POSITIVE_INFINITY]) {

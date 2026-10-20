@@ -53,11 +53,21 @@
  *
  * Edge cases (R6): a non-finite sample -> TypeError; a rate that is not
  * finite and > 0 -> RangeError, and rates that differ but are not integers
- * -> RangeError; an unknown runtime `filter` value -> RangeError; an output
- * length outside the safe-integer range (or unsafe per-sample index
- * arithmetic) -> RangeError. Equal positive finite rates return an exact
- * copy for both modes (no filter is applied). N = 0, or an output length that
- * rounds to zero (extreme downsampling), returns an empty array.
+ * -> RangeError (checked even for N = 0, so an empty input with invalid
+ * rates is still rejected). An unknown runtime `filter` value -> RangeError;
+ * an output length outside the safe-integer range (or unsafe per-sample index
+ * arithmetic) -> RangeError. The unfiltered path additionally rejects
+ * `(outputLength - 1) * inputRateHz > Number.MAX_SAFE_INTEGER` up front: the
+ * nearest-source index `round(n * inputRateHz / outputRateHz)` would then
+ * lose integer exactness before the clamp. Equal positive finite rates return
+ * an exact copy for both modes (no filter is applied). N = 0, or an output
+ * length that rounds to zero (extreme downsampling), returns an empty array
+ * once the rates have been validated.
+ *
+ * The unfiltered guard is necessary because `n * inputRateHz` can exceed
+ * 2^53 even when both rates and the output length are safe integers; the
+ * subsequent division and Math.round would silently return an inexact
+ * (possibly clamped) sample index.
  */
 
 import { designLowpassSinc } from "./windowedSinc.js";
@@ -135,6 +145,16 @@ export function resampleRational(x: Float64Array, options: ResampleRationalOptio
     );
   }
 
+  if (
+    inputRateHz !== outputRateHz &&
+    (!Number.isInteger(inputRateHz) || !Number.isInteger(outputRateHz))
+  ) {
+    throw new RangeError(
+      "resampleRational: sample rates must be integers when inputRateHz != outputRateHz " +
+        `(got ${inputRateHz} and ${outputRateHz})`,
+    );
+  }
+
   if (inputLength === 0 || outputLength === 0) {
     return new Float64Array(0);
   }
@@ -145,14 +165,14 @@ export function resampleRational(x: Float64Array, options: ResampleRationalOptio
     return new Float64Array(x);
   }
 
-  if (!Number.isInteger(inputRateHz) || !Number.isInteger(outputRateHz)) {
-    throw new RangeError(
-      "resampleRational: sample rates must be integers when inputRateHz != outputRateHz " +
-        `(got ${inputRateHz} and ${outputRateHz})`,
-    );
-  }
-
   if (filter === "none") {
+    // Nearest-source index round(n * inputRateHz / outputRateHz) must stay
+    // exact; check the largest multiplication before entering the loop.
+    if ((outputLength - 1) * inputRateHz > Number.MAX_SAFE_INTEGER) {
+      throw new RangeError(
+        "resampleRational: nearest-sample index arithmetic exceeds the safe integer range",
+      );
+    }
     // Pinned aliasing demo path: nearest input sample, clamped at both ends.
     const output = new Float64Array(outputLength);
     for (let n = 0; n < outputLength; n += 1) {

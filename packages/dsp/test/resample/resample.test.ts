@@ -273,13 +273,15 @@ describe("resampleRational properties and edges", () => {
     });
     expect(filtered.length).toBe(6);
     expect(filtered.every((value) => Number.isFinite(value))).toBe(true);
-    expect(
-      resampleRational(new Float64Array(0), {
-        inputRateHz: 48000,
-        outputRateHz: 8000,
-        filter: "kaiserSinc",
-      }).length,
-    ).toBe(0);
+    for (const filter of ["kaiserSinc", "none"] as const) {
+      expect(
+        resampleRational(new Float64Array(0), {
+          inputRateHz: 48000,
+          outputRateHz: 8000,
+          filter,
+        }).length,
+      ).toBe(0);
+    }
   });
 
   it("guards the rates, filter, samples and safe output length", () => {
@@ -317,6 +319,22 @@ describe("resampleRational properties and edges", () => {
       resampleRational(new Float64Array(2), {
         inputRateHz: 1,
         outputRateHz: Number.MAX_SAFE_INTEGER,
+        filter: "none",
+      }),
+    ).toThrow(RangeError);
+    // Empty input is still rate-validated: non-integer rates differ -> RangeError.
+    expect(() =>
+      resampleRational(new Float64Array(0), {
+        inputRateHz: 44100.5,
+        outputRateHz: 48000,
+        filter: "none",
+      }),
+    ).toThrow(RangeError);
+    // Output length is safe, but (outputLength - 1) * inputRateHz is not.
+    expect(() =>
+      resampleRational(new Float64Array(2), {
+        inputRateHz: 2 ** 26,
+        outputRateHz: 2 ** 53,
         filter: "none",
       }),
     ).toThrow(RangeError);
