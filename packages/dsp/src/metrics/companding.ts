@@ -41,10 +41,12 @@
  *   magnitude = 16*q + 8                                 for seg = 0,
  *   magnitude = (2*q + 33) << (seg + 2)                  for seg >= 1,
  *   decoded   = ((a & 0x80) ? magnitude : -magnitude) / 32768.
- * The XOR 0x55 is the G.711 A-law **even-bit inversion** convention: the
- * encoder complements the even code bits (masks 0xD5 for non-negative and
- * 0x55 for negative samples) and the decoder undoes it with the same 0x55
- * mask. It is part of the A-law byte pattern, not an extra per-stream toggle.
+ * The G.711 A-law **even-bit inversion** convention is two separate XORs.
+ * The encoder XORs 0x55 to invert the even code bits (bit 0, 2, 4, 6) and
+ * additionally XORs 0x80 for non-negative samples, which is the 0xD5 mask;
+ * negative samples use 0x55 alone. The decoder XORs only 0x55 to undo the
+ * even-bit inversion. It is part of the A-law byte pattern, not an extra
+ * per-stream toggle.
  *
  * Roundtrip expectations (measured, see the test file):
  *   - A-law: |decode(encode(x)) - x| <= half of the local code step for every
