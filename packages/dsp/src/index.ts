@@ -11,6 +11,13 @@
  * Edge cases: n/a; every exported function documents its own.
  */
 
+export type {
+  FirBand,
+  FirWindowFilter,
+  FirWindowKind,
+  FirWindowOptions,
+} from "./filters/fir.js";
+export { designFirWindow } from "./filters/fir.js";
 export { fftBluestein } from "./fourier/bluestein.js";
 export type { Complex } from "./fourier/complex.js";
 export { dftNaive, idftNaive } from "./fourier/dft.js";
