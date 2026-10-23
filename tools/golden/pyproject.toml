@@ -2,7 +2,9 @@
 name = "avalab-golden"
 version = "0.1.0"
 description = "Deterministic golden-vector generators for AvaLab DSP tests (NumPy reference implementations)."
-requires-python = ">=3.12"
+# Pinned to the 3.12 line: the companding golden reference uses the stdlib
+# audioop module, which was removed in Python 3.13.
+requires-python = ">=3.12,<3.13"
 dependencies = [
   "numpy>=2.0",
   "scipy>=1.13",

@@ -1,0 +1,368 @@
+{
+  "algorithm": "generators",
+  "cases": [
+    {
+      "expected": {
+        "samples": [
+          0.0,
+          0.29389262614623657,
+          0.47552825814757677,
+          0.4755282581475768,
+          0.2938926261462366,
+          -1.6081226496766366e-16,
+          -0.2938926261462365,
+          -0.4755282581475769,
+          -0.4755282581475768,
+          -0.2938926261462366
+        ]
+      },
+      "input": {
+        "sample_rate_hz": 1000,
+        "samples": []
+      },
+      "name": "sine_100hz_amplitude0.5",
+      "params": {
+        "amplitude": 0.5,
+        "durationSeconds": 0.01,
+        "frequencyHz": 100.0,
+        "generator": "sine",
+        "sampleRateHz": 1000
+      },
+      "tolerance": {
+        "atol": 1e-12,
+        "rtol": 1e-09
+      }
+    },
+    {
+      "expected": {
+        "samples": [
+          0.75,
+          0.75,
+          0.75,
+          -0.75,
+          -0.75,
+          -0.75,
+          -0.75,
+          -0.75,
+          -0.75,
+          -0.75
+        ]
+      },
+      "input": {
+        "sample_rate_hz": 1000,
+        "samples": []
+      },
+      "name": "square_100hz_amplitude0.75_duty0.25",
+      "params": {
+        "amplitude": 0.75,
+        "durationSeconds": 0.01,
+        "dutyCycle": 0.25,
+        "frequencyHz": 100.0,
+        "generator": "square",
+        "sampleRateHz": 1000
+      },
+      "tolerance": {
+        "atol": 1e-12,
+        "rtol": 1e-09
+      }
+    },
+    {
+      "expected": {
+        "samples": [
+          -0.5,
+          -0.4,
+          -0.3,
+          -0.2,
+          -0.09999999999999998,
+          0.0,
+          0.09999999999999998,
+          0.19999999999999996,
+          0.30000000000000004,
+          0.4
+        ]
+      },
+      "input": {
+        "sample_rate_hz": 1000,
+        "samples": []
+      },
+      "name": "sawtooth_100hz_amplitude0.5",
+      "params": {
+        "amplitude": 0.5,
+        "durationSeconds": 0.01,
+        "frequencyHz": 100.0,
+        "generator": "sawtooth",
+        "sampleRateHz": 1000
+      },
+      "tolerance": {
+        "atol": 1e-12,
+        "rtol": 1e-09
+      }
+    },
+    {
+      "expected": {
+        "samples": [
+          0.0,
+          0.2,
+          0.4,
+          0.4,
+          0.19999999999999996,
+          0.0,
+          -0.19999999999999996,
+          -0.3999999999999999,
+          -0.3999999999999999,
+          -0.19999999999999996
+        ]
+      },
+      "input": {
+        "sample_rate_hz": 1000,
+        "samples": []
+      },
+      "name": "triangle_100hz_amplitude0.5",
+      "params": {
+        "amplitude": 0.5,
+        "durationSeconds": 0.01,
+        "frequencyHz": 100.0,
+        "generator": "triangle",
+        "sampleRateHz": 1000
+      },
+      "tolerance": {
+        "atol": 1e-12,
+        "rtol": 1e-09
+      }
+    },
+    {
+      "expected": {
+        "samples": [
+          0.0,
+          0.0,
+          0.0,
+          0.75,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "input": {
+        "sample_rate_hz": 1000,
+        "samples": []
+      },
+      "name": "impulse_index3_amplitude0.75",
+      "params": {
+        "amplitude": 0.75,
+        "durationSeconds": 0.01,
+        "generator": "impulse",
+        "impulseSampleIndex": 3,
+        "sampleRateHz": 1000
+      },
+      "tolerance": {
+        "atol": 1e-12,
+        "rtol": 1e-09
+      }
+    },
+    {
+      "expected": {
+        "samples": [
+          -0.25,
+          -0.25,
+          -0.25,
+          -0.25,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5
+        ]
+      },
+      "input": {
+        "sample_rate_hz": 1000,
+        "samples": []
+      },
+      "name": "step_index4_before-0.25_after0.5",
+      "params": {
+        "amplitudeAfter": 0.5,
+        "amplitudeBefore": -0.25,
+        "durationSeconds": 0.01,
+        "generator": "step",
+        "sampleRateHz": 1000,
+        "stepSampleIndex": 4
+      },
+      "tolerance": {
+        "atol": 1e-12,
+        "rtol": 1e-09
+      }
+    },
+    {
+      "expected": {
+        "samples": [
+          0.0,
+          0.6613118653236518,
+          0.9980267284282716,
+          0.3971478906347806,
+          -0.7705132427757894,
+          -0.7071067811865477,
+          0.7705132427757893,
+          0.39714789063478045,
+          -0.9980267284282717,
+          0.6613118653236485
+        ]
+      },
+      "input": {
+        "sample_rate_hz": 1000,
+        "samples": []
+      },
+      "name": "chirp_linear_100to400hz",
+      "params": {
+        "durationSeconds": 0.01,
+        "endFrequencyHz": 400.0,
+        "generator": "chirp",
+        "sampleRateHz": 1000,
+        "startFrequencyHz": 100.0,
+        "sweep": "linear"
+      },
+      "tolerance": {
+        "atol": 1e-12,
+        "rtol": 1e-09
+      }
+    },
+    {
+      "expected": {
+        "samples": [
+          0.0,
+          0.624080744155265,
+          0.9924852936592634,
+          0.7202616631549522,
+          -0.21563741338577222,
+          -0.9838385294243625,
+          -0.39210265373723546,
+          0.9108854299579029,
+          0.2158784436726012,
+          -0.9677489354992133
+        ]
+      },
+      "input": {
+        "sample_rate_hz": 1000,
+        "samples": []
+      },
+      "name": "chirp_logarithmic_100to400hz",
+      "params": {
+        "durationSeconds": 0.01,
+        "endFrequencyHz": 400.0,
+        "generator": "chirp",
+        "sampleRateHz": 1000,
+        "startFrequencyHz": 100.0,
+        "sweep": "logarithmic"
+      },
+      "tolerance": {
+        "atol": 1e-12,
+        "rtol": 1e-09
+      }
+    },
+    {
+      "expected": {
+        "samples": [
+          0.0,
+          0.3969463130731183,
+          0.2377641290737884,
+          -0.012235870926211617,
+          0.14694631307311826,
+          0.25000000000000006,
+          -0.14694631307311826,
+          -0.4877641290737884,
+          -0.23776412907378852,
+          0.10305368692688169
+        ]
+      },
+      "input": {
+        "sample_rate_hz": 1000,
+        "samples": []
+      },
+      "name": "two_tone_100_250hz_amplitude0.5",
+      "params": {
+        "amplitude": 0.5,
+        "durationSeconds": 0.01,
+        "frequenciesHz": [
+          100.0,
+          250.0
+        ],
+        "generator": "twoTone",
+        "sampleRateHz": 1000
+      },
+      "tolerance": {
+        "atol": 1e-12,
+        "rtol": 1e-09
+      }
+    },
+    {
+      "expected": {
+        "samples": [
+          0.0,
+          0.4546791922305222,
+          0.7579920079049929,
+          0.7801212198221298,
+          0.49565503224552276,
+          1.0603988517517956e-16,
+          -0.5219807578724115,
+          -0.8651449508763014,
+          -0.8851080013477033,
+          -0.5589455971712788
+        ]
+      },
+      "input": {
+        "sample_rate_hz": 1000,
+        "samples": []
+      },
+      "name": "am_carrier100_mod10_index0.5_amplitude0.75",
+      "params": {
+        "amplitude": 0.75,
+        "carrierHz": 100.0,
+        "durationSeconds": 0.01,
+        "generator": "am",
+        "modulationHz": 10.0,
+        "modulationIndex": 0.5,
+        "sampleRateHz": 1000
+      },
+      "tolerance": {
+        "atol": 1e-12,
+        "rtol": 1e-09
+      }
+    },
+    {
+      "expected": {
+        "samples": [
+          0.0,
+          0.530275282005769,
+          0.7499997440340951,
+          0.5318053200229677,
+          0.004945323768417136,
+          -0.5234686983397806,
+          -0.7498157513222204,
+          -0.5486189021776038,
+          -0.039171825905259,
+          0.4895850335810171
+        ]
+      },
+      "input": {
+        "sample_rate_hz": 1000,
+        "samples": []
+      },
+      "name": "fm_carrier100_mod10_deviation25_amplitude0.75",
+      "params": {
+        "amplitude": 0.75,
+        "carrierHz": 100.0,
+        "durationSeconds": 0.01,
+        "frequencyDeviationHz": 25.0,
+        "generator": "fm",
+        "modulationHz": 10.0,
+        "sampleRateHz": 1000
+      },
+      "tolerance": {
+        "atol": 1e-12,
+        "rtol": 1e-09
+      }
+    }
+  ]
+}

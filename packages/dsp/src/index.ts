@@ -21,5 +21,63 @@ export { istft, stft } from "./fourier/stft.js";
 export { fft, ifft } from "./fourier/transform.js";
 export type { WindowKind } from "./fourier/windows.js";
 export { i0, kaiser, window, windowSymmetric } from "./fourier/windows.js";
+export type { PsnrOptions, SegmentalSnrOptions } from "./metrics/basic.js";
+export {
+  bitrateKbps,
+  compressionRatio,
+  mse,
+  psnrDb,
+  segmentalSnrDb,
+  snrDb,
+} from "./metrics/basic.js";
+export type { CompandingOptions } from "./metrics/companding.js";
+export { alawDecode, alawEncode, mulawDecode, mulawEncode } from "./metrics/companding.js";
+export { entropyBitsPerSymbol } from "./metrics/entropy.js";
+export type { TpdfDitherOptions, UniformQuantizeOptions } from "./metrics/quantize.js";
+export {
+  quantizationError,
+  quantizeUniform,
+  quantizeWithTpdfDither,
+} from "./metrics/quantize.js";
+export type {
+  ResampleFilter,
+  ResampleRationalOptions,
+} from "./resample/resample.js";
+export { resampleRational } from "./resample/resample.js";
+export type { LowpassSincOptions } from "./resample/windowedSinc.js";
+export { designLowpassSinc } from "./resample/windowedSinc.js";
+export type {
+  FloatArray,
+  SignalType,
+  SupportOptions,
+  SupportRange,
+} from "./signals/extent.js";
+export {
+  averagePower,
+  classifySignalType,
+  reverse,
+  signalEnergy,
+  support,
+  timeScale,
+  timeShift,
+  truncate,
+  zeroPad,
+} from "./signals/extent.js";
+export type { FourierSeriesKind, FourierSeriesSpec } from "./signals/fourierSeries.js";
+export { fourierSeriesPartialSum, measureGibbsOvershoot } from "./signals/fourierSeries.js";
+export type { SignalSpec } from "./signals/generators.js";
+export {
+  generateAm,
+  generateChirp,
+  generateFm,
+  generateImpulse,
+  generateSawtooth,
+  generateSine,
+  generateSquare,
+  generateStep,
+  generateTriangle,
+  generateTwoTone,
+} from "./signals/generators.js";
+export { generatePinkNoise, generateWhiteNoise, mulberry32 } from "./signals/noise.js";
 export { averagePowerOf, energyOf } from "./utils/energy.js";
 export { samplesToSeconds, secondsToSamples } from "./utils/time.js";

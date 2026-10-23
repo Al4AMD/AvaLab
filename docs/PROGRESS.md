@@ -53,9 +53,25 @@ Verified at close-out: `pnpm check` green; `uv run --directory apps/api pytest -
 
 **Needs owner review:** none for code; Wave 1 fixtures ≈6.3 MB (all golden fixtures ≈7.7 MB), accepted by the plan.
 
+## Wave 1 · Plan 02 — Signals, metrics, quantization, resampling (complete)
+
+**Status:** complete. Commit range `290b9da..1c9cc69` plus this final-review fix commit, on `feat/wave-1-signals`.
+
+**Built** (`packages/dsp`, pure TS; golden-verified where a cross-language reference exists): closed-form generators (sine, square, sawtooth, triangle, impulse, step, chirp, two-tone, AM/FM) and seeded white/pink noise (mulberry32, Voss–McCartney — no cross-language golden by design); Fourier-series reconstruction and Gibbs overshoot; signal extent (shift, scale, reverse, truncate, zero-pad, support, energy/power classification, energy, average power); quality metrics (MSE, SNR, segmental SNR, PSNR, compression ratio, bitrate, entropy); uniform quantization with TPDF dither; rational resampling (`kaiserSinc` anti-aliased path plus the unfiltered aliasing demo); G.711 μ-law/A-law companding.
+
+**Verification:** `pnpm check` green; 566 dsp tests; all golden fixtures deterministic (full generator run twice → no golden diff, extent values unchanged by the exact half-up fix).
+
+**Final-review fixes:** the 1-bit quantizer is now a mid-rise bipolar quantizer (exact zero → +1) instead of the degenerate unipolar `{0, +1}`; resampling validates rates before the empty-input return and rejects unsafe unfiltered index arithmetic; the golden toolchain is pinned to Python 3.12 (`<3.13`, stdlib `audioop` removed in 3.13); Python extent half-up now uses floor + fractional compare. Controller ruling kept: a finite excerpt whose nonzero support touches either boundary is classified `"power"` (indistinguishable from a continuing signal), documented in `docs/ALGORITHMS.md`.
+
+**Known/deferred minors:** `sampleCountOf` duplicated between `generators.ts` and `fourierSeries.ts` (hoist in a later plan); resample golden docstring tolerance wording; no explicit length-1 non-empty resample test; `tools/golden` stays outside the mypy-gated packages.
+
+**Needs owner review:** none.
+
+**Next step:** Wave 1 Plan 03 — `docs/plans/wave-1/03-systems-and-filters.md`.
+
 ## What's left
 
-- **Wave 1** — `docs/plans/wave-1/` (4 executable plans; see D-015). Plan `01-fourier-transforms.md` complete (above); next `02-signals-and-metrics.md`, then `03-systems-and-filters.md`, `04-codecs-and-time.md`. Pure-TS DSP + golden vectors; no UI, no router.
+- **Wave 1** — `docs/plans/wave-1/` (4 executable plans; see D-015). Plans `01-fourier-transforms.md` and `02-signals-and-metrics.md` complete (above); next `03-systems-and-filters.md`, then `04-codecs-and-time.md`. Pure-TS DSP + golden vectors; no UI, no router.
 - Wave 2+ — not planned yet; see `docs/plans/README.md` for the wave map.
 
 ## Known issues / deferred minors (carried out of Wave 0)
@@ -85,7 +101,7 @@ From the T1–T12 ledgers; none blocking, each has an upgrade path:
 
 ## Next recommended step
 
-Start **Wave 1, plan `02-signals-and-metrics.md`** via the subagent-driven-development workflow (fresh session, ledger under `.superpowers/sdd/02-signals-and-metrics/`). Do not begin later plans while an earlier one has failing checks.
+Start **Wave 1, plan `03-systems-and-filters.md`** via the subagent-driven-development workflow (fresh session, new ledger under `.superpowers/sdd/`). Do not begin later plans while an earlier one has failing checks.
 
 ## Session log
 

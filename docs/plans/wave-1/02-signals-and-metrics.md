@@ -12,7 +12,7 @@
 
 ## Review Focus
 
-1. **Dither honesty** — TPDF dither at Δ-step scale: test must show decorrelation (cross-corr with signal ≈ 0) and that SNR-vs-theoretical still holds within ±0.5 dB at b=8 for a full-scale sine; a dither test that only checks "noise was added" fails the review.
+1. **Dither honesty** — TPDF dither at Δ-step scale: test must show decorrelation (cross-corr with signal ≈ 0) and that SNR-vs-theoretical still holds within ±0.5 dB at b=8 for a full-scale sine; a dither test that only checks "noise was added" fails the review. Clipping is honest, not a defect: TPDF excursions of ±Δ push full-scale samples past ±1 and the post-round clip correlates the error. Pin `|ρ| < 0.05` at amplitude `1 − Δ` (the full-scale-with-dither-headroom operating point, no clipping) and at 0.6, and `|ρ| > 0.1` at amplitude 1 as the known headroom requirement: back off to ≤ `1 − Δ` or accept clip correlation (R11).
 2. **Aliasing exactness (no-filter resample)** — a sine at 0.8×Nyquist decimated 2× without filter must land at the exact folded frequency `|f − fs|`, not approximately: this is F03's whole teaching point.
 3. **Generator closed-form exactness at boundaries** — sine at exactly phase 0 first sample = 0; square at half-period transitions defined by sign(sin) (value at zeros pinned to +1, documented); sawtooth range pinned [−1,1). Tests assert first/last samples.
 4. **Segmental SNR silence handling** — frames of pure silence must not divide by zero: pinned behavior = frame contributes nothing (skipped), result over active frames only, silence in ALL frames → `Infinity`; test asserts.
@@ -33,14 +33,14 @@ generateImpulse(spec & { impulseSampleIndex: number; amplitude }): Float64Array
 generateStep(spec & { stepSampleIndex: number; amplitudeBefore: number; amplitudeAfter: number }): Float64Array
 generateChirp(spec & { startFrequencyHz, endFrequencyHz, sweep: "linear" | "logarithmic" }): Float64Array   // phase = 2π∫f(t)dt closed form both sweeps
 generateTwoTone(spec & { frequenciesHz: [number, number]; amplitude }): Float64Array
-generateAm(spec & { carrierHz, modulationHz, modulationIndex }): Float64Array
-generateFm(spec & { carrierHz, modulationHz, frequencyDeviationHz }): Float64Array
+generateAm(spec & { carrierHz, modulationHz, modulationIndex, amplitude }): Float64Array
+generateFm(spec & { carrierHz, modulationHz, frequencyDeviationHz, amplitude }): Float64Array
 ```
 Sample count = `Math.round(durationSeconds * sampleRateHz)`; time base `n / sampleRateHz`. Guards: `sampleRateHz ≤ 0`, `durationSeconds < 0`, `amplitude` NaN → `RangeError`/`TypeError`; duration 0 → empty array.
 
 **Golden cases (NumPy formulas):** each generator, duration T=0.01 s, fs=1000 (N=10, readable values); chirp both sweeps; square duty 0.25; impulse index 3; step index 4. Tolerance rtol 1e-9, atol 1e-12.
 
-**Tests:** goldens; boundary samples asserted explicitly (sine[0]=0; square at zeros = +1; sawtooth in [−a, a)); chirp instantaneous frequency endpoints via 2-sample phase difference ≈ 2πf/fs; full-cycle sine energy = N/2·a² (property); guards throw.
+**Tests:** goldens; boundary samples asserted explicitly (sine[0]=0; square at zeros = +1; sawtooth in [−a, a)); chirp endpoint frequencies via the dominant FFT peak of the first/last 512-sample windows (per R10); full-cycle sine energy = N/2·a² (property); guards throw.
 
 - [ ] Commit `feat(F12): closed-form signal generators with golden tests`
 
@@ -64,11 +64,11 @@ Sample count = `Math.round(durationSeconds * sampleRateHz)`; time base `n / samp
 
 **Interfaces:**
 - `fourierSeriesPartialSum(spec: SignalSpec & { kind: "square" | "sawtooth" | "triangle"; frequencyHz: number; harmonics: number; amplitude: number }): Float64Array` — harmonics ≥ 1 integer; k-th term with the standard coefficients (square: odd 4a/(πk); sawtooth: 2a/(πk) alternating; triangle: odd 8a/(π²k²) alternating)
-- `measureGibbsOvershoot(samples: Float64Array, amplitude: number): number` — max(|x|)/a − 1
+- `measureGibbsOvershoot(samples: Float64Array, amplitude: number): number` — max(|x|)/a − 1 (≈0.179 at h=51; 0.0895 is this overshoot relative to the 2a jump)
 
 **Golden cases (NumPy direct series):** square h=1,3,5,51 (three cases), sawtooth h=10, triangle h=9; fs=1000 T=0.02. Tolerance rtol 1e-9.
 
-**Tests:** goldens; Gibbs: square h=51 overshoot ≈ 0.0895 ± 0.002; MSE vs ideal square decreases monotonically as harmonics 1→3→5→51; triangle converges faster than square (MSE ratio assertion) — the pedagogical property.
+**Tests:** goldens; Gibbs: square h=51 gives max(|x|)/a − 1 ≈ 0.179 ± 0.002 (0.0895 is the same overshoot relative to the peak-to-peak jump 2a); MSE vs ideal square decreases monotonically as harmonics 1→3→5→51; triangle converges faster than square (MSE ratio assertion) — the pedagogical property.
 
 - [ ] Commit `feat(F12): fourier series reconstruction and gibbs measurement`
 
@@ -82,8 +82,8 @@ Sample count = `Math.round(durationSeconds * sampleRateHz)`; time base `n / samp
 - `reverse(x): Float64Array`
 - `truncate(x, startSampleIndex, lengthSamples): Float64Array` — out-of-range start → `RangeError`; clamps end with zero-fill? NO — clamps to available, documented
 - `zeroPad(x, padStartSamples, padEndSamples): Float64Array`
-- `support(x, { threshold: number }): { startSampleIndex: number; endSampleIndex: number }` — first/last |x| > threshold (inclusive); all-below → length-0 support `{start: N, end: N−1}` documented
-- `classifySignalType(x): "energy" | "power"` — finite nonzero support → energy, else power, documented rule
+- `support(x, { threshold: number }): { startSampleIndex: number; endSampleIndex: number }` — first/last |x| > threshold (strict; equality excluded); all-below → length-0 support `{start: N, end: N−1}` documented
+- `classifySignalType(x): "energy" | "power"` — energy only when the nonzero support is strictly inside both window edges (finite excerpt), else power; documented rule
 
 **Golden cases (NumPy reference implementations of the same pinned definitions):** shift ±3 on N=10 ramp; timeScale 0.5 and 2 on N=10 ramp; reverse; truncate; zeroPad. Tolerance rtol 1e-12 (exact arithmetic expected).
 
@@ -112,13 +112,13 @@ Sample count = `Math.round(durationSeconds * sampleRateHz)`; time base `n / samp
 **Files:** Create `packages/dsp/src/metrics/quantize.ts`, golden `algorithms/quantize.py` → `golden/quantize.json`, test `packages/dsp/test/metrics/quantize.test.ts`; ALGORITHMS.md entry (mid-tread, formula, dither definition, reference: Zölzer).
 
 **Interfaces:**
-- `quantizeUniform(x: Float64Array, { bits: number }): Float64Array` — pinned: mid-tread, `levels = 2**bits`, step `Δ = 2 / (2**bits − 1)`, value = Δ·round(x/Δ), clip to [−1, 1] after; bits 1..24 → else `RangeError`
+- `quantizeUniform(x: Float64Array, { bits: number }): Float64Array` — pinned: mid-tread, `levels = 2**bits`, step `Δ = 2 / (2**bits − 1)`, value = Δ·round(x/Δ), clip to [−1, 1] after; bits 1..24 → else `RangeError`. **1-bit exception:** `bits = 1` is a mid-rise bipolar quantizer, `−1` for `x < 0` and `+1` for `x ≥ 0` (exact zero pins to `+1`); the mid-tread rule would make every negative sample `−0`, i.e. a unipolar `{0, +1}` output
 - `quantizeWithTpdfDither(x, { bits, seed }): Float64Array` — additive TPDF noise of width Δ (±Δ each uniform) then quantify with same quantizer (the sum is applied before rounding — formula documented)
 - `quantizationError(original, quantized): Float64Array` — original − quantized (observation convention, UI labels it)
 
 **Golden cases (NumPy same pinned definition):** ramp quantize b=3 exact values; sine b=8; clipping case |x|>1. Tolerance rtol 1e-12.
 
-**Tests:** goldens; measured SNR of full-scale sine ≈ 6.02·b + 1.76 dB within ±0.5 dB for b∈{4,8,12}; SNR monotone in b; dither: cross-correlation coefficient of error with signal |ρ| < 0.05 for b=4 (undithered same case |ρ| > 0.3 — asserts the pedagogical contrast); dither determinism per seed; clipping bounded to [−1,1].
+**Tests:** goldens; bits = 1 mid-rise bipolar `[−1, −0.5, −1e−9, 0, 1e−9, 0.5, 1] → [−1, −1, −1, +1, +1, +1, +1]` plus out-of-range clipping; measured SNR of full-scale sine ≈ 6.02·b + 1.76 dB within ±0.5 dB for b∈{4,8,12}; SNR monotone in b; dither: cross-correlation coefficient of error with signal |ρ| < 0.05 for b=4 at amplitude `1 − Δ` and at 0.6 (undithered same cases |ρ| > 0.3 — asserts the pedagogical contrast); amplitude 1 gives |ρ| > 0.1 (clipping correlation, known headroom requirement: back off to ≤ `1 − Δ` or accept clip correlation, R11); dither determinism per seed and distinct dither for distinct seed pairs; clipping bounded to [−1,1].
 
 - [ ] Commit `feat(F03): uniform quantization with tpdf dither and snr verification`
 
@@ -149,6 +149,6 @@ Sample count = `Math.round(durationSeconds * sampleRateHz)`; time base `n / samp
 
 **Golden cases (`audioop.lin2ulaw`/`ulaw2lin` on 16-bit PCM — independent stdlib implementation):** ramp 16-bit; sine b=8-equivalent; both codecs, encode + decode. Tolerance: exact byte equality for encode; rtol 1e-6 for decode (16-bit scale conversion). Golden script silences the audioop DeprecationWarning explicitly.
 
-**Tests:** goldens; roundtrip error bounded by half a code step (property, ≤ 2^-8 of full scale for large values, larger relative resolution at small amplitudes documented); μ-law small-signal: SNR of a −40 dBFS sine under μ-law > SNR under uniform 8-bit by ≥ 8 dB (pedagogical property); decode(encode(x)) length preserved; input |x|>1 clipped before encode (documented, tested).
+**Tests:** goldens; roundtrip error uses the honest G.711 bounds measured over all 65 536 int16 inputs: A-law max |error| = 0.5 local code step (2^-6 of full scale, max 512/32768), μ-law ≤ 0.875 local code step (max |error| 644/32768 at −full scale). G.711 standard encoders truncate magnitude, so the literal ≤ 2^-8 full-scale bound is unattainable (top segment step 1024/32768 = 2^-5, half a step 2^-6); golden byte-exactness against `audioop` takes precedence over a nearest-rounding bound. μ-law small-signal: SNR of a −40 dBFS sine under μ-law > SNR under uniform 8-bit by ≥ 8 dB (measured gain ≈ 23.0 dB, pedagogical property); decode(encode(x)) length preserved; input |x|>1 clipped before encode (documented, tested).
 
 - [ ] Commit `feat(F04): mu-law and a-law companding with g.711 golden tests`
