@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 from avalab_golden.algorithms import (
     companding,
+    convolution_direct,
     dft,
     energy,
     extent,
@@ -24,6 +25,7 @@ from avalab_golden.fixtures import GoldenCase
 
 GENERATORS: dict[str, Callable[[], list[GoldenCase]]] = {
     "companding": companding.cases,
+    "convolution_direct": convolution_direct.cases,
     "dft": dft.cases,
     "energy": energy.cases,
     "extent": extent.cases,
