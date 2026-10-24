@@ -139,5 +139,7 @@ export {
 export { generatePinkNoise, generateWhiteNoise, mulberry32 } from "./signals/noise.js";
 export type { ConvolveFftOptions } from "./systems/convolution.js";
 export { convolveDirect, convolveFft, nextPowerOfTwo } from "./systems/convolution.js";
+export type { MdctParams, MdctResult } from "./timestretch/mdct.js";
+export { imdct, mdct } from "./timestretch/mdct.js";
 export { averagePowerOf, energyOf } from "./utils/energy.js";
 export { samplesToSeconds, secondsToSamples } from "./utils/time.js";
