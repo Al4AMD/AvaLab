@@ -11,6 +11,16 @@
  * Edge cases: n/a; every exported function documents its own.
  */
 
+export type {
+  DeltaHuffmanDecoded,
+  DeltaHuffmanEncoded,
+} from "./codecs/delta.js";
+export {
+  decodeLosslessDeltaHuffman,
+  deltaDecode,
+  deltaEncode,
+  encodeLosslessDeltaHuffman,
+} from "./codecs/delta.js";
 export type { CanonicalCodes, HuffmanCodebook, HuffmanEncoded } from "./codecs/huffman.js";
 export {
   buildCanonicalCodes,
