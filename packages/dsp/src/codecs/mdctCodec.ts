@@ -28,11 +28,11 @@
  *     tie behavior as the plan-02 uniform quantizer. Exact .5 ties are
  *     measure-zero for irrational MDCT coefficients but must be defined.
  *   - R9 keeps the exact ruling: NO dither, NO deadzone.
- *   - Saturation: at absurd rates (E beyond ~1074 bits/coeff) the step
- *     underflows to 0 and `C / s` becomes ±Infinity per IEEE 754 (NaN is
- *     impossible because the C = 0 case shortcuts to q = 0), so the index
- *     saturates at ±32768/32767 — defined behavior, documented, and decoded
- *     output then tracks the original within one step of every coefficient.
+ *   - Saturation: once stepFactor = 2^(−E) underflows to exactly 0 (E
+ *     beyond ~1074 bits/coeff), `C / s` becomes ±Infinity per IEEE 754
+ *     (NaN impossible: C = 0 shortcuts to q = 0) and q saturates at the
+ *     Int16 clip (−32768 / +32767) — but the frame is LOST entirely
+ *     (C′ = q·0 = 0): a defined total-loss cliff, not tracked noise.
  *   - The Int16 clip is part of the interface (R9 "clipping documented"):
  *     extremely loud frames at very low rates can hit the clip, which is a
  *     fixed-level distortion students can observe.

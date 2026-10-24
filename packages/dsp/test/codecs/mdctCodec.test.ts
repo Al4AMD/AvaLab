@@ -434,6 +434,41 @@ describe("R9 rate-model collapse on tonal content (documented limitation)", () =
 });
 
 /**
+ * UNDERFLOW CLIFF (module header, saturation bullet): bitsPerSecond 1e17 on
+ * fs 48 kHz gives E = bitsPerSecond/sampleRateHz ≈ 2.08e12 ≫ 1074, so
+ * stepFactor = 2^(−E) underflows to EXACTLY 0 and every nonzero frame's
+ * step is 0. The index q = clip(round(C/0)) saturates at the Int16 boundary
+ * via ±Infinity, yet the decode multiplies by the step (C′ = q·0 = 0), so
+ * the frame is lost entirely — a defined total-loss cliff, not corruption.
+ */
+describe("underflow cliff: stepFactor 2^(−E) underflows to 0 at absurd rates", () => {
+  it("bitsPerSecond 1e17: step 0, all indices saturated, decode all zeros at valid length", () => {
+    const samples = sineSamples();
+    const encoded = encodeMdct(samples, {
+      sampleRateHz: fs,
+      frameLengthSamples: frame,
+      bitsPerSecond: 1e17,
+    });
+    expect(encoded.coefficients.length).toBeGreaterThan(0);
+    for (let f = 0; f < encoded.steps.length; f += 1) {
+      expect(encoded.steps[f], `steps[${f}]`).toBe(0);
+    }
+    for (const frameQ of encoded.coefficients) {
+      for (let k = 0; k < hop; k += 1) {
+        const q = frameQ[k] ?? 0;
+        expect(q === 0 || q === 32767 || q === -32768, `coefficient q=${q}`).toBe(true);
+      }
+    }
+    const decoded = decodeMdct(encoded, { sampleRateHz: fs, frameLengthSamples: frame });
+    expect(decoded).toBeInstanceOf(Float32Array);
+    expect(decoded.length).toBe((encoded.coefficients.length - 1) * hop);
+    for (let index = 0; index < decoded.length; index += 1) {
+      expect(decoded[index]).toBe(0);
+    }
+  });
+});
+
+/**
  * EDGE CASES (R14 + dispatch list): silence (step pinned to 1.0 on all-zero
  * frames, exact-zero decode output), empty input, mixed zero/nonzero frames,
  * non-multiple-of-hop lengths, and the frameLengthSamples = 4 minimum.
