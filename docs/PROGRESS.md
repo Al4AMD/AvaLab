@@ -93,7 +93,9 @@ Verified at close-out: `pnpm check` green; `uv run --directory apps/api pytest -
 
 **Task 3 delta predictor + single-codebook FLAC-style Huffman (pinned self-contained payload layout):** complete.
 
-**Next:** Plan 04 Task 3 — delta predictor + Huffman, FLAC-style (`docs/plans/wave-1/04-codecs-and-time.md`).
+**Task 4 MDCT/IMDCT with TDAC:** complete. `mdct`/`imdct` in `packages/dsp/src/timestretch/mdct.ts` with the amended pins (CONTROLLER AMENDMENT 2026-10-25): Princen–Bradley oddly-stacked basis `cos(π(2k+1)(2n+1+N)/(4N))` (the plan's plain DCT-IV angle is provably non-reconstructing — per-frame composite `I − A` swaps distinct mirror samples across the covering frames — so R2/R3/R4 were amended before implementation), sine window on both analysis and synthesis, pre-rolled frames (`frameCount = ceil(sampleCount/hop) + 1`, frame i covers `[(i−1)·hop, (i−1)·hop + 2·hop)`), plain TDAC overlap-add in `imdct` with no Σw² division, output `(frameCount−1)·hop` samples. Cosine matrix built once per call and not exported (`mdctMatrix` deliberately absent). Golden `test-data/golden/mdct.json` from `tools/golden/.../algorithms/mdct.py` (6 cases; regenerates byte-identical; generator cross-checks the direct basis against a folded scipy type-4 dct/dst construction) with rtol 1e-9/atol 1e-11 (atol covers cross-language Math.cos/BLAS argument-reduction noise, measured max 4.2e-12). Tests: fixtures both directions, PR ≤ 1e-10 incl. non-multiple tails and the frame-4 minimum, guard tests, no-mutation; measured perfect reconstruction maxerr 1.04e-13 on a synthetic 5-min 44.1 kHz mono file. dsp 814/814.
+
+**Next:** Plan 04 Task 5 — MDCT toy lossy codec, rate-model per ruling R9 (`docs/plans/wave-1/04-codecs-and-time.md`).
 
 ## What's left
 
