@@ -24,7 +24,7 @@
  * add in the overlap region. The default B = nextPowerOfTwo(M) and
  * L = nextPowerOfTwo(B + M - 1) mirror the usual textbook choice; the caller
  * may pin a smaller block with `blockLengthSamples`. The last block may be
- * shorter than B, but `y_b` still has B + M - 1 nonzero samples, so the final
+ * shorter than B, but `y_b` still has `blockSamples + M - 1` nonzero samples, so the final
  * M - 1 output samples are written exactly once (controller ruling R12 and
  * Review Focus 1: the classic dropped-tail bug).
  *

@@ -69,9 +69,25 @@ Verified at close-out: `pnpm check` green; `uv run --directory apps/api pytest -
 
 **Next step:** Wave 1 Plan 03 — `docs/plans/wave-1/03-systems-and-filters.md`.
 
+## Wave 1 · Plan 03 — Convolution and filters (complete)
+
+**Status:** complete. Commit range `b38c5ca..d0c183d`, 10 commits on `feat/wave-1-filters`.
+
+**Built** (`packages/dsp`, pure TS, golden-verified): direct convolution; FFT overlap-add convolution with explicit tail/block handling; window-method FIR design (lowpass, highpass, bandpass, bandstop; hamming/blackman/kaiser windows; SciPy `firwin` normalization; even-tap highpass/bandstop rejected with `RangeError`); Butterworth and Chebyshev I design via the prewarped bilinear transform; RBJ biquads; transposed direct-form-II `applyFilter`; filter analysis — `freqz`, `magnitudeDb`, `unwrapPhase`, `groupDelaySamples`, `impulseResponse`, `stepResponse`, `polesZeros`, `isStable`.
+
+**Verification:** `pnpm check` green; 727 dsp tests; four new goldens (convolution_direct 9.6 KB, fir 8.1 KB, iir 80 KB, filter_analysis 139 KB; golden directory 8.1 MB); golden generators double-run identical; SciPy `firwin` max relative error 2.5e-14; Butterworth/Chebyshev coefficients agree with SciPy at ≈7e-16.
+
+**Design decisions:** b/a IIR stability is fragile at realized order 16, so designs must pass a solver envelope `max|p| ≤ 0.995` plus a 48000-sample impulse-decay behavioral guard; non-finite, non-decaying, or silent responses throw `RangeError` — coefficients are never clamped; the docs call 48000 samples a practical horizon, not a proof; SOS/state-space realization is future work. Group delay is pinned to central finite differences on the unwrapped phase (the golden generator uses the same formula). Repeated zeros at `z = −1` are verified by residual/count/cluster checks; simple roots are pinned at 1e-8; the distinct-zero FIR golden is matched root-to-root. FIR highpass/bandstop even-tap designs are rejected to match SciPy.
+
+**Known/deferred minors:** `nextPowerOfTwo(0.5)` returns 1 (n ≤ 1 documented, no test); the `stepResponse` test reuses `applyFilter` (the golden step covers the independent path); the non-finite/silent behavioral guard branches are untested; the hardcoded 48000/36000 constants are named but not derived; the 33-tap Hamming highpass has `|H(0)| = 2.76e-3` (the plan's ≤ 1e-3 is pinned via the 65-tap test); an all-zero numerator has no finite zeros (document if the UI exposes it); the design guard costs 15–28 ms, so the UI must run it in a worker or debounce per AGENTS §9; the `sampleCountOf` duplication carried from Plan 02.
+
+**Needs owner review:** none.
+
+**Next step:** Wave 1 Plan 04 — `docs/plans/wave-1/04-codecs-and-time.md`.
+
 ## What's left
 
-- **Wave 1** — `docs/plans/wave-1/` (4 executable plans; see D-015). Plans `01-fourier-transforms.md` and `02-signals-and-metrics.md` complete (above); next `03-systems-and-filters.md`, then `04-codecs-and-time.md`. Pure-TS DSP + golden vectors; no UI, no router.
+- **Wave 1** — `docs/plans/wave-1/` (4 executable plans; see D-015). Plans `01-fourier-transforms.md`, `02-signals-and-metrics.md`, and `03-systems-and-filters.md` complete (above); next `04-codecs-and-time.md`. Pure-TS DSP + golden vectors; no UI, no router.
 - Wave 2+ — not planned yet; see `docs/plans/README.md` for the wave map.
 
 ## Known issues / deferred minors (carried out of Wave 0)
@@ -101,7 +117,7 @@ From the T1–T12 ledgers; none blocking, each has an upgrade path:
 
 ## Next recommended step
 
-Start **Wave 1, plan `03-systems-and-filters.md`** via the subagent-driven-development workflow (fresh session, new ledger under `.superpowers/sdd/`). Do not begin later plans while an earlier one has failing checks.
+Start **Wave 1, plan `04-codecs-and-time.md`** via the subagent-driven-development workflow (fresh session, new ledger under `.superpowers/sdd/`). Do not begin later plans while an earlier one has failing checks.
 
 ## Session log
 
