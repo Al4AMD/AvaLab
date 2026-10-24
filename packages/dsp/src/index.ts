@@ -11,6 +11,45 @@
  * Edge cases: n/a; every exported function documents its own.
  */
 
+export type {
+  FreqzOptions,
+  FreqzResult,
+  PolesZerosResult,
+} from "./filters/analysis.js";
+export {
+  freqz,
+  groupDelaySamples,
+  impulseResponse,
+  isStable,
+  magnitudeDb,
+  polesZeros,
+  stepResponse,
+  unwrapPhase,
+} from "./filters/analysis.js";
+export type {
+  BiquadGainOptions,
+  BiquadOptions,
+} from "./filters/biquad.js";
+export {
+  biquadHighpass,
+  biquadLowpass,
+  biquadNotch,
+  biquadPeaking,
+} from "./filters/biquad.js";
+export type {
+  FirBand,
+  FirWindowFilter,
+  FirWindowKind,
+  FirWindowOptions,
+} from "./filters/fir.js";
+export { designFirWindow } from "./filters/fir.js";
+export type {
+  ButterworthOptions,
+  Chebyshev1Options,
+  IirBand,
+  IirCoefficients,
+} from "./filters/iir.js";
+export { applyFilter, designButterworth, designChebyshev1 } from "./filters/iir.js";
 export { fftBluestein } from "./fourier/bluestein.js";
 export type { Complex } from "./fourier/complex.js";
 export { dftNaive, idftNaive } from "./fourier/dft.js";
@@ -79,5 +118,7 @@ export {
   generateTwoTone,
 } from "./signals/generators.js";
 export { generatePinkNoise, generateWhiteNoise, mulberry32 } from "./signals/noise.js";
+export type { ConvolveFftOptions } from "./systems/convolution.js";
+export { convolveDirect, convolveFft, nextPowerOfTwo } from "./systems/convolution.js";
 export { averagePowerOf, energyOf } from "./utils/energy.js";
 export { samplesToSeconds, secondsToSamples } from "./utils/time.js";

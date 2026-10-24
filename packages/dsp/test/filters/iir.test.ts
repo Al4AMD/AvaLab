@@ -1,0 +1,741 @@
+import { describe, expect, it } from "vitest";
+import { assertStableDenominator } from "../../src/filters/iir.js";
+import { polynomialRoots as findPolynomialRoots } from "../../src/filters/polynomial.js";
+import type {
+  ButterworthOptions,
+  Chebyshev1Options,
+  IirBand,
+  IirCoefficients,
+} from "../../src/index.js";
+import { applyFilter, designButterworth, designChebyshev1 } from "../../src/index.js";
+import { asNumber, asNumberArray, type GoldenCase, loadGolden } from "../fixtures.js";
+
+const golden = loadGolden("iir");
+const SAMPLE_RATE_HZ = 48000;
+
+const iirCases = golden.cases.filter((goldenCase) => {
+  const design = goldenCase.params.design;
+  return design === "butterworth" || design === "chebyshev1";
+});
+
+interface ComplexNumber {
+  re: number;
+  im: number;
+}
+
+function addComplex(left: ComplexNumber, right: ComplexNumber): ComplexNumber {
+  return { re: left.re + right.re, im: left.im + right.im };
+}
+
+function subtractComplex(left: ComplexNumber, right: ComplexNumber): ComplexNumber {
+  return { re: left.re - right.re, im: left.im - right.im };
+}
+
+function multiplyComplex(left: ComplexNumber, right: ComplexNumber): ComplexNumber {
+  return {
+    re: left.re * right.re - left.im * right.im,
+    im: left.re * right.im + left.im * right.re,
+  };
+}
+
+function divideComplex(left: ComplexNumber, right: ComplexNumber): ComplexNumber {
+  const denominator = right.re * right.re + right.im * right.im;
+  return {
+    re: (left.re * right.re + left.im * right.im) / denominator,
+    im: (left.im * right.re - left.re * right.im) / denominator,
+  };
+}
+
+function polynomialValue(coefficients: readonly number[], value: ComplexNumber): ComplexNumber {
+  let result: ComplexNumber = { re: coefficients[0] ?? 0, im: 0 };
+  for (let index = 1; index < coefficients.length; index += 1) {
+    result = addComplex(multiplyComplex(result, value), {
+      re: coefficients[index] ?? 0,
+      im: 0,
+    });
+  }
+  return result;
+}
+
+/**
+ * Test-local Durand-Kerner root finder. Task 5 owns the production `polesZeros`;
+ * this copy exists only to assert pole stability of the designed coefficients.
+ */
+function polynomialRoots(coefficients: readonly number[]): ComplexNumber[] {
+  const degree = coefficients.length - 1;
+  if (degree <= 0) {
+    return [];
+  }
+  const roots: ComplexNumber[] = Array.from({ length: degree }, (_, index) => {
+    const angle = (2 * Math.PI * index) / degree + 0.1;
+    return { re: 0.5 * Math.cos(angle), im: 0.5 * Math.sin(angle) };
+  });
+  for (let iteration = 0; iteration < 500; iteration += 1) {
+    let largestStep = 0;
+    for (let index = 0; index < degree; index += 1) {
+      const root = roots[index] ?? { re: 0, im: 0 };
+      let denominator: ComplexNumber = { re: 1, im: 0 };
+      for (let other = 0; other < degree; other += 1) {
+        if (other !== index) {
+          denominator = multiplyComplex(
+            denominator,
+            subtractComplex(root, roots[other] ?? { re: 0, im: 0 }),
+          );
+        }
+      }
+      const step = divideComplex(polynomialValue(coefficients, root), denominator);
+      roots[index] = subtractComplex(root, step);
+      largestStep = Math.max(largestStep, Math.hypot(step.re, step.im));
+    }
+    if (largestStep < 1e-14) {
+      break;
+    }
+  }
+  return roots;
+}
+
+function bandOf(goldenCase: GoldenCase): IirBand {
+  const band = goldenCase.params.band;
+  if (band !== "lowpass" && band !== "highpass" && band !== "bandpass" && band !== "bandstop") {
+    throw new Error(`golden fixture band is invalid: ${String(band)}`);
+  }
+  return band;
+}
+
+function designOf(goldenCase: GoldenCase): IirCoefficients {
+  const design = goldenCase.params.design;
+  const common: ButterworthOptions = {
+    band: bandOf(goldenCase),
+    cutoffHz: asNumberArray(goldenCase.params.cutoffHz, "params.cutoffHz"),
+    order: asNumber(goldenCase.params.order, "params.order"),
+    sampleRateHz: asNumber(goldenCase.params.sampleRateHz, "params.sampleRateHz"),
+  };
+  if (design === "butterworth") {
+    return designButterworth(common);
+  }
+  if (design === "chebyshev1") {
+    const options: Chebyshev1Options = {
+      ...common,
+      rippleDb: asNumber(goldenCase.params.rippleDb, "params.rippleDb"),
+    };
+    return designChebyshev1(options);
+  }
+  throw new Error(`golden fixture design is invalid: ${String(design)}`);
+}
+
+function expectedArrayOf(goldenCase: GoldenCase, key: string): number[] {
+  return asNumberArray(goldenCase.expected[key], `expected.${key}`);
+}
+
+function expectArrayClose(
+  actual: Float64Array,
+  expected: readonly number[],
+  rtol: number,
+  atol: number,
+  label: string,
+): void {
+  expect(actual.length, `${label} length`).toBe(expected.length);
+  for (let index = 0; index < expected.length; index += 1) {
+    const actualValue = actual[index] ?? Number.NaN;
+    const expectedValue = expected[index] ?? Number.NaN;
+    const difference = Math.abs(actualValue - expectedValue);
+    const allowed = Math.max(atol, rtol * Math.abs(expectedValue));
+    expect(
+      difference,
+      `${label}[${index}]: |${actualValue} - ${expectedValue}| = ${difference} exceeds ${allowed}`,
+    ).toBeLessThanOrEqual(allowed);
+  }
+}
+
+function expectUnstableIirDesign(design: () => unknown): void {
+  let thrown: unknown;
+  try {
+    design();
+  } catch (error) {
+    thrown = error;
+  }
+  expect(thrown).toBeInstanceOf(RangeError);
+  expect(thrown instanceof Error ? thrown.message : "").toContain(
+    "IIR design is numerically unstable at this order; reduce order or move the cutoff",
+  );
+}
+
+function expectRejectedIirDesign(design: () => unknown): void {
+  let thrown: unknown;
+  try {
+    design();
+  } catch (error) {
+    thrown = error;
+  }
+  expect(thrown).toBeInstanceOf(RangeError);
+  expect(thrown instanceof Error ? thrown.message : "").toContain("reduce order");
+}
+
+function expectBehavioralRejection(design: () => unknown, messagePart: string): void {
+  let thrown: unknown;
+  try {
+    design();
+  } catch (error) {
+    thrown = error;
+  }
+  expect(thrown).toBeInstanceOf(RangeError);
+  expect(thrown instanceof Error ? thrown.message : "").toContain(messagePart);
+}
+
+/**
+ * Independent re-simulation of the 48000-sample impulse response used by the
+ * design-time behavioral guard. Returns the overall maximum, the maximum over
+ * the last quarter, and whether every sample was finite.
+ */
+function impulseResponseStats(coefficients: IirCoefficients): {
+  overallMax: number;
+  tailMax: number;
+  finite: boolean;
+} {
+  const impulse = new Float64Array(48000);
+  impulse[0] = 1;
+  const response = applyFilter(impulse, coefficients);
+  let overallMax = 0;
+  let tailMax = 0;
+  let finite = true;
+  for (let sample = 0; sample < response.length; sample += 1) {
+    const magnitude = Math.abs(response[sample] ?? 0);
+    if (!Number.isFinite(magnitude)) {
+      finite = false;
+      continue;
+    }
+    overallMax = Math.max(overallMax, magnitude);
+    if (sample >= 36000) {
+      tailMax = Math.max(tailMax, magnitude);
+    }
+  }
+  return { overallMax, tailMax, finite };
+}
+
+function rootMeanSquare(samples: Float64Array, startSample: number): number {
+  let sum = 0;
+  for (let index = startSample; index < samples.length; index += 1) {
+    const value = samples[index] ?? 0;
+    sum += value * value;
+  }
+  return Math.sqrt(sum / (samples.length - startSample));
+}
+
+function sine(frequencyHz: number, durationSeconds = 2): Float64Array {
+  const samples = new Float64Array(Math.round(durationSeconds * SAMPLE_RATE_HZ));
+  for (let index = 0; index < samples.length; index += 1) {
+    samples[index] = Math.sin((2 * Math.PI * frequencyHz * index) / SAMPLE_RATE_HZ);
+  }
+  return samples;
+}
+
+/** Naive difference equation, independent of the transposed direct form II. */
+function impulseResponseFromDifferenceEquation(
+  { b, a }: IirCoefficients,
+  length: number,
+): Float64Array {
+  const a0 = a[0] ?? 0;
+  const output = new Float64Array(length);
+  for (let sample = 0; sample < length; sample += 1) {
+    let value = 0;
+    for (let index = 0; index < b.length; index += 1) {
+      const inputIndex = sample - index;
+      if (inputIndex === 0) {
+        value += (b[index] ?? 0) * 1;
+      }
+    }
+    for (let index = 1; index < a.length; index += 1) {
+      const outputIndex = sample - index;
+      if (outputIndex >= 0) {
+        value -= (a[index] ?? 0) * (output[outputIndex] ?? 0);
+      }
+    }
+    output[sample] = value / a0;
+  }
+  return output;
+}
+
+describe("iir fixture", () => {
+  it("loads the committed golden fixture with the pinned design cases", () => {
+    expect(golden.algorithm).toBe("iir");
+    expect(iirCases.map((goldenCase) => goldenCase.name)).toEqual([
+      "butterworth_lowpass_order4_fc4000_fs48000",
+      "butterworth_highpass_order4_fc4000_fs48000",
+      "butterworth_bandpass_order3_fc1000_4000_fs48000",
+      "butterworth_bandstop_order2_fc1000_4000_fs48000",
+      "chebyshev1_lowpass_order4_fc4000_ripple0.5_fs48000",
+      "chebyshev1_highpass_order4_fc4000_ripple0.5_fs48000",
+      "chebyshev1_bandpass_order3_fc1000_4000_ripple0.5_fs48000",
+      "butterworth_lowpass_order4_fc2000_fs48000",
+      "butterworth_highpass_order2_fc4000_fs48000",
+      "butterworth_bandpass_order4_fc1000_4000_fs48000",
+      "chebyshev1_lowpass_order5_fc4000_ripple1_fs48000",
+      "chebyshev1_bandpass_order4_fc1000_4000_ripple1_fs48000",
+    ]);
+    expect(new Set(iirCases.map((goldenCase) => bandOf(goldenCase)))).toEqual(
+      new Set(["lowpass", "highpass", "bandpass", "bandstop"]),
+    );
+  });
+
+  it("pins the scipy coefficient tolerance rtol = 1e-9", () => {
+    for (const goldenCase of iirCases) {
+      expect(goldenCase.tolerance.rtol).toBe(1e-9);
+    }
+  });
+
+  it.each(iirCases)("matches scipy coefficients for $name", (goldenCase: GoldenCase) => {
+    const actual = designOf(goldenCase);
+    expectArrayClose(
+      actual.b,
+      expectedArrayOf(goldenCase, "b"),
+      goldenCase.tolerance.rtol,
+      goldenCase.tolerance.atol,
+      `${goldenCase.name} b`,
+    );
+    expectArrayClose(
+      actual.a,
+      expectedArrayOf(goldenCase, "a"),
+      goldenCase.tolerance.rtol,
+      goldenCase.tolerance.atol,
+      `${goldenCase.name} a`,
+    );
+  });
+
+  it.each(iirCases)("applyFilter matches scipy lfilter for $name", (goldenCase: GoldenCase) => {
+    // Apply the reference (SciPy) coefficients: this isolates applyFilter from
+    // the 1e-9 coefficient tolerance; the design itself is checked above.
+    const coefficients = {
+      b: Float64Array.from(expectedArrayOf(goldenCase, "b")),
+      a: Float64Array.from(expectedArrayOf(goldenCase, "a")),
+    };
+    const input = Float64Array.from(goldenCase.input.samples);
+    const filtered = applyFilter(input, coefficients);
+    expectArrayClose(
+      filtered,
+      expectedArrayOf(goldenCase, "filteredSamples"),
+      1e-12,
+      1e-12,
+      `${goldenCase.name} filteredSamples`,
+    );
+  });
+});
+
+describe("designButterworth and designChebyshev1", () => {
+  it("returns a[0] = 1 for every golden design", () => {
+    for (const goldenCase of iirCases) {
+      expect(designOf(goldenCase).a[0], goldenCase.name).toBe(1);
+    }
+  });
+
+  it("places every pole strictly inside the unit circle", () => {
+    for (const goldenCase of iirCases) {
+      const { a } = designOf(goldenCase);
+      const poles = polynomialRoots(Array.from(a));
+      expect(poles.length, goldenCase.name).toBe(a.length - 1);
+      for (const pole of poles) {
+        const modulus = Math.hypot(pole.re, pole.im);
+        expect(modulus, `${goldenCase.name} pole |z| = ${modulus} must be < 1 - 1e-9`).toBeLessThan(
+          1 - 1e-9,
+        );
+      }
+    }
+  });
+
+  it("keeps a 1 kHz sine and attenuates a 10 kHz sine by at least 30 dB (order 4)", () => {
+    const coefficients = designButterworth({
+      band: "lowpass",
+      cutoffHz: [4000],
+      order: 4,
+      sampleRateHz: SAMPLE_RATE_HZ,
+    });
+    const transitionSamples = Math.round(0.2 * SAMPLE_RATE_HZ);
+
+    const passbandInput = sine(1000);
+    const passbandOutput = applyFilter(passbandInput, coefficients);
+    const passbandDb =
+      20 *
+      Math.log10(
+        rootMeanSquare(passbandOutput, transitionSamples) /
+          rootMeanSquare(passbandInput, transitionSamples),
+      );
+    expect(Math.abs(passbandDb)).toBeLessThanOrEqual(0.2);
+
+    const stopbandInput = sine(10000);
+    const stopbandOutput = applyFilter(stopbandInput, coefficients);
+    const stopbandDb =
+      20 *
+      Math.log10(
+        rootMeanSquare(stopbandOutput, transitionSamples) /
+          rootMeanSquare(stopbandInput, transitionSamples),
+      );
+    expect(stopbandDb).toBeLessThanOrEqual(-30);
+  });
+
+  it("rejects order-8 bandpass designs whose realized denominator is unstable", () => {
+    // Reviewer cases: the coefficients are finite and match SciPy, but the
+    // degree-16 b/a form has roots outside the unit circle.
+    expectUnstableIirDesign(() =>
+      designChebyshev1({
+        band: "bandpass",
+        cutoffHz: [1000, 4000],
+        order: 8,
+        rippleDb: 1,
+        sampleRateHz: SAMPLE_RATE_HZ,
+      }),
+    );
+    expectUnstableIirDesign(() =>
+      designButterworth({
+        band: "bandpass",
+        cutoffHz: [100, 200],
+        order: 8,
+        sampleRateHz: SAMPLE_RATE_HZ,
+      }),
+    );
+  });
+
+  it("rejects an order-8 bandstop design whose realized denominator is unstable", () => {
+    expectUnstableIirDesign(() =>
+      designButterworth({
+        band: "bandstop",
+        cutoffHz: [100, 200],
+        order: 8,
+        sampleRateHz: SAMPLE_RATE_HZ,
+      }),
+    );
+  });
+
+  it("rejects the reviewer order-8 bandstop design by impulse-response decay, not the solver envelope", () => {
+    // The Durand-Kerner solver reports max|z| = 0.993855593429 (inside the
+    // 0.995 envelope), but the exact float64 roots of the returned `a` have
+    // max|p| = 1.00183894675 and the impulse response grows to ~7e35 by
+    // sample 48000. Only the behavioral simulation catches this design.
+    expectBehavioralRejection(
+      () =>
+        designButterworth({
+          band: "bandstop",
+          cutoffHz: [842.5, 2850],
+          order: 8,
+          sampleRateHz: SAMPLE_RATE_HZ,
+        }),
+      "impulse response does not decay",
+    );
+  });
+
+  it("returns a stable order-8 lowpass design inside the conditioning envelope", () => {
+    const coefficients = designButterworth({
+      band: "lowpass",
+      cutoffHz: [4000],
+      order: 8,
+      sampleRateHz: SAMPLE_RATE_HZ,
+    });
+    expect(coefficients.a.length).toBe(9);
+    const poles = polynomialRoots(Array.from(coefficients.a));
+    for (const pole of poles) {
+      expect(Math.hypot(pole.re, pole.im)).toBeLessThan(0.995);
+    }
+  });
+
+  it("rejects narrow order-8 lowpass designs outside the 0.995 envelope", () => {
+    // True design roots: 150 Hz 0.996177, 151 Hz 0.996152, 160 Hz 0.995923,
+    // 180 Hz 0.995414. All are stable but outside the documented 5e-3 margin,
+    // so the single b/a realization must be refused rather than certified.
+    for (const cutoffHz of [150, 151, 160, 180]) {
+      expectRejectedIirDesign(() =>
+        designButterworth({
+          band: "lowpass",
+          cutoffHz: [cutoffHz],
+          order: 8,
+          sampleRateHz: SAMPLE_RATE_HZ,
+        }),
+      );
+    }
+  });
+
+  it("rejects the 151 Hz order-8 lowpass design with RangeError", () => {
+    // Solver max|z| = 0.9987418410854232: the envelope rejects before the
+    // behavioral simulation runs.
+    expectUnstableIirDesign(() =>
+      designButterworth({
+        band: "lowpass",
+        cutoffHz: [151],
+        order: 8,
+        sampleRateHz: SAMPLE_RATE_HZ,
+      }),
+    );
+  });
+
+  it("accepts order-8 lowpass designs inside the conditioning envelope", () => {
+    for (const cutoffHz of [500, 1000, 4000]) {
+      const coefficients = designButterworth({
+        band: "lowpass",
+        cutoffHz: [cutoffHz],
+        order: 8,
+        sampleRateHz: SAMPLE_RATE_HZ,
+      });
+      expect(coefficients.a.length, `${cutoffHz} Hz`).toBe(9);
+      const poles = polynomialRoots(Array.from(coefficients.a));
+      expect(poles.length, `${cutoffHz} Hz`).toBe(8);
+      for (const pole of poles) {
+        const modulus = Math.hypot(pole.re, pole.im);
+        expect(modulus, `${cutoffHz} Hz pole |z| = ${modulus}`).toBeLessThan(0.995);
+      }
+      const stats = impulseResponseStats(coefficients);
+      expect(stats.finite, `${cutoffHz} Hz impulse response finite`).toBe(true);
+      expect(stats.overallMax, `${cutoffHz} Hz impulse response not silent`).toBeGreaterThan(1e-9);
+      expect(
+        stats.tailMax,
+        `${cutoffHz} Hz last-quarter max ${stats.tailMax} <= 0.5 * ${stats.overallMax}`,
+      ).toBeLessThanOrEqual(0.5 * stats.overallMax);
+    }
+  });
+
+  it("accepts order-8 designs whose root iteration stalls on the step", () => {
+    // These designs used to throw: the Durand-Kerner step stalls around 1e-11
+    // while the relative polynomial residual is ~1e-15, so the roots are
+    // accurate and comfortably inside the conditioning envelope.
+    const designs = [
+      {
+        label: "Butterworth lowpass 1 kHz",
+        coefficients: designButterworth({
+          band: "lowpass",
+          cutoffHz: [1000],
+          order: 8,
+          sampleRateHz: SAMPLE_RATE_HZ,
+        }),
+      },
+      {
+        label: "Butterworth highpass 500 Hz",
+        coefficients: designButterworth({
+          band: "highpass",
+          cutoffHz: [500],
+          order: 8,
+          sampleRateHz: SAMPLE_RATE_HZ,
+        }),
+      },
+    ];
+    for (const { label, coefficients } of designs) {
+      expect(coefficients.a.length, label).toBe(9);
+      const poles = polynomialRoots(Array.from(coefficients.a));
+      expect(poles.length, label).toBe(8);
+      for (const pole of poles) {
+        const modulus = Math.hypot(pole.re, pole.im);
+        expect(modulus, `${label} pole |z| = ${modulus} must be < 0.995`).toBeLessThan(0.995);
+      }
+    }
+  });
+
+  it("rejects Chebyshev I order-8 and order-6 bandpass designs outside the envelope", () => {
+    for (const order of [6, 8]) {
+      expectRejectedIirDesign(() =>
+        designChebyshev1({
+          band: "bandpass",
+          cutoffHz: [1000, 4000],
+          order,
+          rippleDb: 1,
+          sampleRateHz: SAMPLE_RATE_HZ,
+        }),
+      );
+    }
+  });
+
+  it("finds and rejects synthetic polynomials with roots outside the envelope", () => {
+    // (z - 0.5)(z - 1.2) = z^2 - 1.7z + 0.6: the root helper must report the
+    // outside root, and the conditioning guard must reject the polynomial.
+    const result = findPolynomialRoots([1, -1.7, 0.6]);
+    expect(result.converged).toBe(true);
+    const moduli = result.roots
+      .map((root) => Math.hypot(root.re, root.im))
+      .sort((left, right) => left - right);
+    expect(moduli.length).toBe(2);
+    expect(moduli[0] ?? Number.NaN).toBeCloseTo(0.5, 10);
+    expect(moduli[1] ?? Number.NaN).toBeCloseTo(1.2, 10);
+    expect(moduli[1] ?? Number.NaN).toBeGreaterThanOrEqual(1);
+    expect(() => assertStableDenominator([1, -1.7, 0.6])).toThrow(RangeError);
+    // (z - 0.7)(z - 0.8) = z^2 - 1.5z + 0.56 is inside the envelope.
+    expect(() => assertStableDenominator([1, -1.5, 0.56])).not.toThrow();
+  });
+
+  it("rejects orders outside the integer range 1..8", () => {
+    for (const order of [0, -1, 9, 2.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() =>
+        designButterworth({ band: "lowpass", cutoffHz: [4000], order, sampleRateHz: 48000 }),
+      ).toThrow(RangeError);
+      expect(() =>
+        designChebyshev1({
+          band: "lowpass",
+          cutoffHz: [4000],
+          order,
+          rippleDb: 1,
+          sampleRateHz: 48000,
+        }),
+      ).toThrow(RangeError);
+    }
+    expect(() =>
+      designButterworth({ band: "lowpass", cutoffHz: [4000], order: 8, sampleRateHz: 48000 }),
+    ).not.toThrow();
+  });
+
+  it("rejects ripple outside [0.1, 3] dB", () => {
+    for (const rippleDb of [0, 0.05, 3.01, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() =>
+        designChebyshev1({
+          band: "lowpass",
+          cutoffHz: [4000],
+          order: 4,
+          rippleDb,
+          sampleRateHz: 48000,
+        }),
+      ).toThrow(RangeError);
+    }
+    for (const rippleDb of [0.1, 3]) {
+      expect(() =>
+        designChebyshev1({
+          band: "lowpass",
+          cutoffHz: [4000],
+          order: 4,
+          rippleDb,
+          sampleRateHz: 48000,
+        }),
+      ).not.toThrow();
+    }
+  });
+
+  it("rejects a cutoff count that does not match the band", () => {
+    for (const [band, cutoffHz] of [
+      ["lowpass", [4000, 12000]],
+      ["highpass", []],
+      ["bandpass", [4000]],
+      ["bandstop", [4000]],
+    ] as const) {
+      expect(() =>
+        designButterworth({ band, cutoffHz: [...cutoffHz], order: 2, sampleRateHz: 48000 }),
+      ).toThrow(RangeError);
+    }
+  });
+
+  it("rejects cutoffs outside (0, fs/2) and cutoffs that are not strictly increasing", () => {
+    for (const cutoffHz of [
+      [0],
+      [-1],
+      [24000],
+      [30000],
+      [Number.NaN],
+      [Number.POSITIVE_INFINITY],
+    ]) {
+      expect(() =>
+        designButterworth({ band: "lowpass", cutoffHz, order: 2, sampleRateHz: 48000 }),
+      ).toThrow(RangeError);
+    }
+    for (const cutoffHz of [
+      [12000, 4000],
+      [4000, 4000],
+      [4000, 24000],
+    ]) {
+      expect(() =>
+        designButterworth({ band: "bandpass", cutoffHz, order: 2, sampleRateHz: 48000 }),
+      ).toThrow(RangeError);
+    }
+  });
+
+  it("rejects invalid sample rates and unknown runtime bands", () => {
+    for (const sampleRateHz of [0, -48000, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() =>
+        designButterworth({ band: "lowpass", cutoffHz: [4000], order: 2, sampleRateHz }),
+      ).toThrow(RangeError);
+    }
+    expect(() =>
+      designButterworth({
+        band: "notch" as unknown as IirBand,
+        cutoffHz: [4000],
+        order: 2,
+        sampleRateHz: 48000,
+      }),
+    ).toThrow(RangeError);
+  });
+
+  it("does not mutate the cutoff array and returns fresh coefficient arrays", () => {
+    const options: ButterworthOptions = {
+      band: "bandpass",
+      cutoffHz: [1000, 4000],
+      order: 3,
+      sampleRateHz: 48000,
+    };
+    const before = [...options.cutoffHz];
+    const first = designButterworth(options);
+    const second = designButterworth(options);
+    expect(options.cutoffHz).toEqual(before);
+    expect(first.b).not.toBe(second.b);
+    expect(first.a).not.toBe(second.a);
+    expect(Array.from(first.b)).toEqual(Array.from(second.b));
+  });
+});
+
+describe("applyFilter", () => {
+  it("implements the impulse response of the designed difference equation", () => {
+    const coefficients = designButterworth({
+      band: "lowpass",
+      cutoffHz: [2000],
+      order: 4,
+      sampleRateHz: SAMPLE_RATE_HZ,
+    });
+    const impulse = new Float64Array(128);
+    impulse[0] = 1;
+    const actual = applyFilter(impulse, coefficients);
+    expectArrayClose(
+      actual,
+      Array.from(impulseResponseFromDifferenceEquation(coefficients, 128)),
+      1e-12,
+      1e-12,
+      "impulse response",
+    );
+  });
+
+  it("normalizes the coefficients by a[0]", () => {
+    const output = applyFilter(Float64Array.of(0.5, 1), {
+      b: Float64Array.of(2, 2),
+      a: Float64Array.of(2),
+    });
+    expect(Array.from(output)).toEqual([0.5, 1.5]);
+  });
+
+  it("rejects empty coefficient arrays and a zero a[0]", () => {
+    expect(() =>
+      applyFilter(Float64Array.of(1), { b: new Float64Array(0), a: Float64Array.of(1) }),
+    ).toThrow(RangeError);
+    expect(() =>
+      applyFilter(Float64Array.of(1), { b: Float64Array.of(1), a: new Float64Array(0) }),
+    ).toThrow(RangeError);
+    expect(() =>
+      applyFilter(Float64Array.of(1), { b: Float64Array.of(1), a: Float64Array.of(0, 1) }),
+    ).toThrow(RangeError);
+  });
+
+  it("rejects non-finite samples and coefficients with TypeError", () => {
+    const coefficients = { b: Float64Array.of(1), a: Float64Array.of(1) };
+    for (const sample of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      expect(() => applyFilter(Float64Array.of(sample), coefficients)).toThrow(TypeError);
+    }
+    expect(() =>
+      applyFilter(Float64Array.of(1), { b: Float64Array.of(Number.NaN), a: Float64Array.of(1) }),
+    ).toThrow(TypeError);
+    expect(() =>
+      applyFilter(Float64Array.of(1), { b: Float64Array.of(1), a: Float64Array.of(1, Number.NaN) }),
+    ).toThrow(TypeError);
+  });
+
+  it("returns an empty array for empty input and leaves the input unchanged", () => {
+    const coefficients = designChebyshev1({
+      band: "highpass",
+      cutoffHz: [4000],
+      order: 4,
+      rippleDb: 1,
+      sampleRateHz: SAMPLE_RATE_HZ,
+    });
+    expect(applyFilter(new Float64Array(0), coefficients).length).toBe(0);
+
+    const input = sine(1000, 0.01);
+    const before = Array.from(input);
+    applyFilter(input, coefficients);
+    expect(Array.from(input)).toEqual(before);
+  });
+});
