@@ -99,6 +99,9 @@ describe("lossless delta+Huffman round-trip (bit-exact)", () => {
     { label: "seeded random", samples: seededRandomSamples(7, 4096) },
     { label: "single sample", samples: Int16Array.of(12345) },
     { label: "empty", samples: new Int16Array(0) },
+    { label: "wrap edge", samples: Int16Array.of(32767, -32768, 32767, -32768) },
+    // Residual −32768 → zigzag u = 65535 → low = high = 0xFF through decode.
+    { label: "extreme residual", samples: Int16Array.of(0, -32768) },
   ];
   for (const testCase of cases) {
     it(`round-trips ${testCase.label} bit-exactly`, () => {
