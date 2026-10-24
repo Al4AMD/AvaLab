@@ -65,10 +65,16 @@
  * [0.1, 3]; sampleRateHz finite and > 0; cutoffHz holds exactly 1 value for
  * lowpass/highpass and 2 for bandpass/bandstop, finite, strictly increasing,
  * each strictly inside (0, sampleRateHz/2). Every invalid configuration throws
- * RangeError. applyFilter throws TypeError for NaN/Infinity in the data or in
- * b/a, and RangeError for empty b/a or a[0] = 0. Empty data returns an empty
- * array after the coefficient guards pass. No input is mutated.
+ * RangeError. After the bilinear transform the realized denominator roots are
+ * checked with Durand-Kerner iteration: a root with |z| >= 1 - 1e-9, a failed
+ * iteration, or a non-finite coefficient/root throws RangeError instead of
+ * returning a silently unstable design. applyFilter throws TypeError for
+ * NaN/Infinity in the data or in b/a, and RangeError for empty b/a or
+ * a[0] = 0. Empty data returns an empty array after the coefficient guards
+ * pass. No input is mutated.
  */
+
+import { polynomialRoots } from "./polynomial.js";
 
 export type IirBand = "lowpass" | "highpass" | "bandpass" | "bandstop";
 
@@ -103,6 +109,10 @@ interface AnalogPrototype {
 const MAX_ORDER = 8;
 const MIN_RIPPLE_DB = 0.1;
 const MAX_RIPPLE_DB = 3;
+/** Roots at or outside 1 - 1e-9 are practical instability for this design. */
+const UNITY_STABILITY_MARGIN = 1e-9;
+const UNSTABLE_DESIGN_MESSAGE =
+  "designIir: IIR design is numerically unstable at this order; reduce order or move the cutoff";
 
 function complex(re: number, im: number): ComplexValue {
   return { re, im };
@@ -364,9 +374,31 @@ function bilinearTransform(prototype: AnalogPrototype): AnalogPrototype {
   return { zeros, poles, gain };
 }
 
+/**
+ * Reject a design whose realized denominator polynomial has a root outside
+ * the unit circle. The analog prototype is stable by construction, but the
+ * bilinear transform plus the b/a expansion can move coefficients enough at
+ * high order that the realized filter diverges (e.g. bandpass order 8 turns
+ * into degree 16). Checking the actual `a` polynomial catches that before the
+ * caller can apply it.
+ */
+function assertStableDenominator(denominator: readonly ComplexValue[]): void {
+  const result = polynomialRoots(denominator.map((coefficient) => coefficient.re));
+  if (!result.converged) {
+    throw new RangeError(UNSTABLE_DESIGN_MESSAGE);
+  }
+  for (const root of result.roots) {
+    const modulus = Math.hypot(root.re, root.im);
+    if (!Number.isFinite(modulus) || modulus >= 1 - UNITY_STABILITY_MARGIN) {
+      throw new RangeError(UNSTABLE_DESIGN_MESSAGE);
+    }
+  }
+}
+
 function coefficientsFromPrototype(prototype: AnalogPrototype): IirCoefficients {
   const numerator = polynomialFromRoots(prototype.zeros);
   const denominator = polynomialFromRoots(prototype.poles);
+  assertStableDenominator(denominator);
   const b = new Float64Array(numerator.length);
   const a = new Float64Array(denominator.length);
   for (let index = 0; index < numerator.length; index += 1) {

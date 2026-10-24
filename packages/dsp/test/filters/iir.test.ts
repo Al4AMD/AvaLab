@@ -145,6 +145,19 @@ function expectArrayClose(
   }
 }
 
+function expectUnstableIirDesign(design: () => unknown): void {
+  let thrown: unknown;
+  try {
+    design();
+  } catch (error) {
+    thrown = error;
+  }
+  expect(thrown).toBeInstanceOf(RangeError);
+  expect(thrown instanceof Error ? thrown.message : "").toContain(
+    "IIR design is numerically unstable at this order; reduce order or move the cutoff",
+  );
+}
+
 function rootMeanSquare(samples: Float64Array, startSample: number): number {
   let sum = 0;
   for (let index = startSample; index < samples.length; index += 1) {
@@ -302,6 +315,53 @@ describe("designButterworth and designChebyshev1", () => {
           rootMeanSquare(stopbandInput, transitionSamples),
       );
     expect(stopbandDb).toBeLessThanOrEqual(-30);
+  });
+
+  it("rejects order-8 bandpass designs whose realized denominator is unstable", () => {
+    // Reviewer cases: the coefficients are finite and match SciPy, but the
+    // degree-16 b/a form has roots outside the unit circle.
+    expectUnstableIirDesign(() =>
+      designChebyshev1({
+        band: "bandpass",
+        cutoffHz: [1000, 4000],
+        order: 8,
+        rippleDb: 1,
+        sampleRateHz: SAMPLE_RATE_HZ,
+      }),
+    );
+    expectUnstableIirDesign(() =>
+      designButterworth({
+        band: "bandpass",
+        cutoffHz: [100, 200],
+        order: 8,
+        sampleRateHz: SAMPLE_RATE_HZ,
+      }),
+    );
+  });
+
+  it("rejects an order-8 bandstop design whose realized denominator is unstable", () => {
+    expectUnstableIirDesign(() =>
+      designButterworth({
+        band: "bandstop",
+        cutoffHz: [100, 200],
+        order: 8,
+        sampleRateHz: SAMPLE_RATE_HZ,
+      }),
+    );
+  });
+
+  it("returns a stable order-8 lowpass design", () => {
+    const coefficients = designButterworth({
+      band: "lowpass",
+      cutoffHz: [4000],
+      order: 8,
+      sampleRateHz: SAMPLE_RATE_HZ,
+    });
+    expect(coefficients.a.length).toBe(9);
+    const poles = polynomialRoots(Array.from(coefficients.a));
+    for (const pole of poles) {
+      expect(Math.hypot(pole.re, pole.im)).toBeLessThan(1 - 1e-9);
+    }
   });
 
   it("rejects orders outside the integer range 1..8", () => {
