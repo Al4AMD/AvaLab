@@ -8,7 +8,7 @@ ruling R5 — the two implementations that must agree are this file and
 
 Runs longer than 65535 bytes are split greedily (records of 65535 until the
 remaining run is shorter), so 70000 identical bytes encode as the records
-65535 + 2465. The format is NOT self-delimiting by design: a stream of any
+65535 + 4465. The format is NOT self-delimiting by design: a stream of any
 length that is a multiple of 3 is decodable, so corrupted streams decode into
 arbitrary bytes unless they are truncated (odd tail) or carry a count of 0.
 

@@ -13,7 +13,7 @@
  *   stream = zero or more records (a record count must be at least 1)
  * Runs longer than 65535 bytes are split greedily: the scan emits records of
  * 65535 until the remaining run is shorter, so 70000 identical bytes encode
- * as the two records 65535 + 4465 and 200000 as 65535 + 65535 + 65535 + 3495.
+ * as the two records 65535 + 4465 and 200000 as 65535 + 65535 + 65535 + 3395.
  * The greedy split is deterministic: any encoder using the same maximal-run
  * scan yields exactly this stream, which is what the golden vectors pin.
  *
