@@ -67,15 +67,26 @@
  * represent slightly different roots than the transformed prototype, and root
  * certification near the unit circle is unreliable in both directions. We do
  * not pretend to certify exact roots. Instead every design is conservatively
- * restricted to a conditioning envelope: the Durand-Kerner check must
- * converge, every root must satisfy |z| < 1, and max|z| must be at most 0.995
- * (a 5e-3 margin to the unit circle). Designs outside the envelope throw
- * RangeError with a message telling the caller to reduce the order; no
- * coefficient is clamped or otherwise adjusted. This is deliberately
- * conservative: narrow/high-order lowpass/highpass designs and most order-8
- * bandpass/bandstop designs are refused. A second-order-sections (SOS) or
- * state-space realization would remove the b/a conditioning problem and is
- * future work, not part of this API.
+ * restricted to a solver-estimated conditioning envelope: the Durand-Kerner
+ * check must converge, every root must satisfy |z| < 1, and max|z| must be at
+ * most 0.995 (a 5e-3 margin to the unit circle). This envelope is an early
+ * conservative filter, not proof: the root estimates are themselves computed
+ * in double precision and can be wrong by enough to accept a design that
+ * actually diverges.
+ *
+ * Final acceptance is therefore behavioral: the realized b/a pair is run
+ * through the same transposed-direct-form-II kernel as `applyFilter` with a
+ * unit impulse and zero state for 48000 samples. A design is rejected with
+ * RangeError when any output is non-finite, when the response is effectively
+ * silent (max|y| <= 1e-9), or when it does not decay (the maximum over the
+ * last quarter, samples 36000..47999, is greater than half the overall
+ * maximum). Both checks are conservative: narrow/high-order lowpass/highpass
+ * designs and most order-8 bandpass/bandstop designs are refused even though
+ * their analog prototype is stable. No coefficient is clamped or otherwise
+ * adjusted. A much longer simulation could still find a slowly growing design
+ * (48000 samples is a practical horizon, not a proof); a second-order-sections
+ * (SOS) or state-space realization would remove the b/a conditioning problem
+ * and is future work, not part of this API.
  *
  * Edge cases: order must be an integer in [1, 8] (higher orders in b/a form
  * are numerically fragile, so they are rejected); rippleDb must be in
@@ -87,10 +98,13 @@
  * distinct RangeError, and a root with |z| >= 1 or max|z| > 0.995 throws the
  * conditioning-envelope RangeError instead of returning a fragile design.
  * A step-only stall is not treated as instability: the root helper also
- * accepts an accurate relative polynomial residual. applyFilter throws
- * TypeError for NaN/Infinity in the data or in b/a, and RangeError for empty
- * b/a or a[0] = 0. Empty data returns an empty array after the coefficient
- * guards pass. No input is mutated.
+ * accepts an accurate relative polynomial residual. The solver envelope is
+ * followed by the behavioral impulse-response validation described above,
+ * which is the final acceptance test; a non-finite, silent or non-decaying
+ * response throws a distinct RangeError. applyFilter throws TypeError for
+ * NaN/Infinity in the data or in b/a, and RangeError for empty b/a or
+ * a[0] = 0. Empty data returns an empty array after the coefficient guards
+ * pass. No input is mutated.
  */
 
 import { polynomialRoots } from "./polynomial.js";
@@ -134,10 +148,29 @@ const MAX_RIPPLE_DB = 3;
  * coefficient rounding cannot silently return a fragile design.
  */
 const MAX_POLE_MODULUS = 0.995;
+/**
+ * Behavioral acceptance horizon. A stable high-order b/a design has decayed
+ * long before 48000 samples at 48 kHz, while a divergent realization grows
+ * without bound; one second is enough to expose the practical cases without
+ * making design calls expensive.
+ */
+const IMPULSE_RESPONSE_SAMPLES = 48000;
+/** Start of the last quarter (samples 36000..47999). */
+const IMPULSE_RESPONSE_TAIL_START = 36000;
+/** The last-quarter max must be at most this fraction of the overall max. */
+const IMPULSE_RESPONSE_TAIL_RATIO = 0.5;
+/** An impulse response below this maximum is treated as a silent design. */
+const SILENT_RESPONSE_MAX = 1e-9;
 const UNSTABLE_DESIGN_MESSAGE =
   "designIir: IIR design is numerically unstable at this order; reduce order or move the cutoff (b/a conditioning envelope: max|pole| must stay <= 0.995; SOS is not yet implemented)";
 const ROOT_FINDING_FAILED_MESSAGE =
   "designIir: IIR denominator root finding did not converge; reduce order or move the cutoff";
+const NONFINITE_RESPONSE_MESSAGE =
+  "designIir: IIR design impulse response is non-finite at this order; reduce order or move the cutoff (behavioral b/a validation over 48000 samples)";
+const SILENT_RESPONSE_MESSAGE =
+  "designIir: IIR design impulse response is silent at this order; reduce order or move the cutoff (behavioral b/a validation over 48000 samples)";
+const NON_DECAYING_RESPONSE_MESSAGE =
+  "designIir: IIR design impulse response does not decay at this order; reduce order or move the cutoff (behavioral b/a validation over 48000 samples; SOS is not yet implemented)";
 
 function complex(re: number, im: number): ComplexValue {
   return { re, im };
@@ -430,6 +463,54 @@ export function assertStableDenominator(denominatorCoefficients: readonly number
   }
 }
 
+/**
+ * Final, behavioral acceptance test for the realized b/a pair. The root
+ * envelope above is only a solver estimate; double-precision root finding can
+ * report max|z| < 0.995 while the actual polynomial roots are outside the unit
+ * circle (e.g. bandstop order 8 at 842.5–2850 Hz). Running the exact
+ * transposed-direct-form-II kernel used by `applyFilter` on a unit impulse
+ * with zero state for 48000 samples directly exposes that case: a divergent
+ * response is either non-finite or still growing at the end of the window.
+ *
+ * Rejection rules (all RangeError):
+ *   - any non-finite output;
+ *   - max|y| <= 1e-9 over the window (silent design, not a usable filter);
+ *   - max|y[36000..47999]| > 0.5 * max|y[0..47999]| (does not decay).
+ *
+ * The impulse and output buffers are allocated once, outside the simulation
+ * loop; no allocation happens per sample.
+ */
+function assertDecayingImpulseResponse(coefficients: IirCoefficients): void {
+  const impulse = new Float64Array(IMPULSE_RESPONSE_SAMPLES);
+  impulse[0] = 1;
+  const response = applyFilter(impulse, coefficients);
+
+  let overallMax = 0;
+  for (let sample = 0; sample < response.length; sample += 1) {
+    const magnitude = Math.abs(response[sample] ?? 0);
+    if (!Number.isFinite(magnitude)) {
+      throw new RangeError(NONFINITE_RESPONSE_MESSAGE);
+    }
+    if (magnitude > overallMax) {
+      overallMax = magnitude;
+    }
+  }
+  if (overallMax <= SILENT_RESPONSE_MAX) {
+    throw new RangeError(SILENT_RESPONSE_MESSAGE);
+  }
+
+  let tailMax = 0;
+  for (let sample = IMPULSE_RESPONSE_TAIL_START; sample < response.length; sample += 1) {
+    const magnitude = Math.abs(response[sample] ?? 0);
+    if (magnitude > tailMax) {
+      tailMax = magnitude;
+    }
+  }
+  if (tailMax > IMPULSE_RESPONSE_TAIL_RATIO * overallMax) {
+    throw new RangeError(NON_DECAYING_RESPONSE_MESSAGE);
+  }
+}
+
 function coefficientsFromPrototype(prototype: AnalogPrototype): IirCoefficients {
   const numerator = polynomialFromRoots(prototype.zeros);
   const denominator = polynomialFromRoots(prototype.poles);
@@ -452,6 +533,7 @@ function coefficientsFromPrototype(prototype: AnalogPrototype): IirCoefficients 
       throw new RangeError("designIir: design produced a non-finite coefficient (a)");
     }
   }
+  assertDecayingImpulseResponse({ b, a });
   return { b, a };
 }
 

@@ -171,6 +171,47 @@ function expectRejectedIirDesign(design: () => unknown): void {
   expect(thrown instanceof Error ? thrown.message : "").toContain("reduce order");
 }
 
+function expectBehavioralRejection(design: () => unknown, messagePart: string): void {
+  let thrown: unknown;
+  try {
+    design();
+  } catch (error) {
+    thrown = error;
+  }
+  expect(thrown).toBeInstanceOf(RangeError);
+  expect(thrown instanceof Error ? thrown.message : "").toContain(messagePart);
+}
+
+/**
+ * Independent re-simulation of the 48000-sample impulse response used by the
+ * design-time behavioral guard. Returns the overall maximum, the maximum over
+ * the last quarter, and whether every sample was finite.
+ */
+function impulseResponseStats(coefficients: IirCoefficients): {
+  overallMax: number;
+  tailMax: number;
+  finite: boolean;
+} {
+  const impulse = new Float64Array(48000);
+  impulse[0] = 1;
+  const response = applyFilter(impulse, coefficients);
+  let overallMax = 0;
+  let tailMax = 0;
+  let finite = true;
+  for (let sample = 0; sample < response.length; sample += 1) {
+    const magnitude = Math.abs(response[sample] ?? 0);
+    if (!Number.isFinite(magnitude)) {
+      finite = false;
+      continue;
+    }
+    overallMax = Math.max(overallMax, magnitude);
+    if (sample >= 36000) {
+      tailMax = Math.max(tailMax, magnitude);
+    }
+  }
+  return { overallMax, tailMax, finite };
+}
+
 function rootMeanSquare(samples: Float64Array, startSample: number): number {
   let sum = 0;
   for (let index = startSample; index < samples.length; index += 1) {
@@ -363,6 +404,23 @@ describe("designButterworth and designChebyshev1", () => {
     );
   });
 
+  it("rejects the reviewer order-8 bandstop design by impulse-response decay, not the solver envelope", () => {
+    // The Durand-Kerner solver reports max|z| = 0.993855593429 (inside the
+    // 0.995 envelope), but the exact float64 roots of the returned `a` have
+    // max|p| = 1.00183894675 and the impulse response grows to ~7e35 by
+    // sample 48000. Only the behavioral simulation catches this design.
+    expectBehavioralRejection(
+      () =>
+        designButterworth({
+          band: "bandstop",
+          cutoffHz: [842.5, 2850],
+          order: 8,
+          sampleRateHz: SAMPLE_RATE_HZ,
+        }),
+      "impulse response does not decay",
+    );
+  });
+
   it("returns a stable order-8 lowpass design inside the conditioning envelope", () => {
     const coefficients = designButterworth({
       band: "lowpass",
@@ -393,6 +451,19 @@ describe("designButterworth and designChebyshev1", () => {
     }
   });
 
+  it("rejects the 151 Hz order-8 lowpass design with RangeError", () => {
+    // Solver max|z| = 0.9987418410854232: the envelope rejects before the
+    // behavioral simulation runs.
+    expectUnstableIirDesign(() =>
+      designButterworth({
+        band: "lowpass",
+        cutoffHz: [151],
+        order: 8,
+        sampleRateHz: SAMPLE_RATE_HZ,
+      }),
+    );
+  });
+
   it("accepts order-8 lowpass designs inside the conditioning envelope", () => {
     for (const cutoffHz of [500, 1000, 4000]) {
       const coefficients = designButterworth({
@@ -408,6 +479,13 @@ describe("designButterworth and designChebyshev1", () => {
         const modulus = Math.hypot(pole.re, pole.im);
         expect(modulus, `${cutoffHz} Hz pole |z| = ${modulus}`).toBeLessThan(0.995);
       }
+      const stats = impulseResponseStats(coefficients);
+      expect(stats.finite, `${cutoffHz} Hz impulse response finite`).toBe(true);
+      expect(stats.overallMax, `${cutoffHz} Hz impulse response not silent`).toBeGreaterThan(1e-9);
+      expect(
+        stats.tailMax,
+        `${cutoffHz} Hz last-quarter max ${stats.tailMax} <= 0.5 * ${stats.overallMax}`,
+      ).toBeLessThanOrEqual(0.5 * stats.overallMax);
     }
   });
 
