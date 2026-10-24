@@ -11,6 +11,7 @@
  * Edge cases: n/a; every exported function documents its own.
  */
 
+export { rleDecode, rleEncode } from "./codecs/rle.js";
 export type {
   FreqzOptions,
   FreqzResult,
