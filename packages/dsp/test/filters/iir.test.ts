@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { polynomialRoots as findPolynomialRoots } from "../../src/filters/polynomial.js";
 import type {
   ButterworthOptions,
   Chebyshev1Options,
@@ -362,6 +363,65 @@ describe("designButterworth and designChebyshev1", () => {
     for (const pole of poles) {
       expect(Math.hypot(pole.re, pole.im)).toBeLessThan(1 - 1e-9);
     }
+  });
+
+  it("accepts stable order-8 designs whose root iteration stalls on the step", () => {
+    // These designs used to throw: the Durand-Kerner step stalls around 1e-11
+    // while the relative polynomial residual is ~1e-15, so the roots are
+    // accurate. The guard must accept them.
+    const designs = [
+      {
+        label: "Butterworth lowpass 1 kHz",
+        coefficients: designButterworth({
+          band: "lowpass",
+          cutoffHz: [1000],
+          order: 8,
+          sampleRateHz: SAMPLE_RATE_HZ,
+        }),
+      },
+      {
+        label: "Chebyshev I lowpass 1 kHz",
+        coefficients: designChebyshev1({
+          band: "lowpass",
+          cutoffHz: [1000],
+          order: 8,
+          rippleDb: 1,
+          sampleRateHz: SAMPLE_RATE_HZ,
+        }),
+      },
+      {
+        label: "Butterworth highpass 500 Hz",
+        coefficients: designButterworth({
+          band: "highpass",
+          cutoffHz: [500],
+          order: 8,
+          sampleRateHz: SAMPLE_RATE_HZ,
+        }),
+      },
+    ];
+    for (const { label, coefficients } of designs) {
+      expect(coefficients.a.length, label).toBe(9);
+      const poles = polynomialRoots(Array.from(coefficients.a));
+      expect(poles.length, label).toBe(8);
+      for (const pole of poles) {
+        const modulus = Math.hypot(pole.re, pole.im);
+        expect(modulus, `${label} pole |z| = ${modulus} must be < 1 - 1e-9`).toBeLessThan(1 - 1e-9);
+      }
+    }
+  });
+
+  it("finds a synthetic polynomial root outside the unit circle", () => {
+    // (z - 0.5)(z - 1.2) = z^2 - 1.7z + 0.6: the residual acceptance criterion
+    // must stay valid for roots outside the unit circle.
+    const result = findPolynomialRoots([1, -1.7, 0.6]);
+    expect(result.converged).toBe(true);
+    const moduli = result.roots
+      .map((root) => Math.hypot(root.re, root.im))
+      .sort((left, right) => left - right);
+    expect(moduli.length).toBe(2);
+    expect(moduli[0] ?? Number.NaN).toBeCloseTo(0.5, 10);
+    expect(moduli[1] ?? Number.NaN).toBeCloseTo(1.2, 10);
+    expect(moduli[1] ?? Number.NaN).toBeGreaterThanOrEqual(1 - 1e-9);
   });
 
   it("rejects orders outside the integer range 1..8", () => {

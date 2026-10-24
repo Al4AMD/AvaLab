@@ -11,6 +11,15 @@
  * `R = 0.5` (deterministic: no random numbers, so repeated calls return the
  * same roots).
  *
+ * Convergence criterion: after normalization by the leading coefficient
+ * (`c_0 = 1`), a result is accepted when either
+ *   - the largest per-root step of the last iteration is < 1e-12, or
+ *   - the relative polynomial residual is small:
+ *       max_k |p(z_k)| / max(1, |z_k|)^N <= 1e-10.
+ * The second test is what clustered high-degree roots need: roundoff makes
+ * the step stall near 1e-11 while the roots are still accurate to ~1e-15.
+ * Non-convergence is reported only when both tests fail.
+ *
  * Reference: Durand, "Solutions numeriques des equations algebriques" (1960);
  * Kerner, "Ein Gesamtschrittverfahren zur Berechnung der Nullstellen von
  * Polynomen", Numerische Mathematik 8 (1966).
@@ -35,12 +44,13 @@ export interface PolynomialRootsResult {
 }
 
 const MAX_ITERATIONS = 2000;
+/** Largest per-root update accepted as a converged step. */
+const STEP_TOLERANCE = 1e-12;
 /**
- * Absolute step bound. Roundoff in clustered high-degree roots stalls the
- * iteration around 1e-11 while the polynomial residual is still ~1e-15, so a
- * tighter bound would reject accurate roots as non-converged.
+ * Relative residual bound: max |p(z_k)| / max(1, |z_k|)^N after normalizing
+ * the polynomial to a monic one.
  */
-const STEP_TOLERANCE = 1e-10;
+const RESIDUAL_TOLERANCE = 1e-10;
 const INITIAL_RADIUS = 0.5;
 const INITIAL_ANGLE_OFFSET = 0.1;
 
@@ -59,6 +69,29 @@ function evaluatePolynomial(coefficients: readonly number[], root: PolynomialRoo
     value = { re: value.re + (coefficients[index] ?? 0), im: value.im };
   }
   return value;
+}
+
+/**
+ * Monic relative residual `max |p(z_k)| / max(1, |z_k|)^N`. Scaling by the
+ * modulus of the evaluation point keeps the test meaningful for roots outside
+ * the unit circle instead of exploding with `|z|^N`.
+ */
+function relativeResidual(
+  coefficients: readonly number[],
+  roots: readonly PolynomialRoot[],
+): number {
+  const degree = coefficients.length - 1;
+  let worst = 0;
+  for (const root of roots) {
+    const value = evaluatePolynomial(coefficients, root);
+    const scale = Math.max(1, Math.hypot(root.re, root.im)) ** degree;
+    const residual = Math.hypot(value.re, value.im) / scale;
+    if (!Number.isFinite(residual)) {
+      return Number.POSITIVE_INFINITY;
+    }
+    worst = Math.max(worst, residual);
+  }
+  return worst;
 }
 
 export function polynomialRoots(coefficients: readonly number[]): PolynomialRootsResult {
@@ -118,10 +151,13 @@ export function polynomialRoots(coefficients: readonly number[]): PolynomialRoot
         return { roots, converged: false };
       }
     }
-    if (largestStep <= STEP_TOLERANCE) {
+    if (largestStep < STEP_TOLERANCE) {
       return { roots, converged: true };
     }
   }
 
-  return { roots, converged: false };
+  return {
+    roots,
+    converged: relativeResidual(normalized, roots) <= RESIDUAL_TOLERANCE,
+  };
 }

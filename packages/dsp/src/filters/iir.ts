@@ -66,12 +66,14 @@
  * lowpass/highpass and 2 for bandpass/bandstop, finite, strictly increasing,
  * each strictly inside (0, sampleRateHz/2). Every invalid configuration throws
  * RangeError. After the bilinear transform the realized denominator roots are
- * checked with Durand-Kerner iteration: a root with |z| >= 1 - 1e-9, a failed
- * iteration, or a non-finite coefficient/root throws RangeError instead of
- * returning a silently unstable design. applyFilter throws TypeError for
- * NaN/Infinity in the data or in b/a, and RangeError for empty b/a or
- * a[0] = 0. Empty data returns an empty array after the coefficient guards
- * pass. No input is mutated.
+ * checked with Durand-Kerner iteration: a root with |z| >= 1 - 1e-9 throws
+ * RangeError, as does a genuine root-finding failure (distinct message) or a
+ * non-finite coefficient/root, instead of returning a silently unstable
+ * design. A step-only stall is not treated as instability: the root helper
+ * also accepts an accurate relative polynomial residual. applyFilter throws
+ * TypeError for NaN/Infinity in the data or in b/a, and RangeError for empty
+ * b/a or a[0] = 0. Empty data returns an empty array after the coefficient
+ * guards pass. No input is mutated.
  */
 
 import { polynomialRoots } from "./polynomial.js";
@@ -113,6 +115,8 @@ const MAX_RIPPLE_DB = 3;
 const UNITY_STABILITY_MARGIN = 1e-9;
 const UNSTABLE_DESIGN_MESSAGE =
   "designIir: IIR design is numerically unstable at this order; reduce order or move the cutoff";
+const ROOT_FINDING_FAILED_MESSAGE =
+  "designIir: IIR denominator root finding did not converge; reduce order or move the cutoff";
 
 function complex(re: number, im: number): ComplexValue {
   return { re, im };
@@ -385,7 +389,7 @@ function bilinearTransform(prototype: AnalogPrototype): AnalogPrototype {
 function assertStableDenominator(denominator: readonly ComplexValue[]): void {
   const result = polynomialRoots(denominator.map((coefficient) => coefficient.re));
   if (!result.converged) {
-    throw new RangeError(UNSTABLE_DESIGN_MESSAGE);
+    throw new RangeError(ROOT_FINDING_FAILED_MESSAGE);
   }
   for (const root of result.roots) {
     const modulus = Math.hypot(root.re, root.im);
