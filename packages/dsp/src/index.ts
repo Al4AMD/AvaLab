@@ -12,12 +12,29 @@
  */
 
 export type {
+  BiquadGainOptions,
+  BiquadOptions,
+} from "./filters/biquad.js";
+export {
+  biquadHighpass,
+  biquadLowpass,
+  biquadNotch,
+  biquadPeaking,
+} from "./filters/biquad.js";
+export type {
   FirBand,
   FirWindowFilter,
   FirWindowKind,
   FirWindowOptions,
 } from "./filters/fir.js";
 export { designFirWindow } from "./filters/fir.js";
+export type {
+  ButterworthOptions,
+  Chebyshev1Options,
+  IirBand,
+  IirCoefficients,
+} from "./filters/iir.js";
+export { applyFilter, designButterworth, designChebyshev1 } from "./filters/iir.js";
 export { fftBluestein } from "./fourier/bluestein.js";
 export type { Complex } from "./fourier/complex.js";
 export { dftNaive, idftNaive } from "./fourier/dft.js";
