@@ -305,6 +305,18 @@ describe("freqz", () => {
     },
   );
 
+  it("rejects a filter with a pole on the unit circle", () => {
+    expectThrows(
+      () =>
+        freqz(Float64Array.of(1), Float64Array.of(1, -1), {
+          numPoints: 3,
+          sampleRateHz: SAMPLE_RATE_HZ,
+        }),
+      RangeError,
+      "pole on the unit circle at 0 Hz",
+    );
+  });
+
   it("returns a flat unit response for b = a = [1]", () => {
     const actual = freqz(Float64Array.of(1), Float64Array.of(1), {
       numPoints: 16,

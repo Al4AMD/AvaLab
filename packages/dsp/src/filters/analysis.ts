@@ -63,6 +63,10 @@
  * entries and `a[0] !== 0`; non-finite coefficients throw `TypeError`, an
  * empty array or `a[0] = 0` throws `RangeError`. `numPoints` must be an
  * integer >= 2 and `sampleRateHz` finite > 0 → else `RangeError`.
+ * `freqz` throws `RangeError` when the denominator vanishes on the unit
+ * circle (a pole there, e.g. `a = [1, -1]` at DC): the response is undefined
+ * and `0/0` would otherwise surface as a silent NaN. The guard triggers when
+ * `|A|² <= Number.MIN_VALUE`, which also covers subnormal squares.
  * `unwrapPhase` throws `TypeError` for non-finite phase values, and empty
  * input returns an empty array. Response lengths must be non-negative
  * integers (0 returns an empty array after the coefficient guards). A
@@ -190,13 +194,21 @@ export function freqz(b: Float64Array, a: Float64Array, options: FreqzOptions): 
   for (let index = 0; index < numPoints; index += 1) {
     // The final point is pinned exactly to Nyquist so the inclusive grid
     // contract cannot drift by one ulp.
-    frequencyHz[index] =
+    const frequencyHzValue =
       index === numPoints - 1 ? nyquistHz : (index * nyquistHz) / (numPoints - 1);
+    frequencyHz[index] = frequencyHzValue;
     const omega = index === numPoints - 1 ? PHASE_DISCONTINUITY_RAD : index * deltaOmega;
     const numerator = evaluateAtUnitCircle(b, omega);
     const denominator = evaluateAtUnitCircle(a, omega);
     const denominatorMagnitudeSquared =
       denominator.re * denominator.re + denominator.im * denominator.im;
+    // A vanishing denominator means a pole on the unit circle: H is undefined
+    // there, and permitting 0/0 would silently poison magnitude and phase.
+    if (denominatorMagnitudeSquared <= Number.MIN_VALUE) {
+      throw new RangeError(
+        `freqz: filter has a pole on the unit circle at ${frequencyHzValue} Hz; response undefined`,
+      );
+    }
     const real =
       (numerator.re * denominator.re + numerator.im * denominator.im) / denominatorMagnitudeSquared;
     const imaginary =
