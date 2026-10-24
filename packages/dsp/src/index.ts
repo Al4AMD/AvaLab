@@ -29,6 +29,13 @@ export {
   huffmanEncode,
   validatePrefixFree,
 } from "./codecs/huffman.js";
+export type {
+  MdctCodecDecodeParams,
+  MdctCodecEncoded,
+  MdctCodecEncodeParams,
+  MdctCodecStats,
+} from "./codecs/mdctCodec.js";
+export { decodeMdct, encodeMdct } from "./codecs/mdctCodec.js";
 export { rleDecode, rleEncode } from "./codecs/rle.js";
 export type {
   FreqzOptions,
