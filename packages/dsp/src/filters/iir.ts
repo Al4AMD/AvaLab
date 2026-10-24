@@ -57,8 +57,25 @@
  * bilinear transform); SciPy `scipy.signal.butter` / `cheby1` define the
  * coefficients in `packages/dsp/test-data/golden/iir.json`.
  *
- * Complexity: design O(N^2) with N = order (at most 8); applyFilter
+ * Complexity: design O(N^2) with N = prototype order (at most 8; bandpass and
+ * bandstop realize order 2N, at most 16); applyFilter
  * O(inputLength * max(len(b), len(a))).
+ *
+ * Stability / conditioning envelope: the analog prototype is stable by
+ * construction, but expanding it into a single b/a pair is badly conditioned
+ * at high order. The double-precision denominator polynomial can therefore
+ * represent slightly different roots than the transformed prototype, and root
+ * certification near the unit circle is unreliable in both directions. We do
+ * not pretend to certify exact roots. Instead every design is conservatively
+ * restricted to a conditioning envelope: the Durand-Kerner check must
+ * converge, every root must satisfy |z| < 1, and max|z| must be at most 0.995
+ * (a 5e-3 margin to the unit circle). Designs outside the envelope throw
+ * RangeError with a message telling the caller to reduce the order; no
+ * coefficient is clamped or otherwise adjusted. This is deliberately
+ * conservative: narrow/high-order lowpass/highpass designs and most order-8
+ * bandpass/bandstop designs are refused. A second-order-sections (SOS) or
+ * state-space realization would remove the b/a conditioning problem and is
+ * future work, not part of this API.
  *
  * Edge cases: order must be an integer in [1, 8] (higher orders in b/a form
  * are numerically fragile, so they are rejected); rippleDb must be in
@@ -66,11 +83,11 @@
  * lowpass/highpass and 2 for bandpass/bandstop, finite, strictly increasing,
  * each strictly inside (0, sampleRateHz/2). Every invalid configuration throws
  * RangeError. After the bilinear transform the realized denominator roots are
- * checked with Durand-Kerner iteration: a root with |z| >= 1 - 1e-9 throws
- * RangeError, as does a genuine root-finding failure (distinct message) or a
- * non-finite coefficient/root, instead of returning a silently unstable
- * design. A step-only stall is not treated as instability: the root helper
- * also accepts an accurate relative polynomial residual. applyFilter throws
+ * checked with Durand-Kerner iteration: a non-converged solve throws a
+ * distinct RangeError, and a root with |z| >= 1 or max|z| > 0.995 throws the
+ * conditioning-envelope RangeError instead of returning a fragile design.
+ * A step-only stall is not treated as instability: the root helper also
+ * accepts an accurate relative polynomial residual. applyFilter throws
  * TypeError for NaN/Infinity in the data or in b/a, and RangeError for empty
  * b/a or a[0] = 0. Empty data returns an empty array after the coefficient
  * guards pass. No input is mutated.
@@ -111,10 +128,14 @@ interface AnalogPrototype {
 const MAX_ORDER = 8;
 const MIN_RIPPLE_DB = 0.1;
 const MAX_RIPPLE_DB = 3;
-/** Roots at or outside 1 - 1e-9 are practical instability for this design. */
-const UNITY_STABILITY_MARGIN = 1e-9;
+/**
+ * Conservative pole-modulus limit for the single b/a realization. Keeping
+ * max|z| <= 0.995 leaves a 5e-3 margin to the unit circle so that double
+ * coefficient rounding cannot silently return a fragile design.
+ */
+const MAX_POLE_MODULUS = 0.995;
 const UNSTABLE_DESIGN_MESSAGE =
-  "designIir: IIR design is numerically unstable at this order; reduce order or move the cutoff";
+  "designIir: IIR design is numerically unstable at this order; reduce order or move the cutoff (b/a conditioning envelope: max|pole| must stay <= 0.995; SOS is not yet implemented)";
 const ROOT_FINDING_FAILED_MESSAGE =
   "designIir: IIR denominator root finding did not converge; reduce order or move the cutoff";
 
@@ -379,30 +400,40 @@ function bilinearTransform(prototype: AnalogPrototype): AnalogPrototype {
 }
 
 /**
- * Reject a design whose realized denominator polynomial has a root outside
- * the unit circle. The analog prototype is stable by construction, but the
- * bilinear transform plus the b/a expansion can move coefficients enough at
- * high order that the realized filter diverges (e.g. bandpass order 8 turns
- * into degree 16). Checking the actual `a` polynomial catches that before the
- * caller can apply it.
+ * Reject a design whose realized denominator falls outside the conservative
+ * conditioning envelope documented in the file header. The analog prototype
+ * is stable by construction, but the bilinear transform plus the b/a expansion
+ * can move the represented roots enough at high order that the realized filter
+ * is fragile or diverges (e.g. bandpass order 8 becomes degree 16). Checking
+ * the actual `a` polynomial catches that before the caller can apply it.
+ *
+ * The envelope is intentionally stricter than plain stability: solver
+ * non-convergence, any |z| >= 1, or max|z| > MAX_POLE_MODULUS is rejected.
+ * Exported for the internal stability tests only (not re-exported from the
+ * package barrel).
  */
-function assertStableDenominator(denominator: readonly ComplexValue[]): void {
-  const result = polynomialRoots(denominator.map((coefficient) => coefficient.re));
+export function assertStableDenominator(denominatorCoefficients: readonly number[]): void {
+  const result = polynomialRoots(denominatorCoefficients);
   if (!result.converged) {
     throw new RangeError(ROOT_FINDING_FAILED_MESSAGE);
   }
+  let maxModulus = 0;
   for (const root of result.roots) {
     const modulus = Math.hypot(root.re, root.im);
-    if (!Number.isFinite(modulus) || modulus >= 1 - UNITY_STABILITY_MARGIN) {
+    if (!Number.isFinite(modulus) || modulus >= 1) {
       throw new RangeError(UNSTABLE_DESIGN_MESSAGE);
     }
+    maxModulus = Math.max(maxModulus, modulus);
+  }
+  if (maxModulus > MAX_POLE_MODULUS) {
+    throw new RangeError(UNSTABLE_DESIGN_MESSAGE);
   }
 }
 
 function coefficientsFromPrototype(prototype: AnalogPrototype): IirCoefficients {
   const numerator = polynomialFromRoots(prototype.zeros);
   const denominator = polynomialFromRoots(prototype.poles);
-  assertStableDenominator(denominator);
+  assertStableDenominator(denominator.map((coefficient) => coefficient.re));
   const b = new Float64Array(numerator.length);
   const a = new Float64Array(denominator.length);
   for (let index = 0; index < numerator.length; index += 1) {

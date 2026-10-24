@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { assertStableDenominator } from "../../src/filters/iir.js";
 import { polynomialRoots as findPolynomialRoots } from "../../src/filters/polynomial.js";
 import type {
   ButterworthOptions,
@@ -157,6 +158,17 @@ function expectUnstableIirDesign(design: () => unknown): void {
   expect(thrown instanceof Error ? thrown.message : "").toContain(
     "IIR design is numerically unstable at this order; reduce order or move the cutoff",
   );
+}
+
+function expectRejectedIirDesign(design: () => unknown): void {
+  let thrown: unknown;
+  try {
+    design();
+  } catch (error) {
+    thrown = error;
+  }
+  expect(thrown).toBeInstanceOf(RangeError);
+  expect(thrown instanceof Error ? thrown.message : "").toContain("reduce order");
 }
 
 function rootMeanSquare(samples: Float64Array, startSample: number): number {
@@ -351,7 +363,7 @@ describe("designButterworth and designChebyshev1", () => {
     );
   });
 
-  it("returns a stable order-8 lowpass design", () => {
+  it("returns a stable order-8 lowpass design inside the conditioning envelope", () => {
     const coefficients = designButterworth({
       band: "lowpass",
       cutoffHz: [4000],
@@ -361,14 +373,48 @@ describe("designButterworth and designChebyshev1", () => {
     expect(coefficients.a.length).toBe(9);
     const poles = polynomialRoots(Array.from(coefficients.a));
     for (const pole of poles) {
-      expect(Math.hypot(pole.re, pole.im)).toBeLessThan(1 - 1e-9);
+      expect(Math.hypot(pole.re, pole.im)).toBeLessThan(0.995);
     }
   });
 
-  it("accepts stable order-8 designs whose root iteration stalls on the step", () => {
+  it("rejects narrow order-8 lowpass designs outside the 0.995 envelope", () => {
+    // True design roots: 150 Hz 0.996177, 151 Hz 0.996152, 160 Hz 0.995923,
+    // 180 Hz 0.995414. All are stable but outside the documented 5e-3 margin,
+    // so the single b/a realization must be refused rather than certified.
+    for (const cutoffHz of [150, 151, 160, 180]) {
+      expectRejectedIirDesign(() =>
+        designButterworth({
+          band: "lowpass",
+          cutoffHz: [cutoffHz],
+          order: 8,
+          sampleRateHz: SAMPLE_RATE_HZ,
+        }),
+      );
+    }
+  });
+
+  it("accepts order-8 lowpass designs inside the conditioning envelope", () => {
+    for (const cutoffHz of [500, 1000, 4000]) {
+      const coefficients = designButterworth({
+        band: "lowpass",
+        cutoffHz: [cutoffHz],
+        order: 8,
+        sampleRateHz: SAMPLE_RATE_HZ,
+      });
+      expect(coefficients.a.length, `${cutoffHz} Hz`).toBe(9);
+      const poles = polynomialRoots(Array.from(coefficients.a));
+      expect(poles.length, `${cutoffHz} Hz`).toBe(8);
+      for (const pole of poles) {
+        const modulus = Math.hypot(pole.re, pole.im);
+        expect(modulus, `${cutoffHz} Hz pole |z| = ${modulus}`).toBeLessThan(0.995);
+      }
+    }
+  });
+
+  it("accepts order-8 designs whose root iteration stalls on the step", () => {
     // These designs used to throw: the Durand-Kerner step stalls around 1e-11
     // while the relative polynomial residual is ~1e-15, so the roots are
-    // accurate. The guard must accept them.
+    // accurate and comfortably inside the conditioning envelope.
     const designs = [
       {
         label: "Butterworth lowpass 1 kHz",
@@ -376,16 +422,6 @@ describe("designButterworth and designChebyshev1", () => {
           band: "lowpass",
           cutoffHz: [1000],
           order: 8,
-          sampleRateHz: SAMPLE_RATE_HZ,
-        }),
-      },
-      {
-        label: "Chebyshev I lowpass 1 kHz",
-        coefficients: designChebyshev1({
-          band: "lowpass",
-          cutoffHz: [1000],
-          order: 8,
-          rippleDb: 1,
           sampleRateHz: SAMPLE_RATE_HZ,
         }),
       },
@@ -405,14 +441,28 @@ describe("designButterworth and designChebyshev1", () => {
       expect(poles.length, label).toBe(8);
       for (const pole of poles) {
         const modulus = Math.hypot(pole.re, pole.im);
-        expect(modulus, `${label} pole |z| = ${modulus} must be < 1 - 1e-9`).toBeLessThan(1 - 1e-9);
+        expect(modulus, `${label} pole |z| = ${modulus} must be < 0.995`).toBeLessThan(0.995);
       }
     }
   });
 
-  it("finds a synthetic polynomial root outside the unit circle", () => {
-    // (z - 0.5)(z - 1.2) = z^2 - 1.7z + 0.6: the residual acceptance criterion
-    // must stay valid for roots outside the unit circle.
+  it("rejects Chebyshev I order-8 and order-6 bandpass designs outside the envelope", () => {
+    for (const order of [6, 8]) {
+      expectRejectedIirDesign(() =>
+        designChebyshev1({
+          band: "bandpass",
+          cutoffHz: [1000, 4000],
+          order,
+          rippleDb: 1,
+          sampleRateHz: SAMPLE_RATE_HZ,
+        }),
+      );
+    }
+  });
+
+  it("finds and rejects synthetic polynomials with roots outside the envelope", () => {
+    // (z - 0.5)(z - 1.2) = z^2 - 1.7z + 0.6: the root helper must report the
+    // outside root, and the conditioning guard must reject the polynomial.
     const result = findPolynomialRoots([1, -1.7, 0.6]);
     expect(result.converged).toBe(true);
     const moduli = result.roots
@@ -421,7 +471,10 @@ describe("designButterworth and designChebyshev1", () => {
     expect(moduli.length).toBe(2);
     expect(moduli[0] ?? Number.NaN).toBeCloseTo(0.5, 10);
     expect(moduli[1] ?? Number.NaN).toBeCloseTo(1.2, 10);
-    expect(moduli[1] ?? Number.NaN).toBeGreaterThanOrEqual(1 - 1e-9);
+    expect(moduli[1] ?? Number.NaN).toBeGreaterThanOrEqual(1);
+    expect(() => assertStableDenominator([1, -1.7, 0.6])).toThrow(RangeError);
+    // (z - 0.7)(z - 0.8) = z^2 - 1.5z + 0.56 is inside the envelope.
+    expect(() => assertStableDenominator([1, -1.5, 0.56])).not.toThrow();
   });
 
   it("rejects orders outside the integer range 1..8", () => {
