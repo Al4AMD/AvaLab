@@ -71,7 +71,7 @@ Verified at close-out: `pnpm check` green; `uv run --directory apps/api pytest -
 
 ## Wave 1 · Plan 03 — Convolution and filters (complete)
 
-**Status:** complete. Commit range `b38c5ca..d0c183d`, 10 commits on `feat/wave-1-filters`.
+**Status:** complete. Commit range `b38c5ca..HEAD` on `feat/wave-1-filters` (implementation, stability fixes, analysis, docs).
 
 **Built** (`packages/dsp`, pure TS, golden-verified): direct convolution; FFT overlap-add convolution with explicit tail/block handling; window-method FIR design (lowpass, highpass, bandpass, bandstop; hamming/blackman/kaiser windows; SciPy `firwin` normalization; even-tap highpass/bandstop rejected with `RangeError`); Butterworth and Chebyshev I design via the prewarped bilinear transform; RBJ biquads; transposed direct-form-II `applyFilter`; filter analysis — `freqz`, `magnitudeDb`, `unwrapPhase`, `groupDelaySamples`, `impulseResponse`, `stepResponse`, `polesZeros`, `isStable`.
 
