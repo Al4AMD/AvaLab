@@ -8,8 +8,11 @@
  * `p(z) = c_0 z^N + c_1 z^{N-1} + ... + c_N`,
  *   z_i <- z_i - p(z_i) / prod_{j != i} (z_i - z_j),
  * starting from the fixed points `z_i = R*exp(j*(2*pi*i/N + 0.1))` with
- * `R = 0.5` (deterministic: no random numbers, so repeated calls return the
- * same roots).
+ * `R = options.initialRadius` (default 0.5; deterministic: no random numbers,
+ * so repeated calls return the same roots). The unit circle is the natural
+ * scale for filter poles and zeros; a smaller radius makes the Weierstrass
+ * denominators collide for higher-degree polynomials such as the 30th-degree
+ * FIR zeros in F11, which is why `polesZeros` requests R = 1 above degree 16.
  *
  * Convergence criterion: after normalization by the leading coefficient
  * (`c_0 = 1`), a result is accepted when either
@@ -25,12 +28,14 @@
  * Polynomen", Numerische Mathematik 8 (1966).
  *
  * Complexity: O(N^2) per iteration, at most `MAX_ITERATIONS` iterations,
- * O(N) space. Used here with N <= 16.
+ * O(N) space. Used by the IIR design guard (N <= 16) and by `polesZeros`
+ * for FIR zero sets up to degree 30.
  *
  * Edge cases: an empty or constant polynomial has no roots and reports
  * `converged: true`; non-finite coefficients, a zero leading coefficient, a
- * zero Weierstrass denominator, or non-finite roots report `converged: false`
- * instead of throwing. The caller decides how to surface that failure.
+ * zero Weierstrass denominator, non-finite roots, or a non-positive/non-finite
+ * `initialRadius` report `converged: false` instead of throwing. The caller
+ * decides how to surface that failure.
  */
 
 export interface PolynomialRoot {
@@ -41,6 +46,15 @@ export interface PolynomialRoot {
 export interface PolynomialRootsResult {
   roots: PolynomialRoot[];
   converged: boolean;
+}
+
+export interface PolynomialRootsOptions {
+  /**
+   * Radius of the deterministic initial root circle. Default 0.5 (the value
+   * used by the IIR design guard). Higher-degree polynomials with roots near
+   * the unit circle can start at 1 instead.
+   */
+  initialRadius?: number;
 }
 
 const MAX_ITERATIONS = 2000;
@@ -94,7 +108,10 @@ function relativeResidual(
   return worst;
 }
 
-export function polynomialRoots(coefficients: readonly number[]): PolynomialRootsResult {
+export function polynomialRoots(
+  coefficients: readonly number[],
+  options: PolynomialRootsOptions = {},
+): PolynomialRootsResult {
   const degree = coefficients.length - 1;
   if (degree <= 0) {
     return { roots: [], converged: true };
@@ -110,10 +127,14 @@ export function polynomialRoots(coefficients: readonly number[]): PolynomialRoot
     }
   }
 
+  const initialRadius = options.initialRadius ?? INITIAL_RADIUS;
+  if (!Number.isFinite(initialRadius) || initialRadius <= 0) {
+    return { roots: [], converged: false };
+  }
   const normalized = coefficients.map((coefficient) => coefficient / leading);
   let roots: PolynomialRoot[] = Array.from({ length: degree }, (_, index) => {
     const angle = (2 * Math.PI * index) / degree + INITIAL_ANGLE_OFFSET;
-    return { re: INITIAL_RADIUS * Math.cos(angle), im: INITIAL_RADIUS * Math.sin(angle) };
+    return { re: initialRadius * Math.cos(angle), im: initialRadius * Math.sin(angle) };
   });
 
   for (let iteration = 0; iteration < MAX_ITERATIONS; iteration += 1) {

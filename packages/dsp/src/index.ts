@@ -12,6 +12,21 @@
  */
 
 export type {
+  FreqzOptions,
+  FreqzResult,
+  PolesZerosResult,
+} from "./filters/analysis.js";
+export {
+  freqz,
+  groupDelaySamples,
+  impulseResponse,
+  isStable,
+  magnitudeDb,
+  polesZeros,
+  stepResponse,
+  unwrapPhase,
+} from "./filters/analysis.js";
+export type {
   BiquadGainOptions,
   BiquadOptions,
 } from "./filters/biquad.js";
