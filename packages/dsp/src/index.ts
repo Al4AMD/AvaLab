@@ -11,6 +11,14 @@
  * Edge cases: n/a; every exported function documents its own.
  */
 
+export type { CanonicalCodes, HuffmanCodebook, HuffmanEncoded } from "./codecs/huffman.js";
+export {
+  buildCanonicalCodes,
+  buildHistogram,
+  huffmanDecode,
+  huffmanEncode,
+  validatePrefixFree,
+} from "./codecs/huffman.js";
 export { rleDecode, rleEncode } from "./codecs/rle.js";
 export type {
   FreqzOptions,
