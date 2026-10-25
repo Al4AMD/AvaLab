@@ -57,9 +57,13 @@ functions of (input, params) per AGENTS §10; UI holds no DSP logic.
 
 - Worker: `new Worker(new URL("../workers/dsp.worker.ts", import.meta.url), {type:"module"})`.
 - Request `{id: number, op: string, params: object, payload?: transferable}` →
-  Response `{id, ok: true, result: {data: typed-array | object, meta}}` or
-  `{id, ok: false, error: {code, message}}`. All typed-array payloads transferred,
-  never copied (structured clone of 5-min buffers is the §9 risk).
+  Response `{id, ok: true, result: {meta?, payload?}}` where
+  `payload?: {buffer: ArrayBuffer, byteOffset, byteLength}` is a descriptor for a
+  transferred `ArrayBuffer` (the spec's `{data..., payload?: transferable}` was
+  abstract), or `{id, ok: false, error: {code, message}}`
+  (amended against shipped implementation 2026-10-25; rationale in D-018 ledger
+  notes). All typed-array payloads transferred, never copied (structured clone of
+  5-min buffers is the §9 risk).
 - Cancel: `cancel(id)` marks the id superseded; the worker checks between op
   stages and exits early. Late frames for superseded ids are dropped silently.
 - Worker surface importable as plain functions for Vitest (the RPC layer is a
@@ -85,7 +89,7 @@ Backend-first with an offline fallback lane:
 
 ### 2.5 Routing + URL state (D-015 resolved, D-019)
 
-`react-router` (v7 data APIs), routes: `/` → redirect `/tools/waveform`,
+`react-router` (data APIs; v8 installed, same API surface), routes: `/` → redirect `/tools/waveform`,
 `/tools/waveform|spectrogram|fftview|generator`. Tool params serialize into the
 query string (`?win=hann&w=1024&hop=256&db=-100..0`) via a per-tool
 `paramsToSearch/searchToParams` pair; only serializable params ride the URL —
