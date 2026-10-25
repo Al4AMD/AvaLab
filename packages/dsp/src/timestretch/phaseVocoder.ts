@@ -71,7 +71,10 @@
  * interior sum is a constant (1.5 at hop L/4), but frames do not cover the
  * first L-H_s-1 samples uniformly, so the per-sample normalization must be
  * tracked explicitly. S[n] < 1e-12 yields 0 for that sample instead of a
- * division by zero (R12).
+ * division by zero (R12). A synthesis hop Hs >= window length L leaves
+ * uncovered OLA samples, which output 0 there (audible holes at
+ * extreme stretch; cap stretch in the UI, wave-4 concern).
+ *
  *
  * pitchShift (R13, see deviation note):
  *   q = 2^(semitones / 12)
@@ -352,8 +355,7 @@ export function timeStretch(x: Float64Array, params: TimeStretchParams): Float64
  * Shift the pitch of `x` by `semitones` (12-tone equal temperament) while
  * keeping duration: time-stretch by 2^(semitones/12), then resample back to
  * the original rate (see the header deviation note for the direction).
- * the original sample count with the pinned kaiserSinc filter (R13). Output
- * length is exactly x.length (deterministic trim / zero-pad).
+ * Output length is exactly x.length (deterministic trim / zero-pad).
  */
 export function pitchShift(x: Float64Array, params: PitchShiftParams): Float64Array {
   const caller = "pitchShift";

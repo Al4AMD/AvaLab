@@ -85,7 +85,7 @@ function paddedSpectrum(samples: Float64Array, fftLength: number): Float64Array 
 describe("timeStretch identity and length contract", () => {
   it("reconstructs the input exactly when stretchFactor = 1", () => {
     // stretchFactor 1 makes the synthesis phase rotation exact, so the output
-    // must equal a plain istft(stft(x)) wave (measured bit-exact above).
+    // must equal a plain istft(stft(x)) wave (measured ~1e-15).
     const input = seededUniformNoise(8192, 2026);
     const L = 1024;
     const analysis = stft(input, {
