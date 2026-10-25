@@ -357,6 +357,43 @@ describe("wiring and type surface", () => {
     // if the built worker answers.
   });
 
+  it("rejects typed workerUnavailable when the Worker constructor throws, then retries", async () => {
+    const mod = await import("./rpc");
+    // Node has no real Worker (T1 ruling): stub one at the global. First
+    // construction throws like a blocked worker / CSP does in the browser;
+    // the retry stands in for "transport construction now works".
+    class StubWorker {
+      static attempts = 0;
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      constructor() {
+        StubWorker.attempts += 1;
+        if (StubWorker.attempts === 1) {
+          throw new Error("blocked (test stand-in)");
+        }
+      }
+      postMessage(): void {} // silent: the recovered call hangs until terminate
+      terminate(): void {}
+    }
+    vi.stubGlobal("Worker", StubWorker as unknown as typeof Worker);
+
+    // Unguarded call: if construction threw synchronously the test would die
+    // here — instead the promise settles later, like a wire error frame.
+    const first = mod.dspWorkerRpc.call("sessionPing", { count: 1 });
+    await expect(first).rejects.toBeInstanceOf(DspRpcError);
+    await expect(first).rejects.toMatchObject({ code: "workerUnavailable" });
+
+    // Recovery: no half-initialized singleton was cached — the retry builds
+    // a fresh rpc and posts the frame normally (ids restart at 0).
+    const recovered = mod.dspWorkerRpc.call("sessionPing", { count: 2 });
+    expect(StubWorker.attempts).toBe(2);
+    expect(recovered.callId).toBe(0);
+    mod.dspWorkerRpc.terminate(); // settle the pending call + reset singleton
+    await expect(recovered).resolves.toEqual({ cancelled: true });
+    expect(StubWorker.attempts).toBe(2); // terminate does not re-construct
+
+    vi.unstubAllGlobals();
+  });
+
   it("allows exactly one transport subscription", () => {
     const transport = new FakeTransport();
     createDspRpc(transport);

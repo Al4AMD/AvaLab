@@ -83,6 +83,9 @@ export interface DspRpc {
 /** Error thrown for a malformed outgoing payload descriptor. */
 const BAD_PAYLOAD_CODE = "badPayload";
 
+/** Rejection code when the Worker transport cannot even be constructed. */
+const WORKER_UNAVAILABLE_CODE = "workerUnavailable";
+
 /**
  * Validate the descriptor and normalize it so *exactly* `byteLength` bytes
  * transfer (structured clone moves whole `ArrayBuffer`s only): whole-buffer
@@ -272,8 +275,42 @@ function createDefaultTransport(): DspRpcTransport {
 
 let sharedRpc: DspRpc | undefined;
 
+/**
+ * Stand-in rpc used when constructing the Worker threw (blocked worker, bad
+ * URL, CSP…). Every `call` settles as a typed rejected promise — rejection
+ * mirrors the wire error path, so callers face `DspRpcError`, never a
+ * synchronous throw that would kill a React effect. The original error
+ * message rides along in dev only; user-facing copy is produced at the UI
+ * layer from the code (bilingual-by-code model).
+ */
+function createUnavailableRpc(error: unknown): DspRpc {
+  const reason = new DspRpcError(
+    WORKER_UNAVAILABLE_CODE,
+    import.meta.env.DEV
+      ? `avalab dsp rpc: worker unavailable — ${error instanceof Error ? error.message : String(error)}`
+      : undefined,
+  );
+  return {
+    call<K extends DspOpName>(): DspCallPromise<K> {
+      const promise = Promise.reject<DspOpOutcome<K>>(reason) as DspCallPromise<K>;
+      promise.callId = 0; // nothing pending: no cancellable id to correlate
+      return promise;
+    },
+    cancel: () => undefined,
+    terminate: () => undefined,
+  };
+}
+
 function ensureSharedRpc(): DspRpc {
-  sharedRpc ??= createDspRpc(createDefaultTransport());
+  if (sharedRpc === undefined) {
+    try {
+      sharedRpc = createDspRpc(createDefaultTransport());
+    } catch (error) {
+      // Deliberately NOT cached: no half-initialized singleton state, so the
+      // next call retries construction and recovery needs no module reload.
+      return createUnavailableRpc(error);
+    }
+  }
   return sharedRpc;
 }
 
