@@ -152,4 +152,5 @@ export type { PitchShiftParams, TimeStretchParams } from "./timestretch/phaseVoc
 export { pitchShift, timeStretch } from "./timestretch/phaseVocoder.js";
 export { averagePowerOf, energyOf } from "./utils/energy.js";
 export { inputHashFnv1a64 } from "./utils/hash.js";
+export { computePeakBuckets } from "./utils/peaks.js";
 export { samplesToSeconds, secondsToSamples } from "./utils/time.js";

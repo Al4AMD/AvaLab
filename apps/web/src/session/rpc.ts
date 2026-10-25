@@ -224,8 +224,15 @@ export function createDspRpc(transport: DspRpcTransport): DspRpc {
         };
         pendingByKey.set(key, entry);
         pendingById.set(id, entry);
+        // Single cast point for outgoing frames: `op` is a table key by the
+        // typed call signature and `params`/`payload` are typed against THAT
+        // op's table entry (DspOpParams<K>), so the frame is the union
+        // member K names — TS cannot follow the generic through the mapped
+        // union, the runtime frame carries exactly the typed data.
         const request: DspOpRequest =
-          normalized === undefined ? { id, op, params } : { id, op, params, payload: normalized };
+          normalized === undefined
+            ? ({ id, op, params } as DspOpRequest)
+            : ({ id, op, params, payload: normalized } as DspOpRequest);
         transport.postMessage(request, normalized === undefined ? [] : [normalized.buffer]);
       } catch (error) {
         // bad payload descriptor or bad params (canonicalJson throws): reject

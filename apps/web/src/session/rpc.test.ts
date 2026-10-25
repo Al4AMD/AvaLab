@@ -304,8 +304,8 @@ describe("wiring and type surface", () => {
   it("type-level: call is typed against the op table", async () => {
     const { rpc } = makeRpc("silent");
     expectTypeOf(rpc.call<"sessionPing">).toBeFunction();
-    // @ts-expect-error op must be a table key ("waveformOverview" lands with T4)
-    const unknownOp = rpc.call("waveformOverview", { bucketCount: 8 });
+    // @ts-expect-error op must be a table key (an op no plan ever adds)
+    const unknownOp = rpc.call("definitelyNotAnOp", { bucketCount: 8 });
     // @ts-expect-error params must match the op's params type
     const wrongShape = rpc.call("sessionPing", { bucketCount: 8 });
     // These two would post bogus op frames that a silent fake never answers,

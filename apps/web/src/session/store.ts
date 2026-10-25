@@ -14,6 +14,11 @@
  *   cached hits resolve synchronously; misses become `jobs` entries
  *   (`progressPct` is null until worker progress reporting arrives in a
  *   later task) armed with a `cancel()` seam.
+ * - `deriveWithSource(opKey, params)` is the source-payload variant for ops
+ *   that need the analysis lane: it copies `original.samples`, transfers the
+ *   copy (the session source stays intact), and shares `derive`'s canonical
+ *   key/job/settle machinery; without a source it rejects typed `noSource`
+ *   with no rpc frame.
  * - `sessionTroubleshootingPing` is a guarded, idempotent, NON-source
  *   diagnostics action (worker round trip), distinct from `derive`
  *   deliberately: a ping needs no loaded source and bypasses the input hash,
@@ -37,8 +42,8 @@ import { create, type StoreApi, type UseBoundStore } from "zustand";
 import type { DspOpName, DspOpParams } from "./ops";
 import type { DspOpOutcome, TransferablePayload } from "./protocol";
 import { canonicalJson } from "./protocol";
-import type { DspRpc } from "./rpc";
-import { dspWorkerRpc } from "./rpc";
+import type { DspCallPromise, DspRpc } from "./rpc";
+import { DspRpcError, dspWorkerRpc } from "./rpc";
 
 /** AGENTS §7/F01 sample-rate cap (Hz). */
 export const MAX_SAMPLE_RATE_HZ = 96_000;
@@ -145,6 +150,15 @@ export type SessionStore = {
     params: DspOpParams<K>,
     payload?: TransferablePayload,
   ): DeriveTicket<K> | null;
+  /** Source-payload variant of `derive` for ops that operate on the whole
+   * analysis lane (`waveformOverview`): posts a fresh COPY of
+   * `original.samples` as the request payload (the transfer neuters the
+   * copy, never the session source — tested), caches under the same
+   * `op ∝ canonicalJson ∝ inputHash` key. No source → the ticket REJECTS
+   * typed `noSource` (DspRpcError code) without any rpc frame; its `key` is
+   * then meaningless (""). Bad params still throw TypeError through
+   * `canonicalJson` before any frame (app-code bug fails loudly). */
+  deriveWithSource<K extends DspOpName>(opKey: K, params: DspOpParams<K>): DeriveTicket<K>;
   /** Read a derivation's state by its cache key (spec polling interface). */
   getDerived(key: string): DerivedLookup;
   /** Cancel the pending job under `key`: detaches the worker frame id; a
@@ -220,6 +234,66 @@ export function createSessionStore(
       return () => set({ jobs: deleteAndClone(get().jobs, key) });
     };
 
+    /**
+     * The shared miss→call→settle path behind `derive` and
+     * `deriveWithSource`: canonical-key cache hit resolves synchronously
+     * (no closure invocation, no frame); otherwise the rpc call (built by
+     * the caller closure), the job entry and BOTH settle handlers are wired
+     * identically, so the settle guards stay single-sourced.
+     */
+    const openDerivedJob = <K extends DspOpName>(
+      opKey: K,
+      canonical: string,
+      inputHash: string,
+      startCall: () => DspCallPromise<K>,
+    ): DeriveTicket<K> => {
+      const key = `${opKey}\u0000${canonical}\u0000${inputHash}`;
+      const cached = get().derived.get(key);
+      if (cached !== undefined) {
+        // Synchronous cache hit. The cast is keyed to the cache key's op
+        // identity: entries under `opKey\u0000…\u0000hash` are written only
+        // by calls of that op with those params over that source, so the
+        // stored unknown IS this op's result type.
+        return { key, outcome: Promise.resolve(cached.result as DspOpOutcome<K>) };
+      }
+      const promise = startCall();
+      const callId = promise.callId;
+      const jobs = new Map(get().jobs);
+      jobs.set(key, {
+        progressPct: null,
+        callId,
+        cancel: () => {
+          // rpc.cancel is stale-safe: an already-settled id sends no frame.
+          rpc.cancel(callId);
+        },
+      });
+      set({ jobs });
+      // Settles outside the async body; failures REJECT (wire/worker
+      // errors are the ticket's problem — see DeriveTicket's javadoc).
+      void promise.then(
+        (outcome) => {
+          const dropJob = settleIfLive(key, callId, inputHash);
+          if (dropJob === undefined) {
+            return; // stale: superseded, cancelled, or the source changed
+          }
+          if ("cancelled" in outcome) {
+            dropJob(); // just the job entry: a cancelled call caches nothing
+            return;
+          }
+          set({
+            derived: new Map(get().derived).set(key, { key, result: outcome }),
+          });
+          dropJob();
+        },
+        () => {
+          // Failure keeps the cache clean (retrying = re-derive); the
+          // rejection is the ticket consumer's to translate by code.
+          settleIfLive(key, callId, inputHash)?.();
+        },
+      );
+      return { key, outcome: promise };
+    };
+
     return {
       original: null,
       inputHash: null,
@@ -281,7 +355,7 @@ export function createSessionStore(
         params: DspOpParams<K>,
         payload?: TransferablePayload,
       ): DeriveTicket<K> | null {
-        const { original, inputHash, derived } = get();
+        const { original, inputHash } = get();
         if (original === null || inputHash === null) {
           // Documented contract: no source, nothing to derive from. Views
           // guard on `original` first; no worker frame leaves the main thread.
@@ -291,52 +365,55 @@ export function createSessionStore(
         // BEFORE any frames or state changes — loud app-code failure per
         // protocol.ts.
         const canonical = canonicalJson(params);
-        // R24 caveat: params-only keys assume payload-less derives; any future op whose result depends on the request payload must extend the key with a payload hash or bypass the cache (R24 caveat from review).
-        const key = `${opKey}\u0000${canonical}\u0000${inputHash}`;
-        const cached = derived.get(key);
-        if (cached !== undefined) {
-          // Synchronous cache hit. The cast is keyed to the cache key's op
-          // identity: entries under `opKey\u0000…\u0000hash` are written only
-          // by calls of that op with those params over that source, so the
-          // stored unknown IS this op's result type.
-          return { key, outcome: Promise.resolve(cached.result as DspOpOutcome<K>) };
+        // R24 caveat: params-only keys assume payload-less derives; any op
+        // whose result depends on the request payload must have that payload
+        // pinned to the key's input hash (see deriveWithSource).
+        return openDerivedJob(opKey, canonical, inputHash, () => rpc.call(opKey, params, payload));
+      },
+
+      /**
+       * Derive variant for ops that need the SOURCE SAMPLES as their request
+       * payload (`waveformOverview` and friends). The payload is a fresh full
+       * copy of `original.samples`, transferred to the worker: the transfer
+       * neuters the COPY (protocol ownership rule), never the session source,
+       * so playback/analysis keep using the original buffer after the call.
+       *
+       * Memory note (plan Task 4, deliberately simple): one fresh full-source
+       * copy per call — worst case 115.2 MB (5 min @ 96 kHz mono Float32) —
+       * is transferred once and released. Chunked transfer is deferred: the
+       * overview is derived once per source load (first render), so the
+       * once-per-call copy cost is accepted and documented in the plan.
+       *
+       * R24 payload caveat (pinned): the params-only canonical key stays
+       * sound here because this payload is ALWAYS the same bytes `inputHash`
+       * was computed from at `loadSource` — source identity is in the key;
+       * no payload hash can diverge from it. A future op whose payload is
+       * NOT the full source must extend the key with a payload hash or
+       * bypass the cache.
+       *
+       * Contract delta vs `derive`: no source → a ticket whose outcome
+       * REJECTS with the typed store-level code `noSource` (no rpc frame,
+       * no cache/jobs writes); the ticket's `key` is meaningless then
+       * (documented "") because no cache key exists without an input hash.
+       */
+      deriveWithSource<K extends DspOpName>(opKey: K, params: DspOpParams<K>): DeriveTicket<K> {
+        const { original, inputHash } = get();
+        if (original === null || inputHash === null) {
+          const outcome = Promise.reject<DspOpOutcome<K>>(
+            new DspRpcError("noSource", "deriveWithSource: no source loaded"),
+          );
+          outcome.catch(() => undefined); // keep the store-side rejection unobserved until read
+          return { key: "", outcome };
         }
-        const promise = rpc.call(opKey, params, payload);
-        const callId = promise.callId;
-        const jobs = new Map(get().jobs);
-        jobs.set(key, {
-          progressPct: null,
-          callId,
-          cancel: () => {
-            // rpc.cancel is stale-safe: an already-settled id sends no frame.
-            rpc.cancel(callId);
-          },
+        const canonical = canonicalJson(params);
+        return openDerivedJob(opKey, canonical, inputHash, () => {
+          const copy = original.samples.slice();
+          return rpc.call(opKey, params, {
+            buffer: copy.buffer,
+            byteOffset: 0,
+            byteLength: copy.byteLength,
+          });
         });
-        set({ jobs });
-        // Settles outside the async body; failures REJECT (wire/worker
-        // errors are the ticket's problem — see DeriveTicket's javadoc).
-        void promise.then(
-          (outcome) => {
-            const dropJob = settleIfLive(key, callId, inputHash);
-            if (dropJob === undefined) {
-              return; // stale: superseded, cancelled, or the source changed
-            }
-            if ("cancelled" in outcome) {
-              dropJob(); // just the job entry: a cancelled call caches nothing
-              return;
-            }
-            set({
-              derived: new Map(get().derived).set(key, { key, result: outcome }),
-            });
-            dropJob();
-          },
-          () => {
-            // Failure keeps the cache clean (retrying = re-derive); the
-            // rejection is the ticket consumer's to translate by code.
-            settleIfLive(key, callId, inputHash)?.();
-          },
-        );
-        return { key, outcome: promise };
       },
 
       getDerived(key) {

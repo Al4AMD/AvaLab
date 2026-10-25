@@ -387,6 +387,156 @@ describe("reload invalidates everything", () => {
   });
 });
 
+describe("deriveWithSource (source-payload derives, R24 copy path)", () => {
+  const WAVEFORM_PARAMS = { bucketCount: 4, sampleRateHz: 48_000 } as const;
+
+  /** Canned waveformOverview result the way the worker answers: 2·B floats
+   * (8 pairs) in a fresh buffer transferred back out of the "worker". */
+  function overviewFrame(id: number): unknown {
+    const minMax = new Float32Array([-1, -0.5, 0, 0.25, 0.5, 0.75, -0.25, 1]);
+    return {
+      id,
+      ok: true,
+      result: {
+        meta: { sampleCount: 16, sampleRateHz: 48_000, bucketCount: 4 },
+        payload: {
+          buffer: minMax.buffer,
+          byteOffset: 0,
+          byteLength: minMax.byteLength,
+        } satisfies TransferablePayload,
+      },
+    };
+  }
+
+  /** Echo-mode harness: the fake clones WITH the transfer list (detaching
+   * sender buffers like a real worker) and echoes the payload back, so
+   * payload bytes and neutering are observable without a real worker. */
+  function makeEchoStore(): Harness {
+    const transport = makeFakeTransport("echo");
+    return { store: createSessionStore(createDspRpc(transport)), transport };
+  }
+
+  it("rejects typed noSource without a rpc frame when nothing is loaded", async () => {
+    const { store, transport } = makeStore();
+    const ticket = store.getState().deriveWithSource("waveformOverview", WAVEFORM_PARAMS);
+    expect(ticket).not.toBeNull();
+    // No canonical key exists without an input hash: documented "".
+    expect(ticket?.key).toBe("");
+    await expect(ticket?.outcome).rejects.toMatchObject({ code: "noSource" });
+    expect(requestsOf(transport)).toHaveLength(0);
+    expect(cancelFramesOf(transport)).toHaveLength(0);
+    expect(store.getState().jobs.size).toBe(0);
+    expect(store.getState().derived.size).toBe(0);
+  });
+
+  it("posts the source COPY as payload and caches under the canonical key with hash", async () => {
+    const { store, transport } = makeEchoStore();
+    const samples = fakeAudio(16);
+    expectOk(store.getState().loadSource(samples, 48_000, "a.wav", "demoClip"));
+
+    const ticket = store.getState().deriveWithSource("waveformOverview", WAVEFORM_PARAMS);
+    const key = ticket?.key ?? "";
+    // Same canonical key shape as derive: op ∝ params ∝ input hash (keys
+    // sort: "bucketCount" < "sampleRateHz").
+    expect(
+      key.startsWith(`waveformOverview\u0000{"bucketCount":4,"sampleRateHz":48000}\u0000`),
+    ).toBe(true);
+    expect(key.split("\u0000")).toHaveLength(3);
+    expect(store.getState().getDerived(key)).toEqual({ status: "pending" });
+
+    // The request carries the source payload: 16 samples × 4 bytes, and the
+    // buffer is a COPY — not the session source's buffer.
+    const sent = requestAt(transport, 0);
+    expect(sent.op).toBe("waveformOverview");
+    expect(sent.params).toEqual(WAVEFORM_PARAMS);
+    expect(sent.payload?.byteLength).toBe(64);
+    expect(sent.payload?.buffer).not.toBe(samples.buffer);
+    // The bytes the "worker" received are the source's samples (the fake
+    // snapshots payload bytes pre-transfer; the sent buffer is detached).
+    const received = transport.receivedFrames[0];
+    if (received === undefined || received.payloadBytes === undefined) {
+      throw new Error("test: no received frame with a payload");
+    }
+    const receivedSamples = new Float32Array(
+      received.payloadBytes.buffer,
+      received.payloadBytes.byteOffset,
+      received.payloadBytes.byteLength / 4,
+    );
+    expect([...receivedSamples]).toEqual([...samples]);
+
+    // The echo settles the call through the rpc layer and caches the result.
+    await expect(ticket?.outcome).resolves.toEqual({
+      meta: { received: true },
+      payload: expect.anything(),
+    });
+    await vi.waitFor(() => {
+      expect(store.getState().getDerived(key).status).toBe("ready");
+    });
+    expect(store.getState().jobs.size).toBe(0);
+  });
+
+  it("second identical call is a cache hit: no second rpc frame", async () => {
+    const { store, transport } = makeEchoStore();
+    expectOk(store.getState().loadSource(fakeAudio(16), 48_000, "a.wav", "demoClip"));
+    const first = store.getState().deriveWithSource("waveformOverview", WAVEFORM_PARAMS);
+    const firstResult = await first?.outcome;
+    await vi.waitFor(() => {
+      expect(store.getState().getDerived(first?.key ?? "").status).toBe("ready");
+    });
+
+    const second = store.getState().deriveWithSource("waveformOverview", WAVEFORM_PARAMS);
+    expect(second?.key).toBe(first?.key);
+    expect(store.getState().jobs.size).toBe(0); // no new pending job
+    expect(requestsOf(transport)).toHaveLength(1); // one rpc frame total
+    // The cache hit is the EXACT cached result object, resolved synchronously.
+    await expect(second?.outcome).resolves.toBe(firstResult);
+  });
+
+  it("copy path: original.samples stays usable after a successful call (transfer neuters only the copy)", async () => {
+    const { store, transport } = makeEchoStore();
+    const samples = new Float32Array([0.25, -0.5, 0.75, -0.25, 1, -1]);
+    expectOk(store.getState().loadSource(samples, 48_000, "copy.wav", "demoClip"));
+    const before = [...samples];
+    const bufferBefore = samples.buffer;
+
+    const ticket = store.getState().deriveWithSource("waveformOverview", WAVEFORM_PARAMS);
+    // The posted frame transferred its payload buffer: the sender's COPY is
+    // neutered (byteLength reads 0 post-transfer) while the ORIGINAL buffer
+    // stays byte-intact and readable.
+    const sentTransfer = transport.sent[0]?.transfer ?? [];
+    expect(sentTransfer).toHaveLength(1);
+    const transferredBuffer = sentTransfer[0];
+    if (!(transferredBuffer instanceof ArrayBuffer)) {
+      throw new Error("test: transfer list entry is not an ArrayBuffer");
+    }
+    expect(transferredBuffer.byteLength).toBe(0); // neutered copy
+    expect(bufferBefore.byteLength).toBe(24); // the source's own buffer, intact
+
+    // The echo (payload round-tripped through the transfer) settles the call.
+    await expect(ticket?.outcome).resolves.toMatchObject({
+      payload: { byteLength: 24 },
+    });
+    expect([...samples]).toEqual(before); // readable AND unchanged after the call
+    expect(samples.buffer).toBe(bufferBefore); // never swapped for another buffer
+  });
+
+  it("a re-derive while the first is still pending supersedes it (rpc semantics intact)", async () => {
+    const { store, transport } = makeStore();
+    expectOk(store.getState().loadSource(fakeAudio(16), 48_000, "a.wav", "demoClip"));
+    const first = store.getState().deriveWithSource("waveformOverview", WAVEFORM_PARAMS);
+    const second = store.getState().deriveWithSource("waveformOverview", WAVEFORM_PARAMS);
+    const ids = requestsOf(transport).map((request) => request.id);
+    expect(ids).toEqual([0, 1]);
+    expect(cancelFramesOf(transport)).toEqual([{ type: "cancel", id: 0 }]);
+    await expect(first?.outcome).resolves.toEqual({ cancelled: true });
+    expect((store.getState().jobs.get(second?.key ?? "") as JobEntry).callId).toBe(1);
+    transport.deliver(overviewFrame(1));
+    await vi.waitFor(() => {
+      expect(store.getState().getDerived(second?.key ?? "").status).toBe("ready");
+    });
+  });
+});
+
 describe("setSelection clamps and orders", () => {
   it("clamps to [0, N] and orders ascending (half-open [start, end))", () => {
     const { store } = makeStore();
@@ -473,10 +623,12 @@ describe("backendOnline flag", () => {
 describe("type surface", () => {
   it("derive is typed against the op table and the ticket is op-keyed", async () => {
     const { store } = makeStore();
-    // @ts-expect-error op must be a table key ("waveformOverview" lands with T4)
-    void store.getState().derive("waveformOverview", { bucketCount: 8 });
+    // @ts-expect-error op must be a table key (an op no plan ever adds)
+    void store.getState().derive("definitelyNotAnOp", { count: 8 });
     // @ts-expect-error params must match the op's params type
     void store.getState().derive("sessionPing", { bucketCount: 8 });
+    // @ts-expect-error deriveWithSource requires params of the op's type too
+    void store.getState().deriveWithSource("waveformOverview", { count: 8 });
 
     const ticket: DeriveTicket<"sessionPing"> | null = store
       .getState()

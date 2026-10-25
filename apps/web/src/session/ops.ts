@@ -12,15 +12,17 @@
  * Handlers are pure over `@avalab/dsp` inputs only; they receive validated
  * shapes (frame validation happens in `protocol.ts` boundary consumers) and
  * throw `DspOpError({"badParams", …})` on bad params — the worker converts
- * every throw to a typed error frame, never a crash. T2 ships only
- * `sessionPing` (pure byte plumbing); T3/T4 plug real dsp helpers:
- * `dsp.worker.ts` is the ONLY app module that may import `@avalab/dsp`
- * (AGENTS §9 — no main-thread DSP).
+ * every throw to a typed error frame, never a crash. The op table imports
+ * `@avalab/dsp` helpers for its handlers, but only the WORKER imports this
+ * module at runtime (rpc/store import types only), so the DSP still runs off
+ * the main thread (AGENTS §9).
  *
  * Error codes on the wire (frontend translates by code, wave-0 model):
  * `badParams` — malformed/missing params; `unknownOp` — op not in the table;
  * `opFailed` — unexpected handler crash (logged, never swallowed).
  */
+
+import { computePeakBuckets } from "@avalab/dsp";
 import type { TransferablePayload } from "./protocol";
 
 /**
@@ -95,7 +97,70 @@ export function sessionPing(
   return { meta: { received: true }, payload };
 }
 
+export type WaveformOverviewParams = { bucketCount: number; sampleRateHz: number };
+export type WaveformOverviewResult = {
+  meta: { sampleCount: number; sampleRateHz: number; bucketCount: number };
+  /** Interleaved min/max peak buckets (2·bucketCount Float32 values) as a
+   * transferred payload descriptor; see `computePeakBuckets` in @avalab/dsp. */
+  payload?: TransferablePayload;
+};
+
+/**
+ * Waveform overview (F02 groundwork): bucket the request payload's Float32
+ * source samples into exact per-bucket min/max envelope pairs. The payload IS
+ * the session source (the store's `deriveWithSource` copies `original.samples`
+ * and transfers the copy); the result is self-describing — `sampleCount` is
+ * read off the payload, `sampleRateHz`/`bucketCount` echo the params so the
+ * UI never has to re-derive rate metadata.
+ */
+export function waveformOverview(
+  params: WaveformOverviewParams,
+  payload?: TransferablePayload,
+): WaveformOverviewResult {
+  if (
+    params === undefined ||
+    params === null ||
+    typeof params.bucketCount !== "number" ||
+    !Number.isInteger(params.bucketCount) ||
+    params.bucketCount < 1 ||
+    typeof params.sampleRateHz !== "number" ||
+    !Number.isFinite(params.sampleRateHz) ||
+    params.sampleRateHz <= 0
+  ) {
+    throw new DspOpError(
+      "badParams",
+      `waveformOverview: bucketCount must be a positive integer and sampleRateHz a positive finite number, got ${String(params)}`,
+    );
+  }
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "waveformOverview: a Float32 source payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError(
+      "badPayload",
+      `waveformOverview: payload must be Float32-aligned, got byteOffset ${String(payload.byteOffset)}/byteLength ${String(payload.byteLength)}`,
+    );
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  const minMax = computePeakBuckets(samples, params.bucketCount);
+  return {
+    meta: {
+      sampleCount: samples.length,
+      sampleRateHz: params.sampleRateHz,
+      bucketCount: params.bucketCount,
+    },
+    payload: { buffer: minMax.buffer, byteOffset: 0, byteLength: minMax.byteLength },
+  };
+}
+
 export const dspOps = {
+  waveformOverview: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: { bucketCount: 0, sampleRateHz: 0 },
+    result: undefined as unknown as WaveformOverviewResult,
+    handler: waveformOverview,
+  },
   sessionPing: {
     // Type lenses only — the table is read for types (DspOpParams/Result);
     // runtime code dispatches through the worker switch.
