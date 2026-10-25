@@ -23,7 +23,7 @@
  *
  * Money-size note: inputHash is an O(bytes) byte loop executed on the main
  * thread exactly ONCE per successful load — ruled a load-time cost in the
- * wave pre-flight (57.6 MB worst case at 5 min/48 kHz mono), alongside the
+ * wave pre-flight (115.2 MB worst case at 5 min/96 kHz mono Float32), alongside the
  * per-sample finiteness scan that loadSource performs anyway. No other DSP
  * runs on the main thread (AGENTS §9); audio math lives in the worker.
  *
@@ -291,6 +291,7 @@ export function createSessionStore(
         // BEFORE any frames or state changes — loud app-code failure per
         // protocol.ts.
         const canonical = canonicalJson(params);
+        // R24 caveat: params-only keys assume payload-less derives; any future op whose result depends on the request payload must extend the key with a payload hash or bypass the cache (R24 caveat from review).
         const key = `${opKey}\u0000${canonical}\u0000${inputHash}`;
         const cached = derived.get(key);
         if (cached !== undefined) {
