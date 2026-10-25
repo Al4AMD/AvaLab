@@ -1,6 +1,7 @@
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { createBrowserRouter, type RouteObject, redirect } from "react-router";
-
+import { dspWorkerRpc } from "../session/rpc";
 import { AppLayout } from "./layout";
 
 export const TOOL_IDS = ["waveform", "spectrogram", "fftview", "generator"] as const;
@@ -37,6 +38,53 @@ function ToolStub({ tool }: { tool: ToolId }) {
   );
 }
 
+/**
+ * Plumbing probe for the DSP worker RPC (Plan 01 Task 2): fires one
+ * `sessionPing` on mount and shows the echoed payload byte length. StrictMode
+ * double-mount exercises the supersede path — the first call resolves
+ * `{cancelled: true}`, the second renders. No i18n copy: this is a raw
+ * technical readout (Latin digits, LTR); the stub body copy stays unchanged.
+ */
+function WaveformStubPing() {
+  const [pingByteLength, setPingByteLength] = useState<number | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const bytes = new Uint8Array(4);
+    dspWorkerRpc
+      .call(
+        "sessionPing",
+        { count: 1 },
+        { buffer: bytes.buffer, byteOffset: 0, byteLength: bytes.byteLength },
+      )
+      .then(
+        (outcome) => {
+          if (!mounted || !("payload" in outcome) || outcome.payload === undefined) {
+            return; // cancelled, or the worker echoed without a payload
+          }
+          setPingByteLength(outcome.payload.byteLength);
+        },
+        (error: unknown) => {
+          // Worker unavailable (build anomaly, worker host restriction): the
+          // stub keeps its plain body; surfaced in the console as a warning.
+          console.warn("avalab waveform stub: sessionPing failed", error);
+        },
+      );
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (pingByteLength === null) {
+    return null;
+  }
+  return (
+    <span data-testid="waveform.stub.ping" dir="ltr" className="text-xs text-muted">
+      {pingByteLength}
+    </span>
+  );
+}
+
 /** Data-router route table (spec §2.1/§2.5): layout shell + / redirect + /tools/<id>. */
 export const appRoutes: RouteObject[] = [
   {
@@ -48,7 +96,15 @@ export const appRoutes: RouteObject[] = [
         // layer — testable without a DOM render and works on first paint.
         loader: () => redirect(toolPath("waveform")),
       },
-      { path: "tools/waveform", element: <ToolStub tool="waveform" /> },
+      {
+        path: "tools/waveform",
+        element: (
+          <>
+            <WaveformStubPing />
+            <ToolStub tool="waveform" />
+          </>
+        ),
+      },
       { path: "tools/spectrogram", element: <ToolStub tool="spectrogram" /> },
       { path: "tools/fftview", element: <ToolStub tool="fftview" /> },
       { path: "tools/generator", element: <ToolStub tool="generator" /> },

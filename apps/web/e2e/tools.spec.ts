@@ -60,6 +60,9 @@ test("Persian (default): / redirects to the waveform tool and the sidebar reache
   await page.goto("/");
   await expect(page).toHaveURL(/\/tools\/waveform$/);
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+  // DSP worker RPC plumbing (Plan 01 Task 2): the stub ping proves the built
+  // module worker answers through the rpc layer under `vite preview`.
+  await expect(page.getByTestId("waveform.stub.ping")).toHaveText("4");
 
   for (const tool of TOOLS) {
     await page.getByRole("link", { name: tool.label }).click();
@@ -79,6 +82,7 @@ test("English (persisted preference): the same four routes with zero console err
   });
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
+  await expect(page.getByTestId("waveform.stub.ping")).toHaveText("4");
 
   for (const tool of TOOLS) {
     await page.getByRole("link", { name: tool.label }).click();
