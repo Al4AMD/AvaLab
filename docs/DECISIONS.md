@@ -143,3 +143,19 @@
   - b/a IIR designs must pass the solver envelope `max|p| ≤ 0.995` and a 48000-sample impulse-decay behavioral guard; non-finite, silent, or non-decaying responses throw `RangeError`; coefficients are never clamped.
   - Repeated zeros at z = −1 are verified by residual, root count, and cluster checks rather than root-to-root matching.
 - Consequences: Narrow/high-order lowpass/highpass and most order-8 bandpass/bandstop designs are conservatively rejected; filter design must run in a Worker per AGENTS §9, with the UI trigger debounced if needed; a second-order-sections or state-space realization is the future fix; `docs/ALGORITHMS.md` is authoritative for the exact formulas and tolerances.
+
+## D-018 — Typed message DSP worker (no Comlink) + audio decode lanes
+
+- Date: 2026-10-25
+- Status: accepted (owner, Wave 2 brainstorm)
+- Context: AGENTS §3 allows "Comlink or typed message protocol"; Wave 2 needs repeatable worker semantics (cancel, transfers, cache) and §9 offline resilience.
+- Decision: Hand-rolled typed message protocol (~50-line RPC) around one long-lived module worker whose ops are a pure op table over `@avalab/dsp`; no Comlink dependency. Audio decode is backend-first (`POST /ingest` → canonical WAV; limits are the backend's truth), with an offline fallback lane (`decodeAudioData` + bundled demo clips) when the API is unreachable.
+- Consequences: One fewer dependency, testable RPC via `MessageChannel` in Vitest, all typed-array worker results transfer-not-copy; browser codec variance is confined to the explicitly-labeled offline lane.
+
+## D-019 — URL state scheme for tool parameters
+
+- Date: 2026-10-25
+- Status: accepted (owner, Wave 2 brainstorm)
+- Context: AGENTS §3/F16 require tool state serializable to the URL for shareable ready-made experiments (F16), routing deferred by D-015 to Wave 2.
+- Decision: `react-router` data routes at `/tools/<tool>?<params>`; every tool ships `paramsToSearch`/`searchToParams` codecs with canonical key ordering; controls write the URL via debounced `history.replaceState` (parameter state is primary in React, URL follows). User audio never enters the URL.
+- Consequences: F16 share-by-URL lands from day one per tool; params live as single-string source of truth to avoid history thrash on sliders.
