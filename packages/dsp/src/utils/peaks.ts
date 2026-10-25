@@ -24,9 +24,11 @@
  * bucketing — the overlap-free exactness above is the pinned contract here
  * and in the tests.
  *
- * Complexity: O(N + B) time (one pass over samples with an amortized-O(1)
- * bucket pointer; at most 2·B boundary computations in total), O(B) space
- * for the output. No allocation per sample.
+ * Complexity: O(N + B) time — one pass over samples with an amortized-O(1)
+ * bucket pointer; the while-guard reevaluates floor((b+1)·N/B) once per
+ * sample and once per bucket advance, so the boundary work is O(N + B)
+ * (up to one floor per sample plus one per-bucket tick), not "at most 2·B".
+ * O(B) space for the output. No allocation per sample.
  *
  * Edge cases:
  * - `bucketCount` must be a positive integer (B ≥ 1); 0, negatives,

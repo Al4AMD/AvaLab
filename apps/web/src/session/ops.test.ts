@@ -87,7 +87,9 @@ describe("waveformOverview handler", () => {
       byteOffset: 0,
       byteLength: 0,
     } satisfies TransferablePayload);
-    expect(result.meta).toEqual({ sampleCount: 0, sampleRateHz: 44_100, bucketCount: 8 });
+    // meta self-description: an empty source yields 0 buckets even though
+    // params requested 8 — meta describes the payload actually returned.
+    expect(result.meta).toEqual({ sampleCount: 0, sampleRateHz: 44_100, bucketCount: 0 });
     expect(result.payload?.byteLength).toBe(0);
   });
 

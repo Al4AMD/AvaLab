@@ -5,9 +5,10 @@
  * type, result type, handler — and the typed wire unions in `protocol.ts`
  * (`DspOpRequest` / `DspOpResponse`) and the typed `rpc.call(op, params…)`
  * surface extend automatically. The worker's dispatch switch must then gain
- * one `case` for the new op (enforced: the switch ends in
- * `request satisfies never`, so a table entry without a case fails
- * typecheck). No other wire type is hand-written per op.
+ * one `case` for the new op (enforced: the handler record
+ * `dspHandlers satisfies DspOpHandlers` in `dsp.worker.ts` — a table entry
+ * without a handler entry fails typecheck with TS1360). No other wire type
+ * is hand-written per op.
  *
  * Handlers are pure over `@avalab/dsp` inputs only; they receive validated
  * shapes (frame validation happens in `protocol.ts` boundary consumers) and
@@ -110,8 +111,10 @@ export type WaveformOverviewResult = {
  * source samples into exact per-bucket min/max envelope pairs. The payload IS
  * the session source (the store's `deriveWithSource` copies `original.samples`
  * and transfers the copy); the result is self-describing — `sampleCount` is
- * read off the payload, `sampleRateHz`/`bucketCount` echo the params so the
- * UI never has to re-derive rate metadata.
+ * read off the payload, `bucketCount` is derived from the returned payload's
+ * length (byteLength/8; equals the params' value for a valid call), and
+ * `sampleRateHz` echoes the params so the UI never has to re-derive rate
+ * metadata.
  */
 export function waveformOverview(
   params: WaveformOverviewParams,
@@ -147,7 +150,10 @@ export function waveformOverview(
     meta: {
       sampleCount: samples.length,
       sampleRateHz: params.sampleRateHz,
-      bucketCount: params.bucketCount,
+      // Self-description from the actual result: 2 interleaved Float32 = 8
+      // bytes per bucket, so an empty source (length-0 minMax) reports 0
+      // buckets instead of echoing an inapplicable params.bucketCount.
+      bucketCount: minMax.byteLength / 8,
     },
     payload: { buffer: minMax.buffer, byteOffset: 0, byteLength: minMax.byteLength },
   };
