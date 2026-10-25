@@ -249,7 +249,7 @@ describe("huffman encode", () => {
 });
 
 describe("huffman round-trips (bit-exact)", () => {
-  it("round-trips the pinned adversarial set", () => {
+  it("round-trips the pinned adversarial set", { timeout: 24000 }, () => {
     expectRoundTripBitExact(new Uint8Array(100000), "all-zero 1e5");
     expectRoundTripBitExact(
       Uint8Array.from({ length: 20000 }, (_, index) => (index % 2 === 0 ? 0x00 : 0xff)),

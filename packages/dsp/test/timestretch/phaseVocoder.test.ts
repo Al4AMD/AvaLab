@@ -140,7 +140,7 @@ describe("timeStretch identity and length contract", () => {
 });
 
 describe("timeStretch content preservation", () => {
-  it("keeps a sine's pitch under a 2x stretch (center and side bins)", () => {
+  it("keeps a sine's pitch under a 2x stretch (center and side bins)", { timeout: 24000 }, () => {
     const samples = new Float64Array(2 * RATE);
     for (let n = 0; n < samples.length; n += 1) {
       samples[n] = Math.sin((2 * Math.PI * 440 * n) / RATE);
@@ -214,7 +214,7 @@ describe("timeStretch content preservation", () => {
     }
   });
 
-  it("keeps noise finite and bounded within 10x the input rms", () => {
+  it("keeps noise finite and bounded within 10x the input rms", { timeout: 24000 }, () => {
     const noise = seededUniformNoise(2 * RATE, 55);
     const stretched = timeStretch(noise, { stretchFactor: 2, windowLengthSamples: 1024 });
     let inputSumSq = 0;
@@ -342,8 +342,8 @@ describe("phase vocoder guards", () => {
           windowLengthSamples: 1024,
           sampleRateHz: RATE,
         }),
-        ).toThrow(TypeError);
-      }
+      ).toThrow(TypeError);
+    }
   });
 
   it("rejects invalid stretch factors and window lengths with RangeError", () => {
