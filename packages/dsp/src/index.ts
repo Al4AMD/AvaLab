@@ -12,6 +12,32 @@
  */
 
 export type {
+  DeltaHuffmanDecoded,
+  DeltaHuffmanEncoded,
+} from "./codecs/delta.js";
+export {
+  decodeLosslessDeltaHuffman,
+  deltaDecode,
+  deltaEncode,
+  encodeLosslessDeltaHuffman,
+} from "./codecs/delta.js";
+export type { CanonicalCodes, HuffmanCodebook, HuffmanEncoded } from "./codecs/huffman.js";
+export {
+  buildCanonicalCodes,
+  buildHistogram,
+  huffmanDecode,
+  huffmanEncode,
+  validatePrefixFree,
+} from "./codecs/huffman.js";
+export type {
+  MdctCodecDecodeParams,
+  MdctCodecEncoded,
+  MdctCodecEncodeParams,
+  MdctCodecStats,
+} from "./codecs/mdctCodec.js";
+export { decodeMdct, encodeMdct } from "./codecs/mdctCodec.js";
+export { rleDecode, rleEncode } from "./codecs/rle.js";
+export type {
   FreqzOptions,
   FreqzResult,
   PolesZerosResult,
@@ -120,5 +146,9 @@ export {
 export { generatePinkNoise, generateWhiteNoise, mulberry32 } from "./signals/noise.js";
 export type { ConvolveFftOptions } from "./systems/convolution.js";
 export { convolveDirect, convolveFft, nextPowerOfTwo } from "./systems/convolution.js";
+export type { MdctParams, MdctResult } from "./timestretch/mdct.js";
+export { imdct, mdct } from "./timestretch/mdct.js";
+export type { PitchShiftParams, TimeStretchParams } from "./timestretch/phaseVocoder.js";
+export { pitchShift, timeStretch } from "./timestretch/phaseVocoder.js";
 export { averagePowerOf, energyOf } from "./utils/energy.js";
 export { samplesToSeconds, secondsToSamples } from "./utils/time.js";

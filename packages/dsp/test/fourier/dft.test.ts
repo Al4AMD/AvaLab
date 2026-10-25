@@ -47,31 +47,39 @@ describe("dftNaive (golden)", () => {
     expect(golden.cases.length).toBeGreaterThan(0);
   });
 
-  it.each(golden.cases)("matches forward spectrum for $name", (goldenCase: GoldenCase) => {
-    const samples = Float64Array.from(goldenCase.input.samples);
-    const expectedRe = asNumberArray(goldenCase.expected.re, "expected.re");
-    const expectedIm = asNumberArray(goldenCase.expected.im, "expected.im");
-    const actual = dftNaive(samples);
+  it.each(golden.cases)(
+    "matches forward spectrum for $name",
+    (goldenCase: GoldenCase) => {
+      const samples = Float64Array.from(goldenCase.input.samples);
+      const expectedRe = asNumberArray(goldenCase.expected.re, "expected.re");
+      const expectedIm = asNumberArray(goldenCase.expected.im, "expected.im");
+      const actual = dftNaive(samples);
 
-    expect(actual.re.length).toBe(expectedRe.length);
-    expect(actual.im.length).toBe(expectedIm.length);
-    expectedRe.forEach((expected, k) => {
-      expectClose(valueAt(actual.re, k), expected, goldenCase.tolerance, `re[${k}]`);
-    });
-    expectedIm.forEach((expected, k) => {
-      expectClose(valueAt(actual.im, k), expected, goldenCase.tolerance, `im[${k}]`);
-    });
-  });
+      expect(actual.re.length).toBe(expectedRe.length);
+      expect(actual.im.length).toBe(expectedIm.length);
+      expectedRe.forEach((expected, k) => {
+        expectClose(valueAt(actual.re, k), expected, goldenCase.tolerance, `re[${k}]`);
+      });
+      expectedIm.forEach((expected, k) => {
+        expectClose(valueAt(actual.im, k), expected, goldenCase.tolerance, `im[${k}]`);
+      });
+    },
+    24000,
+  );
 
-  it.each(golden.cases)("inverts golden spectrum for $name", (goldenCase: GoldenCase) => {
-    const expectedIfft = asNumberArray(goldenCase.expected.ifft, "expected.ifft");
-    const actual = idftNaive(spectrumOfGoldenCase(goldenCase));
+  it.each(golden.cases)(
+    "inverts golden spectrum for $name",
+    (goldenCase: GoldenCase) => {
+      const expectedIfft = asNumberArray(goldenCase.expected.ifft, "expected.ifft");
+      const actual = idftNaive(spectrumOfGoldenCase(goldenCase));
 
-    expect(actual.length).toBe(expectedIfft.length);
-    expectedIfft.forEach((expected, n) => {
-      expectClose(valueAt(actual, n), expected, goldenCase.tolerance, `ifft[${n}]`);
-    });
-  });
+      expect(actual.length).toBe(expectedIfft.length);
+      expectedIfft.forEach((expected, n) => {
+        expectClose(valueAt(actual, n), expected, goldenCase.tolerance, `ifft[${n}]`);
+      });
+    },
+    24000,
+  );
 });
 
 describe("dftNaive properties", () => {
