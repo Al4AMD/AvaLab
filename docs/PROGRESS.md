@@ -103,7 +103,7 @@ Verified at close-out: `pnpm check` green; `uv run --directory apps/api pytest -
 
 ## What's left
 
-- **Wave 1** — `docs/plans/wave-1/` (4 executable plans; see D-015). Plans `01-fourier-transforms.md`, `02-signals-and-metrics.md`, and `03-systems-and-filters.md` complete (above); `04-codecs-and-time.md` in progress (Tasks 1–6 done). Pure-TS DSP + golden vectors; no UI, no router.
+- **Wave 1** — `docs/plans/wave-1/` (4 executable plans; see D-015). All four plans complete (`01` Fourier, `02` signals/metrics, `03` systems/filters, `04` codecs/time, above). Pure-TS DSP + golden vectors; no UI, no router. Next: wave 2 planning per the wave map (`docs/plans/README.md`) — owner direction pending.
 - Wave 2+ — not planned yet; see `docs/plans/README.md` for the wave map.
 
 ## Known issues / deferred minors (carried out of Wave 0)
