@@ -86,8 +86,9 @@
  * guard the container, `huffmanDecode` the continuous stream with
  * `encoded.codebook`, split at M, un-zigzag pairs to Int16 indices, dequantize
  * per frame C'[k] = q[k]·steps[frame], `imdct`, and return Float32 samples of
- * length (frameCount − 1)·hop — the caller trims trailing (exact-zero) tail
- * samples to the original count, exactly like the raw `imdct` contract.
+ * length (frameCount − 1)·hop — the caller trims trailing tail samples
+ * (exact algebraic zeros up to float ulps, not bit-exact 0) to the original
+ * count, exactly like the raw `imdct` contract.
  * `sampleRateHz` does not enter the math (the reconstruction is rate-free);
  * it is validated for symmetry with the encode signature pinned in the plan
  * (stats readouts are wave 4). Huffman streams are not self-authenticating
@@ -315,8 +316,9 @@ export function encodeMdct(samples: Float32Array, params: MdctCodecEncodeParams)
  * `invalid huffman codebook`); a decoded stream whose byte count does not
  * match the container's coefficient grid is rejected as
  * `RangeError("truncated mdct codec stream")`. Output length is
- * (frameCount − 1)·hop; the caller trims the (exact-zero) tail to the
- * original sample count. The container is only read, never mutated; the
+ * (frameCount − 1)·hop; the caller trims the tail (exact algebraic zeros up
+ * to float ulps, not bit-exact 0) to the original sample count. The
+ * container is only read, never mutated; the
  * result is fresh and deterministic. `sampleRateHz` is validated but does
  * not enter the math (header).
  */

@@ -139,7 +139,7 @@ function snrOf(reference: Float32Array, test: Float32Array): number {
  * the decoded signal must be a perceptually transparent proxy with PR error
  * ≤ 1e-2 relative RMS — measured on the seeds where the R9 rate model holds
  * (flat-spectrum random: 9.39e-5; impulse: 1.29e-4; fs 48 kHz, frame 1024).
- * The R9 rate model collapses TONAL content at high rates (sine/coirp/DC
+ * The R9 rate model collapses TONAL content at high rates (sine/chirp/DC
  * pins live in the "rate-model collapse" suite below) — documented, and the
  * motivating teaching hook for per-band scale factors + F13 masking.
  */

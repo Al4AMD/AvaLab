@@ -342,9 +342,8 @@ describe("phase vocoder guards", () => {
           windowLengthSamples: 1024,
           sampleRateHz: RATE,
         }),
-      ).toThrow(TypeError);
-      void testCase.label;
-    }
+        ).toThrow(TypeError);
+      }
   });
 
   it("rejects invalid stretch factors and window lengths with RangeError", () => {

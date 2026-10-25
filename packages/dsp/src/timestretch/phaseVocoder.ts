@@ -54,7 +54,7 @@
  *
  * Magnitudes are reused from the analysis frames unchanged (phase-vocoder
  * premise: the magnitude spectrum is stationary relative to the phase
- * modifications). Only bins 0..ceil(F/2)-1 are measured and propagated; the
+ * modifications). Only bins 0..⌊F/2⌋ are measured and propagated; the
  * remaining bins are filled with the conjugate of their Hermitian partner
  * (bin F-k), which keeps the output spectrum Hermitian-symmetric so every
  * inverse transform is real up to roundoff. Bins 0 and F/2 (even F) are their

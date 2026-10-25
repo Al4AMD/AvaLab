@@ -84,8 +84,9 @@
  * to imdct must hold exactly hop coefficients -> RangeError; a NaN or
  * +/-Infinity input sample or coefficient -> TypeError. Inputs are never
  * mutated; results are fresh Float64Arrays. Output samples beyond
- * sampleCount are exactly 0 (the cross terms cancel to 0 there), so callers
- * can trim freely.
+ * sampleCount are exact algebraic zeros up to float ulps (the cross terms
+ * cancel to 0 there, but rounding leaves ulp-level float noise, not
+ * bit-exact 0 — tests pin <= 1e-10), so callers can trim freely.
  */
 
 export interface MdctParams {
@@ -203,8 +204,9 @@ export function mdct(x: Float64Array, params: MdctParams): MdctResult {
  * Inverse MDCT with TDAC overlap-add. `coefficients` are consecutive frames of
  * the forward transform; the output spans (frameCount - 1) * hop samples with
  * the reconstruction aligned to the input the frames came from (positions
- * 0..sampleCount-1), padded with exact zeros up to that length (trim to the
- * original sample count by taking a prefix).
+ * 0..sampleCount-1), padded with exact algebraic zeros up to float ulps
+ * (ulp-level float noise, not bit-exact 0; trim to the original sample
+ * count by taking a prefix).
  */
 export function imdct(coefficients: readonly Float64Array[], params: MdctParams): Float64Array {
   assertFrameLengthSamples(params.frameLengthSamples, "imdct");
