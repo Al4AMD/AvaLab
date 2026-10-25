@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { createBrowserRouter, type RouteObject, redirect } from "react-router";
-import { dspWorkerRpc } from "../session/rpc";
+import { useSessionStore } from "../session/store";
 import { AppLayout } from "./layout";
 
 export const TOOL_IDS = ["waveform", "spectrogram", "fftview", "generator"] as const;
@@ -39,41 +39,21 @@ function ToolStub({ tool }: { tool: ToolId }) {
 }
 
 /**
- * Plumbing probe for the DSP worker RPC (Plan 01 Task 2): fires one
- * `sessionPing` on mount and shows the echoed payload byte length. StrictMode
- * double-mount exercises the supersede path — the first call resolves
- * `{cancelled: true}`, the second renders. No i18n copy: this is a raw
- * technical readout (Latin digits, LTR); the stub body copy stays unchanged.
+ * Plumbing probe for the DSP worker RPC (Plan 01 Tasks 2–3): renders the
+ * echoed diagnostics-ping payload byte length from the SESSION STORE. Ruling
+ * R23: the store is the sole view-tree RPC caller — this stub fires the
+ * store's guarded `sessionTroubleshootingPing` action on mount (StrictMode
+ * double-mount is a no-op under the action's pending/done guard) and reads
+ * `diagnostics.pingByteLength` back. No i18n copy: raw technical readout
+ * (Latin digits, LTR); the stub body copy stays unchanged.
  */
 function WaveformStubPing() {
-  const [pingByteLength, setPingByteLength] = useState<number | null>(null);
+  const pingByteLength = useSessionStore((state) => state.diagnostics.pingByteLength);
+  const sessionTroubleshootingPing = useSessionStore((state) => state.sessionTroubleshootingPing);
 
   useEffect(() => {
-    let mounted = true;
-    const bytes = new Uint8Array(4);
-    dspWorkerRpc
-      .call(
-        "sessionPing",
-        { count: 1 },
-        { buffer: bytes.buffer, byteOffset: 0, byteLength: bytes.byteLength },
-      )
-      .then(
-        (outcome) => {
-          if (!mounted || !("payload" in outcome) || outcome.payload === undefined) {
-            return; // cancelled, or the worker echoed without a payload
-          }
-          setPingByteLength(outcome.payload.byteLength);
-        },
-        (error: unknown) => {
-          // Worker unavailable (build anomaly, worker host restriction): the
-          // stub keeps its plain body; surfaced in the console as a warning.
-          console.warn("avalab waveform stub: sessionPing failed", error);
-        },
-      );
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    sessionTroubleshootingPing();
+  }, [sessionTroubleshootingPing]);
 
   if (pingByteLength === null) {
     return null;
