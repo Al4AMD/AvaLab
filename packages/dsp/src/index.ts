@@ -151,4 +151,6 @@ export { imdct, mdct } from "./timestretch/mdct.js";
 export type { PitchShiftParams, TimeStretchParams } from "./timestretch/phaseVocoder.js";
 export { pitchShift, timeStretch } from "./timestretch/phaseVocoder.js";
 export { averagePowerOf, energyOf } from "./utils/energy.js";
+export { inputHashFnv1a64 } from "./utils/hash.js";
+export { computePeakBuckets } from "./utils/peaks.js";
 export { samplesToSeconds, secondsToSamples } from "./utils/time.js";

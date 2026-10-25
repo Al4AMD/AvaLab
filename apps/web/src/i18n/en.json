@@ -14,5 +14,35 @@
     "privacy": {
       "ttlNotice": "Uploaded files are deleted from the server automatically after 60 minutes."
     }
+  },
+  "nav": {
+    "landmark": "Tools",
+    "waveform": "Waveform",
+    "spectrogram": "Spectrogram",
+    "fftview": "FFT View",
+    "generator": "Generator"
+  },
+  "tool": {
+    "waveform": {
+      "title": "Waveform",
+      "stub": "This tool lands later this wave."
+    },
+    "spectrogram": {
+      "title": "Spectrogram",
+      "stub": "This tool lands later this wave."
+    },
+    "fftview": {
+      "title": "FFT View",
+      "stub": "This tool lands later this wave."
+    },
+    "generator": {
+      "title": "Signal Generator",
+      "stub": "This tool lands later this wave."
+    }
+  },
+  "layout": {
+    "player": {
+      "upcoming": "Audio player dock — playback controls arrive later in this wave."
+    }
   }
 }

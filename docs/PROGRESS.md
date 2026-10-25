@@ -101,6 +101,21 @@ Verified at close-out: `pnpm check` green; `uv run --directory apps/api pytest -
 
 **Closing:** 6/6 tasks done. Verification: `pnpm --filter @avalab/dsp test` 865/865, golden pytest 8/8, typecheck/lint/i18n clean. Two carry-over notes for wave-4: (a) `huffmanDecode` preallocates a bitLength-sized output — up to ~15× the actual symbol count transiently for skewed codebooks; not committed yet, wave-4 may tighten via codebook prescan. (b) A full-length whole-file `timeStretch` on a 5-minute file can hold ~0.9 GB of analysis frames — the F06 UI must use the excerpt strategy per AGENTS §9 before enabling full-file apply.
 
+## Wave 2 · Plan 01 — App skeleton: router, session store, DSP worker, RPC (complete)
+
+**Approach (owner-approved 2026-10-25):** Spec `docs/superpowers/specs/2026-10-25-wave-2-core-visuals-design.md`; plans `docs/plans/wave-2/01…04`. Decisions recorded: D-018 (typed message DSP worker, no Comlink; backend-first decode + offline fallback lane), D-019 (per-tool routes with canonical URL-encoded params). Wave 2 = four sequential SDD plans, this is Plan 01.
+
+**Task 1 router + layout:** complete. Data routes `/` → `/tools/{waveform,spectrogram,fftview,generator}` with stub pages; layout keeps the Wave-0 header (HealthStatus + LanguageToggle), adds a logical-property sidebar (NavLink `aria-current`, token focus-visible treatment) and a docked player placeholder. Pure `lib/url-state.ts` encode/decode (sorted keys, locale-free `String()`, arrays as repeated keys, TypeError on booleans/objects/NaN/±Infinity; textual decode — per-tool codecs restore types). Deps added exactly `react-router@8.5.0` + `zustand@5.0.16` (MIT, THIRD_PARTY rows); root engines floor raised to `>=22.22.0` (react-router engines). Tests: unit 22 → grew with tasks; e2e `tools.spec.ts` (fa redirect + 4 sidebar routes; en persisted) with the zero-console-error fixture. Ledger rulings R22 (engines), R23 (store becomes sole view-tree RPC consumer at T3).
+
+**Task 2 worker + RPC:** complete. `apps/web/src/workers/dsp.worker.ts` (module worker) + `session/{protocol,ops,rpc}.ts`: wire = `{id, op, params, payload?: {buffer, byteOffset, byteLength}}` → `{id, ok, result: {meta?, payload?} | error | cancelled}`; one op-table extension rule (2 files); transport seam with a `MessageChannel`-class fake for Vitest (no real Worker in node); lazy worker init, HMR dispose, `terminate()` resolves pending; supersede by identical `op + canonicalJson(params)` resolves `{cancelled: true}` for the older call; cancel frames drop late frames; response payload buffers moved in the transfer list both directions (asserted at the `postMessage` level). Built worker answer verified in e2e preview (`dist/assets/dsp.worker-*.js`). Fix 3a4f2ee: transport-construction throw becomes typed async `workerUnavailable` rejection (React-effect crash path removed; retry rebuilds).
+
+**Task 3 session store:** complete. Zustand store per spec §2.2: immutable `original {samples, sampleRateHz, name, sourceKind}`, `derived` cache keyed `op ‖ canonicalJson(params) ‖ inputHash(original)` (reset on new source), `jobs {progressPct|null, cancel}`, `selection` clamp/order, `backendOnline`. Guard codes `invalidType/notFinite/rateTooHigh/tooLong` (≤ 96 kHz, ≤ 300 s-equivalent). `packages/dsp/src/utils/hash.ts` = FNV-1a 64 over the PCM byte view (BigInt-reference-verified limb math; prime `1099511628211`, offset `14695981039346656037`). Rulings recorded: R25 main-thread hash exception accepted (checksum, once per load, synchronous-typed guard contract kept), R26 avalanche claim replaced by flip-bijectivity + mean-bits band [24, 40] (measured ≈ 30.4/64 — FNV's known 2-adic weakness), supersede/cancel can't clobber a live cache entry (callId + hash captured at call time). Carry-over: derived keys are params-only — first payload-dependent op must extend the key with a payload hash (caveat comment + R24).
+
+**Task 4 waveform overview op:** complete. `packages/dsp/src/utils/peaks.ts` `computePeakBuckets` — exact overlap-free linear partition (Σ buckets = N), interleaved `min[k], max[k]` Float32Array, `RangeError` guards, empty → empty, all-nonFinite bucket → `[0,0]` (documented); golden-style hand vector + partition-identity property sweep. Worker op `waveformOverview` `{bucketCount, sampleRateHz}` (R28: meta self-describes from actual payload — `sampleCount`/`bucketCount` derived from byteLength, params cannot lie); store `deriveWithSource` posts a one-copy `.slice()` transfer (115.2 MB worst case, documented; source buffer proven intact post-transfer); `derive`/`deriveWithSource` share `openDerivedJob` (R29). Waveform stub page reads buckets via the store only.
+
+**Closing:** 4/4 tasks done (commits 9610c6e → 8bd1bcd on `feat/wave-2-plan-01`). Final verifier: PASS — `pnpm check` exit 0 (dsp 892/892, web 90/90, scripts 13/13, i18n OK, biome 114 files), `pnpm e2e` 6/6 (offline harness, fa+en), golden rle/mdct regenerate byte-identical + pytest 8/8, dep freeze exact (+2 named deps + workspace link), no type-`any`/`@ts-ignore`/`console.log` in src. Carry-overs into plans 02–04: payload-dependent cache key (R24), `cancelledIds` pruning, detached zero-length descriptor typed as `badParams` (edge), `deriveWithSource` full-copy until chunked transfer needed, Vite `worker.format` revisit if a worker chunk needs ESM imports, fa stub copy owner-review at wave close.
+
+
 ## What's left
 
 - **Wave 1** — `docs/plans/wave-1/` (4 executable plans; see D-015). All four plans complete (`01` Fourier, `02` signals/metrics, `03` systems/filters, `04` codecs/time, above). Pure-TS DSP + golden vectors; no UI, no router. Next: wave 2 planning per the wave map (`docs/plans/README.md`) — owner direction pending.
@@ -129,11 +144,17 @@ From the T1–T12 ledgers; none blocking, each has an upgrade path:
 - `app.health.loading`, `app.health.ok`, `app.health.offline`, `app.health.offlineDetail`
 - `app.privacy.ttlNotice`
 
+Wave 2 plan 01 additions (machine-drafted, agent):
+
+- `nav.*` (5 keys: landmark + 4 tool names)
+- `tool.{waveform,spectrogram,fftview,generator}.{title,stub}` (8 keys)
+- `layout.player.upcoming`
+
 (Future Persian copy: every wave's fa strings land in this section until the owner reviews them.)
 
 ## Next recommended step
 
-Start **Wave 1, plan `04-codecs-and-time.md`** via the subagent-driven-development workflow (fresh session, new ledger under `.superpowers/sdd/`). Do not begin later plans while an earlier one has failing checks.
+Start **Wave 2, plan `02-audio-sources-playback.md`** via the subagent-driven-development workflow (ledger `.superpowers/sdd/02-audio-sources-playback/`). It builds the source lane (backend ingest + offline fallback + demo clips) and player on top of the shipped session store/RPC. Do not begin later plans while an earlier one has failing checks.
 
 ## Session log
 
@@ -175,3 +196,12 @@ Start **Wave 1, plan `04-codecs-and-time.md`** via the subagent-driven-developme
 - Verified: `pnpm --filter @avalab/dsp test` 865/865 ✓ (29 files) · `pnpm typecheck` ✓ · `pnpm lint` ✓ (biome 93 files) · `pnpm check` ✓.
 - Debugging note on record: the identity test caught production leaking frame 0's Nyquist-bin value for even L (`halfBins = ⌈L/2⌉` skipped bin L/2 — now `⌊L/2⌋ + 1`). The plan's "neighbors ≤ −20 dB at ±3 bins" pin does NOT hold for stretch-2 output at any implementation variant (pre- and post-fix spectra identical): offsets ±1..±16 bins carry the 21.3 ms analysis-window skirt (hann main lobe ±187 Hz at 262144-point padding); the test asserts ≤ −20 dB at offsets ±32..128 padded bins (measured −26.5 dB) and documents the measured skirt instead.
 - Deviation notes on record (also in the source header): (1) synthesis deviation scaled by the hop ratio H_s/H_a (standard Dolson; R11 literal line omits it); (2) pitchShift direction uses stretch `2^(+semitones/12)` and resample to `fs/2^(semitones/12)` — the literal R13 reading measured an inverted pitch (+12 → 220 Hz violating the plan's "+12 doubles the peak" contract), semitones 0 unchanged.
+
+### 2026-10-25 — Wave 2 planning + plan 01 executed (app skeleton complete)
+
+- Planning: owner-approved brainstorm → spec `docs/superpowers/specs/2026-10-25-wave-2-core-visuals-design.md` + four SDD plans `docs/plans/wave-2/01…04` + `docs/DECISIONS.md` D-018 (typed-message DSP worker, no Comlink; backend-first decode lane with offline fallback) + D-019 (per-tool routes, URL-encoded canonical params). Deps `react-router@8.5.0`, `zustand@5.0.16` (MIT, THIRD_PARTY rows); engines floor `>=22.22.0`.
+- Plan 01 (`feat/wave-2-plan-01`, commits 9610c6e → 8bd1bcd): router/layout/URL-state; typed worker RPC over `session/{protocol,ops,rpc}.ts` (transfer lists both directions, supersede/cancel, built-worker answer proven in e2e); zustand session store (immutable `original`, derived cache keyed op+params+inputHash, `inputHashFnv1a64` in dsp, guard codes invalidType/notFinite/rateTooHigh/tooLong); `computePeakBuckets` + `waveformOverview` op + `deriveWithSource` (single-copy transfer path).
+- Verified (independent verifier, this branch): `pnpm check` exit 0 (dsp 892/892, web 90/90, scripts 13/13, biome 114 files, i18n OK) · `pnpm e2e` 6/6 · golden rle+mdct regenerate byte-identical, pytest 8/8 · dep additions exact · no `any`/`@ts-ignore`/`console.log` in src.
+- Key rulings on ledger: R22 engines; R23 store = sole view-tree RPC consumer; R24 params-only derived keys (caveat: first payload-dependent op must extend key); R25 main-thread hash exception accepted; R26 avalanche test contract = bijectivity + mean-bits band; R27 `computePeakBuckets` no clamp; R28 op meta self-describes from actual payload; R29 `derive`/`deriveWithSource` share `openDerivedJob`.
+- Spec amendments: §2.3 wire shape `{meta?, payload?}` + transfer descriptor; §2.5 react-router v8 wording (commit 8bd1bcd).
+- Carry-overs: cancelledIds pruning; detached zero-length descriptor typed `badParams` (edge); chunked transfer for `deriveWithSource` if per-call copies become hot; Vite `worker.format` revisit on ESM worker chunks; fa copy owner-review below.
