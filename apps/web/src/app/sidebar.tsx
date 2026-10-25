@@ -6,7 +6,10 @@ import { cn } from "../lib/cn";
 function linkClass({ isActive }: { isActive: boolean }): string {
   return cn(
     "block rounded-md px-3 py-2 text-sm",
-    isActive ? "bg-surface text-text" : "text-muted hover:bg-surface hover:text-text",
+    isActive
+      ? "bg-surface text-text"
+      : "text-muted hover:bg-surface hover:text-text",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
   );
 }
 

@@ -58,6 +58,7 @@ test("Persian (default): / redirects to the waveform tool and the sidebar reache
 }) => {
   const errors = watchForErrors(page);
   await page.goto("/");
+  await expect(page).toHaveURL(/\/tools\/waveform$/);
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
 
   for (const tool of TOOLS) {
