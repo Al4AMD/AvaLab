@@ -72,14 +72,15 @@ const WAVEFORM_STUB_BUCKET_COUNT = 32;
 
 /**
  * Plumbing probe for the waveform overview op (Plan 01 Task 4, adapted in
- * Plan 02 Task 1): fires the store's `deriveWithSource("waveformOverview", …)`
+ * Plan 02 Tasks 1–2): fires the store's `deriveWithSource("waveformOverview", …)`
  * for the LOADED session source — the worker buckets the samples and the
- * readout renders the returned bucket count. The Plan-01 deterministic probe
- * seeding is retired: real sources now come from the input empty state (and
- * later the offline lane/demo clips). No canvas yet (Plan 03); no i18n copy:
- * raw technical readout (Latin digits, LTR). Rejections (worker unavailable,
- * noSource) render nothing and never surface as unhandled console
- * rejections.
+ * readout renders the REAL sample count the worker read off the transferred
+ * source bytes (op contract: `WaveformOverviewResult.meta.sampleCount`). The
+ * Plan-01 deterministic probe seeding is retired: real sources now come from
+ * the input empty state (upload, offline lane, demo clips). No canvas yet
+ * (Plan 03); no i18n copy: raw technical readout (Latin digits, LTR).
+ * Rejections (worker unavailable, noSource) render nothing and never surface
+ * as unhandled console rejections.
  */
 function WaveformStubOverview() {
   const derived = useSessionStore((state) => state.derived);
@@ -105,18 +106,14 @@ function WaveformStubOverview() {
   }
   // DerivedEntry.result is unknown by contract; the overview result's shape
   // is pinned by the op table (WaveformOverviewResult).
-  const payload = (entry.result as { payload?: { buffer: ArrayBuffer; byteLength: number } })
-    .payload;
-  if (payload === undefined) {
-    return null;
-  }
-  const bucketCount = payload.byteLength / 8; // 2 Float32 values per bucket
-  if (!Number.isInteger(bucketCount)) {
+  const meta = (entry.result as { meta?: { sampleCount?: unknown } }).meta;
+  const sampleCount = meta?.sampleCount;
+  if (typeof sampleCount !== "number" || !Number.isInteger(sampleCount)) {
     return null;
   }
   return (
     <span data-testid="waveform.stub.overview" dir="ltr" className="text-xs text-muted">
-      {bucketCount}
+      {sampleCount}
     </span>
   );
 }

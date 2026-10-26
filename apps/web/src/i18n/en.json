@@ -28,6 +28,23 @@
     },
     "fileButton": "Choose file",
     "busy": "Uploading…",
+    "offlineLaneOnly": "Server unreachable — the offline lane only: the demo clips below load without the server.",
+    "demo": {
+      "title": "Demo clips",
+      "meta": "WAV · {{seconds}} s · {{rateHz}} Hz",
+      "loadButton": "Load",
+      "loadAria": "Load demo clip: {{title}}",
+      "loading": "Loading…",
+      "chirp": {
+        "title": "Logarithmic chirp (100 Hz → 8 kHz)"
+      },
+      "clicks": {
+        "title": "Clicks (2 Hz)"
+      },
+      "pinkNoise": {
+        "title": "Pink noise"
+      }
+    },
     "error": {
       "file_too_large": "The file is larger than the upload limit (100 MB).",
       "duration_too_long": "The audio is longer than 5 minutes (300 s).",
@@ -38,6 +55,7 @@
       "unknown": "Unexpected server error (code: {{code}}).",
       "backendUnavailable": "Server unreachable; the file was not uploaded.",
       "backendUnavailableHint": "Check the connection and try again; browser-side tools keep working without the server.",
+      "demoUnavailable": "The demo clip could not be loaded.",
       "tooLong": "The audio is longer than 5 minutes (300 s).",
       "rateTooHigh": "The sample rate exceeds the 96 kHz cap.",
       "notFinite": "The audio contains values that are not finite numbers.",

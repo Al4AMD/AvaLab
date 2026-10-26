@@ -13,10 +13,20 @@
  *
  * Nothing here truncates: the session store's guards (≤ 96 kHz, ≤ 300 s)
  * REJECT out-of-cap samples — this card surfaces that typed rejection.
+ *
+ * Wave-2 Plan 02 Task 2: the block also carries the bundled demo clips (the
+ * offline lane's entry points) and, once the ingest lane has PROVEN the
+ * backend down (`backendOnline` flag), an "offline lane only" hint above the
+ * file button. The button itself retains its Task-1 flow — a failed upload
+ * still surfaces the same typed error (plan Review Focus 3: flag flips only
+ * on real lane evidence, and the flag's teeth must not change that flow).
  */
 import { useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useSessionStore } from "../../session/store";
+import { DemoClipsRow } from "./demo";
+import { LaneFailureReadout } from "./failureReadout";
 import { IngestError, ingestFile } from "./ingest";
 
 /** Busy/error state of the card's loader (typed; no boolean soup). */
@@ -74,24 +84,6 @@ const FILE_BUTTON_CLASSES =
   "focus-within:outline-none focus-within:ring-2 focus-within:ring-accent " +
   "aria-disabled:pointer-events-none aria-disabled:opacity-50";
 
-function FailureReadout({ failure }: { failure: IngestError }) {
-  const { t } = useTranslation();
-  return (
-    <div
-      data-testid="input.upload.error"
-      role="alert"
-      className="flex flex-col gap-1 rounded-md border border-surface bg-surface/50 p-3 text-start"
-    >
-      <p className="text-sm">
-        {t(failure.messageKey, failure.code === undefined ? undefined : { code: failure.code })}
-      </p>
-      {failure.kind === "backendUnavailable" && (
-        <p className="text-xs text-muted">{t("input.error.backendUnavailableHint")}</p>
-      )}
-    </div>
-  );
-}
-
 /**
  * The "no source yet" block. Drag-and-drop is the pointer enhancement; the
  * file input behind the label is the keyboard-operable alternative (it is
@@ -101,6 +93,7 @@ function FailureReadout({ failure }: { failure: IngestError }) {
 export function UploadEmptyState() {
   const { t } = useTranslation();
   const { busy, failure, loadFile } = useIngestFile();
+  const backendOnline = useSessionStore((state) => state.backendOnline);
   const [dragging, setDragging] = useState(false);
   // Standard dragenter/dragleave counter: child elements fire their own
   // leave events, which would flicker the ring without a depth count.
@@ -140,6 +133,11 @@ export function UploadEmptyState() {
       }
     >
       <p className="text-sm text-muted">{t("input.empty.hint")}</p>
+      {!backendOnline && (
+        <p data-testid="input.offlineLaneOnly" className="text-xs text-muted">
+          {t("input.offlineLaneOnly")}
+        </p>
+      )}
       <input
         data-testid="input.upload.input"
         id={inputId}
@@ -163,7 +161,8 @@ export function UploadEmptyState() {
       >
         {busy ? t("input.busy") : t("input.fileButton")}
       </label>
-      {failure !== null && <FailureReadout failure={failure} />}
+      {failure !== null && <LaneFailureReadout failure={failure} testId="input.upload.error" />}
+      <DemoClipsRow />
     </div>
   );
 }
