@@ -92,9 +92,34 @@
       "stub": "This tool lands later this wave."
     }
   },
-  "layout": {
-    "player": {
-      "upcoming": "Audio player dock — playback controls arrive later in this wave."
+  "player": {
+    "title": "Player",
+    "play": "Play",
+    "pause": "Pause",
+    "seek": {
+      "back": "Back {{seconds}} s",
+      "forward": "Forward {{seconds}} s"
+    },
+    "time": {
+      "pattern": "{{current}} / {{total}}",
+      "aria": "Playback position {{current}} of {{total}}"
+    },
+    "selection": {
+      "pattern": "Selection {{start}} – {{end}}"
+    },
+    "empty": {
+      "hint": "Load an audio source to play it."
+    },
+    "loop": {
+      "label": "Loop",
+      "unavailable": "Selection loop arrives in a later wave"
+    },
+    "lane": {
+      "ingested": "Uploaded file",
+      "offlineBrowser": "Browser decode (offline lane)",
+      "demoClip": "Demo clip",
+      "recording": "Microphone take",
+      "generated": "Generated signal"
     }
   }
 }

@@ -1,1 +1,8 @@
-["app.health.loading", "app.health.ok", "app.health.offline", "input.error", "input.demo"]
+[
+  "app.health.loading",
+  "app.health.ok",
+  "app.health.offline",
+  "input.error",
+  "input.demo",
+  "player.lane"
+]

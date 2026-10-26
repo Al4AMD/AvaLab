@@ -118,8 +118,8 @@ Verified at close-out: `pnpm check` green; `uv run --directory apps/api pytest -
 
 ## What's left
 
-- **Wave 1** — `docs/plans/wave-1/` (4 executable plans; see D-015). All four plans complete (`01` Fourier, `02` signals/metrics, `03` systems/filters, `04` codecs/time, above). Pure-TS DSP + golden vectors; no UI, no router. Next: wave 2 planning per the wave map (`docs/plans/README.md`) — owner direction pending.
-- Wave 2+ — not planned yet; see `docs/plans/README.md` for the wave map.
+- **Wave 2 · Plan 02** `02-audio-sources-playback.md` — Tasks 1–4 complete (upload/ingest, offline lane + demo clips, microphone recording, dock player). Remaining plan-02 task: none — the plan is complete pending owner review of the shipped code.
+- Wave 2 plans 03 (visuals: waveform/spectrogram) and 04 — see `docs/plans/README.md`; do not begin a later plan with failing checks.
 
 ## Known issues / deferred minors (carried out of Wave 0)
 
@@ -148,13 +148,18 @@ Wave 2 plan 01 additions (machine-drafted, agent):
 
 - `nav.*` (5 keys: landmark + 4 tool names)
 - `tool.{waveform,spectrogram,fftview,generator}.{title,stub}` (8 keys)
-- `layout.player.upcoming`
+
+Wave 2 plan 02 additions (machine-drafted, agent):
+
+- `input.*` full key set (upload + offline lane + demo cards + errors, Tasks 1–2)
+- `input.record.*` (Task 3 recording states: start `stop/elapsed/deniedHint/mediaError{{error}}/capReached`, absent hint, limit)
+- `player.*` (Task 4 dock: title/play/pause/seek.back/seek.forward, time.pattern/time.aria, selection.pattern, empty.hint, loop.label/loop.unavailable, lane.{ingested,offlineBrowser,demoClip,recording,generated})
 
 (Future Persian copy: every wave's fa strings land in this section until the owner reviews them.)
 
 ## Next recommended step
 
-Start **Wave 2, plan `02-audio-sources-playback.md`** via the subagent-driven-development workflow (ledger `.superpowers/sdd/02-audio-sources-playback/`). It builds the source lane (backend ingest + offline fallback + demo clips) and player on top of the shipped session store/RPC. Do not begin later plans while an earlier one has failing checks.
+Plan `02-audio-sources-playback.md` is complete (Tasks 1–4 in `.superpowers/sdd/02-audio-sources-playback/`); owner code review pending. Then **Wave 2 plan `03-waveform-spectrogram.md`** (waveform + spectrogram canvases subscribe to `appPlayhead`, per Task 4's publish contract). Do not begin later plans while an earlier one has failing checks.
 
 ## Session log
 
@@ -210,6 +215,24 @@ Start **Wave 2, plan `02-audio-sources-playback.md`** via the subagent-driven-de
 - Verified: root `pnpm check` exit 0 (dsp 892/892, web 128/128 incl. 13 offline-lane tests, scripts 13/13, biome 123 files, i18n OK) · `pnpm e2e` 11/11 (2 new demo e2e: fa+en card click → real worker-derived overview count, HealthStatus pill asserted, zero console errors). Harness finding: `decodeAudioData` resamples to the device AudioContext rate (48 kHz clip → ≈220.5 k samples at 44.1 kHz on the dev Mac) — e2e asserts a real non-trivial count, not a magic number; the exact count is device/browser-dependent (documented offline-lane codec variance).
 - Deviations: no jsdom click test for the demo cards (repo pre-flight pins test deps; no jsdom installed) — lane wiring unit-tested node-side (fetch/decode/store seams injected) and the click covered by Playwright (real DOM, stronger). Plan's "sidebar empty-state" has no current surface (the sidebar has no empty state); demo cards went into the shared empty-state component per brief resolution.
 - Needs owner Persian review: `input.offlineLaneOnly`, `input.demo.*` fa copy (machine-drafted).
+- Details in `.superpowers/sdd/02-audio-sources-playback/progress.md`.
+
+### 2026-10-26 — Wave 2, plan 02 Task 3 (F01 microphone recording → ingest)
+
+- Done: `apps/web/src/lib/media.ts` + `features/input/record.tsx` — recorder seam state machine (`idle|requesting|requestingDenied|recording|processing|error(mediaError)|done(completed|capReached)`, all boundaries injectable, monotonic attempt id cancels grant races); 5-min cap through the same stop path (== store MAX_DURATION_SECONDS); cancel stops tracks; completed take → `ingestFile(..., sourceKind: "recording")` (`IngestOptions.sourceKind` typed override), capReached NOT uploaded + translated. Empty-state section: absent-devices honest hint, aria-live elapsed counter, stop/cancel. Machine failure states translated (`deniedHint`/`mediaError{{error}}`).
+- NOTE: implementer crashed twice mid-dispatch (API outage); `media.ts` survived; remaining finished inline by controller. Gates: root `pnpm check` 0, web 139/139, dsp 892/892, e2e 14/14. E2e pins no permission prompt in CI (absent `mediaDevices` → translated disabled hint).
+- Needs owner Persian review: `input.record.*`. UX note flagged: a failed upload of a completed take loses the take (re-record required).
+- Details in `.superpowers/sdd/02-audio-sources-playback/progress.md`.
+
+### 2026-10-27 — Wave 2, plan 02 Task 4 (F02 dock player: transport + playhead)
+
+- Done: `apps/web/src/features/player/{transport.ts,playhead.ts,usePlayer.ts,player.tsx}` —
+  - `transport.ts`: DOM-free player state machine `empty|ready{positionSample}|playing{startedAtSample}|stopped{positionSample}` with ALL seams injectable (`contextFactory, bufferFactory, nodeFactory, timeSource, onEnded, close`); node tests use recording fakes, app default is a real AudioContext. `setSource` builds the new AudioBuffer first, stops the old node, then swaps (§9: exactly ONE live AudioBufferSourceNode; store's mono lane + transport's buffer = ≤ 2 full-length buffers). Pause pins the interpolated position; play resumes from the pin, restarts from 0 at/past end; play-while-playing documented no-op; seek while playing restarts the node; zero-length source: `ready` elsewhere but `play()` no-op (Web Audio cannot make a 0-length AudioBuffer); stale `onEnded` detached at every stop; `dispose()` stops + closes. `playbackRate` field pinned 1 (F06 seam, Wave 3 plugs its speed control). Guards: non-finite args are documented no-ops (seek) / loud TypeErrors (malformed source, bad rate).
+  - `playhead.ts`: tiny EventTarget-style pub-sub `appPlayhead` singleton — Plan 03 canvases subscribe; publish notifies only current listeners synchronously; late subscribers get no replay (pinned); non-finite guard; dispose clear + permanent inertness; app code never disposes it.
+  - `usePlayer.ts`: mount-only machine effect (record.tsx StrictMode-safe pattern), `useSyncExternalStore` + useMemo EMPTY_STATE fallback (SSR-safe), source attach via `sourceToBufferLike(original)` in try/catch (exotic-rate `createBuffer` degradation keeps the tool tree alive; single-cast adapter, media.ts precedent; mono-at-source-rate playback documented — stereo stays owner question 4); exactly ONE rAF loop only while playing, publishing the interpolated head to `appPlayhead`.
+  - `player.tsx`: `PlayerDock` — honest empty posture (disabled buttons + hint), back10/back5/toggle/forward5/forward10 order, reserved disabled loop stub (Wave 3 region-loop), throttled `mm:ss` readout (one setState per displayed second, NO second rAF; `dir="ltr"`, Latin digits), store-bound selection readout, lane badge `player.lane.<sourceKind>` (T2 carry landed). Layout placeholder → `<PlayerDock />`; `layout.player.upcoming` retired in en+fa. i18n nested `player.*` en+fa; dynamic allowlist `player.lane`.
+- Verified: typecheck clean; `pnpm --filter @avalab/web test` 173/173 (incl. 28 transport + 6 playhead node tests with fake seams); `pnpm lint` clean (134 files; import organization + `role="timer"` a11y fix); `pnpm i18n:check` OK; root `pnpm check` exit 0 (dsp 892/892, scripts 13/13); `pnpm e2e` 16/16 (new `player.spec.ts`: fa+en — no-source posture → demo load arms dock + lane badge → REAL Web-Audio-clock readout reaches 00:01 → pause pins the displayed second, zero console errors).
+- Notes for owner: fa `player.*` machine-drafted (Persian review); uniform documentation: playback of the ORIGINAL at full length only — derived/selected playback is Wave 3; loop-region toggle reserved disabled until a derived source exists.
 - Details in `.superpowers/sdd/02-audio-sources-playback/progress.md`.
 
 ### 2026-10-25 — Wave 2 planning + plan 01 executed (app skeleton complete)

@@ -4,13 +4,14 @@ import { Outlet } from "react-router";
 
 import { HealthStatus } from "../components/HealthStatus";
 import { LanguageToggle } from "../components/LanguageToggle";
+import { PlayerDock } from "../features/player/player";
 import { Sidebar } from "./sidebar";
 
 /**
  * App shell: Wave-0 header (title, health pill, language toggle) with a
- * tool sidebar and a docked player placeholder box, filled by Wave-2 Plan 02.
- * Inline asymmetries use logical properties (e.g. sidebar `border-e`), so the
- * row mirrors under RTL without forks (AGENTS §6).
+ * tool sidebar and the docked player panel (Plan 02 Task 4) on every tool
+ * page. Inline asymmetries use logical properties (e.g. sidebar `border-e`),
+ * so the row mirrors under RTL without forks (AGENTS §6).
  */
 export function AppLayout() {
   const { t } = useTranslation();
@@ -37,11 +38,7 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
-      <section
-        data-testid="player-dock"
-        aria-label={t("layout.player.upcoming")}
-        className="min-h-16 border-t border-surface"
-      />
+      <PlayerDock />
       <footer className="border-t border-surface px-6 py-3 text-xs text-muted">
         {t("app.privacy.ttlNotice")}
       </footer>
