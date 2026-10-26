@@ -1,7 +1,11 @@
 /**
- * Wave 2 navigation smoke for the four tool routes (Plan 01 Task 1):
- * root redirect, sidebar navigation, per-tool stub title, both locales,
- * zero console errors. Same offline static-preview harness as smoke.spec.ts.
+ * Wave-2 checks for the four tool routes (Plan 01 Task 1, adapted in Plan 02
+ * Task 1): root redirect, sidebar navigation, per-tool stub title, both
+ * locales, zero console errors. Same backend-absent static-preview harness
+ * as smoke.spec.ts. The waveform overview probe readout now requires a
+ * LOADED source (the Plan-01 auto-loaded demo probe was retired for real
+ * sources); until a source exists the waveform page shows the load-audio
+ * empty state instead.
  */
 import { type ConsoleMessage, expect, type Page, test } from "@playwright/test";
 
@@ -54,14 +58,14 @@ function watchForErrors(page: Page): string[] {
 }
 
 /**
- * Plan 01 Task 4: the waveform stub also proves the waveformOverview op
- * end-to-end (store → worker → cache). The readout is the returned bucket
- * count; the value depends on the probe and the canvas arrives in Plan 03,
- * so assert it exists and holds a bucket count ≥ 2 in either locale.
+ * Wave-2 Plan 02 Task 1: without a session source the /tools/waveform page
+ * shows the SOLE load affordances (file button + drop target) instead of the
+ * waveformOverview readout (that readout belongs to a loaded source; the
+ * Plan-01 auto-load was removed with this task).
  */
-async function expectOverviewReadout(page: Page): Promise<void> {
-  const overviewText = await page.getByTestId("waveform.stub.overview").textContent();
-  expect(Number(overviewText)).toBeGreaterThanOrEqual(2);
+async function expectWaveformEmptyState(page: Page): Promise<void> {
+  await expect(page.getByTestId("input.upload.dropzone")).toBeVisible();
+  await expect(page.getByTestId("input.upload.button")).toBeVisible();
 }
 
 test("Persian (default): / redirects to the waveform tool and the sidebar reaches all four routes", async ({
@@ -74,7 +78,7 @@ test("Persian (default): / redirects to the waveform tool and the sidebar reache
   // DSP worker RPC plumbing (Plan 01 Task 2): the stub ping proves the built
   // module worker answers through the rpc layer under `vite preview`.
   await expect(page.getByTestId("waveform.stub.ping")).toHaveText("4");
-  await expectOverviewReadout(page);
+  await expectWaveformEmptyState(page);
 
   for (const tool of TOOLS) {
     await page.getByRole("link", { name: tool.label }).click();
@@ -95,7 +99,7 @@ test("English (persisted preference): the same four routes with zero console err
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
   await expect(page.getByTestId("waveform.stub.ping")).toHaveText("4");
-  await expectOverviewReadout(page);
+  await expectWaveformEmptyState(page);
 
   for (const tool of TOOLS) {
     await page.getByRole("link", { name: tool.label }).click();

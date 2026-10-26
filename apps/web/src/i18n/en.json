@@ -22,6 +22,27 @@
     "fftview": "FFT View",
     "generator": "Generator"
   },
+  "input": {
+    "empty": {
+      "hint": "Choose an audio file to load, or drop it here."
+    },
+    "fileButton": "Choose file",
+    "busy": "Uploading…",
+    "error": {
+      "file_too_large": "The file is larger than the upload limit (100 MB).",
+      "duration_too_long": "The audio is longer than 5 minutes (300 s).",
+      "decode_failed": "The audio could not be decoded.",
+      "not_found": "The uploaded audio is no longer on the server (it may have expired).",
+      "invalid_request": "The server rejected the request.",
+      "unknown": "Unexpected server error (code: {{code}}).",
+      "backendUnavailable": "Server unreachable; the file was not uploaded.",
+      "backendUnavailableHint": "Check the connection and try again; browser-side tools keep working without the server.",
+      "tooLong": "The audio is longer than 5 minutes (300 s).",
+      "rateTooHigh": "The sample rate exceeds the 96 kHz cap.",
+      "notFinite": "The audio contains values that are not finite numbers.",
+      "invalidType": "The decoded audio has an unexpected shape."
+    }
+  },
   "tool": {
     "waveform": {
       "title": "Waveform",

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { createBrowserRouter, type RouteObject, redirect } from "react-router";
+import { UploadEmptyState } from "../features/input/upload";
 import { useSessionStore } from "../session/store";
 import { AppLayout } from "./layout";
 
@@ -68,66 +69,35 @@ function WaveformStubPing() {
 /** Bucket width of the stub's waveform-overview plumbing probe (Plan 03
  * paints this envelope; the count only proves the pipeline here). */
 const WAVEFORM_STUB_BUCKET_COUNT = 32;
-/** Probe size: far under every loadSource cap; deterministic sine + LCG
- * noise (test-doubles shape, NOT @avalab/dsp math — no main-thread DSP). */
-const WAVEFORM_STUB_PROBE_SAMPLES = 2048;
 
 /**
- * Deterministic demo probe for the waveform stub: plain Math.sin + LCG fill.
- * Kept inline so the view tree imports no dsp module (AGENTS §9); the WORKER
- * does the real bucketing through `waveformOverview`.
- */
-function waveformProbeSamples(sampleCount: number): Float32Array {
-  let state = 0x183f2b;
-  const samples = new Float32Array(sampleCount);
-  for (let index = 0; index < sampleCount; index += 1) {
-    state = (1664525 * state + 1013904223) >>> 0;
-    samples[index] =
-      Math.sin((2 * Math.PI * 440 * index) / 48000) * 0.4 + ((state % 2001) - 1000) / 100000;
-  }
-  return samples;
-}
-
-/**
- * Plumbing probe for the waveform overview op (Plan 01 Task 4): loads a
- * deterministic demo probe ONCE (guarded: never clobbers a session source)
- * and fires the store's `deriveWithSource("waveformOverview", …)` — the
- * worker buckets the samples and the readout renders the returned bucket
- * count. No canvas yet (Plan 03); no i18n copy: raw technical readout
- * (Latin digits, LTR); the stub body copy stays unchanged. Rejections
- * (worker unavailable, noSource) render nothing and never surface as
- * unhandled console rejections.
+ * Plumbing probe for the waveform overview op (Plan 01 Task 4, adapted in
+ * Plan 02 Task 1): fires the store's `deriveWithSource("waveformOverview", …)`
+ * for the LOADED session source — the worker buckets the samples and the
+ * readout renders the returned bucket count. The Plan-01 deterministic probe
+ * seeding is retired: real sources now come from the input empty state (and
+ * later the offline lane/demo clips). No canvas yet (Plan 03); no i18n copy:
+ * raw technical readout (Latin digits, LTR). Rejections (worker unavailable,
+ * noSource) render nothing and never surface as unhandled console
+ * rejections.
  */
 function WaveformStubOverview() {
   const derived = useSessionStore((state) => state.derived);
+  const original = useSessionStore((state) => state.original);
   const [overviewKey, setOverviewKey] = useState<string | null>(null);
 
   useEffect(() => {
-    const before = useSessionStore.getState();
-    if (before.original === null) {
-      const load = before.loadSource(
-        waveformProbeSamples(WAVEFORM_STUB_PROBE_SAMPLES),
-        48_000,
-        "waveform-stub-probe.wav",
-        "demoClip",
-      );
-      if (!load.ok) {
-        return; // unreachable for the built-in probe; stay silent by contract
-      }
-    }
-    const state = useSessionStore.getState();
-    const original = state.original;
     if (original === null) {
       return;
     }
-    const ticket = state.deriveWithSource("waveformOverview", {
+    const ticket = useSessionStore.getState().deriveWithSource("waveformOverview", {
       bucketCount: WAVEFORM_STUB_BUCKET_COUNT,
       sampleRateHz: original.sampleRateHz,
     });
     setOverviewKey(ticket.key);
     // Store failures are the readout's to ignore (stub): swallow typedly.
     ticket.outcome.catch(() => undefined);
-  }, []);
+  }, [original]);
 
   const entry = overviewKey === null ? undefined : derived.get(overviewKey);
   if (entry === undefined) {
@@ -151,6 +121,26 @@ function WaveformStubOverview() {
   );
 }
 
+/**
+ * The waveform stub page (Plan 02 Task 1): the stub body copy is replaced by
+ * the shared no-source empty state (file button + dropzone) until a source
+ * exists; with a source the stub readout text stays.
+ */
+function WaveformStubPage() {
+  const { t } = useTranslation();
+  const original = useSessionStore((state) => state.original);
+  return (
+    <section className="flex flex-col gap-2">
+      <h2 className="text-2xl font-semibold">{t("tool.waveform.title")}</h2>
+      {original === null ? (
+        <UploadEmptyState />
+      ) : (
+        <p className="text-sm text-muted">{t("tool.waveform.stub")}</p>
+      )}
+    </section>
+  );
+}
+
 /** Data-router route table (spec §2.1/§2.5): layout shell + / redirect + /tools/<id>. */
 export const appRoutes: RouteObject[] = [
   {
@@ -168,7 +158,7 @@ export const appRoutes: RouteObject[] = [
           <>
             <WaveformStubPing />
             <WaveformStubOverview />
-            <ToolStub tool="waveform" />
+            <WaveformStubPage />
           </>
         ),
       },
