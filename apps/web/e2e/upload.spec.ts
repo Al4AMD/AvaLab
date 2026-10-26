@@ -71,6 +71,19 @@ async function stubIngestSuccess(page: Page): Promise<void> {
   );
 }
 
+/** Scripted /health probe: backend reachable — settles the boot probe
+ * (review finding 1) deterministically, so the file lane and hint states
+ * are decided by the stub, not by a probe race with `setInputFiles`. */
+async function stubHealthOk(page: Page): Promise<void> {
+  await page.route("**/api/v1/health", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ status: "ok", ffmpeg: false, version: "stub" }),
+    }),
+  );
+}
+
 /** Scripted canonical-WAV endpoint: the tiny WAV bytes (a successful lane). */
 async function stubWavDownload(page: Page): Promise<void> {
   const wav = tinyWav();
@@ -96,12 +109,16 @@ test("Persian (default): uploading through the ingest lane loads the session sou
   page,
 }) => {
   const errors = watchForErrors(page);
+  await stubHealthOk(page);
   await stubIngestSuccess(page);
   await stubWavDownload(page);
 
   await page.goto("/");
   await expect(page).toHaveURL(/\/tools\/waveform$/);
   await expect(page.getByTestId("input.upload.dropzone")).toBeVisible();
+  // Review finding 1: the settled probe is REACHABLE here (and a pending
+  // probe hides the hint too) — the offline-lane hint must not render.
+  await expect(page.getByTestId("input.offlineLaneOnly")).toHaveCount(0);
 
   await page.getByTestId("input.upload.input").setInputFiles({
     name: "clip.wav",
@@ -129,6 +146,10 @@ test("Persian: a 500 ingest answer surfaces the translated lane error with its r
   page.on("pageerror", (error: Error) => {
     pageErrors.push(error.message);
   });
+  // Health 200 keeps the boot state deterministic on the ingest path (an
+  // unstubbed 404 would settle the probe offline and race the upload into
+  // the offline lane).
+  await stubHealthOk(page);
   await page.route("**/api/v1/ingest", (route) =>
     route.fulfill({ status: 500, contentType: "text/plain", body: "boom" }),
   );
@@ -158,6 +179,7 @@ test("Persian: a 500 ingest answer surfaces the translated lane error with its r
 
 test("English (persisted preference): the same upload path loads the source", async ({ page }) => {
   const errors = watchForErrors(page);
+  await stubHealthOk(page);
   await stubIngestSuccess(page);
   await stubWavDownload(page);
   await page.addInitScript(() => {
@@ -175,5 +197,35 @@ test("English (persisted preference): the same upload path loads the source", as
   await expect(page.getByTestId("input.upload.dropzone")).toHaveCount(0);
   await expect(page.getByText("This tool lands later this wave.")).toBeVisible();
   await expect(page.getByTestId("input.upload.error")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("Persian: a settled-offline probe routes the file input to the OFFLINE lane (no ingest call)", async ({
+  page,
+}) => {
+  const errors = watchForErrors(page);
+  // Health answers 500 → the probe settles the store OFFLINE (the four
+  // demo cards / Wave-0 harness in the other specs rely on the same
+  // preview shape). The ingest endpoint may NEVER be called: a scripted
+  // fail-safe records any request against it.
+  const ingestCalls: string[] = [];
+  await page.route("**/api/v1/ingest", (route) => {
+    ingestCalls.push(route.request().url());
+    return route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+  });
+
+  await page.goto("/");
+  await expect(page.getByTestId("input.offlineLaneOnly")).toBeVisible();
+  await page.getByTestId("input.upload.input").setInputFiles({
+    name: "clip.wav",
+    mimeType: "audio/wav",
+    buffer: tinyWav(),
+  });
+
+  // The offline lane decodes in the REAL browser and loads the session
+  // source: the empty state disappears.
+  await expect(page.getByTestId("input.upload.dropzone")).toHaveCount(0);
+  await expect(page.getByTestId("input.upload.error")).toHaveCount(0);
+  expect(ingestCalls).toEqual([]);
   expect(errors).toEqual([]);
 });

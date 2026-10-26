@@ -2,7 +2,7 @@
  * Shared no-source empty state ("load audio" card, F01, Wave-2 Plan 02
  * Task 1): an invisible file input with an a11y-correct label (the keyboard
  * path — the input itself stays focusable) plus a dropzone on the card. The
- * session store and the ingest lane are wired through `useIngestFile`; view
+ * session store and the file lanes are wired through `useFileLoader`; view
  * code performs no fetch and no AudioContext work (plan architecture).
  *
  * Rejections are structured (`IngestError`): the component translates the
@@ -14,12 +14,16 @@
  * Nothing here truncates: the session store's guards (≤ 96 kHz, ≤ 300 s)
  * REJECT out-of-cap samples — this card surfaces that typed rejection.
  *
- * Wave-2 Plan 02 Task 2: the block also carries the bundled demo clips (the
- * offline lane's entry points) and, once the ingest lane has PROVEN the
- * backend down (`backendOnline` flag), an "offline lane only" hint above the
- * file button. The button itself retains its Task-1 flow — a failed upload
- * still surfaces the same typed error (plan Review Focus 3: flag flips only
- * on real lane evidence, and the flag's teeth must not change that flow).
+ * Wave-2 Plan 02 Task 2 (review findings 1+2): the block also carries the
+ * bundled demo clips. The "offline lane only" hint and the file lane are
+ * EVIDENCE-gated, never keyed on the raw `backendOnline` flag (it starts
+ * false as "not yet proven"): the hint renders only when an ingest attempt
+ * failed on this mount (the lane readout state) or the boot /health probe
+ * has SETTLED (`backendProbeSettled` via HealthStatus's mark). Under the
+ * same evidence the file input/drop routes the OFFLINE lane
+ * (`loadOfflineFile`, sourceKind "offlineBrowser") instead of the ingest
+ * lane; the Task-1 flow is unchanged otherwise — a failed upload still
+ * surfaces the same typed error (plan Review Focus 3).
  */
 import { useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -27,37 +31,72 @@ import { useTranslation } from "react-i18next";
 import { useSessionStore } from "../../session/store";
 import { DemoClipsRow } from "./demo";
 import { LaneFailureReadout } from "./failureReadout";
-import { IngestError, ingestFile } from "./ingest";
+import { IngestError, ingestFile, type LoadedSource } from "./ingest";
+import { loadOfflineFile, OfflineError } from "./offline";
 
-/** Busy/error state of the card's loader (typed; no boolean soup). */
-type IngestState = {
+/** Busy/error state of the card's loader (typed; no boolean soup). The
+ * failure carries EITHER lane's readout view (both satisfy
+ * `LaneFailureView`). */
+type FileLoadState = {
   readonly busy: boolean;
-  readonly failure: IngestError | null;
+  readonly failure: IngestError | OfflineError | null;
 };
 
 /**
- * Small hook wiring `ingestFile` to the session store singleton: the lane
- * resolves after the store already holds the new source; failures keep the
- * previous source untouched and surface as the card's typed failure state.
- * Unexpected non-`IngestError` rejections are logged for developers and
- * surface as the lane kind (they must never vanish silently).
+ * The offline-lane evidence gate (review findings 1+2): true only when (a)
+ * an ingest attempt failed on this mount (the lane readout state), or (b)
+ * the boot probe settled AND proved the backend offline (`backendOnline ===
+ * false AND backendProbeSettled`). During the boot window with no failure
+ * the gate is FALSE — `backendOnline` still means "not yet proven", so the
+ * hint must not make its claim yet and the file input must keep the ingest
+ * lane.
  */
-function useIngestFile(): IngestState & { readonly loadFile: (file: File) => void } {
-  const [state, setState] = useState<IngestState>({ busy: false, failure: null });
+export type OfflineLaneEvidence = {
+  readonly backendOnline: boolean;
+  readonly backendProbeSettled: boolean;
+  readonly laneFailure: IngestError | OfflineError | null;
+};
+
+export function offlineLaneEvidence(evidence: OfflineLaneEvidence): boolean {
+  return evidence.laneFailure !== null || (!evidence.backendOnline && evidence.backendProbeSettled);
+}
+
+/**
+ * Hook wiring the file lane to the session store singleton: the lane is
+ * picked per call from the evidence gate (ingest lane routes ONLINE, the
+ * offline lane only under real evidence); the store resolves after it
+ * already holds the new source; failures keep the previous source untouched
+ * and surface as the card's typed failure state (either lane's error class
+ * satisfies the readout). Unexpected non-typed rejections are logged for
+ * developers and surface as the lane kind (they must never vanish silently).
+ */
+function useFileLoader(): FileLoadState & {
+  readonly offlineLane: boolean;
+  readonly loadFile: (file: File) => void;
+} {
+  const [state, setState] = useState<FileLoadState>({ busy: false, failure: null });
+  const backendOnline = useSessionStore((s) => s.backendOnline);
+  const backendProbeSettled = useSessionStore((s) => s.backendProbeSettled);
+  const offlineLane = offlineLaneEvidence({
+    backendOnline,
+    backendProbeSettled,
+    laneFailure: state.failure,
+  });
 
   function loadFile(file: File): void {
     if (state.busy) {
       return; // one upload at a time (the label is aria-disabled meanwhile)
     }
     setState({ busy: true, failure: null });
-    void ingestFile(file).then(
+    const run: Promise<LoadedSource> = offlineLane ? loadOfflineFile(file) : ingestFile(file);
+    void run.then(
       () => setState({ busy: false, failure: null }),
       (error: unknown) => {
-        if (error instanceof IngestError) {
+        if (error instanceof IngestError || error instanceof OfflineError) {
           setState({ busy: false, failure: error });
           return;
         }
-        console.warn("avalab input: unexpected ingest failure", error);
+        console.warn("avalab input: unexpected load failure", error);
         setState({
           busy: false,
           failure: new IngestError(
@@ -73,7 +112,21 @@ function useIngestFile(): IngestState & { readonly loadFile: (file: File) => voi
     );
   }
 
-  return { ...state, loadFile };
+  return { ...state, offlineLane, loadFile };
+}
+
+/**
+ * The "offline lane only" hint: the hint's exact copy is store-contract free
+ * (only the key is rendered here); `show` comes from `offlineLaneEvidence`
+ * at the card level, store reads included.
+ */
+function OfflineLaneHint({ show }: { readonly show: boolean }) {
+  const { t } = useTranslation();
+  return show ? (
+    <p data-testid="input.offlineLaneOnly" className="text-xs text-muted">
+      {t("input.offlineLaneOnly")}
+    </p>
+  ) : null;
 }
 
 /** Visual classes of the file button — a <label> for the invisible input,
@@ -92,8 +145,7 @@ const FILE_BUTTON_CLASSES =
  */
 export function UploadEmptyState() {
   const { t } = useTranslation();
-  const { busy, failure, loadFile } = useIngestFile();
-  const backendOnline = useSessionStore((state) => state.backendOnline);
+  const { busy, failure, offlineLane, loadFile } = useFileLoader();
   const [dragging, setDragging] = useState(false);
   // Standard dragenter/dragleave counter: child elements fire their own
   // leave events, which would flicker the ring without a depth count.
@@ -133,11 +185,7 @@ export function UploadEmptyState() {
       }
     >
       <p className="text-sm text-muted">{t("input.empty.hint")}</p>
-      {!backendOnline && (
-        <p data-testid="input.offlineLaneOnly" className="text-xs text-muted">
-          {t("input.offlineLaneOnly")}
-        </p>
-      )}
+      <OfflineLaneHint show={offlineLane} />
       <input
         data-testid="input.upload.input"
         id={inputId}

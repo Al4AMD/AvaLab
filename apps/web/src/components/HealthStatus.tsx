@@ -50,6 +50,15 @@ export function HealthStatus() {
           setProbePending(false);
           useSessionStore.getState().markBackendUnreachable();
         }
+      })
+      .finally(() => {
+        // Any verdict settles the boot probe; the store's settledness marker
+        // feeds the upload card's offline-lane evidence gate (review
+        // finding 1), never this widget's UI state (probePending stays the
+        // in-flight marker here).
+        if (!cancelled) {
+          useSessionStore.getState().markBackendProbeSettled();
+        }
       });
     return () => {
       cancelled = true;

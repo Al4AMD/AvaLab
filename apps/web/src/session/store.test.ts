@@ -618,6 +618,18 @@ describe("backendOnline flag", () => {
     store.getState().markBackendUnreachable();
     expect(store.getState().backendOnline).toBe(false);
   });
+
+  it("exposes the boot probe's settledness as a SEPARATE marker (upload evidence gate)", () => {
+    const { store } = makeStore();
+    expect(store.getState().backendProbeSettled).toBe(false);
+    // Lane-evidence flips do not settle the probe marker…
+    store.getState().markBackendReachable();
+    expect(store.getState().backendProbeSettled).toBe(false);
+    // …and the settle marker does not flip the flag.
+    store.getState().markBackendProbeSettled();
+    expect(store.getState().backendProbeSettled).toBe(true);
+    expect(store.getState().backendOnline).toBe(true);
+  });
 });
 
 describe("type surface", () => {
