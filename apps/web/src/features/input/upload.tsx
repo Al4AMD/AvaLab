@@ -33,6 +33,7 @@ import { DemoClipsRow } from "./demo";
 import { LaneFailureReadout } from "./failureReadout";
 import { IngestError, ingestFile, type LoadedSource } from "./ingest";
 import { loadOfflineFile, OfflineError } from "./offline";
+import { RecordSection } from "./record";
 
 /** Busy/error state of the card's loader (typed; no boolean soup). The
  * failure carries EITHER lane's readout view (both satisfy
@@ -211,6 +212,7 @@ export function UploadEmptyState() {
       </label>
       {failure !== null && <LaneFailureReadout failure={failure} testId="input.upload.error" />}
       <DemoClipsRow />
+      <RecordSection />
     </div>
   );
 }

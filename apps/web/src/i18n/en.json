@@ -60,6 +60,18 @@
       "rateTooHigh": "The sample rate exceeds the 96 kHz cap.",
       "notFinite": "The audio contains values that are not finite numbers.",
       "invalidType": "The decoded audio has an unexpected shape."
+    },
+    "record": {
+      "title": "Or record your voice",
+      "start": "Start recording",
+      "stop": "Stop recording",
+      "cancel": "Cancel recording",
+      "busy": "Working on the microphone…",
+      "elapsed": "Recording · {{seconds}} s",
+      "absentHint": "This browser does not expose a microphone API, so recording is disabled here.",
+      "deniedHint": "Microphone access was denied. Allow it in the browser settings, then start again.",
+      "mediaError": "The microphone reported an error ({{error}}). Please try again.",
+      "capReached": "The 5-minute recording limit was reached; the take was kept local and was not uploaded. Record again if you need it."
     }
   },
   "tool": {

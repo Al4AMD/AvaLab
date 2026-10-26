@@ -27,7 +27,7 @@
  */
 import { api, type IngestResponse } from "../../api/client";
 import { isRecordLike } from "../../session/protocol";
-import type { SessionSource, SessionStore } from "../../session/store";
+import type { SessionSource, SessionStore, SourceKind } from "../../session/store";
 import { useSessionStore } from "../../session/store";
 
 /**
@@ -201,6 +201,11 @@ export type IngestOptions = {
   readonly decodeWav?: DecodeWav;
   readonly maxUploadBytes?: number;
   readonly store?: IngestStore;
+  /** Session provenance of the uploaded take: `"ingested"` (the default) or
+   * `"recording"` (Task 3 sends its blob down this same lane). Guarded at
+   * type level AND validated at the store boundary — a caller passing an
+   * arbitrary string is rejected by `loadSource` with `invalidType`. */
+  readonly sourceKind?: Exclude<SourceKind, "offlineBrowser" | "demoClip" | "generated">;
 };
 
 /** Non-2xx mapping (plan Task 1): a READABLE error envelope = the backend
@@ -267,6 +272,7 @@ export async function ingestFile(file: File, options: IngestOptions = {}): Promi
     decodeWav = browserDecodeWav,
     maxUploadBytes = DEFAULT_MAX_UPLOAD_BYTES,
     store = useSessionStore,
+    sourceKind = "ingested",
   } = options;
   if (!Number.isFinite(maxUploadBytes) || maxUploadBytes <= 0) {
     throw new TypeError("ingestFile: maxUploadBytes must be a positive finite number of bytes");
@@ -336,7 +342,7 @@ export async function ingestFile(file: File, options: IngestOptions = {}): Promi
 
   const load = store
     .getState()
-    .loadSource(monoDownmix(decoded), decoded.sampleRate, file.name, "ingested");
+    .loadSource(monoDownmix(decoded), decoded.sampleRate, file.name, sourceKind);
   if (!load.ok) {
     throw new IngestError({
       kind: "storeCode",
