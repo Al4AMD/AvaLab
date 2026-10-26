@@ -18,7 +18,13 @@ import { createDspRpc } from "../../session/rpc";
 import type { LoadSourceResult } from "../../session/store";
 import { createSessionStore } from "../../session/store";
 import { type FakeTransport, makeFakeTransport } from "../../session/testDoubles";
-import type { DecodedAudio, DecodeWav, IngestCallResult, IngestClient } from "./ingest";
+import type {
+  DecodedAudio,
+  DecodeWav,
+  IngestCallResult,
+  IngestClient,
+  IngestStore,
+} from "./ingest";
 import { DEFAULT_MAX_UPLOAD_BYTES, IngestError, ingestFile, monoDownmix } from "./ingest";
 
 /** Minimal fake client: returns the scripted result triple per method and
@@ -265,17 +271,20 @@ describe("ingestFile backend error codes", () => {
     });
   });
 
-  it("maps a 500 answer to the lane error (backendUnavailable) even with an envelope", async () => {
+  it("classifies a 500 with a readable envelope as backendCode/internal_error (the server answered)", async () => {
+    const { store } = makeSeededStore();
+    // backendOnline starts false: the envelope answer is reachability
+    // evidence even on a 5xx, so the flip must land.
     const client = fakeIngestClient({
       post: { status: 500, errorBody: { error: { code: "internal_error", message: "boom" } } },
     });
-    await expect(
-      ingestFile(makeFile(16), { client, store: makeSeededStore().store }),
-    ).rejects.toMatchObject({
-      kind: "backendUnavailable",
-      messageKey: "input.error.backendUnavailable",
+    await expect(ingestFile(makeFile(16), { client, store })).rejects.toMatchObject({
+      kind: "backendCode",
+      code: "internal_error",
+      messageKey: "input.error.internal_error",
     });
     expect(client.calls).toEqual(["POST"]);
+    expect(store.getState().backendOnline).toBe(true);
   });
 });
 
@@ -361,6 +370,69 @@ describe("ingestFile lane failures", () => {
     await expect(
       ingestFile(makeFile(16), { client, decodeWav: decode, store: makeSeededStore().store }),
     ).rejects.toMatchObject({ kind: "decodeFailed", messageKey: "input.error.decode_failed" });
+  });
+});
+
+describe("ingestFile flag symmetry (the GET catch flips like the POST catch)", () => {
+  /** Spy store: records the mark* calls in order. loadSource is never
+   * reached on these error paths (original stays null). */
+  function makeSpyStore(): { store: IngestStore; flips: string[] } {
+    const flips: string[] = [];
+    const store: IngestStore = {
+      getState: () => ({
+        loadSource: () => ({ ok: true }),
+        markBackendReachable: () => {
+          flips.push("reachable");
+        },
+        markBackendUnreachable: () => {
+          flips.push("unreachable");
+        },
+        original: null,
+      }),
+    };
+    return { store, flips };
+  }
+
+  it("marks reachable on a GET envelope answer (not_found), same evidence rule as the POST catch", async () => {
+    const { store, flips } = makeSpyStore();
+    const client = fakeIngestClient({
+      post: { status: 200, data: INGEST_OK },
+      get: { status: 404, errorBody: { error: { code: "not_found", message: "gone" } } },
+    });
+    await expect(ingestFile(makeFile(16), { client, store })).rejects.toMatchObject({
+      kind: "backendCode",
+      code: "not_found",
+      messageKey: "input.error.not_found",
+    });
+    // POST success marks reachable; the GET envelope answer marks it again.
+    expect(flips).toEqual(["reachable", "reachable"]);
+  });
+
+  it("marks reachable on a GET 5xx envelope answer (internal_error: the server answered)", async () => {
+    const { store, flips } = makeSpyStore();
+    const client = fakeIngestClient({
+      post: { status: 200, data: INGEST_OK },
+      get: { status: 500, errorBody: { error: { code: "internal_error", message: "boom" } } },
+    });
+    await expect(ingestFile(makeFile(16), { client, store })).rejects.toMatchObject({
+      kind: "backendCode",
+      code: "internal_error",
+      messageKey: "input.error.internal_error",
+    });
+    expect(flips).toEqual(["reachable", "reachable"]);
+  });
+
+  it("marks unreachable on a GET lane failure (5xx without a readable envelope)", async () => {
+    const { store, flips } = makeSpyStore();
+    const client = fakeIngestClient({
+      post: { status: 200, data: INGEST_OK },
+      get: { status: 503 },
+    });
+    await expect(ingestFile(makeFile(16), { client, store })).rejects.toMatchObject({
+      kind: "backendUnavailable",
+      messageKey: "input.error.backendUnavailable",
+    });
+    expect(flips).toEqual(["reachable", "unreachable"]);
   });
 });
 

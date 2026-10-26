@@ -12,11 +12,14 @@
  * - Errors are typed: the backend error envelope's stable `code` becomes the
  *   rejection's `messageKey` (`input.error.<code>`; unknown codes surface
  *   verbatim through `input.error.unknown` plus `code` — never swallowed).
- *   A failed lane (fetch throw, status ≥ 500) rejects the kind
+ *   A readable 5xx envelope is ALSO a backendCode (the server answered;
+ *   e.g. `internal_error`), so its copy stays honest. A failed lane (fetch
+ *   throw, or non-2xx with no readable envelope) rejects the kind
  *   "backendUnavailable" — the lane error the UI pairs with a recovery hint.
  * - Store-flag discipline (plan Review Focus 3): the store's `backendOnline`
- *   flips only on real evidence from this lane's own calls — a throw or
- *   ≥ 500 answers prove the lane down; a 4xx envelope answer proves it up.
+ *   flips only on real evidence from this lane's own calls — a throw or a
+ *   non-2xx WITHOUT a readable envelope proves the lane down; any envelope
+ *   answer (4xx or 5xx) proves it up.
  * - Decoding sits behind the injectable `decodeWav` seam: the default
  *   browser implementation constructs its AudioContext lazily INSIDE the
  *   call (never at module load), so node unit tests — which inject fakes —
@@ -43,6 +46,7 @@ const KNOWN_BACKEND_CODES: readonly string[] = [
   "decode_failed",
   "not_found",
   "invalid_request",
+  "internal_error",
 ];
 
 /** Discriminated failure kinds carried by every ingest rejection. */
@@ -199,14 +203,13 @@ export type IngestOptions = {
   readonly store?: IngestStore;
 };
 
-/** Non-2xx mapping (plan Task 1): ≥ 500 or an unreadable envelope = the lane
- * itself failed; a readable 4xx envelope = the backend answered with a
- * stable code (known → `input.error.<code>`, unknown → verbatim through
- * `input.error.unknown`). */
+/** Non-2xx mapping (plan Task 1): a READABLE error envelope = the backend
+ * answered with a stable code (known → `input.error.<code>`, unknown →
+ * verbatim through `input.error.unknown`). This includes a 5xx envelope
+ * (e.g. `internal_error`): the server answered, so it is reachable and the
+ * copy must not claim a connection problem. An unreadable/absent envelope
+ * = the lane itself failed → "backendUnavailable". */
 function callFailure(call: IngestCallResult<unknown>): IngestError {
-  if (call.response.status >= 500) {
-    return laneUnavailable();
-  }
   const code = envelopeCode(call.error);
   if (code !== null) {
     if (KNOWN_BACKEND_CODES.includes(code)) {
@@ -306,11 +309,19 @@ export async function ingestFile(file: File, options: IngestOptions = {}): Promi
   try {
     wavBytes = await requestCanonicalWav(client, ingest.audio_id);
   } catch (error) {
-    if (error instanceof IngestError) {
-      throw error; // typed: not_found envelope or a broken lane
+    // Same kind-based flip as the POST catch: an envelope answer (e.g.
+    // not_found or internal_error) is reachability evidence, a lane failure
+    // is disconnection evidence — on BOTH calls, not the POST only.
+    if (!(error instanceof IngestError)) {
+      store.getState().markBackendUnreachable();
+      throw laneUnavailable(error);
     }
-    store.getState().markBackendUnreachable();
-    throw laneUnavailable(error);
+    if (error.kind === "backendCode") {
+      store.getState().markBackendReachable();
+    } else {
+      store.getState().markBackendUnreachable();
+    }
+    throw error;
   }
 
   let decoded: DecodedAudio;

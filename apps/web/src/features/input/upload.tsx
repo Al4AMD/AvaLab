@@ -14,7 +14,7 @@
  * Nothing here truncates: the session store's guards (≤ 96 kHz, ≤ 300 s)
  * REJECT out-of-cap samples — this card surfaces that typed rejection.
  */
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { IngestError, ingestFile } from "./ingest";
@@ -102,19 +102,32 @@ export function UploadEmptyState() {
   const { t } = useTranslation();
   const { busy, failure, loadFile } = useIngestFile();
   const [dragging, setDragging] = useState(false);
+  // Standard dragenter/dragleave counter: child elements fire their own
+  // leave events, which would flicker the ring without a depth count.
+  const dragDepth = useRef(0);
   const inputId = useId();
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only dropzone; keyboard path is the file input
     <div
       data-testid="input.upload.dropzone"
-      onDragOver={(event) => {
-        event.preventDefault(); // allow the drop; the browser must not navigate
+      onDragEnter={() => {
+        dragDepth.current += 1;
         setDragging(true);
       }}
-      onDragLeave={() => setDragging(false)}
+      onDragOver={(event) => {
+        event.preventDefault(); // allow the drop; the browser must not navigate
+      }}
+      onDragLeave={() => {
+        dragDepth.current -= 1;
+        if (dragDepth.current <= 0) {
+          dragDepth.current = 0;
+          setDragging(false);
+        }
+      }}
       onDrop={(event) => {
         event.preventDefault();
+        dragDepth.current = 0;
         setDragging(false);
         const dropped = event.dataTransfer.files[0];
         if (dropped !== undefined) {

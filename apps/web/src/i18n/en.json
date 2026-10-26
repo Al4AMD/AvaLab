@@ -34,6 +34,7 @@
       "decode_failed": "The audio could not be decoded.",
       "not_found": "The uploaded audio is no longer on the server (it may have expired).",
       "invalid_request": "The server rejected the request.",
+      "internal_error": "The server had an internal error; try again later.",
       "unknown": "Unexpected server error (code: {{code}}).",
       "backendUnavailable": "Server unreachable; the file was not uploaded.",
       "backendUnavailableHint": "Check the connection and try again; browser-side tools keep working without the server.",
