@@ -9,8 +9,8 @@
  *   displayed second (`mm:ss` precision) — canvases (Plan 03) subscribe to
  *   `appPlayhead` themselves; the player NEVER re-renders canvases and
  *   never runs a second rAF loop (the publish loop belongs to usePlayer).
- * - Disabled when no source is loaded; the no-source hint is the honest
- *   state (aria-live region, buttons disabled not hidden). The selection
+ * - Disabled when no source is loaded; the no-source hint is honest
+ *   visible text, buttons disabled not hidden. The selection
  *   readout is store-bound read-only text; the loop toggle is a reserved
  *   stub, disabled until Wave 3's derived sources exist.
  * - i18n: every user-visible string through `player.*`; the readouts are
