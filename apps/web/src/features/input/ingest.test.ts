@@ -25,7 +25,13 @@ import type {
   IngestClient,
   IngestStore,
 } from "./ingest";
-import { DEFAULT_MAX_UPLOAD_BYTES, IngestError, ingestFile, monoDownmix } from "./ingest";
+import {
+  DEFAULT_MAX_UPLOAD_BYTES,
+  IngestError,
+  ingestFile,
+  monoDownmix,
+  parseWavSampleRateHz,
+} from "./ingest";
 
 /** Minimal fake client: returns the scripted result triple per method and
  * records the call order + FormData file name for the assertions. */
@@ -466,6 +472,92 @@ describe("monoDownmix", () => {
             : new Float32Array([-1]),
     };
     expect(monoDownmix(triple)).toEqual(new Float32Array([0]));
+  });
+});
+
+describe("parseWavSampleRateHz", () => {
+  /** Hand-built 44-byte WAV (mono, 16-bit PCM skeleton) with one rate.
+   * Writes past `byteLength` are dropped, so truncated sizes build without
+   * throwing and the test cuts the file instead of the builder. */
+  function makeWavBytes(rateHz: number, byteLength = 44): ArrayBuffer {
+    const bytes = new Uint8Array(byteLength);
+    const view = new DataView(bytes.buffer);
+    const tag = (offset: number, text: string) => {
+      if (offset + 4 > byteLength) {
+        return;
+      }
+      for (let index = 0; index < 4; index += 1) {
+        bytes[offset + index] = text.charCodeAt(index);
+      }
+    };
+    const setU32 = (offset: number, value: number) => {
+      if (offset + 4 <= byteLength) {
+        view.setUint32(offset, value, true);
+      }
+    };
+    const setU16 = (offset: number, value: number) => {
+      if (offset + 2 <= byteLength) {
+        view.setUint16(offset, value, true);
+      }
+    };
+    tag(0, "RIFF");
+    view.setUint32(4, Math.max(0, byteLength - 8), true);
+    tag(8, "WAVE");
+    tag(12, "fmt ");
+    setU32(16, 16); // fmt body size (PCM)
+    setU16(20, 1); // PCM format tag
+    setU16(22, 1); // mono
+    setU32(24, rateHz); // ← the parsed field
+    setU32(28, rateHz * 2); // byte rate
+    setU16(32, 2); // block align
+    setU16(34, 16); // bits
+    tag(36, "data");
+    setU32(40, Math.max(0, byteLength - 44));
+    return bytes.buffer;
+  }
+
+  it("parses the canonical 8000 Hz rate exactly", () => {
+    expect(parseWavSampleRateHz(makeWavBytes(8000))).toBe(8000);
+  });
+
+  it("parses the canonical 48000 Hz rate exactly", () => {
+    expect(parseWavSampleRateHz(makeWavBytes(48_000))).toBe(48_000);
+  });
+
+  it("skips a LIST chunk before fmt and finds the rate", () => {
+    // 52 bytes: 12-byte header, one 8-byte-body LIST chunk (body offset
+    // 20), then the fmt chunk at 24 with its rate at 24 + 12 = 36.
+    const bytes = new Uint8Array(52);
+    const view = new DataView(bytes.buffer);
+    const tag = (offset: number, text: string) => {
+      for (let index = 0; index < 4; index += 1) {
+        bytes[offset + index] = text.charCodeAt(index);
+      }
+    };
+    tag(0, "RIFF");
+    view.setUint32(4, 44, true);
+    tag(8, "WAVE");
+    tag(12, "LIST");
+    view.setUint32(16, 4, true);
+    view.setUint32(20, 0x0011_2233, true); // skipper body
+    tag(24, "fmt ");
+    view.setUint32(28, 16, true);
+    view.setUint16(32, 1, true);
+    view.setUint16(34, 1, true);
+    view.setUint32(36, 44_100, true);
+    view.setUint32(40, 88_200, true);
+    view.setUint16(44, 2, true);
+    view.setUint16(46, 16, true);
+    expect(parseWavSampleRateHz(bytes.buffer)).toBe(44_100);
+  });
+
+  it("returns null (fallback) on a truncated/malformed header instead of throwing", () => {
+    expect(parseWavSampleRateHz(new ArrayBuffer(0))).toBeNull();
+    expect(parseWavSampleRateHz(new ArrayBuffer(10))).toBeNull(); // header cut
+    expect(parseWavSampleRateHz(makeWavBytes(8000, 18))).toBeNull(); // cut inside fmt body
+    const garbage = new Uint8Array(64);
+    new DataView(garbage.buffer).setUint32(0, 0x2145_4545, true); // "EEEE" ≠ RIFF
+    expect(parseWavSampleRateHz(garbage.buffer)).toBeNull();
   });
 });
 

@@ -105,11 +105,62 @@ export type DecodedAudio = {
 /** Decode seam (plan Task 1/2): canonical WAV bytes → decoded audio. */
 export type DecodeWav = (wavBytes: ArrayBuffer) => Promise<DecodedAudio>;
 
+/**
+ * Parse the canonical WAV's `fmt ` chunk sample rate (Hz), pure and DOM-free.
+ * Iterates the chunk list after the fixed 12-byte RIFF/WAVE header; the rate
+ * is the little-endian uint32 at fmt-chunk-id start + 12 (body offset 4 per
+ * the WAVE spec). Every access is length-guarded; `null` means
+ * unparseable/malformed — the browser decode then FALLS BACK to a plain
+ * AudioContext at the device rate (silently, as before).
+ */
+export function parseWavSampleRateHz(wavBytes: ArrayBuffer): number | null {
+  const view = new DataView(wavBytes);
+  const readTag = (offset: number): string | null => {
+    if (offset + 4 > view.byteLength) {
+      return null;
+    }
+    let tag = "";
+    for (let index = 0; index < 4; index += 1) {
+      tag += String.fromCharCode(view.getUint8(offset + index));
+    }
+    return tag;
+  };
+  const readU32Le = (offset: number): number | null => {
+    if (offset + 4 > view.byteLength) {
+      return null;
+    }
+    return view.getUint32(offset, true);
+  };
+  if (readTag(0) !== "RIFF" || readTag(8) !== "WAVE") {
+    return null;
+  }
+  let offset = 12;
+  while (offset + 8 <= view.byteLength) {
+    const id = readTag(offset);
+    const size = readU32Le(offset + 4);
+    if (id === null || size === null) {
+      return null;
+    }
+    if (id === "fmt ") {
+      const rate = readU32Le(offset + 12);
+      return rate !== null && rate > 0 ? rate : null;
+    }
+    // Skip header + body; chunks are word-aligned.
+    offset += 8 + size + (size % 2);
+  }
+  return null;
+}
+
 /** Default browser decode. One AudioContext per call, closed immediately —
  * no shared module state, and the constructor reference lives only in the
- * call body, so node tests that never call this never touch Web Audio. */
+ * call body, so node tests that never call this never touch Web Audio.
+ * The context is pinned to the canonical WAV's fmt-chunk rate, so
+ * `decodeAudioData` does NOT re-resample to the device rate and the store
+ * keeps the true original rate (F03). Unparseable bytes (never expected
+ * for a canonical WAV) fall back to the device rate silently. */
 export function browserDecodeWav(wavBytes: ArrayBuffer): Promise<DecodedAudio> {
-  const context = new AudioContext();
+  const rateHz = parseWavSampleRateHz(wavBytes);
+  const context = rateHz === null ? new AudioContext() : new AudioContext({ sampleRate: rateHz });
   return context.decodeAudioData(wavBytes).finally(() => {
     void context.close();
   });
