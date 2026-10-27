@@ -10,7 +10,8 @@
  * BEFORE the clip load. The >1 s sample-level timing is deliberately loose:
  * decodeAudioData resamples to the device rate (documented offline-lane
  * variance), so only second-granular `mm:ss` figures are used, never magic
- * numbers.
+ * numbers. The Persian spec also probes the ±5 s seek buttons (mouse +
+ * keyboard Enter) against the pinned head.
  */
 import { type ConsoleMessage, expect, type Page, test } from "@playwright/test";
 
@@ -67,6 +68,16 @@ test("Persian (default): dock arms after a demo load, play advances the readout,
   await page.waitForTimeout(1_200);
   const stillPaused = await page.getByTestId("player.time").textContent();
   expect(stillPaused).toBe(pausedLabel);
+
+  // ±5 s seek from the pinned head (paused < 00:05 → back clamps to the
+  // start; forward lands at ~5 s — second-granular ties stay loose).
+  const time = page.getByTestId("player.time");
+  await page.getByTestId("player.back5").click();
+  await expect(time).toContainText("00:00");
+  // Native operability probe: keyboard focus + Enter drives the forward seek.
+  await page.getByTestId("player.forward5").focus();
+  await page.keyboard.press("Enter");
+  await expect(time).toContainText("00:05", { timeout: 4_000 });
   expect(errors).toEqual([]);
 });
 

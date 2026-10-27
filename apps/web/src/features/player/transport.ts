@@ -24,11 +24,17 @@
  *                               while playing      node first, §9)
  *
  * Documented edge semantics (each pinned by a unit test):
- * - `pause()` pins the interpolated current position and does NOT reset to 0;
- *   the next `play()` resumes there (restarts from 0 when pinned at/past end).
+ * - `pause()` pins the interpolated current position (the FRACTIONAL
+ *   sub-sample position, not reset to 0); the next `play()` resumes there
+ *   sample-exactly through `node.start(0, offset)` (restarts from 0 when
+ *   pinned at/past end).
  * - `play()` while `playing` is a no-op (the view repositions with
  *   `seekToSample`); seeking while playing stops the old node and starts a
  *   fresh one at the new offset — at most ONE live node ever (§9).
+ * - Time-math honesty (quantization): the interpolation head
+ *   (`getCurrentSample`, driven by the context clock) can lead the AUDIBLE
+ *   head by at most one render quantum (~128 samples ≈ 2.9 ms at 44.1 kHz)
+ *   — inaudible, playhead-only.
  * - `dispose()` re-arms: the same machine takes a new source afterwards.
  * - A zero-length source reaches `ready` but `play()` is a no-op: Web Audio
  *   cannot create a 0-length `AudioBuffer`. Non-finite seek arguments are
