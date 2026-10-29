@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { cn } from "../lib/cn";
+import { useSessionStore } from "../session/store";
 
 type HealthState = "loading" | "ok" | "offline";
 
@@ -13,32 +14,58 @@ const DOT_CLASSES: Record<HealthState, string> = {
 };
 
 /**
- * Server health pill. Calls `GET /health` once on mount; any failure
- * (network error, non-2xx status, unexpected payload) maps to the
- * translated offline state. Raw error text is never rendered.
+ * Server health pill. Calls `GET /health` once on mount and writes the
+ * verdict through the SESSION STORE's mark* actions (Wave-2 Plan 02
+ * Task 2): `backendOnline` is the single source of truth (spec §2.2) — the
+ * ingest lane's lane-evidence flips and this probe both feed it, and the
+ * pill SUBSCRIBES to the flag instead of holding the ok/offline state
+ * itself. The only local state left is the mount probe's in-flight marker:
+ * the store flag is boolean and starts false, which alone cannot mean
+ * "offline yet". Any probe failure (network error, non-2xx status,
+ * unexpected payload) maps to the translated offline state; raw error text
+ * is never rendered.
  */
 export function HealthStatus() {
   const { t } = useTranslation();
-  const [state, setState] = useState<HealthState>("loading");
+  const backendOnline = useSessionStore((state) => state.backendOnline);
+  const [probePending, setProbePending] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     api
       .GET("/health", { signal: AbortSignal.timeout(5000) })
       .then(({ data, response }) => {
-        if (!cancelled) {
-          setState(response.ok && data?.status === "ok" ? "ok" : "offline");
+        if (cancelled) {
+          return;
+        }
+        setProbePending(false);
+        if (response.ok && data?.status === "ok") {
+          useSessionStore.getState().markBackendReachable();
+        } else {
+          useSessionStore.getState().markBackendUnreachable();
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setState("offline");
+          setProbePending(false);
+          useSessionStore.getState().markBackendUnreachable();
+        }
+      })
+      .finally(() => {
+        // Any verdict settles the boot probe; the store's settledness marker
+        // feeds the upload card's offline-lane evidence gate (review
+        // finding 1), never this widget's UI state (probePending stays the
+        // in-flight marker here).
+        if (!cancelled) {
+          useSessionStore.getState().markBackendProbeSettled();
         }
       });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const state: HealthState = probePending ? "loading" : backendOnline ? "ok" : "offline";
 
   const labelKey =
     state === "loading"

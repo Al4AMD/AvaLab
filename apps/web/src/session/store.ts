@@ -126,6 +126,14 @@ export type SessionStore = {
   readonly selection: Readonly<Selection>;
   /** False until proven reachable (spec §2.2). */
   readonly backendOnline: boolean;
+  /** Whether the boot /health probe (HealthStatus) has SETTLED — any verdict.
+   * `backendOnline` alone cannot mean "offline" while that probe is still
+   * pending (it starts false as "not yet proven"), so the upload card's
+   * offline-lane evidence gate (upload.tsx review findings 1+2) requires
+   * this settledness before claiming settled-offline evidence. The ingest
+   * lane's own mark* flips are lane evidence only and never touch this
+   * marker. */
+  readonly backendProbeSettled: boolean;
   readonly diagnostics: Readonly<Diagnostics>;
 
   /** Guarded load: validates, hashes the PCM bytes once, and replaces the
@@ -171,6 +179,9 @@ export type SessionStore = {
   setSelection(startSample: number, endSample: number): void;
   markBackendReachable(): void;
   markBackendUnreachable(): void;
+  /** Record the boot /health probe as SETTLED (any verdict — HealthStatus
+   * calls it once per settled probe; the set is idempotent). */
+  markBackendProbeSettled(): void;
   /** Diagnostics ping (guarded idempotent worker round trip). Fires only
    * from `idle`/`failed`; `pending`/`done` make re-fires no-ops, so
    * StrictMode double-mounts (and route revisits) hit the worker exactly
@@ -301,6 +312,7 @@ export function createSessionStore(
       jobs: new Map<string, JobEntry>(),
       selection: { startSample: 0, endSample: 0 },
       backendOnline: false,
+      backendProbeSettled: false,
       diagnostics: { pingByteLength: null, pingStatus: "idle" },
 
       loadSource(samples, sampleRateHz, name, sourceKind) {
@@ -451,6 +463,10 @@ export function createSessionStore(
 
       markBackendUnreachable() {
         set({ backendOnline: false });
+      },
+
+      markBackendProbeSettled() {
+        set({ backendProbeSettled: true });
       },
 
       sessionTroubleshootingPing() {

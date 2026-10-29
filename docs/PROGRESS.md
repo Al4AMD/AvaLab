@@ -118,8 +118,8 @@ Verified at close-out: `pnpm check` green; `uv run --directory apps/api pytest -
 
 ## What's left
 
-- **Wave 1** — `docs/plans/wave-1/` (4 executable plans; see D-015). All four plans complete (`01` Fourier, `02` signals/metrics, `03` systems/filters, `04` codecs/time, above). Pure-TS DSP + golden vectors; no UI, no router. Next: wave 2 planning per the wave map (`docs/plans/README.md`) — owner direction pending.
-- Wave 2+ — not planned yet; see `docs/plans/README.md` for the wave map.
+- **Wave 2 · Plan 02** `02-audio-sources-playback.md` — Tasks 1–4 complete (upload/ingest, offline lane + demo clips, microphone recording, dock player). Remaining plan-02 task: none — the plan is complete pending owner review of the shipped code.
+- Wave 2 plans 03 (visuals: waveform/spectrogram) and 04 — see `docs/plans/README.md`; do not begin a later plan with failing checks.
 
 ## Known issues / deferred minors (carried out of Wave 0)
 
@@ -148,13 +148,18 @@ Wave 2 plan 01 additions (machine-drafted, agent):
 
 - `nav.*` (5 keys: landmark + 4 tool names)
 - `tool.{waveform,spectrogram,fftview,generator}.{title,stub}` (8 keys)
-- `layout.player.upcoming`
+
+Wave 2 plan 02 additions (machine-drafted, agent):
+
+- `input.*` full key set (upload + offline lane + demo cards + errors, Tasks 1–2)
+- `input.record.*` (Task 3 recording states: start `stop/elapsed/deniedHint/mediaError{{error}}/capReached`, absent hint, limit)
+- `player.*` (Task 4 dock: title/play/pause/seek.back/seek.forward, time.pattern/time.aria, selection.pattern, empty.hint, loop.label/loop.unavailable, lane.{ingested,offlineBrowser,demoClip,recording,generated})
 
 (Future Persian copy: every wave's fa strings land in this section until the owner reviews them.)
 
 ## Next recommended step
 
-Start **Wave 2, plan `02-audio-sources-playback.md`** via the subagent-driven-development workflow (ledger `.superpowers/sdd/02-audio-sources-playback/`). It builds the source lane (backend ingest + offline fallback + demo clips) and player on top of the shipped session store/RPC. Do not begin later plans while an earlier one has failing checks.
+Plan `02-audio-sources-playback.md` is complete (Tasks 1–4 in `.superpowers/sdd/02-audio-sources-playback/`); owner code review pending. Then **Wave 2 plan `03-waveform-spectrogram.md`** (waveform + spectrogram canvases subscribe to `appPlayhead`, per Task 4's publish contract). Do not begin later plans while an earlier one has failing checks.
 
 ## Session log
 
@@ -197,6 +202,39 @@ Start **Wave 2, plan `02-audio-sources-playback.md`** via the subagent-driven-de
 - Debugging note on record: the identity test caught production leaking frame 0's Nyquist-bin value for even L (`halfBins = ⌈L/2⌉` skipped bin L/2 — now `⌊L/2⌋ + 1`). The plan's "neighbors ≤ −20 dB at ±3 bins" pin does NOT hold for stretch-2 output at any implementation variant (pre- and post-fix spectra identical): offsets ±1..±16 bins carry the 21.3 ms analysis-window skirt (hann main lobe ±187 Hz at 262144-point padding); the test asserts ≤ −20 dB at offsets ±32..128 padded bins (measured −26.5 dB) and documents the measured skirt instead.
 - Deviation notes on record (also in the source header): (1) synthesis deviation scaled by the hop ratio H_s/H_a (standard Dolson; R11 literal line omits it); (2) pitchShift direction uses stretch `2^(+semitones/12)` and resample to `fs/2^(semitones/12)` — the literal R13 reading measured an inverted pitch (+12 → 220 Hz violating the plan's "+12 doubles the peak" contract), semitones 0 unchanged.
 
+### 2026-10-26 — Wave 2, plan 02 Task 1 (F01 upload → ingest → session)
+
+- Done: `apps/web/src/features/input/{ingest.ts,upload.tsx}` — typed ingest lane (courtesy size pre-check → POST /ingest → GET /audio/{id} → decode seam → mono downmix → `loadSource("ingested")`), backend envelope codes → `input.error.<code>` (unknown verbatim via `input.error.unknown`), lane errors `backendUnavailable` + translated recovery hint, store-flag discipline from the lane's own evidence; shared no-source empty state (sr-only input + a11y label + dropzone + `role="alert"` readout) wired into `/tools/waveform`. Plan-01 auto-seeded waveform probe retired (empty state now reachable); `routes.test.tsx` + `e2e/tools.spec.ts` adapted. i18n `input.*` full key set en+fa (fa machine-drafted — **needs human Persian review**); dynamic-key allowlist `input.error`.
+- Verified: `pnpm check` exit 0 (dsp 892/892, web 111/111 incl. 20 ingest-lane tests, scripts 13/13, biome 118 files, i18n OK) · `pnpm e2e` 9/9 (incl. 3 new upload e2e over a route-stubbed API: fa+en success, fa 500-error path). Harness finding recorded: 4xx/5xx route fulfills always log one browser network error in Chromium; only 200 fulfills are console-clean.
+- Concerns for owner: backend runtime upload cap not exposed by any endpoint (client mirrors the 100 MB default — over-rejects if env raised; suggest publishing it via /health); upload progress/cancel deferred (YAGNI); stereo playback deferred to Task 4; first biome a11y suppression precedent (documented dropzone ignore).
+- Details in `.superpowers/sdd/02-audio-sources-playback/progress.md`.
+
+### 2026-10-26 — Wave 2, plan 02 Task 2 (F01 offline lane + demo clips)
+
+- Done: `apps/web/src/features/input/offline.ts` — offline decode lane `loadOfflineFile` (read bytes → Task 1's `browserDecodeWav` seam (no second decode implementation) → `monoDownmix` → `loadSource(..., "offlineBrowser")`), store guards the ONLY backstop, store codes → `input.error.<code>`, no `backendOnline` writes (no API call); `loadDemoClip(clipId)` fetches `/demo/<file>.wav` and loads through the SAME decode tail with `sourceKind: "demoClip"` (D-016 clips: 48 kHz 16-bit mono 5 s). `demo.tsx` demo cards live in the shared no-source empty state (one real labelled button per card, card not clickable); `failureReadout.tsx` shared `role="alert"` readout for both lanes. `WaveformStubOverview` readout now renders the REAL `meta.sampleCount` the worker derived (was the bucket count). `backendOnline` became observable: `HealthStatus` subscribes to the store flag (mount probe writes verdict via mark*; only local state is the probe-pending marker) — carry item 7(a) teeth: the empty state shows an "offline lane only" hint above the file button when the flag is down; the button's Task-1 error flow unchanged.
+- Verified: root `pnpm check` exit 0 (dsp 892/892, web 128/128 incl. 13 offline-lane tests, scripts 13/13, biome 123 files, i18n OK) · `pnpm e2e` 11/11 (2 new demo e2e: fa+en card click → real worker-derived overview count, HealthStatus pill asserted, zero console errors). Harness finding: `decodeAudioData` resamples to the device AudioContext rate (48 kHz clip → ≈220.5 k samples at 44.1 kHz on the dev Mac) — e2e asserts a real non-trivial count, not a magic number; the exact count is device/browser-dependent (documented offline-lane codec variance).
+- Deviations: no jsdom click test for the demo cards (repo pre-flight pins test deps; no jsdom installed) — lane wiring unit-tested node-side (fetch/decode/store seams injected) and the click covered by Playwright (real DOM, stronger). Plan's "sidebar empty-state" has no current surface (the sidebar has no empty state); demo cards went into the shared empty-state component per brief resolution.
+- Needs owner Persian review: `input.offlineLaneOnly`, `input.demo.*` fa copy (machine-drafted).
+- Details in `.superpowers/sdd/02-audio-sources-playback/progress.md`.
+
+### 2026-10-26 — Wave 2, plan 02 Task 3 (F01 microphone recording → ingest)
+
+- Done: `apps/web/src/lib/media.ts` + `features/input/record.tsx` — recorder seam state machine (`idle|requesting|requestingDenied|recording|processing|error(mediaError)|done(completed|capReached)`, all boundaries injectable, monotonic attempt id cancels grant races); 5-min cap through the same stop path (== store MAX_DURATION_SECONDS); cancel stops tracks; completed take → `ingestFile(..., sourceKind: "recording")` (`IngestOptions.sourceKind` typed override), capReached NOT uploaded + translated. Empty-state section: absent-devices honest hint, aria-live elapsed counter, stop/cancel. Machine failure states translated (`deniedHint`/`mediaError{{error}}`).
+- NOTE: implementer crashed twice mid-dispatch (API outage); `media.ts` survived; remaining finished inline by controller. Gates: root `pnpm check` 0, web 139/139, dsp 892/892, e2e 14/14. E2e pins no permission prompt in CI (absent `mediaDevices` → translated disabled hint).
+- Needs owner Persian review: `input.record.*`. UX note flagged: a failed upload of a completed take loses the take (re-record required).
+- Details in `.superpowers/sdd/02-audio-sources-playback/progress.md`.
+
+### 2026-10-27 — Wave 2, plan 02 Task 4 (F02 dock player: transport + playhead)
+
+- Done: `apps/web/src/features/player/{transport.ts,playhead.ts,usePlayer.ts,player.tsx}` —
+  - `transport.ts`: DOM-free player state machine `empty|ready{positionSample}|playing{startedAtSample}|stopped{positionSample}` with ALL seams injectable (`contextFactory, bufferFactory, nodeFactory, timeSource, onEnded, close`); node tests use recording fakes, app default is a real AudioContext. `setSource` builds the new AudioBuffer first, stops the old node, then swaps (§9: exactly ONE live AudioBufferSourceNode; store's mono lane + transport's buffer = ≤ 2 full-length buffers). Pause pins the interpolated position; play resumes from the pin, restarts from 0 at/past end; play-while-playing documented no-op; seek while playing restarts the node; zero-length source: `ready` elsewhere but `play()` no-op (Web Audio cannot make a 0-length AudioBuffer); stale `onEnded` detached at every stop; `dispose()` stops + closes. `playbackRate` field pinned 1 (F06 seam, Wave 3 plugs its speed control). Guards: non-finite args are documented no-ops (seek) / loud TypeErrors (malformed source, bad rate).
+  - `playhead.ts`: tiny EventTarget-style pub-sub `appPlayhead` singleton — Plan 03 canvases subscribe; publish notifies only current listeners synchronously; late subscribers get no replay (pinned); non-finite guard; dispose clear + permanent inertness; app code never disposes it.
+  - `usePlayer.ts`: mount-only machine effect (record.tsx StrictMode-safe pattern), `useSyncExternalStore` + useMemo EMPTY_STATE fallback (SSR-safe), source attach via `sourceToBufferLike(original)` in try/catch (exotic-rate `createBuffer` degradation keeps the tool tree alive; single-cast adapter, media.ts precedent; mono-at-source-rate playback documented — stereo stays owner question 4); exactly ONE rAF loop only while playing, publishing the interpolated head to `appPlayhead`.
+  - `player.tsx`: `PlayerDock` — honest empty posture (disabled buttons + hint), back10/back5/toggle/forward5/forward10 order, reserved disabled loop stub (Wave 3 region-loop), throttled `mm:ss` readout (one setState per displayed second, NO second rAF; `dir="ltr"`, Latin digits), store-bound selection readout, lane badge `player.lane.<sourceKind>` (T2 carry landed). Layout placeholder → `<PlayerDock />`; `layout.player.upcoming` retired in en+fa. i18n nested `player.*` en+fa; dynamic allowlist `player.lane`.
+- Verified: typecheck clean; `pnpm --filter @avalab/web test` 173/173 (incl. 28 transport + 6 playhead node tests with fake seams); `pnpm lint` clean (134 files; import organization + `role="timer"` a11y fix); `pnpm i18n:check` OK; root `pnpm check` exit 0 (dsp 892/892, scripts 13/13); `pnpm e2e` 16/16 (new `player.spec.ts`: fa+en — no-source posture → demo load arms dock + lane badge → REAL Web-Audio-clock readout reaches 00:01 → pause pins the displayed second, zero console errors).
+- Notes for owner: fa `player.*` machine-drafted (Persian review); uniform documentation: playback of the ORIGINAL at full length only — derived/selected playback is Wave 3; loop-region toggle reserved disabled until a derived source exists.
+- Details in `.superpowers/sdd/02-audio-sources-playback/progress.md`.
+
 ### 2026-10-25 — Wave 2 planning + plan 01 executed (app skeleton complete)
 
 - Planning: owner-approved brainstorm → spec `docs/superpowers/specs/2026-10-25-wave-2-core-visuals-design.md` + four SDD plans `docs/plans/wave-2/01…04` + `docs/DECISIONS.md` D-018 (typed-message DSP worker, no Comlink; backend-first decode lane with offline fallback) + D-019 (per-tool routes, URL-encoded canonical params). Deps `react-router@8.5.0`, `zustand@5.0.16` (MIT, THIRD_PARTY rows); engines floor `>=22.22.0`.
@@ -205,3 +243,16 @@ Start **Wave 2, plan `02-audio-sources-playback.md`** via the subagent-driven-de
 - Key rulings on ledger: R22 engines; R23 store = sole view-tree RPC consumer; R24 params-only derived keys (caveat: first payload-dependent op must extend key); R25 main-thread hash exception accepted; R26 avalanche test contract = bijectivity + mean-bits band; R27 `computePeakBuckets` no clamp; R28 op meta self-describes from actual payload; R29 `derive`/`deriveWithSource` share `openDerivedJob`.
 - Spec amendments: §2.3 wire shape `{meta?, payload?}` + transfer descriptor; §2.5 react-router v8 wording (commit 8bd1bcd).
 - Carry-overs: cancelledIds pruning; detached zero-length descriptor typed `badParams` (edge); chunked transfer for `deriveWithSource` if per-call copies become hot; Vite `worker.format` revisit on ESM worker chunks; fa copy owner-review below.
+
+## 2026-10-28 — Wave 2, plan 02 CLOSED (F01 audio sources + F02 dock player)
+
+- Branch feat/wave-2-plan-02, 9 commits d600d27 → d4f7a3c (T1 ingest lane, T2 offline lane + demo clips, T3 microphone recording, T4 dock player + whole-plan fixes). Whole-branch review **Approved** (per-task reviews: T1, T2, T4 Approved/fixes→Approved; T3 reviewed as part of the branch sweep after implementer crashes). Independent verifier **8/8 PASS**.
+- Commit d4f7a3c (review-driven): `browserDecodeWav` now parses the canonical WAV fmt-chunk rate and constructs `AudioContext({sampleRate: rawRate})` — the ingest lane no longer resamples to the device rate (48 kHz canonical stays 48 kHz on a 44.1 kHz machine). Malformed headers fall back to the previous device-rate path. This was an educational-correctness risk (store kept the device rate as "original").
+- Owner decisions needed (carried, not blocking):
+  1. Record-offline UX: a completed take uploaded while the backend is offline fails and LOSES the take (re-record required). Options: offline decode of the blob (Chromium can decode MediaRecorder containers) or a settled-offline gate on the record button.
+  2. Parallel-landing race: demo card clicks during an active upload/recording — a settled `loadSource` from one lane silently replaces another's work (independent busy states; demo click mid-recording unmounts + disposes the take). Suggested: one shared store-level lane guard (plan 03 or F15).
+  3. RecordSection fa copy + `input.*`/`player.*` Persian review (all flagged below).
+  4. Stereo playback still mono via the shared JS-buffer path (mono downmix at source rate; TOOLS run on the downmix) — owner question 4 open, D-entry pending.
+- Deviations (recorded in ledger): T4 brief "selection highlighted on the transport" shipped as read-only text readout — axis/canvas rendering belongs to plan 03; brief "keys" = natively keyboard-operable buttons (no global keymap until F18); documents both in `.superpowers/sdd/02-audio-sources-playback/progress.md:48`.
+- Known-behave-UA facts: `decodeAudioData` device-rate resample now avoided on the ingest lane by construction; offline lane still documents device-rate variance (no WAV rate header guaranteed for arbitrary user files); Chromium e2e always logs one network error on 4xx/5xx route stubs (console-clean asserts moved to 200-fulfill paths).
+- Carries into plan 03: parallel-landing guard; selection-canvas highlight (store selection now exercised); replayed playhead `appPlayhead` pub-sub (toString contract pinned); platform-rate e2e tolerance documented; record-offline decision above.

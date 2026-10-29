@@ -22,6 +22,58 @@
     "fftview": "FFT View",
     "generator": "Generator"
   },
+  "input": {
+    "empty": {
+      "hint": "Choose an audio file to load, or drop it here."
+    },
+    "fileButton": "Choose file",
+    "busy": "Uploading…",
+    "offlineLaneOnly": "Server unreachable — the offline lane only: the demo clips below load without the server.",
+    "demo": {
+      "title": "Demo clips",
+      "meta": "WAV · {{seconds}} s · {{rateHz}} Hz",
+      "loadButton": "Load",
+      "loadAria": "Load demo clip: {{title}}",
+      "loading": "Loading…",
+      "chirp": {
+        "title": "Logarithmic chirp (100 Hz → 8 kHz)"
+      },
+      "clicks": {
+        "title": "Clicks (2 Hz)"
+      },
+      "pinkNoise": {
+        "title": "Pink noise"
+      }
+    },
+    "error": {
+      "file_too_large": "The file is larger than the upload limit (100 MB).",
+      "duration_too_long": "The audio is longer than 5 minutes (300 s).",
+      "decode_failed": "The audio could not be decoded.",
+      "not_found": "The uploaded audio is no longer on the server (it may have expired).",
+      "invalid_request": "The server rejected the request.",
+      "internal_error": "The server had an internal error; try again later.",
+      "unknown": "Unexpected server error (code: {{code}}).",
+      "backendUnavailable": "Server unreachable; the file was not uploaded.",
+      "backendUnavailableHint": "Check the connection and try again; browser-side tools keep working without the server.",
+      "demoUnavailable": "The demo clip could not be loaded.",
+      "tooLong": "The audio is longer than 5 minutes (300 s).",
+      "rateTooHigh": "The sample rate exceeds the 96 kHz cap.",
+      "notFinite": "The audio contains values that are not finite numbers.",
+      "invalidType": "The decoded audio has an unexpected shape."
+    },
+    "record": {
+      "title": "Or record your voice",
+      "start": "Start recording",
+      "stop": "Stop recording",
+      "cancel": "Cancel recording",
+      "busy": "Working on the microphone…",
+      "elapsed": "Recording · {{seconds}} s",
+      "absentHint": "This browser does not expose a microphone API, so recording is disabled here.",
+      "deniedHint": "Microphone access was denied. Allow it in the browser settings, then start again.",
+      "mediaError": "The microphone reported an error ({{error}}). Please try again.",
+      "capReached": "The 5-minute recording limit was reached; the take was kept local and was not uploaded. Record again if you need it."
+    }
+  },
   "tool": {
     "waveform": {
       "title": "Waveform",
@@ -40,9 +92,34 @@
       "stub": "This tool lands later this wave."
     }
   },
-  "layout": {
-    "player": {
-      "upcoming": "Audio player dock — playback controls arrive later in this wave."
+  "player": {
+    "title": "Player",
+    "play": "Play",
+    "pause": "Pause",
+    "seek": {
+      "back": "Back {{seconds}} s",
+      "forward": "Forward {{seconds}} s"
+    },
+    "time": {
+      "pattern": "{{current}} / {{total}}",
+      "aria": "Playback position {{current}} of {{total}}"
+    },
+    "selection": {
+      "pattern": "Selection {{start}} – {{end}}"
+    },
+    "empty": {
+      "hint": "Load an audio source to play it."
+    },
+    "loop": {
+      "label": "Loop",
+      "unavailable": "Selection loop arrives in a later wave"
+    },
+    "lane": {
+      "ingested": "Uploaded file",
+      "offlineBrowser": "Browser decode (offline lane)",
+      "demoClip": "Demo clip",
+      "recording": "Microphone take",
+      "generated": "Generated signal"
     }
   }
 }

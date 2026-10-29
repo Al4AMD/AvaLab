@@ -75,8 +75,10 @@ test("API offline state is translated and no raw error text reaches the page", a
   await page.goto("/");
 
   // No API in the e2e environment: the health widget must show the
-  // translated offline state with its detail line.
-  await expect(page.getByText("سرور در دسترس نیست")).toBeVisible();
+  // translated offline state with its detail line. Exact match: the upload
+  // card's offline-lane hint (Plan 02) shares the «سرور در دسترس نیست»
+  // prefix and must not be an alternative match for the health span.
+  await expect(page.getByText("سرور در دسترس نیست", { exact: true })).toBeVisible();
   await expect(page.getByText("ابزارهای سمت مرورگر بدون سرور هم کار می‌کنند")).toBeVisible();
 
   const bodyText = await page.locator("body").innerText();

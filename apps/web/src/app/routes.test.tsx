@@ -49,28 +49,43 @@ async function waitUntilInitialised(router: DataRouter, pathname: string): Promi
 it("renders each /tools/* stub page through the data router with its i18n title", async () => {
   const { RouterProvider: Provider, appRoutes, i18n } = await importAppModules();
 
-  const expected: Record<string, { title: string; stub: string }> = {
-    "/tools/waveform": { title: i18n.t("tool.waveform.title"), stub: i18n.t("tool.waveform.stub") },
+  // Waveform (Plan 02 Task 1): with no source loaded the page shows the
+  // shared load-audio empty state (hint + file button) instead of the stub
+  // body copy — the empty state is the entry point to the ingest lane.
+  const expected: Record<string, { title: string; body: string }> = {
+    "/tools/waveform": {
+      title: i18n.t("tool.waveform.title"),
+      body: i18n.t("input.empty.hint"),
+    },
     "/tools/spectrogram": {
       title: i18n.t("tool.spectrogram.title"),
-      stub: i18n.t("tool.spectrogram.stub"),
+      body: i18n.t("tool.spectrogram.stub"),
     },
-    "/tools/fftview": { title: i18n.t("tool.fftview.title"), stub: i18n.t("tool.fftview.stub") },
+    "/tools/fftview": { title: i18n.t("tool.fftview.title"), body: i18n.t("tool.fftview.stub") },
     "/tools/generator": {
       title: i18n.t("tool.generator.title"),
-      stub: i18n.t("tool.generator.stub"),
+      body: i18n.t("tool.generator.stub"),
     },
   };
 
-  for (const [path, expectedStub] of Object.entries(expected)) {
+  for (const [path, expectedBody] of Object.entries(expected)) {
     const router = createMemoryRouter(appRoutes, { initialEntries: [path] });
     await waitUntilInitialised(router, path);
 
     const markup = renderToStaticMarkup(<Provider router={router} />);
-    expect(markup).toContain(expectedStub.title);
-    expect(markup).toContain(expectedStub.stub); // "tool lands later this wave" body
+    expect(markup).toContain(expectedBody.title);
+    expect(markup).toContain(expectedBody.body);
     expect(markup).toContain(i18n.t("app.title")); // Wave-0 header preserved
     expect(markup).not.toContain("tool."); // no raw unresolved i18n keys render
+  }
+
+  // The waveform page carries the empty state's file button (the a11y label
+  // for the hidden input), not just the hint line.
+  {
+    const router = createMemoryRouter(appRoutes, { initialEntries: ["/tools/waveform"] });
+    await waitUntilInitialised(router, "/tools/waveform");
+    const markup = renderToStaticMarkup(<Provider router={router} />);
+    expect(markup).toContain(i18n.t("input.fileButton"));
   }
 });
 
@@ -84,4 +99,39 @@ it("redirects / to /tools/waveform via the index loader before any render", asyn
     expect(router.state.initialized).toBe(true);
     expect(router.state.location.pathname).toBe("/tools/waveform");
   });
+});
+
+it("the waveform empty state offers the demo clips with fa/en parity (Task 2)", async () => {
+  const { RouterProvider: Provider, appRoutes, i18n } = await importAppModules();
+  const router = createMemoryRouter(appRoutes, { initialEntries: ["/tools/waveform"] });
+  await waitUntilInitialised(router, "/tools/waveform");
+  const markup = renderToStaticMarkup(<Provider router={router} />);
+
+  // The node i18n singleton boots in fa (no localStorage in node): the
+  // rendered markup carries the Persian card labels.
+  expect(markup).toContain(i18n.t("input.demo.title"));
+  expect(markup).toContain(i18n.t("input.demo.chirp.title"));
+  expect(markup).toContain(i18n.t("input.demo.clicks.title"));
+  expect(markup).toContain(i18n.t("input.demo.pinkNoise.title"));
+  expect(markup).toContain(i18n.t("input.demo.loadButton"));
+  // The technical meta line resolves its numbers (one card's worth).
+  expect(markup).toContain(i18n.t("input.demo.meta", { seconds: 5, rateHz: 48000 }));
+  // The a11y-correct affordance is a real button per card, aria-labelled.
+  expect(markup).toContain(
+    i18n.t("input.demo.loadAria", { title: i18n.t("input.demo.chirp.title") }),
+  );
+
+  // Parity: every demo key resolves under the ENGLISH locale too (a missing
+  // translation makes i18next echo the key itself, which would fail here),
+  // and no raw key text ever renders.
+  for (const key of [
+    "input.demo.title",
+    "input.demo.chirp.title",
+    "input.demo.clicks.title",
+    "input.demo.pinkNoise.title",
+    "input.demo.loadButton",
+  ]) {
+    expect(i18n.t(key, { lng: "en" })).not.toBe(key);
+    expect(markup).not.toContain(key);
+  }
 });
