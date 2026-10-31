@@ -23,7 +23,11 @@
  * `opFailed` — unexpected handler crash (logged, never swallowed).
  */
 
-import { computePeakBuckets } from "@avalab/dsp";
+import {
+  computePeakBuckets,
+  spectrogramTiles as computeSpectrogramTiles,
+  type SpectrogramTilesParams,
+} from "@avalab/dsp";
 import type { TransferablePayload } from "./protocol";
 
 /**
@@ -226,6 +230,67 @@ export function waveformRange(
   };
 }
 
+export type { SpectrogramTilesParams };
+export type SpectrogramTilesResult = {
+  meta: {
+    rowStart: number;
+    rowCount: number;
+    columnCount: number;
+    hopLengthSamples: number;
+    fftLengthSamples: number;
+    sampleRateHz: number;
+    dbFloorDb: number;
+    sourceStartSample: number;
+  };
+  payload?: TransferablePayload;
+};
+
+/**
+ * One progressive spectrogram row chunk. The request payload is the bounded
+ * source slice for these frames; the handler derives one frame chunk and
+ * transfers a Float32 dB map back. No frames or spectra survive the call.
+ */
+export function spectrogramTiles(
+  params: SpectrogramTilesParams,
+  payload?: TransferablePayload,
+): SpectrogramTilesResult {
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "spectrogramTiles: a Float32 source payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError(
+      "badPayload",
+      `spectrogramTiles: payload must be Float32-aligned, got byteOffset ${String(payload.byteOffset)}/byteLength ${String(payload.byteLength)}`,
+    );
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  let result: ReturnType<typeof computeSpectrogramTiles>;
+  try {
+    result = computeSpectrogramTiles(samples, params);
+  } catch (error) {
+    if (error instanceof Error && error.name === "RangeError") {
+      throw new DspOpError("badParams", error.message);
+    }
+    if (error instanceof Error && error.name === "TypeError") {
+      throw new DspOpError("badPayload", error.message);
+    }
+    throw error;
+  }
+  return {
+    meta: {
+      rowStart: result.rowStart,
+      rowCount: result.rowCount,
+      columnCount: result.columnCount,
+      hopLengthSamples: result.hopLengthSamples,
+      fftLengthSamples: result.fftLengthSamples,
+      sampleRateHz: result.sampleRateHz,
+      dbFloorDb: result.dbFloorDb,
+      sourceStartSample: result.sourceStartSample,
+    },
+    payload: { buffer: result.rows.buffer, byteOffset: 0, byteLength: result.rows.byteLength },
+  };
+}
+
 export const dspOps = {
   waveformOverview: {
     // Type lenses only — the table is read for types (DspOpParams/Result);
@@ -240,6 +305,22 @@ export const dspOps = {
     params: { bucketCount: 0, sampleRateHz: 0, startSample: 0, endSample: 0 },
     result: undefined as unknown as WaveformRangeResult,
     handler: waveformRange,
+  },
+  spectrogramTiles: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: {
+      sampleRateHz: 0,
+      windowFamily: "hann" as const,
+      windowLengthSamples: 0,
+      hopFraction: 0,
+      dbFloorDb: 0,
+      rowStart: 0,
+      rowCount: 0,
+      sourceStartSample: 0,
+    },
+    result: undefined as unknown as SpectrogramTilesResult,
+    handler: spectrogramTiles,
   },
   sessionPing: {
     // Type lenses only — the table is read for types (DspOpParams/Result);
