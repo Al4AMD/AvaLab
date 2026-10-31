@@ -30,6 +30,7 @@ import {
   dspOps,
   sessionPing,
   waveformOverview,
+  waveformRange,
 } from "../session/ops";
 import {
   type CancelFrame,
@@ -52,6 +53,7 @@ type DspOpHandlers = {
 const dspHandlers = {
   sessionPing,
   waveformOverview,
+  waveformRange,
 } satisfies DspOpHandlers;
 
 /** Ids whose request was cancelled after the frame left the client (§2.3);
@@ -125,6 +127,10 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
       }
       case "waveformOverview": {
         const result = dspHandlers.waveformOverview(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "waveformRange": {
+        const result = dspHandlers.waveformRange(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       default: {

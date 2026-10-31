@@ -79,7 +79,14 @@
     "detail": "جزئیات",
     "readout": "{{duration}} · {{rateHz}} هرتز · بیشینه {{peak}}",
     "overviewAria": "نمای کلی شکل موج",
-    "detailAria": "جزئیات شکل موج"
+    "detailAria": "جزئیات شکل موج",
+    "zoomIn": "بزرگ‌نمایی",
+    "zoomOut": "کوچک‌نمایی",
+    "resetZoom": "بازنشانی بزرگ‌نمایی",
+    "panLeft": "جابه‌جایی به چپ",
+    "panRight": "جابه‌جایی به راست",
+    "hint": "برای انتخاب بکشید · [ / ] بزرگ‌نمایی · کلیدهای جهت انتخاب را جابه‌جا می‌کنند",
+    "selectionReadout": "انتخاب {{start}} – {{end}}"
   },
   "tool": {
     "waveform": {

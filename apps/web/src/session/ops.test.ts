@@ -13,6 +13,7 @@ import {
   dspOps,
   sessionPing,
   waveformOverview,
+  waveformRange,
 } from "./ops";
 import type { TransferablePayload } from "./protocol";
 import { float32PayloadOf, float32ValuesOf } from "./testDoubles";
@@ -154,10 +155,11 @@ describe("op table wiring", () => {
   it("carries the handler for dispatch", () => {
     expect(dspOps.sessionPing.handler).toBe(sessionPing);
     expect(dspOps.waveformOverview.handler).toBe(waveformOverview);
+    expect(dspOps.waveformRange.handler).toBe(waveformRange);
   });
 
   it("derives typed params/results from the table (the add-one-entry lens)", () => {
-    expectTypeOf<DspOpName>().toEqualTypeOf<"sessionPing" | "waveformOverview">();
+    expectTypeOf<DspOpName>().toEqualTypeOf<"sessionPing" | "waveformOverview" | "waveformRange">();
     expectTypeOf<DspOpParams<"sessionPing">>().toEqualTypeOf<{ count: number }>();
     expectTypeOf<DspOpResult<"sessionPing">>().toEqualTypeOf<{
       meta: { received: true };
@@ -169,6 +171,22 @@ describe("op table wiring", () => {
     }>();
     expectTypeOf<DspOpResult<"waveformOverview">>().toEqualTypeOf<{
       meta: { sampleCount: number; sampleRateHz: number; bucketCount: number };
+      payload?: TransferablePayload;
+    }>();
+    expectTypeOf<DspOpParams<"waveformRange">>().toEqualTypeOf<{
+      bucketCount: number;
+      sampleRateHz: number;
+      startSample: number;
+      endSample: number;
+    }>();
+    expectTypeOf<DspOpResult<"waveformRange">>().toEqualTypeOf<{
+      meta: {
+        sampleCount: number;
+        sampleRateHz: number;
+        bucketCount: number;
+        startSample: number;
+        endSample: number;
+      };
       payload?: TransferablePayload;
     }>();
   });

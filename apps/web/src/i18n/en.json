@@ -79,7 +79,14 @@
     "detail": "Detail",
     "readout": "{{duration}} · {{rateHz}} Hz · peak {{peak}}",
     "overviewAria": "Waveform overview",
-    "detailAria": "Waveform detail"
+    "detailAria": "Waveform detail",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "resetZoom": "Reset zoom",
+    "panLeft": "Pan left",
+    "panRight": "Pan right",
+    "hint": "Drag to select · [ / ] zoom · arrows move selection",
+    "selectionReadout": "Selection {{start}} – {{end}}"
   },
   "tool": {
     "waveform": {

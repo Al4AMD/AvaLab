@@ -159,6 +159,73 @@ export function waveformOverview(
   };
 }
 
+export type WaveformRangeParams = {
+  bucketCount: number;
+  sampleRateHz: number;
+  startSample: number;
+  endSample: number;
+};
+export type WaveformRangeResult = {
+  meta: {
+    sampleCount: number;
+    sampleRateHz: number;
+    bucketCount: number;
+    startSample: number;
+    endSample: number;
+  };
+  payload?: TransferablePayload;
+};
+
+/**
+ * Zoomed waveform envelope: the request payload is already the source slice
+ * `[startSample, endSample)`, so the handler only buckets those samples. The
+ * start/end params are echoed for the view's time axis and pin the range in
+ * the store cache key.
+ */
+export function waveformRange(
+  params: WaveformRangeParams,
+  payload?: TransferablePayload,
+): WaveformRangeResult {
+  if (
+    params === undefined ||
+    params === null ||
+    !Number.isInteger(params.bucketCount) ||
+    params.bucketCount < 1 ||
+    !Number.isFinite(params.sampleRateHz) ||
+    params.sampleRateHz <= 0 ||
+    !Number.isInteger(params.startSample) ||
+    !Number.isInteger(params.endSample) ||
+    params.startSample < 0 ||
+    params.endSample < params.startSample
+  ) {
+    throw new DspOpError("badParams", `waveformRange: invalid params ${String(params)}`);
+  }
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "waveformRange: a Float32 source payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError(
+      "badPayload",
+      `waveformRange: payload must be Float32-aligned, got byteOffset ${String(payload.byteOffset)}/byteLength ${String(payload.byteLength)}`,
+    );
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  const minMax =
+    samples.length === 0
+      ? new Float32Array(0)
+      : computePeakBuckets(samples, Math.min(params.bucketCount, Math.max(1, samples.length)));
+  return {
+    meta: {
+      sampleCount: samples.length,
+      sampleRateHz: params.sampleRateHz,
+      bucketCount: minMax.byteLength / 8,
+      startSample: params.startSample,
+      endSample: params.endSample,
+    },
+    payload: { buffer: minMax.buffer, byteOffset: 0, byteLength: minMax.byteLength },
+  };
+}
+
 export const dspOps = {
   waveformOverview: {
     // Type lenses only — the table is read for types (DspOpParams/Result);
@@ -166,6 +233,13 @@ export const dspOps = {
     params: { bucketCount: 0, sampleRateHz: 0 },
     result: undefined as unknown as WaveformOverviewResult,
     handler: waveformOverview,
+  },
+  waveformRange: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: { bucketCount: 0, sampleRateHz: 0, startSample: 0, endSample: 0 },
+    result: undefined as unknown as WaveformRangeResult,
+    handler: waveformRange,
   },
   sessionPing: {
     // Type lenses only — the table is read for types (DspOpParams/Result);

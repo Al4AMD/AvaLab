@@ -167,6 +167,16 @@ export type SessionStore = {
    * then meaningless (""). Bad params still throw TypeError through
    * `canonicalJson` before any frame (app-code bug fails loudly). */
   deriveWithSource<K extends DspOpName>(opKey: K, params: DspOpParams<K>): DeriveTicket<K>;
+  /** Bounded payload variant: posts only `[startSample, endSample)` from the
+   * source (a fresh copy, transferred). The CALLER must pin the same range in
+   * `params`, because the cache key is built from params + source hash — a
+   * range that is not part of the key would collide with other windows. */
+  deriveWithSourceSlice<K extends DspOpName>(
+    opKey: K,
+    params: DspOpParams<K>,
+    startSample: number,
+    endSample: number,
+  ): DeriveTicket<K>;
   /** Read a derivation's state by its cache key (spec polling interface). */
   getDerived(key: string): DerivedLookup;
   /** Cancel the pending job under `key`: detaches the worker frame id; a
@@ -420,6 +430,38 @@ export function createSessionStore(
         const canonical = canonicalJson(params);
         return openDerivedJob(opKey, canonical, inputHash, () => {
           const copy = original.samples.slice();
+          return rpc.call(opKey, params, {
+            buffer: copy.buffer,
+            byteOffset: 0,
+            byteLength: copy.byteLength,
+          });
+        });
+      },
+
+      deriveWithSourceSlice<K extends DspOpName>(
+        opKey: K,
+        params: DspOpParams<K>,
+        startSample: number,
+        endSample: number,
+      ): DeriveTicket<K> {
+        const { original, inputHash } = get();
+        if (original === null || inputHash === null) {
+          const outcome = Promise.reject<DspOpOutcome<K>>(
+            new DspRpcError("noSource", "deriveWithSourceSlice: no source loaded"),
+          );
+          outcome.catch(() => undefined);
+          return { key: "", outcome };
+        }
+        const sampleCount = original.samples.length;
+        const start = Number.isFinite(startSample)
+          ? Math.max(0, Math.min(Math.round(startSample), sampleCount))
+          : 0;
+        const end = Number.isFinite(endSample)
+          ? Math.max(start, Math.min(Math.round(endSample), sampleCount))
+          : start;
+        const canonical = canonicalJson(params);
+        return openDerivedJob(opKey, canonical, inputHash, () => {
+          const copy = original.samples.slice(start, end);
           return rpc.call(opKey, params, {
             buffer: copy.buffer,
             byteOffset: 0,

@@ -1,22 +1,29 @@
 /**
- * Waveform tool (F02): overview + detail panels painted from the worker's
- * min/max envelope. The page is a thin reader of the session store's derived
- * cache; all DSP happens in the worker through `deriveWithSource`.
+ * Waveform tool (F02): overview + zoomable detail painted from worker-built
+ * min/max envelopes. The view owns only window/selection interaction; DSP
+ * stays behind the store's derive lane.
  */
-import { useEffect, useMemo, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router";
 import { formatS } from "../../lib/format";
-import type { WaveformOverviewResult } from "../../session/ops";
-import { useSessionStore } from "../../session/store";
+import type { WaveformOverviewResult, WaveformRangeResult } from "../../session/ops";
+import { type SessionSource, useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
 import { WaveformCanvas } from "./canvasWaveform";
+import {
+  clampWindow,
+  panWindow,
+  type SampleWindow,
+  windowFromSearch,
+  windowToSearch,
+  zoomWindow,
+} from "./interactions";
 
 const OVERVIEW_BUCKET_COUNT = 1200;
+const DETAIL_BUCKET_COUNT = 1200;
 
-function useOverview(): {
-  readonly minMax: Float32Array;
-  readonly sampleCount: number;
-} {
+function useOverview(): { readonly minMax: Float32Array; readonly sampleCount: number } {
   const original = useSessionStore((state) => state.original);
   const derived = useSessionStore((state) => state.derived);
   const [key, setKey] = useState<string | null>(null);
@@ -48,11 +55,138 @@ function useOverview(): {
   }, [entry, original]);
 }
 
+function useSliceEnvelope(
+  original: SessionSource | null,
+  window: SampleWindow,
+  skip: boolean,
+): { minMax: Float32Array; range: SampleWindow } | null {
+  const derived = useSessionStore((state) => state.derived);
+  const [key, setKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (original === null || skip) {
+      setKey(null);
+      return;
+    }
+    const ticket = useSessionStore.getState().deriveWithSourceSlice(
+      "waveformRange",
+      {
+        bucketCount: DETAIL_BUCKET_COUNT,
+        sampleRateHz: original.sampleRateHz,
+        startSample: window.startSample,
+        endSample: window.endSample,
+      },
+      window.startSample,
+      window.endSample,
+    );
+    setKey(ticket.key);
+    ticket.outcome.catch(() => undefined);
+  }, [original, skip, window.startSample, window.endSample]);
+
+  const entry = key === null ? undefined : derived.get(key);
+  return useMemo(() => {
+    const result = entry?.result as WaveformRangeResult | undefined;
+    const payload = result?.payload;
+    if (result === undefined || payload === undefined) {
+      return null;
+    }
+    return {
+      minMax: new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4),
+      range: { startSample: result.meta.startSample, endSample: result.meta.endSample },
+    };
+  }, [entry]);
+}
+
+function sampleAt(event: PointerEvent<HTMLCanvasElement>, range: SampleWindow): number {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const fraction = rect.width <= 0 ? 0 : (event.clientX - rect.left) / rect.width;
+  const clamped = Math.max(0, Math.min(1, fraction));
+  return Math.round(range.startSample + clamped * (range.endSample - range.startSample));
+}
+
 export function WaveformView() {
   const { t } = useTranslation();
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
+  const setSelection = useSessionStore((state) => state.setSelection);
   const { minMax, sampleCount } = useOverview();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [cursorTime, setCursorTime] = useState<number | null>(null);
+  const dragAnchor = useRef<number | null>(null);
+
+  const window =
+    original === null
+      ? { startSample: 0, endSample: 0 }
+      : windowFromSearch(`?${searchParams.toString()}`, sampleCount);
+  const isFullWindow = window.startSample === 0 && window.endSample === Math.max(1, sampleCount);
+  const slice = useSliceEnvelope(original, window, isFullWindow);
+  const detailMinMax = slice?.minMax ?? minMax;
+  const detailRange = slice?.range ?? { startSample: 0, endSample: sampleCount };
+
+  function applyWindow(next: SampleWindow): void {
+    if (sampleCount <= 0) {
+      return;
+    }
+    const clamped = clampWindow(next, sampleCount);
+    const params = new URLSearchParams(searchParams);
+    if (clamped.startSample === 0 && clamped.endSample === sampleCount) {
+      params.delete("t");
+    } else {
+      const encoded = windowToSearch(clamped);
+      params.set("t", encoded.slice(2));
+    }
+    setSearchParams(params, { replace: true });
+  }
+
+  function zoom(factor: number): void {
+    const anchor = Math.round((selection.startSample + selection.endSample) / 2);
+    applyWindow(zoomWindow(window, sampleCount, factor, anchor));
+  }
+
+  const onDetailPointerDown = (event: PointerEvent<HTMLCanvasElement>): void => {
+    const sample = sampleAt(event, detailRange);
+    dragAnchor.current = sample;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setSelection(sample, sample);
+  };
+
+  const onDetailPointerMove = (event: PointerEvent<HTMLCanvasElement>): void => {
+    const sample = sampleAt(event, detailRange);
+    setCursorTime(sample / (original?.sampleRateHz ?? 1));
+    if (dragAnchor.current !== null) {
+      const anchor = dragAnchor.current;
+      setSelection(Math.min(anchor, sample), Math.max(anchor, sample));
+    }
+  };
+
+  const onDetailPointerUp = (event: PointerEvent<HTMLCanvasElement>): void => {
+    dragAnchor.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  const onDetailKeyDown = (event: KeyboardEvent<HTMLCanvasElement>): void => {
+    const span = Math.max(1, selection.endSample - selection.startSample);
+    const step = Math.max(1, Math.round(span * 0.1));
+    if (event.key === "[") {
+      event.preventDefault();
+      zoom(2);
+    } else if (event.key === "]") {
+      event.preventDefault();
+      zoom(0.5);
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      event.preventDefault();
+      const direction = event.key === "ArrowLeft" ? -1 : 1;
+      if (event.shiftKey) {
+        setSelection(selection.startSample, Math.max(1, selection.endSample + direction * step));
+      } else {
+        const start = Math.max(
+          0,
+          Math.min(sampleCount - span, selection.startSample + direction * step),
+        );
+        setSelection(start, start + span);
+      }
+    }
+  };
 
   if (original === null) {
     return (
@@ -64,11 +198,12 @@ export function WaveformView() {
   }
 
   const durationSeconds = sampleCount / original.sampleRateHz;
+  const selectionStartSeconds = selection.startSample / original.sampleRateHz;
+  const selectionEndSeconds = selection.endSample / original.sampleRateHz;
   let peak = 0;
   for (const value of minMax) {
     peak = Math.max(peak, Math.abs(value));
   }
-  const sampleRange = { startSample: 0, endSample: sampleCount };
 
   return (
     <section className="flex flex-col gap-4">
@@ -92,7 +227,7 @@ export function WaveformView() {
         </figcaption>
         <WaveformCanvas
           minMax={minMax}
-          sampleRange={sampleRange}
+          sampleRange={{ startSample: 0, endSample: sampleCount }}
           selectionRange={selection}
           heightPx={120}
           testId="waveform.overview.canvas"
@@ -100,23 +235,83 @@ export function WaveformView() {
         />
       </figure>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="rounded-md border border-surface px-3 py-1 text-sm"
+          onClick={() => zoom(0.5)}
+          aria-label={t("waveform.zoomIn")}
+        >
+          {t("waveform.zoomIn")}
+        </button>
+        <button
+          type="button"
+          className="rounded-md border border-surface px-3 py-1 text-sm"
+          onClick={() => zoom(2)}
+          aria-label={t("waveform.zoomOut")}
+        >
+          {t("waveform.zoomOut")}
+        </button>
+        <button
+          type="button"
+          className="rounded-md border border-surface px-3 py-1 text-sm"
+          onClick={() => applyWindow({ startSample: 0, endSample: sampleCount })}
+        >
+          {t("waveform.resetZoom")}
+        </button>
+        <button
+          type="button"
+          className="rounded-md border border-surface px-3 py-1 text-sm"
+          onClick={() => applyWindow(panWindow(window, sampleCount, -0.5))}
+          aria-label={t("waveform.panLeft")}
+        >
+          ←
+        </button>
+        <button
+          type="button"
+          className="rounded-md border border-surface px-3 py-1 text-sm"
+          onClick={() => applyWindow(panWindow(window, sampleCount, 0.5))}
+          aria-label={t("waveform.panRight")}
+        >
+          →
+        </button>
+        <span className="text-xs text-muted">{t("waveform.hint")}</span>
+        {cursorTime !== null ? (
+          <span dir="ltr" className="ms-auto font-mono text-xs text-muted">
+            {formatS(cursorTime)}
+          </span>
+        ) : null}
+      </div>
+
       <figure className="flex flex-col gap-1">
         <figcaption className="flex items-baseline justify-between gap-2 text-sm text-muted">
           <span>{t("waveform.detail")}</span>
           <span dir="ltr" className="font-mono text-xs">
-            {formatS(selection.startSample / original.sampleRateHz)} –{" "}
-            {formatS(selection.endSample / original.sampleRateHz)}
+            {formatS(detailRange.startSample / original.sampleRateHz)} –{" "}
+            {formatS(detailRange.endSample / original.sampleRateHz)}
           </span>
         </figcaption>
         <WaveformCanvas
-          minMax={minMax}
-          sampleRange={sampleRange}
+          minMax={detailMinMax}
+          sampleRange={detailRange}
           selectionRange={selection}
           heightPx={220}
           testId="waveform.detail.canvas"
           label={t("waveform.detailAria")}
+          interactive
+          onPointerDown={onDetailPointerDown}
+          onPointerMove={onDetailPointerMove}
+          onPointerUp={onDetailPointerUp}
+          onKeyDown={onDetailKeyDown}
         />
       </figure>
+
+      <p dir="ltr" className="font-mono text-xs text-muted">
+        {t("waveform.selectionReadout", {
+          start: formatS(selectionStartSeconds),
+          end: formatS(selectionEndSeconds),
+        })}
+      </p>
     </section>
   );
 }
