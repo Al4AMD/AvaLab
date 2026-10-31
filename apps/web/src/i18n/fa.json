@@ -74,6 +74,13 @@
       "capReached": "حد ۵ دقیقهٔ ضبط پر شد؛ این ضبط نگه داشته شد و بارگذاری نکرد. در صورت نیاز دوباره ضبط کنید."
     }
   },
+  "waveform": {
+    "overview": "نمای کلی",
+    "detail": "جزئیات",
+    "readout": "{{duration}} · {{rateHz}} هرتز · بیشینه {{peak}}",
+    "overviewAria": "نمای کلی شکل موج",
+    "detailAria": "جزئیات شکل موج"
+  },
   "tool": {
     "waveform": {
       "title": "نمایشگر شکل‌موج (Waveform)",

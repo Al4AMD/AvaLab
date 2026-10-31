@@ -74,6 +74,13 @@
       "capReached": "The 5-minute recording limit was reached; the take was kept local and was not uploaded. Record again if you need it."
     }
   },
+  "waveform": {
+    "overview": "Overview",
+    "detail": "Detail",
+    "readout": "{{duration}} · {{rateHz}} Hz · peak {{peak}}",
+    "overviewAria": "Waveform overview",
+    "detailAria": "Waveform detail"
+  },
   "tool": {
     "waveform": {
       "title": "Waveform",
