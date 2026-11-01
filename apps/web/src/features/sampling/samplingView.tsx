@@ -262,10 +262,11 @@ function AliasingCard({ sourceLoaded }: { readonly sourceLoaded: boolean }) {
     setFailed(false);
     setBusy(true);
     const timer = window.setTimeout(() => {
+      const appliedFrequencyHz = Math.min(frequencyHz, 2 * targetRateHz);
       const ticket = useSessionStore.getState().deriveStandalone("aliasDemo", {
         sourceRateHz: ALIAS_SOURCE_RATE_HZ,
         targetRateHz,
-        frequencyHz,
+        frequencyHz: appliedFrequencyHz,
         durationSeconds: ALIAS_DURATION_SECONDS,
         antiAlias,
       });

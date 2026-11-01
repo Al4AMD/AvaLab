@@ -588,9 +588,9 @@ describe("mapPlayheadSeconds", () => {
     expect(mapPlayheadSeconds(0.5, 24_000, 24_000)).toBe(12_000);
   });
 
-  it("clamps at zero and at the target length", () => {
+  it("clamps at zero and at the last playable sample", () => {
     expect(mapPlayheadSeconds(-1, 48_000, 48_000)).toBe(0);
-    expect(mapPlayheadSeconds(99, 48_000, 48_000)).toBe(48_000);
+    expect(mapPlayheadSeconds(99, 48_000, 48_000)).toBe(47_999);
     expect(mapPlayheadSeconds(0.5, 48_000, 0)).toBe(0);
   });
 

@@ -210,8 +210,8 @@ export function PlayerDock(): React.ReactElement {
       {hasSource && (
         <span dir="ltr" data-testid="player.selection" className="text-xs text-muted">
           {t("player.selection.pattern", {
-            start: formatMmss(selection.startSample, player.sampleRateHz),
-            end: formatMmss(selection.endSample, player.sampleRateHz),
+            start: formatMmss(selection.startSample, original?.sampleRateHz ?? player.sampleRateHz),
+            end: formatMmss(selection.endSample, original?.sampleRateHz ?? player.sampleRateHz),
           })}
         </span>
       )}

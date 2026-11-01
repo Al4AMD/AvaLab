@@ -331,3 +331,20 @@ Wave 3 plans 01–05 are complete; owner code review pending. Next: **owner revi
 - Test-infra ruling: the web Vitest timeout is 15 s (was Vitest's 5 s default) because the nine-route static-render sweep and one phase-vocoder op test legitimately exceeded 5 s under full-suite CPU contention; no assertion was weakened.
 - Carries: `spectrumEdit.*` Persian copy needs owner review (added to the fa backlog); the default range analyses the first 65 536 samples and the hint says so, while the cap notice appears only when an explicit longer range is requested; full-band `linearPhase`/`randomPhase` presets expand to one edit per bin, so their share URLs can be very large (future fix: encode preset name + seed); `present.md` (owner-friendly digest dated 2026-10-26) arrived in `754ad66` and still needs an owner keep/remove decision.
 - **Next step:** owner review of the completed Wave 3 branch → PR to `main`.
+
+## 2026-11-01 — Wave 3 audit close-out (F03/F06/F07/F10)
+
+- Independent review of `git diff origin/main...HEAD` found seven integration defects; all fixed in this audit commit:
+  - Reverb IR panel now pins `wetMix=1`/`preDelayMs=0`, so it shows the raw IR instead of a mixed delta.
+  - Reverse card reverses the same 65 536-sample analysis window it compares, instead of reversing the whole slice and analysing its tail.
+  - Uploaded-IR spectrum now maps Hz with the IR's own sample rate.
+  - Player selection readout uses the original source rate, not the active processed-lane rate.
+  - A/B playhead mapping clamps to `lengthSamples - 1`, so switching lanes at the end no longer restarts from zero.
+  - The waveform tool maps the active-lane playhead back into original-source samples, so a processed lane at another rate no longer misplaces the playhead.
+  - Aliasing demo receives the same frequency clamped to `2 * targetRateHz` that the readout displays.
+- Reverb conv-step chart now formats its sample-index x axis as integers, not Hz; extent spectra copy only the 65 536-sample analysis frame they use.
+- Extent `extentProcess` now returns `beforeSupportStartSample`/`beforeSupportEndSample`, and the before waveform highlights support as the plan requires.
+- Speed e2e now waits for the demo source to settle before clicking a preset; the prior 36/37 run was a race, not a product failure.
+- Gates: `pnpm check` exit 0 (dsp 951/951, web 286/286, scripts 13/13, i18n OK, biome 188 files); `pnpm e2e` 37/37 with zero console errors in fa + en. Perf on that run: overview first paint 396 ms (< 1000 ms), spectrogram first tiles 495 ms (< 3000 ms).
+- Carries: all Wave 3 Persian copy still needs owner review; `present.md` still needs a keep/remove decision; full-band phase presets can produce very large share URLs (future fix: encode preset + seed); freehand spectrum drawing and full theory panels remain deferred; extent/reverb mini-waveform envelopes still bucket on the main thread (move to a worker envelope before whole-file 96 kHz sources); a pre-existing Wave 2 FFT phase-mask bug treats already-dB magnitudes as linear, so the default phase chart can be blank (fix separately).
+- **Next step:** owner review and PR `feat/wave-3` → `main`.

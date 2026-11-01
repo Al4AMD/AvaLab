@@ -196,7 +196,8 @@ const clampSample = (sample: number, length: number): number =>
 
 /** Map a playhead position in seconds onto a target source's sample grid.
  * Used when A/B swapping sources with different rates or lengths: the
- * position in TIME is preserved, clamped to the target extent. Non-finite
+ * position in TIME is preserved, clamped to the last playable sample so an
+ * at-end swap does not hit `play()`'s restart-from-zero rule. Non-finite
  * seconds map to 0 (mirrors the store's seek no-op convention). */
 export function mapPlayheadSeconds(
   seconds: number,
@@ -207,7 +208,7 @@ export function mapPlayheadSeconds(
     return 0;
   }
   const target = Math.round(seconds * targetRateHz);
-  return clampSample(target, Math.max(0, targetLengthSamples));
+  return clampSample(target, Math.max(0, targetLengthSamples - 1));
 }
 
 /** Interpolated position of a playing node: the sample offset the node was

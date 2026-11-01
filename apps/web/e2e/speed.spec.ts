@@ -43,6 +43,7 @@ test("Persian (default): 2x resample processes, paints, and activates the A/B la
   const errors = watchForErrors(page);
   await page.goto("/tools/speed");
   await page.getByTestId("input.demo.load.chirp").click();
+  await expect(page.getByTestId("input.upload.dropzone")).toHaveCount(0);
 
   await page.getByTestId("speed.preset.2").click();
   await expect(page).toHaveURL(/sp=2/);
@@ -65,6 +66,7 @@ test("English (LTR): the speed lab renders with zero console errors", async ({ p
   });
   await page.goto("/tools/speed");
   await page.getByTestId("input.demo.load.chirp").click();
+  await expect(page.getByTestId("input.upload.dropzone")).toHaveCount(0);
   await page.getByTestId("speed.preset.2").click();
   await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
   await expectCanvasPainted(page, "speed.result.spectrogram");

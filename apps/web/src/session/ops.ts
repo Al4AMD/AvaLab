@@ -719,6 +719,8 @@ export type ExtentProcessResult = {
     durationSeconds: number;
     supportStartSample: number;
     supportEndSample: number;
+    beforeSupportStartSample: number;
+    beforeSupportEndSample: number;
     energy: number;
     averagePower: number;
     signalType: "energy" | "power";
@@ -836,6 +838,7 @@ export function extentProcess(
 
   const startedMs = performance.now();
   const input = Float64Array.from(samples);
+  const beforeSupport = support(input, { threshold: 0 });
   let output: Float64Array;
   switch (params.operation) {
     case "identity":
@@ -878,6 +881,8 @@ export function extentProcess(
       durationSeconds: out.length / params.sampleRateHz,
       supportStartSample: supportRange.startSampleIndex,
       supportEndSample: supportRange.endSampleIndex,
+      beforeSupportStartSample: beforeSupport.startSampleIndex,
+      beforeSupportEndSample: beforeSupport.endSampleIndex,
       energy: signalEnergy(output),
       averagePower: averagePower(output),
       signalType: classifySignalType(output),

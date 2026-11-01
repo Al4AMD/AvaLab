@@ -490,6 +490,8 @@ describe("extentProcess handler", () => {
       durationSeconds: 5 / SAMPLE_RATE,
       supportStartSample: 2,
       supportEndSample: 2,
+      beforeSupportStartSample: 2,
+      beforeSupportEndSample: 2,
       energy: 1,
       averagePower: 0.2,
       signalType: "energy",
@@ -505,6 +507,8 @@ describe("extentProcess handler", () => {
     expect(delayed.meta.outputSampleCount).toBe(1000);
     expect(delayed.meta.supportStartSample).toBe(150);
     expect(delayed.meta.supportEndSample).toBe(150);
+    expect(delayed.meta.beforeSupportStartSample).toBe(100);
+    expect(delayed.meta.beforeSupportEndSample).toBe(100);
     expect(advanced.meta.supportStartSample).toBe(50);
     expect(advanced.meta.supportEndSample).toBe(50);
   });

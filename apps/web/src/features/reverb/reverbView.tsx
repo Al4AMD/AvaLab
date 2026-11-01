@@ -198,6 +198,7 @@ function LineChart({
   xLabel,
   yLabel,
   yFormat,
+  xFormat = formatHz,
   color = "#38bdf8",
 }: {
   readonly x: Float64Array;
@@ -207,6 +208,7 @@ function LineChart({
   readonly xLabel: string;
   readonly yLabel: string;
   readonly yFormat: (value: number) => string;
+  readonly xFormat?: (value: number) => string;
   readonly color?: string;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -247,7 +249,7 @@ function LineChart({
           label: xLabel,
           labelSize: 14,
           size: 32,
-          values: (_self, splits) => splits.map((value) => formatHz(value)),
+          values: (_self, splits) => splits.map((value) => xFormat(value)),
         },
         {
           stroke: "#8b98a5",
@@ -263,7 +265,7 @@ function LineChart({
     return () => {
       plot.destroy();
     };
-  }, [x, y, widthPx, xLabel, yLabel, yFormat, color]);
+  }, [x, y, widthPx, xLabel, yLabel, yFormat, color, xFormat]);
   return <div ref={hostRef} dir="ltr" role="img" aria-label={ariaLabel} data-testid={testId} />;
 }
 
@@ -614,7 +616,7 @@ export function ReverbView(): React.ReactElement {
         .getState()
         .deriveStandalone(
           "fftSelection",
-          spectrumParams(original.sampleRateHz, analysisLength, "hamming"),
+          spectrumParams(uploadedIr.sampleRateHz, analysisLength, "hamming"),
           payloadOf(copy),
         );
       ticket.outcome.then(
@@ -632,13 +634,15 @@ export function ReverbView(): React.ReactElement {
       return;
     }
     const impulse = new Float32Array([1]);
+    // The panel shows the IR itself, not the wet/dry mix of a delta input.
+    const irOnlyParams: ReverbProcessParams = {
+      ...mainParams(settings, original.sampleRateHz, 0, 1, 0, undefined),
+      preDelayMs: 0,
+      wetMix: 1,
+    };
     const ticket = useSessionStore
       .getState()
-      .deriveStandalone(
-        "reverbProcess",
-        mainParams(settings, original.sampleRateHz, 0, 1, 0, undefined),
-        payloadOf(impulse),
-      );
+      .deriveStandalone("reverbProcess", irOnlyParams, payloadOf(impulse));
     ticket.outcome.then(
       (outcome) => {
         if (irGenerationRef.current !== generation || "cancelled" in outcome) {
@@ -705,13 +709,16 @@ export function ReverbView(): React.ReactElement {
     const generation = reverseGenerationRef.current + 1;
     reverseGenerationRef.current = generation;
     const analysisLength = Math.min(slice.length, FFT_MAX_LENGTH);
+    // Compare the SAME window before and after reversal; reversing the whole
+    // slice then taking its head would analyse the tail instead.
+    const analysisSlice = slice.slice(0, analysisLength);
     void (async () => {
       const reverseTicket = useSessionStore
         .getState()
         .deriveStandalone(
           "extentProcess",
           { sampleRateHz: original.sampleRateHz, operation: "reverse" },
-          payloadOf(slice.slice()),
+          payloadOf(analysisSlice.slice()),
         );
       const reverseOutcome = await reverseTicket.outcome;
       if (reverseGenerationRef.current !== generation || "cancelled" in reverseOutcome) {
@@ -1298,6 +1305,7 @@ export function ReverbView(): React.ReactElement {
               xLabel={t("reverb.steps.sampleAxis")}
               yLabel={t("reverb.steps.amplitudeAxis")}
               yFormat={(value) => value.toFixed(2)}
+              xFormat={(value) => value.toFixed(0)}
               color="#f59e0b"
             />
             <p className="text-xs text-muted">{t("reverb.steps.note")}</p>

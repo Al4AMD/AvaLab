@@ -1,6 +1,6 @@
 # Wave 3 · Plan 03 — Signal extent (F07)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [x]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A `/tools/extent` lab shows duration, sample count, support, energy, average power and energy/power classification, and applies shift, time-scale, reverse, truncate, zero-pad and periodic extension while showing the spectral consequences (Δf, leakage, zero-padding interpolation, time–bandwidth trade-off).
 

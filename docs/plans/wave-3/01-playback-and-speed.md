@@ -50,11 +50,11 @@
 - `loadSource` success clears `processed` and resets `playbackMode` to `"original"`.
 - Export pure selector `selectPlaybackSource(state: Pick<SessionState, "original" | "processed" | "playbackMode">): Readonly<SessionSource | ProcessedSource> | null` — processed only when mode is processed AND processed exists; otherwise original.
 
-- [ ] **Step 1: Write failing store tests** in `store.test.ts` for: setProcessed happy path (mode flips, samples identity preserved), empty rejected, non-finite sample rejected, rate ≤ 0 rejected, >300 s rejected, clear resets, loadSource resets, `setPlaybackMode("processed")` no-op without processed, `selectPlaybackSource` fallback.
-- [ ] **Step 2: Run** `pnpm --filter @avalab/web test -- store.test` — expected FAIL (`setProcessed` absent).
-- [ ] **Step 3: Implement** the lane exactly as the Interfaces block; reuse the existing finite-sample scan style from `loadSource`.
-- [ ] **Step 4: Run** the same command — expected PASS.
-- [ ] **Step 5: Commit** `feat(F06): add processed playback lane to the session store`.
+- [x] **Step 1: Write failing store tests** in `store.test.ts` for: setProcessed happy path (mode flips, samples identity preserved), empty rejected, non-finite sample rejected, rate ≤ 0 rejected, >300 s rejected, clear resets, loadSource resets, `setPlaybackMode("processed")` no-op without processed, `selectPlaybackSource` fallback.
+- [x] **Step 2: Run** `pnpm --filter @avalab/web test -- store.test` — expected FAIL (`setProcessed` absent).
+- [x] **Step 3: Implement** the lane exactly as the Interfaces block; reuse the existing finite-sample scan style from `loadSource`.
+- [x] **Step 4: Run** the same command — expected PASS.
+- [x] **Step 5: Commit** `feat(F06): add processed playback lane to the session store`.
 
 ### Task 2: Worker op `speedTransform`
 
@@ -74,11 +74,11 @@
 - Convert result to `Float32Array`; return transferred payload and `elapsedMs` from `performance.now()`.
 - `speedFactor` finite in `[0.25, 4]`, `semitones` finite in `[-12, 12]`, `startSample/endSample` valid integers; else `badParams`.
 
-- [ ] **Step 1: Write failing op tests** in `ops.test.ts`: 1 s 440 Hz sine at 48 kHz → resample 2× yields ~24 000 samples and FFT peak near 880 Hz; time-stretch 2× yields ~96 000 samples and peak stays 440 Hz; pitch-shift +12 semitones keeps length and peak near 880 Hz; reverse of a ramp is descending; 5-min × 0.5× throws `tooLong`; bad speed throws `badParams`.
-- [ ] **Step 2: Run** `pnpm --filter @avalab/web test -- ops.test` — expected FAIL.
-- [ ] **Step 3: Implement** the handler and add the one worker dispatch case.
-- [ ] **Step 4: Run** the test — expected PASS.
-- [ ] **Step 5: Commit** `feat(F06): add speed transform worker op`.
+- [x] **Step 1: Write failing op tests** in `ops.test.ts`: 1 s 440 Hz sine at 48 kHz → resample 2× yields ~24 000 samples and FFT peak near 880 Hz; time-stretch 2× yields ~96 000 samples and peak stays 440 Hz; pitch-shift +12 semitones keeps length and peak near 880 Hz; reverse of a ramp is descending; 5-min × 0.5× throws `tooLong`; bad speed throws `badParams`.
+- [x] **Step 2: Run** `pnpm --filter @avalab/web test -- ops.test` — expected FAIL.
+- [x] **Step 3: Implement** the handler and add the one worker dispatch case.
+- [x] **Step 4: Run** the test — expected PASS.
+- [x] **Step 5: Commit** `feat(F06): add speed transform worker op`.
 
 ### Task 3: Player A/B and playhead continuity
 
@@ -94,11 +94,11 @@
 - Source-swap effect: capture `wasPlaying` and `seconds = currentSample / sampleRateHz` before `setSource`; after `setSource`, `seekToSample(clamp(round(seconds * newRateHz), 0, lengthSamples - 1))`; if `wasPlaying`, `play()`.
 - Dock adds a two-button A/B group (`player.ab.original`, `player.ab.processed`), processed button disabled when `!hasProcessed`, and a reset action (`player.reset`) that calls `clearProcessed`. Keep the existing source-kind lane badge for the original and show `player.lane.processed` when active.
 
-- [ ] **Step 1: Write a failing unit test** for the pure seconds→sample mapping helper (`mapPlayheadSeconds(seconds, targetRateHz, targetLengthSamples)`) in `transport.test.ts` or a new `playback.test.ts`: rate change, clamp at 0 and end, non-finite → 0.
-- [ ] **Step 2: Run** `pnpm --filter @avalab/web test -- playback` — expected FAIL.
-- [ ] **Step 3: Implement** the helper, `usePlayer` swap effect, and dock A/B controls.
-- [ ] **Step 4: Run** web tests — expected PASS.
-- [ ] **Step 5: Commit** `feat(F06): A/B processed playback with playhead continuity`.
+- [x] **Step 1: Write a failing unit test** for the pure seconds→sample mapping helper (`mapPlayheadSeconds(seconds, targetRateHz, targetLengthSamples)`) in `transport.test.ts` or a new `playback.test.ts`: rate change, clamp at 0 and end, non-finite → 0.
+- [x] **Step 2: Run** `pnpm --filter @avalab/web test -- playback` — expected FAIL.
+- [x] **Step 3: Implement** the helper, `usePlayer` swap effect, and dock A/B controls.
+- [x] **Step 4: Run** web tests — expected PASS.
+- [x] **Step 5: Commit** `feat(F06): A/B processed playback with playhead continuity`.
 
 ### Task 4: F06 speed/direction page
 
@@ -117,13 +117,13 @@
 - Result panel: waveform mini-canvas + spectrogram via `deriveStandalone("spectrogramTiles", params, copiedProcessedPayload)`; show output duration and actual speed; `tooLong`/cap notice translated.
 - Route `/tools/speed`; `TOOL_IDS` adds `"speed"`; sidebar link.
 
-- [ ] **Step 1: Write failing `speedState.test.ts`** for encode/decode round-trip, invalid values fall back, range clamp, and preview-range selection.
-- [ ] **Step 2: Run** `pnpm --filter @avalab/web test -- speedState` — expected FAIL.
-- [ ] **Step 3: Implement** state codec + view + route/sidebar + i18n keys (`speed.*`, `nav.speed`).
-- [ ] **Step 4: Run** `pnpm check` — expected PASS.
-- [ ] **Step 5: Write e2e** `speed.spec.ts`: load demo clip; choose 2×; wait for processed badge; result spectrogram canvas non-blank; toggle reverse; assert `player.ab.processed` pressed; switch locale with init script and assert LTR + no console errors.
-- [ ] **Step 6: Run** `pnpm e2e -- speed` (after `vite build` if invoking Playwright directly) — expected PASS.
-- [ ] **Step 7: Commit** `feat(F06): speed and direction lab`.
+- [x] **Step 1: Write failing `speedState.test.ts`** for encode/decode round-trip, invalid values fall back, range clamp, and preview-range selection.
+- [x] **Step 2: Run** `pnpm --filter @avalab/web test -- speedState` — expected FAIL.
+- [x] **Step 3: Implement** state codec + view + route/sidebar + i18n keys (`speed.*`, `nav.speed`).
+- [x] **Step 4: Run** `pnpm check` — expected PASS.
+- [x] **Step 5: Write e2e** `speed.spec.ts`: load demo clip; choose 2×; wait for processed badge; result spectrogram canvas non-blank; toggle reverse; assert `player.ab.processed` pressed; switch locale with init script and assert LTR + no console errors.
+- [x] **Step 6: Run** `pnpm e2e -- speed` (after `vite build` if invoking Playwright directly) — expected PASS.
+- [x] **Step 7: Commit** `feat(F06): speed and direction lab`.
 
 ### Task 5: Compare slot activation and close-out
 
@@ -136,7 +136,16 @@
 - Add `D-022` recording: processed lane ownership, 300 s cap, A/B playhead mapping, transport rate seam still pinned.
 - `ALGORITHMS` row for `speedTransform`: composition of `resampleRational`, `timeStretch`, `pitchShift`, `reverse`; no new math.
 
-- [ ] **Step 1: Implement** compare-slot processed pane.
-- [ ] **Step 2: Run** `pnpm check` and `pnpm e2e` — expected PASS; record measured numbers in `PROGRESS`.
-- [ ] **Step 3: Update** docs and mark plan 01 done in `wave-3/README.md`.
-- [ ] **Step 4: Commit** `docs(F06): close processed playback and speed plan`.
+- [x] **Step 1: Implement** compare-slot processed pane.
+- [x] **Step 2: Run** `pnpm check` and `pnpm e2e` — expected PASS; record measured numbers in `PROGRESS`.
+- [x] **Step 3: Update** docs and mark plan 01 done in `wave-3/README.md`.
+- [x] **Step 4: Commit** `docs(F06): close processed playback and speed plan`.
+
+## Shipped (2026-11-01)
+
+- Store-owned processed lane (`setProcessed`/`clearProcessed`/`setPlaybackMode`, `selectPlaybackSource`, typed errors, 300 s cap, `loadSource` reset); `speedTransform` worker op (tape resample, pitch-preserving time-stretch, optional pitch shift, reverse); dock A/B with last-playable-sample continuity; `/tools/speed` URL/state/view with presets, custom speed, semitones, reverse, preview/whole-file apply, result waveform + spectrogram, and compare-slot processed pane.
+- Semantics pinned by D-022: `speedFactor > 1` is faster; resample changes speed and pitch; time-stretch changes speed only; output above 300 s is rejected, never truncated; `transport.ts` playbackRate remains an unused seam. The Task 2 `~96 000`-sample time-stretch expectation inverted the pinned semantics; tests pin ~24 000 samples with pitch preserved.
+- Audit close-out fixed the player source-swap clamp at the last playable sample so swapping lanes at the end does not restart at zero, and corrected the selection readout to use the original source rate instead of the active lane rate.
+- Gates after audit: `pnpm check` exit 0 (dsp 951/951, web 286/286, scripts 13/13, i18n OK, biome 188 files); `pnpm e2e` 37/37 with zero console errors in fa + en. Perf on that run: overview first paint 396 ms (< 1000 ms), spectrogram first tiles 495 ms (< 3000 ms).
+- Carries: `speed.*` and `player.*` Persian copy needs owner review; the processed lane is intentionally not cached/evicted; the compare slot's original pane still renders the honest dash.
+- **Next step:** Wave 3 plan 02 — `docs/plans/wave-3/02-sampling-bit-depth.md`.

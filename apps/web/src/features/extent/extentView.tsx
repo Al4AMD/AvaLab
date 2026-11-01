@@ -428,30 +428,32 @@ export function ExtentView(): React.ReactElement {
     // two spectra share params when the lengths match. Running them one after
     // the other keeps the before frame from being cancelled by the after call.
     void (async () => {
+      const beforeFrame = beforeSamples.slice(0, beforeAnalysisLength);
       const beforeTicket = useSessionStore
         .getState()
         .deriveStandalone(
           "fftSelection",
           spectrumParams(original.sampleRateHz, beforeAnalysisLength),
           {
-            buffer: beforeSamples.slice().buffer,
+            buffer: beforeFrame.buffer,
             byteOffset: 0,
-            byteLength: beforeSamples.byteLength,
+            byteLength: beforeFrame.byteLength,
           },
         );
       const beforeOutcome = await beforeTicket.outcome;
       if (spectrumGenerationRef.current !== generation || "cancelled" in beforeOutcome) {
         return;
       }
+      const afterFrame = result.samples.slice(0, afterAnalysisLength);
       const afterTicket = useSessionStore
         .getState()
         .deriveStandalone(
           "fftSelection",
           spectrumParams(original.sampleRateHz, afterWindowLength),
           {
-            buffer: result.samples.slice().buffer,
+            buffer: afterFrame.buffer,
             byteOffset: 0,
-            byteLength: result.samples.byteLength,
+            byteLength: afterFrame.byteLength,
           },
         );
       const afterOutcome = await afterTicket.outcome;
@@ -761,8 +763,8 @@ export function ExtentView(): React.ReactElement {
                 </figcaption>
                 <ExtentWaveform
                   samples={beforeSamples ?? new Float32Array(0)}
-                  supportStartSample={-1}
-                  supportEndSample={-1}
+                  supportStartSample={result.meta.beforeSupportStartSample}
+                  supportEndSample={result.meta.beforeSupportEndSample}
                   ariaLabel={t("extent.waveform.beforeAria")}
                   testId="extent.waveform.before"
                 />
