@@ -42,6 +42,12 @@ const TOOLS: ToolSpec[] = [
     label: /(مولد سیگنال|Generator)/,
     title: /(مولد سیگنال|Signal Generator)/,
   },
+  {
+    path: "/tools/speed",
+    url: /\/tools\/speed$/,
+    label: /(سرعت|Speed)/,
+    title: /(سرعت|Speed)/,
+  },
 ];
 
 function watchForErrors(page: Page): string[] {
@@ -68,7 +74,7 @@ async function expectWaveformEmptyState(page: Page): Promise<void> {
   await expect(page.getByTestId("input.upload.button")).toBeVisible();
 }
 
-test("Persian (default): / redirects to the waveform tool and the sidebar reaches all four routes", async ({
+test("Persian (default): / redirects to the waveform tool and the sidebar reaches all five routes", async ({
   page,
 }) => {
   const errors = watchForErrors(page);
@@ -89,7 +95,7 @@ test("Persian (default): / redirects to the waveform tool and the sidebar reache
   expect(errors).toEqual([]);
 });
 
-test("English (persisted preference): the same four routes with zero console errors", async ({
+test("English (persisted preference): the same five routes with zero console errors", async ({
   page,
 }) => {
   const errors = watchForErrors(page);

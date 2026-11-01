@@ -20,7 +20,8 @@
     "waveform": "Waveform",
     "spectrogram": "Spectrogram",
     "fftview": "FFT View",
-    "generator": "Generator"
+    "generator": "Generator",
+    "speed": "Speed and direction"
   },
   "input": {
     "empty": {
@@ -100,6 +101,9 @@
     },
     "generator": {
       "title": "Signal Generator"
+    },
+    "speed": {
+      "title": "Speed and direction"
     }
   },
   "fftview": {
@@ -282,5 +286,47 @@
     "original": "Original",
     "derived": "Processed",
     "pending": "No processed source yet. The original-vs-processed canvases appear here once processing results exist."
+  },
+  "speed": {
+    "mode": {
+      "resample": "Resample (tape speed, pitch follows)",
+      "timeStretch": "Time-stretch (pitch preserved)"
+    },
+    "controls": {
+      "mode": "Speed mode",
+      "customSpeed": "Speed factor",
+      "semitones": "Pitch shift (semitones)",
+      "reverse": "Reverse"
+    },
+    "preset": "{{factor}}×",
+    "range": {
+      "pattern": "Range {{start}} – {{end}}"
+    },
+    "apply": {
+      "preview": "Preview range",
+      "whole": "Apply to whole file"
+    },
+    "result": {
+      "title": "Processed result",
+      "duration": "Duration",
+      "actualSpeed": "Actual speed",
+      "elapsed": "Compute time",
+      "waveformAria": "Processed waveform",
+      "spectrogramAria": "Processed spectrogram"
+    },
+    "status": {
+      "computing": "Computing in the worker…",
+      "idle": "Adjust a control to process the preview."
+    },
+    "error": {
+      "tooLong": "The processed result would exceed the 300 s cap. Shorten the range or choose a faster speed.",
+      "failed": "The speed transform failed. Try a shorter range."
+    },
+    "observe": {
+      "title": "What to observe",
+      "resample": "Resample mode changes speed and pitch together; watch the spectrogram shift vertically.",
+      "timeStretch": "Time-stretch changes duration while the harmonic peaks stay put; the phase vocoder may smear transients.",
+      "reverse": "Reverse plays the result backwards; the magnitude spectrum is unchanged, the phase is not."
+    }
   }
 }
