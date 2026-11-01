@@ -87,6 +87,15 @@ export type {
   SpectrogramWindowFamily,
 } from "./fourier/spectrogramTiles.js";
 export { spectrogramTiles } from "./fourier/spectrogramTiles.js";
+export type {
+  EditSpectrumParams,
+  EditSpectrumResult,
+  SpectrumEdit,
+  SpectrumEditMode,
+  SpectrumEditTarget,
+  SpectrumPreset,
+} from "./fourier/spectrumEdit.js";
+export { buildSpectrumPreset, editSpectrum } from "./fourier/spectrumEdit.js";
 export type { StftParams, StftResult } from "./fourier/stft.js";
 export { istft, stft } from "./fourier/stft.js";
 export { fft, ifft } from "./fourier/transform.js";
