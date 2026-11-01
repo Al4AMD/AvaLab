@@ -1,6 +1,7 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { createBrowserRouter, type RouteObject, redirect } from "react-router";
+import { SpectrogramView } from "../features/spectrogram/spectrogramView";
 import { WaveformView } from "../features/waveform/waveformView";
 import { useSessionStore } from "../session/store";
 import { AppLayout } from "./layout";
@@ -12,22 +13,21 @@ export function toolPath(toolId: ToolId): string {
   return `/tools/${toolId}`;
 }
 
+/** Tools whose view has not landed yet (Plan 02–05). */
+type StubToolId = "fftview" | "generator";
+
 /**
- * Stub body shown until each tool view lands later in this wave (Plan 02â€“05).
+ * Stub body shown until each tool view lands later in this wave (Plan 02–05).
  * Keys are referenced as literal t() calls (not t(`tool.${id}`)) so the i18n
  * key checker sees every key without widening the dynamic allowlist.
  */
-function ToolStub({ tool }: { tool: ToolId }) {
+function ToolStub({ tool }: { tool: StubToolId }) {
   const { t } = useTranslation();
-  const titles: Record<ToolId, string> = {
-    waveform: t("tool.waveform.title"),
-    spectrogram: t("tool.spectrogram.title"),
+  const titles: Record<StubToolId, string> = {
     fftview: t("tool.fftview.title"),
     generator: t("tool.generator.title"),
   };
-  const stubTexts: Record<ToolId, string> = {
-    waveform: t("tool.waveform.stub"),
-    spectrogram: t("tool.spectrogram.stub"),
+  const stubTexts: Record<StubToolId, string> = {
     fftview: t("tool.fftview.stub"),
     generator: t("tool.generator.stub"),
   };
@@ -40,9 +40,9 @@ function ToolStub({ tool }: { tool: ToolId }) {
 }
 
 /**
- * Plumbing probe for the DSP worker RPC (Plan 01 Tasks 2â€“3): renders the
+ * Plumbing probe for the DSP worker RPC (Plan 01 Tasks 2–3): renders the
  * echoed diagnostics-ping payload byte length from the SESSION STORE. Ruling
- * R23: the store is the sole view-tree RPC caller â€” this stub fires the
+ * R23: the store is the sole view-tree RPC caller — this stub fires the
  * store's guarded `sessionTroubleshootingPing` action on mount (StrictMode
  * double-mount is a no-op under the action's pending/done guard) and reads
  * `diagnostics.pingByteLength` back. No i18n copy: raw technical readout
@@ -72,8 +72,8 @@ const WAVEFORM_STUB_BUCKET_COUNT = 32;
 
 /**
  * Plumbing probe for the waveform overview op (Plan 01 Task 4, adapted in
- * Plan 02 Tasks 1â€“2): fires the store's `deriveWithSource("waveformOverview", â€¦)`
- * for the LOADED session source â€” the worker buckets the samples and the
+ * Plan 02 Tasks 1–2): fires the store's `deriveWithSource("waveformOverview", …)`
+ * for the LOADED session source — the worker buckets the samples and the
  * readout renders the REAL sample count the worker read off the transferred
  * source bytes (op contract: `WaveformOverviewResult.meta.sampleCount`). The
  * Plan-01 deterministic probe seeding is retired: real sources now come from
@@ -118,7 +118,7 @@ function WaveformStubOverview() {
   );
 }
 
-/** Data-router route table (spec Â§2.1/Â§2.5): layout shell + / redirect + /tools/<id>. */
+/** Data-router route table (spec §2.1/§2.5): layout shell + / redirect + /tools/<id>. */
 export const appRoutes: RouteObject[] = [
   {
     element: <AppLayout />,
@@ -126,7 +126,7 @@ export const appRoutes: RouteObject[] = [
       {
         index: true,
         // Loader redirect (not <Navigate>) so the redirect happens in the data
-        // layer â€” testable without a DOM render and works on first paint.
+        // layer — testable without a DOM render and works on first paint.
         loader: () => redirect(toolPath("waveform")),
       },
       {
@@ -139,7 +139,7 @@ export const appRoutes: RouteObject[] = [
           </>
         ),
       },
-      { path: "tools/spectrogram", element: <ToolStub tool="spectrogram" /> },
+      { path: "tools/spectrogram", element: <SpectrogramView /> },
       { path: "tools/fftview", element: <ToolStub tool="fftview" /> },
       { path: "tools/generator", element: <ToolStub tool="generator" /> },
     ],

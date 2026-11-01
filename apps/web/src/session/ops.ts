@@ -235,6 +235,7 @@ export type SpectrogramTilesResult = {
   meta: {
     rowStart: number;
     rowCount: number;
+    frameStride: number;
     columnCount: number;
     hopLengthSamples: number;
     fftLengthSamples: number;
@@ -276,10 +277,12 @@ export function spectrogramTiles(
     }
     throw error;
   }
+  const rows = new Float32Array(result.rows);
   return {
     meta: {
       rowStart: result.rowStart,
       rowCount: result.rowCount,
+      frameStride: result.frameStride,
       columnCount: result.columnCount,
       hopLengthSamples: result.hopLengthSamples,
       fftLengthSamples: result.fftLengthSamples,
@@ -287,7 +290,7 @@ export function spectrogramTiles(
       dbFloorDb: result.dbFloorDb,
       sourceStartSample: result.sourceStartSample,
     },
-    payload: { buffer: result.rows.buffer, byteOffset: 0, byteLength: result.rows.byteLength },
+    payload: { buffer: rows.buffer, byteOffset: 0, byteLength: rows.byteLength },
   };
 }
 
@@ -311,14 +314,15 @@ export const dspOps = {
     // runtime code dispatches through the worker switch.
     params: {
       sampleRateHz: 0,
-      windowFamily: "hann" as const,
+      windowFamily: "hann",
       windowLengthSamples: 0,
       hopFraction: 0,
       dbFloorDb: 0,
       rowStart: 0,
       rowCount: 0,
+      frameStride: 1,
       sourceStartSample: 0,
-    },
+    } as SpectrogramTilesParams,
     result: undefined as unknown as SpectrogramTilesResult,
     handler: spectrogramTiles,
   },

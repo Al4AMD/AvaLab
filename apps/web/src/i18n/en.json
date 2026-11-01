@@ -90,12 +90,10 @@
   },
   "tool": {
     "waveform": {
-      "title": "Waveform",
-      "stub": "This tool lands later this wave."
+      "title": "Waveform"
     },
     "spectrogram": {
-      "title": "Spectrogram",
-      "stub": "This tool lands later this wave."
+      "title": "Spectrogram"
     },
     "fftview": {
       "title": "FFT View",
@@ -135,5 +133,54 @@
       "recording": "Microphone take",
       "generated": "Generated signal"
     }
+  },
+  "spectrogram": {
+    "controls": {
+      "windowFamily": "Window family",
+      "windowLength": "Window length",
+      "hop": "Hop",
+      "colormap": "Colormap",
+      "dbFloor": "dB floor",
+      "axis": "Frequency axis"
+    },
+    "window": {
+      "rect": "Rectangular",
+      "hann": "Hann",
+      "hamming": "Hamming",
+      "blackman": "Blackman",
+      "kaiser": "Kaiser (beta = 8.6)"
+    },
+    "hop": {
+      "option": "{{percent}} %"
+    },
+    "colormap": {
+      "viridis": "Viridis",
+      "gray": "Gray",
+      "viridisCB": "Cividis (colorblind-safe)"
+    },
+    "axis": {
+      "linear": "Linear",
+      "log": "Log",
+      "frequency": "Frequency (Hz)",
+      "time": "Time (s)"
+    },
+    "legend": {
+      "label": "Level"
+    },
+    "canvas": {
+      "label": "Spectrogram: time on the x axis, frequency on the y axis, colour shows level in dB"
+    },
+    "meta": {
+      "sampleRate": "Sample rate",
+      "duration": "Duration",
+      "window": "Window",
+      "hop": "Hop",
+      "columns": "Columns",
+      "decimation": "Decimation"
+    },
+    "decimationNotice": "Canvas budget exceeded; columns were decimated ×{{factor}} (the analysis hop is wider).",
+    "loading": "Computing the spectrogram…",
+    "error": "The spectrogram could not be computed.",
+    "empty": "The source has no samples to analyse."
   }
 }

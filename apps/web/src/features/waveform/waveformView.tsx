@@ -221,7 +221,7 @@ export function WaveformView() {
       <figure className="flex flex-col gap-1">
         <figcaption className="flex items-baseline justify-between gap-2 text-sm text-muted">
           <span>{t("waveform.overview")}</span>
-          <span dir="ltr" className="font-mono text-xs">
+          <span dir="ltr" data-testid="waveform.overview.range" className="font-mono text-xs">
             {formatS(0)} – {formatS(durationSeconds)}
           </span>
         </figcaption>
@@ -240,6 +240,7 @@ export function WaveformView() {
           type="button"
           className="rounded-md border border-surface px-3 py-1 text-sm"
           onClick={() => zoom(0.5)}
+          data-testid="waveform.zoom.in"
           aria-label={t("waveform.zoomIn")}
         >
           {t("waveform.zoomIn")}
@@ -248,6 +249,7 @@ export function WaveformView() {
           type="button"
           className="rounded-md border border-surface px-3 py-1 text-sm"
           onClick={() => zoom(2)}
+          data-testid="waveform.zoom.out"
           aria-label={t("waveform.zoomOut")}
         >
           {t("waveform.zoomOut")}
@@ -256,6 +258,7 @@ export function WaveformView() {
           type="button"
           className="rounded-md border border-surface px-3 py-1 text-sm"
           onClick={() => applyWindow({ startSample: 0, endSample: sampleCount })}
+          data-testid="waveform.zoom.reset"
         >
           {t("waveform.resetZoom")}
         </button>
@@ -277,7 +280,11 @@ export function WaveformView() {
         </button>
         <span className="text-xs text-muted">{t("waveform.hint")}</span>
         {cursorTime !== null ? (
-          <span dir="ltr" className="ms-auto font-mono text-xs text-muted">
+          <span
+            dir="ltr"
+            data-testid="waveform.hover.time"
+            className="ms-auto font-mono text-xs text-muted"
+          >
             {formatS(cursorTime)}
           </span>
         ) : null}
@@ -286,7 +293,7 @@ export function WaveformView() {
       <figure className="flex flex-col gap-1">
         <figcaption className="flex items-baseline justify-between gap-2 text-sm text-muted">
           <span>{t("waveform.detail")}</span>
-          <span dir="ltr" className="font-mono text-xs">
+          <span dir="ltr" data-testid="waveform.range.value" className="font-mono text-xs">
             {formatS(detailRange.startSample / original.sampleRateHz)} –{" "}
             {formatS(detailRange.endSample / original.sampleRateHz)}
           </span>
@@ -306,7 +313,7 @@ export function WaveformView() {
         />
       </figure>
 
-      <p dir="ltr" className="font-mono text-xs text-muted">
+      <p dir="ltr" data-testid="waveform.selection.value" className="font-mono text-xs text-muted">
         {t("waveform.selectionReadout", {
           start: formatS(selectionStartSeconds),
           end: formatS(selectionEndSeconds),

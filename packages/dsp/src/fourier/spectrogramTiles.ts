@@ -8,11 +8,14 @@
  * Formula (N = payload length, L = windowLengthSamples, H = hopLengthSamples,
  * F = L, C = floor(F/2) + 1):
  *   frame m (global) starts at m*H; local start = m*H - sourceStartSample
+ *   sampled frames are m = rowStart + r*frameStride (r = 0..rowCount-1)
  *   y_m[n] = x[localStart + n] * w[n], zero outside the payload
  *   X_m = rfft(y_m), bin k = 0..C-1, FFT length F (unnormalized)
- *   dB_m[k] = max(20*log10(max(|X_m[k]|, 1e-12)), dbFloorDb)
- * Rows are frame-major: rows[m*C + k]. The peak reference is fixed at 1, so
- * 0 dB is a full-scale sinusoid peak of one (documented in the UI).
+ *   A_m[k] = |X_m[k]| * s_k / sum(w), s_k = 1 at DC/Nyquist, 2 otherwise
+ *   dB_m[k] = max(20*log10(max(A_m[k], 1e-12)), dbFloorDb)
+ * Rows are frame-major: rows[m*C + k]. The window's coherent gain is removed
+ * and the one-sided amplitude is restored, so 0 dB is a full-scale sinusoid
+ * at any window family/length (documented in the UI).
  *
  * Reference: Oppenheim & Schafer, "Discrete-Time Signal Processing", 3rd ed.,
  * sections 10.3-10.4; Harris, "On the use of windows for harmonic analysis
@@ -22,7 +25,8 @@
  * Per-frame temporaries are O(F). No module-level cache.
  *
  * Edge cases: windowLengthSamples must be an integer >= 2; rowStart >= 0,
- * rowCount >= 0; hopFraction in (0, 1]; sampleRateHz, dbFloorDb finite;
+ * rowCount >= 0; frameStride an integer >= 1; hopFraction in (0, 1];
+ * sampleRateHz, dbFloorDb finite;
  * sourceStartSample must equal rowStart*H (otherwise the slice and frame
  * indexes disagree -> RangeError). A negative local start -> RangeError.
  * Frames that run past the payload are zero-padded. Silent spectra clamp to
@@ -30,7 +34,7 @@
  */
 
 import { rfft } from "./rfft.js";
-import { kaiser, window, type WindowKind } from "./windows.js";
+import { kaiser, type WindowKind, window } from "./windows.js";
 
 export type SpectrogramWindowFamily = WindowKind | "kaiser";
 
@@ -44,6 +48,8 @@ export interface SpectrogramTilesParams {
   /** First global frame index in this chunk. */
   rowStart: number;
   rowCount: number;
+  /** Analyse every `frameStride`-th frame (column decimation, default 1). */
+  frameStride?: number;
   /** Global source index of the payload's first sample. */
   sourceStartSample: number;
 }
@@ -53,6 +59,7 @@ export interface SpectrogramTilesResult {
   rows: Float32Array;
   rowStart: number;
   rowCount: number;
+  frameStride: number;
   columnCount: number;
   frameLengthSamples: number;
   hopLengthSamples: number;
@@ -83,16 +90,31 @@ function validate(params: SpectrogramTilesParams): void {
     );
   }
   if (!Number.isFinite(params.hopFraction) || params.hopFraction <= 0 || params.hopFraction > 1) {
-    throw new RangeError(`spectrogramTiles: hopFraction must be in (0, 1] (got ${params.hopFraction})`);
+    throw new RangeError(
+      `spectrogramTiles: hopFraction must be in (0, 1] (got ${params.hopFraction})`,
+    );
   }
   if (!Number.isFinite(params.dbFloorDb) || params.dbFloorDb > 0) {
-    throw new RangeError(`spectrogramTiles: dbFloorDb must be finite and <= 0 (got ${params.dbFloorDb})`);
+    throw new RangeError(
+      `spectrogramTiles: dbFloorDb must be finite and <= 0 (got ${params.dbFloorDb})`,
+    );
   }
   if (!Number.isInteger(params.rowStart) || params.rowStart < 0) {
-    throw new RangeError(`spectrogramTiles: rowStart must be an integer >= 0 (got ${params.rowStart})`);
+    throw new RangeError(
+      `spectrogramTiles: rowStart must be an integer >= 0 (got ${params.rowStart})`,
+    );
   }
   if (!Number.isInteger(params.rowCount) || params.rowCount < 0) {
-    throw new RangeError(`spectrogramTiles: rowCount must be an integer >= 0 (got ${params.rowCount})`);
+    throw new RangeError(
+      `spectrogramTiles: rowCount must be an integer >= 0 (got ${params.rowCount})`,
+    );
+  }
+  if (params.frameStride !== undefined) {
+    if (!Number.isInteger(params.frameStride) || params.frameStride < 1) {
+      throw new RangeError(
+        `spectrogramTiles: frameStride must be an integer >= 1 (got ${params.frameStride})`,
+      );
+    }
   }
   if (!Number.isInteger(params.sourceStartSample) || params.sourceStartSample < 0) {
     throw new RangeError(
@@ -108,6 +130,7 @@ export function spectrogramTiles(
   validate(params);
   const windowLengthSamples = params.windowLengthSamples;
   const hopLengthSamples = Math.max(1, Math.round(windowLengthSamples * params.hopFraction));
+  const frameStride = params.frameStride ?? 1;
   const columnCount = Math.floor(windowLengthSamples / 2) + 1;
   if (params.sourceStartSample !== params.rowStart * hopLengthSamples) {
     throw new RangeError(
@@ -118,11 +141,19 @@ export function spectrogramTiles(
     params.windowFamily === "kaiser"
       ? kaiser(windowLengthSamples, 8.6)
       : window(params.windowFamily, windowLengthSamples);
+  let coherentGain = 0;
+  for (const weight of analysisWindow) {
+    coherentGain += weight;
+  }
+  if (!(coherentGain > 0) || !Number.isFinite(coherentGain)) {
+    throw new RangeError("spectrogramTiles: analysis window has zero coherent gain");
+  }
+  const nyquistColumn = columnCount - 1;
   const rows = new Float32Array(params.rowCount * columnCount);
   const frame = new Float64Array(windowLengthSamples);
 
   for (let row = 0; row < params.rowCount; row += 1) {
-    const localStart = row * hopLengthSamples;
+    const localStart = row * frameStride * hopLengthSamples;
     if (localStart < 0) {
       throw new RangeError(`spectrogramTiles: negative frame start ${localStart}`);
     }
@@ -150,8 +181,9 @@ export function spectrogramTiles(
       if (re === undefined || im === undefined) {
         throw new TypeError(`spectrogramTiles: bin ${column} read out of bounds`);
       }
-      const magnitude = Math.sqrt(re * re + im * im);
-      const db = 20 * Math.log10(Math.max(magnitude, 1e-12));
+      const oneSidedScale = column === 0 || column === nyquistColumn ? 1 : 2;
+      const amplitude = (Math.sqrt(re * re + im * im) * oneSidedScale) / coherentGain;
+      const db = 20 * Math.log10(Math.max(amplitude, 1e-12));
       rows[rowOffset + column] = Math.max(params.dbFloorDb, db);
     }
   }
@@ -160,6 +192,7 @@ export function spectrogramTiles(
     rows,
     rowStart: params.rowStart,
     rowCount: params.rowCount,
+    frameStride,
     columnCount,
     frameLengthSamples: windowLengthSamples,
     hopLengthSamples,

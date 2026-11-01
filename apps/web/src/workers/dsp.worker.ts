@@ -29,6 +29,7 @@ import {
   type DspOpResult,
   dspOps,
   sessionPing,
+  spectrogramTiles,
   waveformOverview,
   waveformRange,
 } from "../session/ops";
@@ -52,6 +53,7 @@ type DspOpHandlers = {
 
 const dspHandlers = {
   sessionPing,
+  spectrogramTiles,
   waveformOverview,
   waveformRange,
 } satisfies DspOpHandlers;
@@ -131,6 +133,10 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
       }
       case "waveformRange": {
         const result = dspHandlers.waveformRange(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "spectrogramTiles": {
+        const result = dspHandlers.spectrogramTiles(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       default: {

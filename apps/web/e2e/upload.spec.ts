@@ -126,12 +126,10 @@ test("Persian (default): uploading through the ingest lane loads the session sou
     buffer: tinyWav(),
   });
 
-  // Success: the store holds a source, so the empty state yields to the stub
-  // body (a later task paints the real waveform) and no failure readout shows.
+  // Success: the store holds a source, so the empty state yields to the
+  // waveform tool and no failure readout shows.
   await expect(page.getByTestId("input.upload.dropzone")).toHaveCount(0);
-  await expect(
-    page.getByText("این ابزار در ادامهٔ همین موج پیاده\u200cسازی می\u200cشود."),
-  ).toBeVisible();
+  await expect(page.getByTestId("waveform.detail.canvas")).toBeVisible();
   await expect(page.getByTestId("input.upload.error")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
@@ -195,7 +193,7 @@ test("English (persisted preference): the same upload path loads the source", as
   });
 
   await expect(page.getByTestId("input.upload.dropzone")).toHaveCount(0);
-  await expect(page.getByText("This tool lands later this wave.")).toBeVisible();
+  await expect(page.getByTestId("waveform.detail.canvas")).toBeVisible();
   await expect(page.getByTestId("input.upload.error")).toHaveCount(0);
   expect(errors).toEqual([]);
 });

@@ -12,6 +12,7 @@ import {
   type DspOpResult,
   dspOps,
   sessionPing,
+  spectrogramTiles,
   waveformOverview,
   waveformRange,
 } from "./ops";
@@ -156,10 +157,13 @@ describe("op table wiring", () => {
     expect(dspOps.sessionPing.handler).toBe(sessionPing);
     expect(dspOps.waveformOverview.handler).toBe(waveformOverview);
     expect(dspOps.waveformRange.handler).toBe(waveformRange);
+    expect(dspOps.spectrogramTiles.handler).toBe(spectrogramTiles);
   });
 
   it("derives typed params/results from the table (the add-one-entry lens)", () => {
-    expectTypeOf<DspOpName>().toEqualTypeOf<"sessionPing" | "waveformOverview" | "waveformRange">();
+    expectTypeOf<DspOpName>().toEqualTypeOf<
+      "sessionPing" | "spectrogramTiles" | "waveformOverview" | "waveformRange"
+    >();
     expectTypeOf<DspOpParams<"sessionPing">>().toEqualTypeOf<{ count: number }>();
     expectTypeOf<DspOpResult<"sessionPing">>().toEqualTypeOf<{
       meta: { received: true };
@@ -186,6 +190,31 @@ describe("op table wiring", () => {
         bucketCount: number;
         startSample: number;
         endSample: number;
+      };
+      payload?: TransferablePayload;
+    }>();
+    expectTypeOf<DspOpParams<"spectrogramTiles">>().toEqualTypeOf<{
+      sampleRateHz: number;
+      windowFamily: "rect" | "hann" | "hamming" | "blackman" | "kaiser";
+      windowLengthSamples: number;
+      hopFraction: number;
+      dbFloorDb: number;
+      rowStart: number;
+      rowCount: number;
+      frameStride?: number;
+      sourceStartSample: number;
+    }>();
+    expectTypeOf<DspOpResult<"spectrogramTiles">>().toEqualTypeOf<{
+      meta: {
+        rowStart: number;
+        rowCount: number;
+        frameStride: number;
+        columnCount: number;
+        hopLengthSamples: number;
+        fftLengthSamples: number;
+        sampleRateHz: number;
+        dbFloorDb: number;
+        sourceStartSample: number;
       };
       payload?: TransferablePayload;
     }>();

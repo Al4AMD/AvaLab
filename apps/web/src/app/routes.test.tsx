@@ -59,7 +59,7 @@ it("renders each /tools/* stub page through the data router with its i18n title"
     },
     "/tools/spectrogram": {
       title: i18n.t("tool.spectrogram.title"),
-      body: i18n.t("tool.spectrogram.stub"),
+      body: i18n.t("input.empty.hint"),
     },
     "/tools/fftview": { title: i18n.t("tool.fftview.title"), body: i18n.t("tool.fftview.stub") },
     "/tools/generator": {

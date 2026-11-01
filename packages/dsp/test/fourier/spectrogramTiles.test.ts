@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { spectrogramTiles, type SpectrogramTilesParams } from "../../src/fourier/spectrogramTiles.js";
+import {
+  type SpectrogramTilesParams,
+  spectrogramTiles,
+} from "../../src/fourier/spectrogramTiles.js";
 
 function sine(frequencyHz: number, sampleRateHz: number, length: number): Float64Array {
   const values = new Float64Array(length);
@@ -38,7 +41,18 @@ describe("spectrogramTiles", () => {
       }
     }
     expect(dominant).toBe(32);
-    expect(dominantDb).toBeCloseTo(20 * Math.log10(128), 1);
+    expect(dominantDb).toBeCloseTo(0, 1);
+  });
+
+  it("uses 0 dB for a full-scale tone and −6.02 dB for half scale", () => {
+    const full = spectrogramTiles(sine(128, 1024, 1024), BASE);
+    const half = spectrogramTiles(
+      Float64Array.from(sine(128, 1024, 1024), (value) => value * 0.5),
+      BASE,
+    );
+    const peak = (rows: Float32Array): number => Math.max(...rows);
+    expect(peak(full.rows)).toBeCloseTo(0, 1);
+    expect(peak(half.rows)).toBeCloseTo(-6.0206, 1);
   });
 
   it("clamps silence to the dB floor", () => {
@@ -65,6 +79,30 @@ describe("spectrogramTiles", () => {
     }
   });
 
+  it("frameStride analyses every stride-th frame and reports it", () => {
+    const samples = sine(64, 1024, 2048);
+    const full = spectrogramTiles(samples, { ...BASE, rowCount: 8 });
+    const strided = spectrogramTiles(samples, { ...BASE, rowCount: 4, frameStride: 2 });
+    expect(strided.frameStride).toBe(2);
+    for (let row = 0; row < 4; row += 1) {
+      for (let column = 0; column < strided.columnCount; column += 1) {
+        expect(strided.rows[row * strided.columnCount + column]).toBeCloseTo(
+          full.rows[row * 2 * full.columnCount + column] ?? Number.NaN,
+          5,
+        );
+      }
+    }
+  });
+
+  it("rejects a non-integer or sub-1 frameStride", () => {
+    expect(() => spectrogramTiles(new Float64Array(512), { ...BASE, frameStride: 0 })).toThrowError(
+      /frameStride/,
+    );
+    expect(() =>
+      spectrogramTiles(new Float64Array(512), { ...BASE, frameStride: 1.5 }),
+    ).toThrowError(/frameStride/);
+  });
+
   it("rejects a slice that starts after the first requested frame", () => {
     expect(() =>
       spectrogramTiles(new Float64Array(512), { ...BASE, sourceStartSample: 1 }),
@@ -73,10 +111,10 @@ describe("spectrogramTiles", () => {
 
   it("rejects a window family outside the supported union", () => {
     expect(() =>
-      spectrogramTiles(
-        new Float64Array(512),
-        { ...BASE, windowFamily: "triangle" as unknown as SpectrogramTilesParams["windowFamily"] },
-      ),
+      spectrogramTiles(new Float64Array(512), {
+        ...BASE,
+        windowFamily: "triangle" as unknown as SpectrogramTilesParams["windowFamily"],
+      }),
     ).toThrowError(/windowFamily/);
   });
 });
