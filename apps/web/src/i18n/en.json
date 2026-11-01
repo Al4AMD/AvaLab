@@ -25,7 +25,8 @@
     "sampling": "Sampling and bit depth",
     "extent": "Signal extent",
     "reverb": "Reverb",
-    "spectrumEdit": "Spectrum editor"
+    "spectrumEdit": "Spectrum editor",
+    "codecLab": "Compression lab"
   },
   "input": {
     "empty": {
@@ -120,6 +121,91 @@
     },
     "spectrumEdit": {
       "title": "Spectrum editor"
+    },
+    "codecLab": {
+      "title": "Compression lab"
+    }
+  },
+  "codecLab": {
+    "excerpt": {
+      "start": "Excerpt start (s)",
+      "end": "Excerpt end (s)",
+      "useSelection": "Use selection",
+      "range": "Range {{start}} – {{end}}",
+      "capNotice": "Each run is capped at 30 s; shorten the excerpt to process the whole file in pieces."
+    },
+    "codec": {
+      "label": "Codec",
+      "rle": "RLE (run-length)",
+      "huffman": "Canonical Huffman",
+      "deltaHuffman": "First-order predictor + Huffman",
+      "mulaw": "μ-law (G.711)",
+      "alaw": "A-law (G.711)",
+      "mdct": "MDCT (transform codec)"
+    },
+    "bitrate": {
+      "label": "MDCT bitrate",
+      "option": "{{kbps}} kbps"
+    },
+    "encode": "Encode",
+    "running": "Encoding…",
+    "play": "Play decoded result",
+    "stale": "Settings changed; encode again for a fresh result.",
+    "status": {
+      "idle": "Pick a codec and excerpt, then press Encode."
+    },
+    "error": {
+      "failed": "Encoding failed. Try a shorter excerpt or another codec.",
+      "playback": "The result could not be installed for playback (length or sample rate over the cap)."
+    },
+    "stats": {
+      "title": "Compression statistics",
+      "originalBytes": "Original size",
+      "compressedBytes": "Compressed size",
+      "ratio": "Compression ratio",
+      "bitsPerSample": "Bits per sample",
+      "bitrate": "Bitrate",
+      "entropy": "Entropy",
+      "encodeMs": "Encode time",
+      "decodeMs": "Decode time",
+      "bitExact": "Bit-exact",
+      "yes": "Yes ✓",
+      "no": "No",
+      "snr": "SNR",
+      "segmentalSnr": "Segmental SNR",
+      "psnr": "PSNR",
+      "mse": "MSE",
+      "psnrNote": "PSNR uses peak = 1.0 (full scale); ∞ means the reconstruction is identical."
+    },
+    "mdct": {
+      "title": "MDCT details",
+      "sparsity": "Coefficient sparsity",
+      "frames": "Frame count",
+      "totalBits": "Total bits"
+    },
+    "histogram": {
+      "title": "PCM byte histogram (256 bins)",
+      "aria": "256-bin histogram of PCM byte values"
+    },
+    "codeLengths": {
+      "title": "Huffman code lengths (present symbols only)",
+      "symbol": "Symbol",
+      "length": "Length (bits)"
+    },
+    "theory": {
+      "title": "Theory and what to observe",
+      "rle": "RLE replaces runs of equal bytes with (count, value); it gains little on ordinary audio.",
+      "huffman": "Canonical Huffman gives frequent symbols short codes and derives code lengths from the histogram; nothing is lost.",
+      "delta": "The first-order predictor codes differences between adjacent samples; the smaller range makes Huffman more compact.",
+      "companding": "μ-law and A-law (G.711) compress amplitude logarithmically; 8 bits sound acceptable but are not bit-exact.",
+      "mdct": "A windowed MDCT with TDAC turns the signal into coefficients; uniform quantization under a bit budget produces playback-friendly error.",
+      "observe": {
+        "title": "What to observe",
+        "lossless": "RLE, Huffman and delta+Huffman must show “bit-exact ✓”; μ-law, A-law and MDCT must not.",
+        "entropy": "Compare the lossless size with entropy; the coder approaches the theoretical bound.",
+        "bitrate": "In MDCT, sweep the bitrate and watch SNR/PSNR against bitrate.",
+        "sparsity": "MDCT coefficient sparsity shows how much quantization zeroes out."
+      }
     }
   },
   "spectrumEdit": {

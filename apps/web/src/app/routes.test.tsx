@@ -89,6 +89,10 @@ it("renders each /tools/* stub page through the data router with its i18n title"
       title: i18n.t("tool.spectrumEdit.title"),
       body: i18n.t("input.empty.hint"),
     },
+    "/tools/codec-lab": {
+      title: i18n.t("tool.codecLab.title"),
+      body: i18n.t("input.empty.hint"),
+    },
   };
 
   for (const [path, expectedBody] of Object.entries(expected)) {

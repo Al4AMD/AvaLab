@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { createBrowserRouter, type RouteObject, redirect } from "react-router";
+import { CodecLabView } from "../features/codecLab/codecLabView";
 import { ExtentView } from "../features/extent/extentView";
 import { FftView } from "../features/fftview/fftView";
 import { GeneratorView } from "../features/generator/generatorView";
@@ -22,6 +23,7 @@ export const TOOL_IDS = [
   "extent",
   "reverb",
   "spectrum-edit",
+  "codec-lab",
 ] as const;
 export type ToolId = (typeof TOOL_IDS)[number];
 
@@ -84,6 +86,7 @@ export const appRoutes: RouteObject[] = [
       { path: "tools/extent", element: <ExtentView /> },
       { path: "tools/reverb", element: <ReverbView /> },
       { path: "tools/spectrum-edit", element: <SpectrumEditView /> },
+      { path: "tools/codec-lab", element: <CodecLabView /> },
     ],
   },
 ];
