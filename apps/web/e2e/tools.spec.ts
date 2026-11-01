@@ -66,6 +66,12 @@ const TOOLS: ToolSpec[] = [
     label: /(پژواک|Reverb)/,
     title: /(پژواک|Reverb)/,
   },
+  {
+    path: "/tools/spectrum-edit",
+    url: /\/tools\/spectrum-edit$/,
+    label: /(ویرایشگر طیف|Spectrum editor)/,
+    title: /(ویرایشگر طیف|Spectrum editor)/,
+  },
 ];
 
 function watchForErrors(page: Page): string[] {
@@ -92,7 +98,7 @@ async function expectWaveformEmptyState(page: Page): Promise<void> {
   await expect(page.getByTestId("input.upload.button")).toBeVisible();
 }
 
-test("Persian (default): / redirects to the waveform tool and the sidebar reaches all eight routes", async ({
+test("Persian (default): / redirects to the waveform tool and the sidebar reaches all nine routes", async ({
   page,
 }) => {
   const errors = watchForErrors(page);
@@ -113,7 +119,7 @@ test("Persian (default): / redirects to the waveform tool and the sidebar reache
   expect(errors).toEqual([]);
 });
 
-test("English (persisted preference): the same eight routes with zero console errors", async ({
+test("English (persisted preference): the same nine routes with zero console errors", async ({
   page,
 }) => {
   const errors = watchForErrors(page);

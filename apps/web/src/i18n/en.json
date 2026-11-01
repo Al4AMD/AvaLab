@@ -24,7 +24,8 @@
     "speed": "Speed and direction",
     "sampling": "Sampling and bit depth",
     "extent": "Signal extent",
-    "reverb": "Reverb"
+    "reverb": "Reverb",
+    "spectrumEdit": "Spectrum editor"
   },
   "input": {
     "empty": {
@@ -116,6 +117,85 @@
     },
     "reverb": {
       "title": "Reverb"
+    },
+    "spectrumEdit": {
+      "title": "Spectrum editor"
+    }
+  },
+  "spectrumEdit": {
+    "controls": {
+      "bandStart": "Band start (Hz)",
+      "bandEnd": "Band end (Hz)",
+      "target": "Component",
+      "mode": "Operation",
+      "value": "Value",
+      "add": "Add edit",
+      "remove": "Remove",
+      "clear": "Clear edits",
+      "hermitian": "Enforce Hermitian symmetry",
+      "edits": "Edit list"
+    },
+    "target": {
+      "re": "Real part (Re)",
+      "im": "Imaginary part (Im)",
+      "mag": "Magnitude",
+      "phase": "Phase"
+    },
+    "mode": {
+      "zero": "Zero",
+      "scale": "Scale",
+      "set": "Set"
+    },
+    "preset": {
+      "title": "Presets",
+      "zeroIm": "Zero Im",
+      "zeroRe": "Zero Re",
+      "zeroPhase": "Zero phase",
+      "linearPhase": "Linear phase",
+      "randomPhase": "Random phase",
+      "magnitudeOnly": "Magnitude only",
+      "phaseOnly": "Phase only"
+    },
+    "chart": {
+      "re": "Real part",
+      "im": "Imaginary part",
+      "magnitude": "Magnitude",
+      "phase": "Phase"
+    },
+    "meta": {
+      "sampleCount": "Samples",
+      "fftLength": "FFT length",
+      "binWidth": "Bin width",
+      "imaginaryRatio": "Imaginary energy ratio"
+    },
+    "range": {
+      "pattern": "Analysis range {{start}} – {{end}}",
+      "hint": "With no selection, the first 65,536 samples are analyzed."
+    },
+    "status": {
+      "computing": "Computing in the worker…",
+      "empty": "No result yet."
+    },
+    "warning": {
+      "hermitianOff": "Hermitian symmetry is off, so the output is complex; only its real part is played."
+    },
+    "cap": {
+      "notice": "The selection is longer than 65,536 samples; only the first 65,536 are analyzed."
+    },
+    "error": {
+      "failed": "The spectrum edit failed."
+    },
+    "edits": {
+      "empty": "No edits added yet.",
+      "item": "[{{start}}, {{end}}) {{target}} {{mode}} {{value}}"
+    },
+    "play": "Play edited result",
+    "observe": {
+      "title": "What to observe",
+      "magnitude": "Editing magnitude keeps phase; zeroing magnitude zeros Re and Im together.",
+      "phase": "Editing phase keeps magnitude; zeroing phase sets it to zero.",
+      "hermitian": "With Hermitian symmetry on, the output stays real; turning it off shows why the symmetry is needed.",
+      "gibbs": "Zeroing a whole band produces Gibbs ringing in the output; sharp truncation causes it."
     }
   },
   "fftview": {

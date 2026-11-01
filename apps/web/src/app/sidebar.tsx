@@ -63,6 +63,11 @@ export function Sidebar() {
             {t("nav.reverb")}
           </NavLink>
         </li>
+        <li>
+          <NavLink to="/tools/spectrum-edit" className={linkClass}>
+            {t("nav.spectrumEdit")}
+          </NavLink>
+        </li>
       </ul>
     </nav>
   );

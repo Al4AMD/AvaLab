@@ -6,6 +6,7 @@ import { GeneratorView } from "../features/generator/generatorView";
 import { ReverbView } from "../features/reverb/reverbView";
 import { SamplingView } from "../features/sampling/samplingView";
 import { SpectrogramView } from "../features/spectrogram/spectrogramView";
+import { SpectrumEditView } from "../features/spectrumEdit/spectrumEditView";
 import { SpeedView } from "../features/speed/speedView";
 import { WaveformView } from "../features/waveform/waveformView";
 import { useSessionStore } from "../session/store";
@@ -20,6 +21,7 @@ export const TOOL_IDS = [
   "sampling",
   "extent",
   "reverb",
+  "spectrum-edit",
 ] as const;
 export type ToolId = (typeof TOOL_IDS)[number];
 
@@ -81,6 +83,7 @@ export const appRoutes: RouteObject[] = [
       { path: "tools/sampling", element: <SamplingView /> },
       { path: "tools/extent", element: <ExtentView /> },
       { path: "tools/reverb", element: <ReverbView /> },
+      { path: "tools/spectrum-edit", element: <SpectrumEditView /> },
     ],
   },
 ];

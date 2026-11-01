@@ -22,11 +22,11 @@ import {
   type ReverbProcessParams,
   reverbProcess,
   type SamplingProcessParams,
+  type SpectrumEditParams,
   samplingProcess,
   sessionPing,
-  type SpectrumEditParams,
-  spectrumEdit,
   spectrogramTiles,
+  spectrumEdit,
   speedTransform,
   waveformOverview,
   waveformRange,
@@ -791,9 +791,7 @@ describe("spectrumEdit handler", () => {
 
   it("packs samples and the four one-sided spectra at fixed offsets", () => {
     const input = [0.25, -0.5, 1, 0, -1.5, 0.75, 0.125, -0.25];
-    const result = run(input, [
-      { startBin: 0, endBin: 5, target: "mag", mode: "zero", value: 0 },
-    ]);
+    const result = run(input, [{ startBin: 0, endBin: 5, target: "mag", mode: "zero", value: 0 }]);
     const values = valuesOf(result);
     const { sampleCount, binCount } = result.meta;
     expect(sampleCount).toBe(input.length);
@@ -824,9 +822,7 @@ describe("spectrumEdit handler", () => {
     const input = Array.from({ length: 64 }, (_, index) =>
       Math.cos((2 * Math.PI * 3 * index) / 64),
     );
-    const result = run(input, [
-      { startBin: 0, endBin: 33, target: "im", mode: "zero", value: 0 },
-    ]);
+    const result = run(input, [{ startBin: 0, endBin: 33, target: "im", mode: "zero", value: 0 }]);
     const values = valuesOf(result);
     expect(result.meta.imaginaryEnergyRatio).toBeLessThan(1e-12);
     for (let index = 0; index < input.length; index += 1) {
