@@ -6,6 +6,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
+  aliasDemo,
   DspOpError,
   type DspOpName,
   type DspOpParams,
@@ -13,6 +14,8 @@ import {
   dspOps,
   fftSelection,
   generateSynth,
+  type SamplingProcessParams,
+  samplingProcess,
   sessionPing,
   spectrogramTiles,
   speedTransform,
@@ -276,6 +279,185 @@ describe("speedTransform handler", () => {
   });
 });
 
+describe("samplingProcess handler", () => {
+  const SAMPLE_RATE = 48_000;
+
+  function sinePayload(frequencyHz: number, seconds = 1): TransferablePayload {
+    const sampleCount = Math.round(SAMPLE_RATE * seconds);
+    const values = Array.from({ length: sampleCount }, (_, index) =>
+      Math.sin((2 * Math.PI * frequencyHz * index) / SAMPLE_RATE),
+    );
+    return float32PayloadOf(values);
+  }
+
+  function run(
+    overrides: Partial<SamplingProcessParams> = {},
+    payload: TransferablePayload = sinePayload(440),
+  ) {
+    return samplingProcess(
+      {
+        sampleRateHz: SAMPLE_RATE,
+        startSample: 0,
+        endSample: SAMPLE_RATE,
+        targetRateHz: 8000,
+        antiAlias: false,
+        bits: 16,
+        dither: false,
+        seed: 1,
+        ...overrides,
+      },
+      payload,
+    );
+  }
+
+  function zeroCrossingHz(values: number[], sampleRateHz: number): number {
+    let crossings = 0;
+    for (let index = 1; index < values.length; index += 1) {
+      if ((values[index - 1] ?? 0) < 0 !== (values[index] ?? 0) < 0) {
+        crossings += 1;
+      }
+    }
+    return (crossings * sampleRateHz) / (2 * values.length);
+  }
+
+  function rms(values: number[]): number {
+    let energy = 0;
+    for (const value of values) {
+      energy += value * value;
+    }
+    return Math.sqrt(energy / values.length);
+  }
+
+  it("resamples to 8 kHz and returns quantized + error halves", () => {
+    const result = run();
+    const payload = result.payload;
+    if (payload === undefined) {
+      throw new Error("missing payload");
+    }
+    const values = float32ValuesOf(payload);
+    expect(result.meta.outputSampleCount).toBeGreaterThan(7900);
+    expect(result.meta.outputSampleCount).toBeLessThan(8100);
+    expect(values.length).toBe(2 * result.meta.outputSampleCount);
+    expect(result.meta.sampleRateHz).toBe(8000);
+    expect(result.meta.theorySnrDb).toBeCloseTo(6.02 * 16 + 1.76, 6);
+    const quantized = values.slice(0, result.meta.outputSampleCount);
+    expect(zeroCrossingHz(quantized, 8000)).toBeGreaterThan(420);
+    expect(zeroCrossingHz(quantized, 8000)).toBeLessThan(460);
+  });
+
+  it("shows the 3 kHz fold-back without the filter and removes it with it", () => {
+    const unfiltered = run({ antiAlias: false }, sinePayload(5000));
+    const filtered = run({ antiAlias: true }, sinePayload(5000));
+    const unfilteredPayload = unfiltered.payload;
+    const filteredPayload = filtered.payload;
+    if (unfilteredPayload === undefined || filteredPayload === undefined) {
+      throw new Error("missing payload");
+    }
+    const unfilteredValues = float32ValuesOf(unfilteredPayload);
+    const filteredValues = float32ValuesOf(filteredPayload);
+    const unfilteredQuantized = unfilteredValues.slice(0, unfiltered.meta.outputSampleCount);
+    const filteredQuantized = filteredValues.slice(0, filtered.meta.outputSampleCount);
+    expect(zeroCrossingHz(unfilteredQuantized, 8000)).toBeGreaterThan(2900);
+    expect(zeroCrossingHz(unfilteredQuantized, 8000)).toBeLessThan(3100);
+    expect(rms(unfilteredQuantized)).toBeGreaterThan(0.5);
+    expect(rms(filteredQuantized)).toBeLessThan(0.01);
+  });
+
+  it("measures 16-bit SNR within 3 dB of theory on a full-scale sine", () => {
+    const result = run({ targetRateHz: SAMPLE_RATE, antiAlias: true, bits: 16 });
+    expect(result.meta.snrDb).toBeGreaterThan(result.meta.theorySnrDb - 3);
+    expect(result.meta.snrDb).toBeLessThan(result.meta.theorySnrDb + 3);
+    expect(result.meta.mse).toBeGreaterThan(0);
+    expect(result.meta.psnrDb).toBeGreaterThan(90);
+  });
+
+  it("changes the dither error sequence with the seed", () => {
+    const first = run({ bits: 8, dither: true, seed: 1 });
+    const repeat = run({ bits: 8, dither: true, seed: 1 });
+    const other = run({ bits: 8, dither: true, seed: 2 });
+    if (
+      first.payload === undefined ||
+      repeat.payload === undefined ||
+      other.payload === undefined
+    ) {
+      throw new Error("missing payload");
+    }
+    const errorOf = (payload: TransferablePayload, count: number): number[] =>
+      float32ValuesOf(payload).slice(count);
+    const firstError = errorOf(first.payload, first.meta.outputSampleCount);
+    expect(errorOf(repeat.payload, repeat.meta.outputSampleCount)).toEqual(firstError);
+    expect(errorOf(other.payload, other.meta.outputSampleCount)).not.toEqual(firstError);
+  });
+
+  it("throws badParams for out-of-range bits and invalid rates", () => {
+    const expectBadParams = (act: () => unknown): void => {
+      expect(act).toThrowError(expect.objectContaining({ code: "badParams" }));
+    };
+    expectBadParams(() => run({ bits: 0 }));
+    expectBadParams(() => run({ bits: 25 }));
+    expectBadParams(() => run({ bits: 8.5 }));
+    expectBadParams(() => run({ targetRateHz: 0 }));
+    expectBadParams(() => run({ targetRateHz: 8000.5 }));
+    expectBadParams(() => run({ targetRateHz: 96_001 }));
+    expectBadParams(() => run({ startSample: -1 }));
+    expectBadParams(() => run({ endSample: 10, startSample: 11 }));
+  });
+});
+
+describe("aliasDemo handler", () => {
+  function run(frequencyHz: number, antiAlias: boolean) {
+    return aliasDemo({
+      sourceRateHz: 48_000,
+      targetRateHz: 8000,
+      frequencyHz,
+      durationSeconds: 1,
+      antiAlias,
+    });
+  }
+
+  it("predicts and measures the 3 kHz fold-back without the filter", () => {
+    const result = run(5000, false);
+    const payload = result.payload;
+    if (payload === undefined) {
+      throw new Error("missing payload");
+    }
+    const values = float32ValuesOf(payload);
+    let crossings = 0;
+    for (let index = 1; index < values.length; index += 1) {
+      if ((values[index - 1] ?? 0) < 0 !== (values[index] ?? 0) < 0) {
+        crossings += 1;
+      }
+    }
+    expect(result.meta.aliasFrequencyHz).toBe(3000);
+    expect(result.meta.measuredPeakHz).toBeGreaterThan(2900);
+    expect(result.meta.measuredPeakHz).toBeLessThan(3100);
+    expect(result.meta.outputSampleCount).toBe(values.length);
+    expect((crossings * 8000) / (2 * values.length)).toBeGreaterThan(2900);
+  });
+
+  it("removes the fold-back with the anti-alias filter", () => {
+    const result = run(5000, true);
+    const payload = result.payload;
+    if (payload === undefined) {
+      throw new Error("missing payload");
+    }
+    const values = float32ValuesOf(payload);
+    let energy = 0;
+    for (const value of values) {
+      energy += value * value;
+    }
+    expect(Math.sqrt(energy / values.length)).toBeLessThan(0.01);
+    expect(result.meta.aliasFrequencyHz).toBe(3000);
+  });
+
+  it("keeps a below-Nyquist tone unchanged", () => {
+    const result = run(440, false);
+    expect(result.meta.aliasFrequencyHz).toBe(440);
+    expect(result.meta.measuredPeakHz).toBeGreaterThan(420);
+    expect(result.meta.measuredPeakHz).toBeLessThan(460);
+  });
+});
+
 describe("op table wiring", () => {
   it("carries the handler for dispatch", () => {
     expect(dspOps.sessionPing.handler).toBe(sessionPing);
@@ -286,6 +468,8 @@ describe("op table wiring", () => {
     expect(dspOps.windowProfiles.handler).toBe(windowProfiles);
     expect(dspOps.generateSynth.handler).toBe(generateSynth);
     expect(dspOps.speedTransform.handler).toBe(speedTransform);
+    expect(dspOps.samplingProcess.handler).toBe(samplingProcess);
+    expect(dspOps.aliasDemo.handler).toBe(aliasDemo);
   });
 
   it("derives typed params/results from the table (the add-one-entry lens)", () => {
@@ -298,6 +482,8 @@ describe("op table wiring", () => {
       | "windowProfiles"
       | "generateSynth"
       | "speedTransform"
+      | "samplingProcess"
+      | "aliasDemo"
     >();
     expectTypeOf<DspOpParams<"sessionPing">>().toEqualTypeOf<{ count: number }>();
     expectTypeOf<DspOpResult<"sessionPing">>().toEqualTypeOf<{

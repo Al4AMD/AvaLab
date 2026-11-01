@@ -23,6 +23,7 @@
  * import `@avalab/dsp` (AGENTS §9 — no main-thread DSP).
  */
 import {
+  aliasDemo,
   DspOpError,
   type DspOpName,
   type DspOpParams,
@@ -30,6 +31,7 @@ import {
   dspOps,
   fftSelection,
   generateSynth,
+  samplingProcess,
   sessionPing,
   spectrogramTiles,
   speedTransform,
@@ -56,8 +58,10 @@ type DspOpHandlers = {
 };
 
 const dspHandlers = {
+  aliasDemo,
   fftSelection,
   generateSynth,
+  samplingProcess,
   sessionPing,
   speedTransform,
   spectrogramTiles,
@@ -161,6 +165,14 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
       }
       case "speedTransform": {
         const result = dspHandlers.speedTransform(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "samplingProcess": {
+        const result = dspHandlers.samplingProcess(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "aliasDemo": {
+        const result = dspHandlers.aliasDemo(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       default: {

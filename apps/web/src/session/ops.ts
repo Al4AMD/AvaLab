@@ -24,6 +24,7 @@
  */
 
 import {
+  aliasFrequencyHz,
   computePeakBuckets,
   spectrogramTiles as computeSpectrogramTiles,
   fft,
@@ -39,10 +40,17 @@ import {
   generateWhiteNoise,
   kaiser,
   magnitudeDb,
+  mse,
   pitchShift,
+  psnrDb,
+  quantizationError,
+  quantizeUniform,
+  quantizeWithTpdfDither,
   resampleRational,
   reverse,
   type SpectrogramTilesParams,
+  segmentalSnrDb,
+  snrDb,
   timeStretch,
   unwrapPhase,
   window,
@@ -683,6 +691,198 @@ export function speedTransform(
   };
 }
 
+export type SamplingProcessParams = {
+  sampleRateHz: number;
+  startSample: number;
+  endSample: number;
+  targetRateHz: number;
+  antiAlias: boolean;
+  bits: number;
+  dither: boolean;
+  seed: number;
+};
+
+export type SamplingProcessResult = {
+  meta: {
+    outputSampleCount: number;
+    sampleRateHz: number;
+    mse: number;
+    snrDb: number;
+    segmentalSnrDb: number;
+    psnrDb: number;
+    theorySnrDb: number;
+    capped: boolean;
+  };
+  payload?: TransferablePayload;
+};
+
+/**
+ * F03 sampling + quantization over the request payload (already the selected
+ * source slice). Resamples first, then quantizes the RESAMPLED reference, so
+ * the metrics describe the quantization step alone; the payload is
+ * `[quantized N | error N]` and the view can play either half.
+ *
+ * Metrics: `snrDb`/`segmentalSnrDb`/`psnrDb(peak = 1)` compare the resampled
+ * reference with the quantized output; `theorySnrDb = 6.02·bits + 1.76`
+ * assumes a full-scale sine and is shown only as a labelled reference.
+ */
+export function samplingProcess(
+  params: SamplingProcessParams,
+  payload?: TransferablePayload,
+): SamplingProcessResult {
+  const targetRateHz = params?.targetRateHz;
+  if (
+    params === undefined ||
+    params === null ||
+    !Number.isFinite(params.sampleRateHz) ||
+    params.sampleRateHz <= 0 ||
+    params.sampleRateHz > 96_000 ||
+    !Number.isFinite(targetRateHz) ||
+    targetRateHz <= 0 ||
+    targetRateHz > 96_000 ||
+    (targetRateHz !== params.sampleRateHz && !Number.isInteger(targetRateHz)) ||
+    !Number.isInteger(params.startSample) ||
+    !Number.isInteger(params.endSample) ||
+    params.startSample < 0 ||
+    params.endSample < params.startSample ||
+    !Number.isInteger(params.bits) ||
+    params.bits < 1 ||
+    params.bits > 24 ||
+    typeof params.antiAlias !== "boolean" ||
+    typeof params.dither !== "boolean" ||
+    !Number.isInteger(params.seed)
+  ) {
+    throw new DspOpError("badParams", `samplingProcess: invalid params ${String(params)}`);
+  }
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "samplingProcess: a Float32 source payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError("badPayload", "samplingProcess: payload must be Float32-aligned");
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  if (samples.length === 0) {
+    throw new DspOpError("badParams", "samplingProcess: the selection is empty");
+  }
+
+  const input = Float64Array.from(samples);
+  const reference = resampleRational(input, {
+    inputRateHz: params.sampleRateHz,
+    outputRateHz: targetRateHz,
+    filter: params.antiAlias ? "kaiserSinc" : "none",
+  });
+  const quantized = params.dither
+    ? quantizeWithTpdfDither(reference, { bits: params.bits, seed: params.seed })
+    : quantizeUniform(reference, { bits: params.bits });
+  const error = quantizationError(reference, quantized);
+  const sampleCount = quantized.length;
+  const combined = new Float32Array(sampleCount * 2);
+  combined.set(Float32Array.from(quantized), 0);
+  combined.set(Float32Array.from(error), sampleCount);
+  return {
+    meta: {
+      outputSampleCount: sampleCount,
+      sampleRateHz: targetRateHz,
+      mse: mse(reference, quantized),
+      snrDb: snrDb(reference, quantized),
+      segmentalSnrDb: segmentalSnrDb(reference, quantized, { frameLengthSamples: 1024 }),
+      psnrDb: psnrDb(reference, quantized, { peak: 1 }),
+      theorySnrDb: 6.02 * params.bits + 1.76,
+      capped: false,
+    },
+    payload: { buffer: combined.buffer, byteOffset: 0, byteLength: combined.byteLength },
+  };
+}
+
+export type AliasDemoParams = {
+  sourceRateHz: number;
+  targetRateHz: number;
+  frequencyHz: number;
+  durationSeconds: number;
+  antiAlias: boolean;
+};
+
+export type AliasDemoResult = {
+  meta: {
+    aliasFrequencyHz: number;
+    measuredPeakHz: number;
+    outputSampleCount: number;
+  };
+  payload?: TransferablePayload;
+};
+
+/** Dominant one-sided FFT bin of a real signal, in Hz. */
+function dominantFrequencyHz(values: Float64Array, sampleRateHz: number): number {
+  if (values.length === 0) {
+    return 0;
+  }
+  const spectrum = fft(values);
+  const lastBin = Math.floor(values.length / 2);
+  let bestBin = 0;
+  let bestMagnitude = -1;
+  for (let bin = 0; bin <= lastBin; bin += 1) {
+    const re = spectrum.re[bin] ?? 0;
+    const im = spectrum.im[bin] ?? 0;
+    const magnitude = Math.hypot(re, im);
+    if (magnitude > bestMagnitude) {
+      bestMagnitude = magnitude;
+      bestBin = bin;
+    }
+  }
+  return (bestBin * sampleRateHz) / values.length;
+}
+
+/**
+ * Source-free F03 aliasing demo: generate a sine at `sourceRateHz`, resample
+ * it to `targetRateHz` with or without the anti-alias filter, then measure
+ * the dominant output bin. The predicted fold-back comes from
+ * `aliasFrequencyHz`; the measured value shows what actually came out.
+ */
+export function aliasDemo(
+  params: AliasDemoParams,
+  _payload?: TransferablePayload,
+): AliasDemoResult {
+  if (
+    params === undefined ||
+    params === null ||
+    !Number.isFinite(params.sourceRateHz) ||
+    params.sourceRateHz <= 0 ||
+    params.sourceRateHz > 96_000 ||
+    !Number.isInteger(params.sourceRateHz) ||
+    !Number.isFinite(params.targetRateHz) ||
+    params.targetRateHz <= 0 ||
+    params.targetRateHz > 96_000 ||
+    !Number.isInteger(params.targetRateHz) ||
+    !Number.isFinite(params.frequencyHz) ||
+    !Number.isFinite(params.durationSeconds) ||
+    params.durationSeconds <= 0 ||
+    params.durationSeconds > 300 ||
+    typeof params.antiAlias !== "boolean"
+  ) {
+    throw new DspOpError("badParams", `aliasDemo: invalid params ${String(params)}`);
+  }
+  const source = generateSine({
+    sampleRateHz: params.sourceRateHz,
+    durationSeconds: params.durationSeconds,
+    amplitude: 1,
+    frequencyHz: params.frequencyHz,
+  });
+  const output = resampleRational(source, {
+    inputRateHz: params.sourceRateHz,
+    outputRateHz: params.targetRateHz,
+    filter: params.antiAlias ? "kaiserSinc" : "none",
+  });
+  const samples = Float32Array.from(output);
+  return {
+    meta: {
+      aliasFrequencyHz: aliasFrequencyHz(params.frequencyHz, params.targetRateHz),
+      measuredPeakHz: dominantFrequencyHz(output, params.targetRateHz),
+      outputSampleCount: samples.length,
+    },
+    payload: { buffer: samples.buffer, byteOffset: 0, byteLength: samples.byteLength },
+  };
+}
+
 export type GenerateSynthParams = {
   waveform: SynthWaveform;
   sampleRateHz: number;
@@ -902,6 +1102,35 @@ export const dspOps = {
     },
     result: undefined as unknown as SpeedTransformResult,
     handler: speedTransform,
+  },
+  samplingProcess: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: {
+      sampleRateHz: 0,
+      startSample: 0,
+      endSample: 0,
+      targetRateHz: 0,
+      antiAlias: true,
+      bits: 16,
+      dither: false,
+      seed: 1,
+    },
+    result: undefined as unknown as SamplingProcessResult,
+    handler: samplingProcess,
+  },
+  aliasDemo: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: {
+      sourceRateHz: 0,
+      targetRateHz: 0,
+      frequencyHz: 0,
+      durationSeconds: 0,
+      antiAlias: false,
+    },
+    result: undefined as unknown as AliasDemoResult,
+    handler: aliasDemo,
   },
   spectrogramTiles: {
     // Type lenses only — the table is read for types (DspOpParams/Result);
