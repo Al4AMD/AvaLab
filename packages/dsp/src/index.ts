@@ -36,6 +36,14 @@ export type {
   MdctCodecStats,
 } from "./codecs/mdctCodec.js";
 export { decodeMdct, encodeMdct } from "./codecs/mdctCodec.js";
+export type { WavPcm16Options } from "./codecs/pcmWav.js";
+export {
+  bytesToInt16Pcm,
+  encodeWavPcm16,
+  floatToInt16Pcm,
+  int16PcmToBytes,
+  int16PcmToFloat,
+} from "./codecs/pcmWav.js";
 export { rleDecode, rleEncode } from "./codecs/rle.js";
 export type {
   FreqzOptions,
