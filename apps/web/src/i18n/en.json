@@ -21,7 +21,8 @@
     "spectrogram": "Spectrogram",
     "fftview": "FFT View",
     "generator": "Generator",
-    "speed": "Speed and direction"
+    "speed": "Speed and direction",
+    "sampling": "Sampling and bit depth"
   },
   "input": {
     "empty": {
@@ -104,6 +105,9 @@
     },
     "speed": {
       "title": "Speed and direction"
+    },
+    "sampling": {
+      "title": "Sampling and bit depth"
     }
   },
   "fftview": {
@@ -327,6 +331,70 @@
       "resample": "Resample mode changes speed and pitch together; watch the spectrogram shift vertically.",
       "timeStretch": "Time-stretch changes duration while the harmonic peaks stay put; the phase vocoder may smear transients.",
       "reverse": "Reverse plays the result backwards; the magnitude spectrum is unchanged, the phase is not."
+    }
+  },
+  "sampling": {
+    "alias": {
+      "title": "Aliasing demo (no file needed)",
+      "description": "A sine is sampled at 48 kHz, then resampled to the target rate. With the anti-alias filter off, energy above the new Nyquist folds back to a lower frequency.",
+      "targetRate": "Target rate",
+      "frequency": "Input frequency",
+      "predicted": "Predicted alias",
+      "measured": "Measured peak",
+      "waveformAria": "Aliased sine waveform",
+      "play": "Play aliased result"
+    },
+    "controls": {
+      "targetRate": "Target sampling rate",
+      "custom": "Custom…",
+      "customRate": "Custom rate (Hz)",
+      "bits": "Bit depth",
+      "antiAlias": "Anti-alias filter",
+      "dither": "TPDF dither"
+    },
+    "error": {
+      "failed": "The sampling process failed. Try a shorter range or another rate."
+    },
+    "status": {
+      "computing": "Computing in the worker…",
+      "idle": "Adjust a control to process the preview."
+    },
+    "range": {
+      "pattern": "Range {{start}} – {{end}}"
+    },
+    "apply": {
+      "preview": "Preview range",
+      "whole": "Apply to whole file"
+    },
+    "result": {
+      "title": "Resampled and quantized result",
+      "before": "Reference (resampled, before quantization)",
+      "after": "Quantized",
+      "beforeAria": "Reference waveform before quantization",
+      "afterAria": "Quantized waveform",
+      "errorAria": "Quantization error waveform",
+      "timeAxis": "Time (s)",
+      "errorAxis": "Error"
+    },
+    "metrics": {
+      "snr": "SNR",
+      "segmentalSnr": "Segmental SNR",
+      "psnr": "PSNR",
+      "theorySnr": "Theoretical SNR",
+      "mse": "MSE",
+      "duration": "Duration",
+      "psnrNote": "PSNR peak = 1.0 (full scale of the normalized float signal).",
+      "theoryNote": "The theoretical 6.02·N + 1.76 dB assumes a full-scale sine and no dither."
+    },
+    "play": {
+      "processed": "Play quantized",
+      "residual": "Play residual"
+    },
+    "observe": {
+      "title": "What to observe",
+      "aliasing": "Turn the anti-alias filter off and lower the target rate: a tone above the new Nyquist appears at a different frequency.",
+      "dither": "At low bit depth, dither replaces correlated quantization distortion with a steady noise floor.",
+      "snr": "Each extra bit adds about 6 dB of SNR; compare the measured value with the theoretical line."
     }
   }
 }

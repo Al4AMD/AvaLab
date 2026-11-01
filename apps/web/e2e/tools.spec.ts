@@ -1,7 +1,7 @@
 /**
- * Wave-2 checks for the four tool routes (Plan 01 Task 1, adapted in Plan 02
- * Task 1): root redirect, sidebar navigation, per-tool stub title, both
- * locales, zero console errors. Same backend-absent static-preview harness
+ * Wave-2 checks for the tool routes (Plan 01 Task 1, adapted in Plan 02
+ * Task 1 and Wave-3 Plan 02 Task 3): root redirect, sidebar navigation,
+ * per-tool title, both locales, zero console errors. Same backend-absent static-preview harness
  * as smoke.spec.ts. The waveform overview probe readout now requires a
  * LOADED source (the Plan-01 auto-loaded demo probe was retired for real
  * sources); until a source exists the waveform page shows the load-audio
@@ -48,6 +48,12 @@ const TOOLS: ToolSpec[] = [
     label: /(سرعت|Speed)/,
     title: /(سرعت|Speed)/,
   },
+  {
+    path: "/tools/sampling",
+    url: /\/tools\/sampling$/,
+    label: /(نمونه‌برداری|Sampling)/,
+    title: /(نمونه‌برداری|Sampling)/,
+  },
 ];
 
 function watchForErrors(page: Page): string[] {
@@ -74,7 +80,7 @@ async function expectWaveformEmptyState(page: Page): Promise<void> {
   await expect(page.getByTestId("input.upload.button")).toBeVisible();
 }
 
-test("Persian (default): / redirects to the waveform tool and the sidebar reaches all five routes", async ({
+test("Persian (default): / redirects to the waveform tool and the sidebar reaches all six routes", async ({
   page,
 }) => {
   const errors = watchForErrors(page);
@@ -95,7 +101,7 @@ test("Persian (default): / redirects to the waveform tool and the sidebar reache
   expect(errors).toEqual([]);
 });
 
-test("English (persisted preference): the same five routes with zero console errors", async ({
+test("English (persisted preference): the same six routes with zero console errors", async ({
   page,
 }) => {
   const errors = watchForErrors(page);

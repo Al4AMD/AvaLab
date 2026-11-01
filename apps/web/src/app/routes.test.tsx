@@ -73,6 +73,10 @@ it("renders each /tools/* stub page through the data router with its i18n title"
       title: i18n.t("tool.speed.title"),
       body: i18n.t("input.empty.hint"),
     },
+    "/tools/sampling": {
+      title: i18n.t("tool.sampling.title"),
+      body: i18n.t("input.empty.hint"),
+    },
   };
 
   for (const [path, expectedBody] of Object.entries(expected)) {

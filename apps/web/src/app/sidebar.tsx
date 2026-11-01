@@ -48,6 +48,11 @@ export function Sidebar() {
             {t("nav.speed")}
           </NavLink>
         </li>
+        <li>
+          <NavLink to="/tools/sampling" className={linkClass}>
+            {t("nav.sampling")}
+          </NavLink>
+        </li>
       </ul>
     </nav>
   );
