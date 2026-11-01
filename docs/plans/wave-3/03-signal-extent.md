@@ -1,6 +1,6 @@
 # Wave 3 · Plan 03 — Signal extent (F07)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** A `/tools/extent` lab shows duration, sample count, support, energy, average power and energy/power classification, and applies shift, time-scale, reverse, truncate, zero-pad and periodic extension while showing the spectral consequences (Δf, leakage, zero-padding interpolation, time–bandwidth trade-off).
 
@@ -42,11 +42,11 @@
 - `repetitions` integer `>= 1`; `N·repetitions` a safe integer; non-finite sample → `TypeError`; bad repetitions → `RangeError`; `N = 0` → empty.
 - Golden case: `[1, 2, 3]`, repetitions `3` → `[1,2,3,1,2,3,1,2,3]`; single repetition is identity.
 
-- [ ] **Step 1: Write failing tests** for identity, repetition count, empty input, non-finite sample, bad repetitions.
-- [ ] **Step 2: Run** `pnpm --filter @avalab/dsp test -- extent` — expected FAIL.
-- [ ] **Step 3: Implement** and export; extend the golden generator and regenerate.
-- [ ] **Step 4: Run** dsp tests — expected PASS; add `ALGORITHMS` row.
-- [ ] **Step 5: Commit** `feat(F07): add periodic extension helper`.
+- [x] **Step 1: Write failing tests** for identity, repetition count, empty input, non-finite sample, bad repetitions.
+- [x] **Step 2: Run** `pnpm --filter @avalab/dsp test -- extent` — expected FAIL.
+- [x] **Step 3: Implement** and export; extend the golden generator and regenerate.
+- [x] **Step 4: Run** dsp tests — expected PASS; add `ALGORITHMS` row.
+- [x] **Step 5: Commit** `feat(F07): add periodic extension helper`.
 
 ### Task 2: Worker op `extentProcess`
 
@@ -63,11 +63,11 @@
 - Output longer than `MAX_PROCESSED_SECONDS` → `DspOpError("tooLong", …)`.
 - Bad params (`factor <= 0`, negative pads, bad repetition) → `badParams`.
 
-- [ ] **Step 1: Write failing op tests** for each operation on a 1 s ramp/impulse: shift moves support; scale 2 halves duration; reverse flips; truncate shortens; zeroPad adds zeros and keeps energy; periodicExtend triples length; classification `energy` for an interior pulse and `power` for a constant; `tooLong` for an oversized pad.
-- [ ] **Step 2: Run** `pnpm --filter @avalab/web test -- ops.test` — expected FAIL.
-- [ ] **Step 3: Implement** the handler + worker case.
-- [ ] **Step 4: Run** the test — expected PASS.
-- [ ] **Step 5: Commit** `feat(F07): add signal extent worker op`.
+- [x] **Step 1: Write failing op tests** for each operation on a 1 s ramp/impulse: shift moves support; scale 2 halves duration; reverse flips; truncate shortens; zeroPad adds zeros and keeps energy; periodicExtend triples length; classification `energy` for an interior pulse and `power` for a constant; `tooLong` for an oversized pad.
+- [x] **Step 2: Run** `pnpm --filter @avalab/web test -- ops.test` — expected FAIL.
+- [x] **Step 3: Implement** the handler + worker case.
+- [x] **Step 4: Run** the test — expected PASS.
+- [x] **Step 5: Commit** `feat(F07): add signal extent worker op`.
 
 ### Task 3: Signal extent lab view
 
@@ -90,19 +90,27 @@
 - Compact “what to observe” bullets.
 - Route `/tools/extent`; `TOOL_IDS` + sidebar.
 
-- [ ] **Step 1: Write failing state tests** for URL round-trip and operation-specific defaults/clamps.
-- [ ] **Step 2: Run** `pnpm --filter @avalab/web test -- extentState` — expected FAIL.
-- [ ] **Step 3: Implement** state + view + route/sidebar + i18n (`extent.*`, `nav.extent`).
-- [ ] **Step 4: Run** `pnpm check` — expected PASS.
-- [ ] **Step 5: Write e2e** `extent.spec.ts`: load demo; shift; assert support readout changes; zero-pad; assert spectrum chart paints and Δf readout updates; periodic extension; processed badge; en locale; zero console errors.
-- [ ] **Step 6: Run** `pnpm e2e -- extent` — expected PASS.
-- [ ] **Step 7: Commit** `feat(F07): signal extent lab`.
+- [x] **Step 1: Write failing state tests** for URL round-trip and operation-specific defaults/clamps.
+- [x] **Step 2: Run** `pnpm --filter @avalab/web test -- extentState` — expected FAIL.
+- [x] **Step 3: Implement** state + view + route/sidebar + i18n (`extent.*`, `nav.extent`).
+- [x] **Step 4: Run** `pnpm check` — expected PASS.
+- [x] **Step 5: Write e2e** `extent.spec.ts`: load demo; shift; assert support readout changes; zero-pad; assert spectrum chart paints and Δf readout updates; periodic extension; processed badge; en locale; zero console errors.
+- [x] **Step 6: Run** `pnpm e2e -- extent` — expected PASS.
+- [x] **Step 7: Commit** `feat(F07): signal extent lab`.
 
 ### Task 4: Close-out
 
 **Files:**
 - Modify: `docs/PROGRESS.md`, `docs/plans/wave-3/README.md`, `docs/ALGORITHMS.md`
 
-- [ ] **Step 1: Run** full `pnpm check` + `pnpm e2e`; record numbers and fa-review backlog.
-- [ ] **Step 2: Update** plan status and docs.
-- [ ] **Step 3: Commit** `docs(F07): close signal extent plan`.
+- [x] **Step 1: Run** full `pnpm check` + `pnpm e2e`; record numbers and fa-review backlog.
+- [x] **Step 2: Update** plan status and docs.
+- [x] **Step 3: Commit** `docs(F07): close signal extent plan`.
+
+## Shipped (2026-11-01)
+
+- `periodicExtend` dsp helper with golden vector and 12 tests; `extentProcess` worker op (seven operations, output cap before allocation, analysis metadata) with 11 tests; `/tools/extent` lab with URL codec (`op,sh,sf,ts,tl,ps,pe,rp,from,to`), selection/first-30-s preview vs whole-file apply, readouts (duration, samples, support, energy, average power, energy/power badge, Δf), support-highlighted before/after waveforms, sequential before/after uPlot spectra, periodic-extension card, processed playback, and compact observe bullets.
+- Semantics: energy/power are amplitude-squared (UI prints “full-scale²” for normalized sources); `timeScale` has no anti-alias filter by design and the UI points to F03; zero-padding is labelled interpolation (same main-lobe width, denser sampling), not new resolution.
+- Gates: `pnpm check` exit 0 (dsp 919/919, web 256/256, scripts 13/13, i18n OK, biome 176 files); `pnpm e2e` 33/33 with zero console errors in fa + en, including both extent-lab locales and the seven-route sidebar sweep. Perf on the same run: overview first paint 219 ms (< 1000 ms), spectrogram first tiles 302 ms (< 3000 ms).
+- Carries: `extent.*` Persian copy needs owner review (added to the fa backlog); the view runs the before- and after-spectrum analyses sequentially because identical concurrent RPC params supersede each other; freehand/brush editing and full theory panels remain deferred.
+- **Next step:** Wave 3 plan 04 — `docs/plans/wave-3/04-reverse-reverb.md`.

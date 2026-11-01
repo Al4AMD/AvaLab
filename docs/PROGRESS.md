@@ -157,9 +157,15 @@ Wave 2 plan 02 additions (machine-drafted, agent):
 
 (Future Persian copy: every wave's fa strings land in this section until the owner reviews them.)
 
+Wave 3 additions (machine-drafted, agent):
+
+- `speed.*` (F06 speed/direction lab)
+- `sampling.*` (F03 resampling/quantization/aliasing lab)
+- `extent.*` (F07 signal-extent lab), `nav.extent`, `tool.extent.title`
+
 ## Next recommended step
 
-Plan `02-audio-sources-playback.md` is complete (Tasks 1–4 in `.superpowers/sdd/02-audio-sources-playback/`); owner code review pending. Then **Wave 2 plan `03-waveform-spectrogram.md`** (waveform + spectrogram canvases subscribe to `appPlayhead`, per Task 4's publish contract). Do not begin later plans while an earlier one has failing checks.
+Wave 3 plans 01–03 are complete; owner code review pending. Next: **Wave 3 plan `04-reverse-reverb.md`** (`docs/plans/wave-3/04-reverse-reverb.md`), which reuses plan 03's reverse operation. Do not begin later plans while an earlier one has failing checks.
 
 ## Session log
 
@@ -294,3 +300,12 @@ Plan `02-audio-sources-playback.md` is complete (Tasks 1–4 in `.superpowers/sd
 - Gates: `pnpm check` exit 0 (dsp 907/907, web 240/240, scripts 13/13, i18n OK, biome 172 files); `pnpm e2e` 31/31 with zero console errors in fa + en, including both sampling-lab locales and the six-route sidebar sweep. Perf on the same run: overview first paint 342 ms (< 1000 ms), spectrogram first tiles 440 ms (< 3000 ms).
 - Carries: `sampling.*` Persian copy needs owner review (added to the fa backlog); the aliasing card's play button appears only after a source is loaded because it installs into the shared processed lane; the compare slot is unchanged.
 - **Next step:** Wave 3 plan 03 — `docs/plans/wave-3/03-signal-extent.md`.
+
+## 2026-11-01 — Wave 3, plan 03 CLOSED (F07 signal extent)
+
+- Branch `feat/wave-3`. Commits: `d5318c0` (`periodicExtend` dsp helper + golden), `090aea2` (ALGORITHMS row), `cb89b9a` (`extentProcess` worker op), `77dafe3` (extent lab view + e2e), plus this close-out commit.
+- F07 shipped: `/tools/extent` with a URL codec (`op,sh,sf,ts,tl,ps,pe,rp,from,to`), identity/shift/time-scale/reverse/truncate/zero-pad/periodic-extension operations, selection-or-first-30-s preview vs explicit whole-file apply, readouts (duration, sample count, support range, energy, average power, energy/power badge, Δf), support-highlighted before/after waveforms, sequential before/after uPlot spectra, periodic-extension card, processed playback, reset, and compact observe bullets.
+- Semantics: energy/power are amplitude-squared (the UI prints “full-scale²” for normalized sources); `timeScale` intentionally has no anti-alias filter and the UI points to F03; zero-padding is labelled interpolation (same main-lobe width, denser sampling), not improved resolution; truncation widens the main lobe and Δf is `fs/N` of the transformed length.
+- Gates: `pnpm check` exit 0 (dsp 919/919, web 256/256, scripts 13/13, i18n OK, biome 176 files); `pnpm e2e` 33/33 with zero console errors in fa + en, including both extent-lab locales and the seven-route sidebar sweep. Perf on the same run: overview first paint 219 ms (< 1000 ms), spectrogram first tiles 302 ms (< 3000 ms).
+- Carries: `extent.*` Persian copy needs owner review (added to the fa backlog); the view runs the before- and after-spectrum analyses sequentially because identical concurrent RPC params supersede each other; freehand/brush editing and full theory panels remain deferred.
+- **Next step:** Wave 3 plan 04 — `docs/plans/wave-3/04-reverse-reverb.md`.
