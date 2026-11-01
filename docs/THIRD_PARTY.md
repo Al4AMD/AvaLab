@@ -30,6 +30,7 @@
 | openapi-fetch | 0.17.0 | MIT |
 | openapi-typescript | 7.13.0 | MIT |
 | zustand | 5.0.16 | MIT |
+| uplot | 1.6.32 | MIT |
 | vite | 8.3.4 | MIT |
 | @vitejs/plugin-react | 6.1.2 | MIT |
 | vitest | 5.0.5 | MIT |
