@@ -286,3 +286,11 @@ Plan `02-audio-sources-playback.md` is complete (Tasks 1–4 in `.superpowers/sd
 - Carries: `speed.*` and the existing `player.*` Persian copy need owner review; the processed lane is intentionally not cached/evicted (tools recompute); a non-integer resample rate surfaces `resampleRational`'s `RangeError` as `opFailed` rather than `badParams` (latent, not reachable from the view's integer presets); the compare slot's original pane still renders the honest dash.
 - **Next step:** Wave 3 plan 02 — `docs/plans/wave-3/02-sampling-bit-depth.md`.
 
+## 2026-11-01 — Wave 3, plan 02 CLOSED (F03 sampling and bit depth)
+
+- Branch `feat/wave-3`. Commits: `08fa4ce` (`aliasFrequencyHz`), `da87149` (`samplingProcess` + `aliasDemo` worker ops), `5ab3ca9` (sampling lab view + e2e), plus this close-out commit.
+- F03 shipped: `/tools/sampling` with a URL codec (`tr,aa,bd,dt,seed,from,to`), target-rate presets + custom rate, anti-alias and TPDF-dither toggles, bit depth 1..16, selection/first-30-s preview vs explicit whole-file apply, measured SNR/segmental SNR/PSNR (peak 1.0 note)/theory SNR/MSE/duration, uPlot quantization-error chart, before/after mini waveforms, processed and residual playback, reset; source-free aliasing card (48 kHz sine, target 4/8/16 kHz, frequency 0..2×target, predicted and measured fold, play after a source exists).
+- Semantics pinned by D-023: metrics compare the quantized output with the RESAMPLED reference; residual = reference − quantized; theory SNR is labelled as a full-scale-sine reference; the aliasing card is source-free.
+- Gates: `pnpm check` exit 0 (dsp 907/907, web 240/240, scripts 13/13, i18n OK, biome 172 files); `pnpm e2e` 31/31 with zero console errors in fa + en, including both sampling-lab locales and the six-route sidebar sweep. Perf on the same run: overview first paint 342 ms (< 1000 ms), spectrogram first tiles 440 ms (< 3000 ms).
+- Carries: `sampling.*` Persian copy needs owner review (added to the fa backlog); the aliasing card's play button appears only after a source is loaded because it installs into the shared processed lane; the compare slot is unchanged.
+- **Next step:** Wave 3 plan 03 — `docs/plans/wave-3/03-signal-extent.md`.
