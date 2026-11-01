@@ -4,7 +4,11 @@ import {
   editSpectrum,
   type SpectrumEdit,
   type SpectrumEditTarget,
+  type SpectrumPreset,
 } from "../../src/index.js";
+import { asNumberArray, type GoldenCase, loadGolden } from "../fixtures.js";
+
+const golden = loadGolden("spectrum_edit");
 
 function signal(length: number): Float64Array {
   const samples = new Float64Array(length);
@@ -197,6 +201,41 @@ describe("buildSpectrumPreset", () => {
     expect(() => buildSpectrumPreset("bogus" as never, 4, 1)).toThrow(RangeError);
     expect(() => buildSpectrumPreset("zeroPhase", 0, 1)).toThrow(RangeError);
     expect(() => buildSpectrumPreset("randomPhase", 4, 1.5)).toThrow(RangeError);
+  });
+});
+
+describe("editSpectrum golden presets", () => {
+  it("pins the fixture names and tolerance", () => {
+    expect(golden.algorithm).toBe("spectrum_edit");
+    expect(golden.cases.map((goldenCase) => goldenCase.name)).toEqual([
+      "zeroIm_fixed8",
+      "zeroRe_fixed8",
+      "zeroPhase_fixed8",
+      "magnitudeOnly_fixed8",
+      "phaseOnly_fixed8",
+    ]);
+    for (const goldenCase of golden.cases) {
+      expect(goldenCase.tolerance).toEqual({ rtol: 1e-12, atol: 0 });
+    }
+  });
+
+  it.each(golden.cases)("matches the NumPy reference for $name", (goldenCase: GoldenCase) => {
+    const preset = goldenCase.params.preset;
+    if (typeof preset !== "string") {
+      throw new Error(`params.preset of ${goldenCase.name} is not a string`);
+    }
+    const fftLengthSamples = goldenCase.params.fftLengthSamples;
+    if (typeof fftLengthSamples !== "number") {
+      throw new Error(`params.fftLengthSamples of ${goldenCase.name} is not a number`);
+    }
+    const input = Float64Array.from(goldenCase.input.samples);
+    const result = editSpectrum(input, {
+      fftLengthSamples,
+      edits: buildSpectrumPreset(preset as SpectrumPreset, fftLengthSamples / 2 + 1, 1),
+      hermitian: true,
+    });
+    const expected = asNumberArray(goldenCase.expected.samples, "expected.samples");
+    expectSamplesClose(result.samples, Float64Array.from(expected), 1e-12);
   });
 });
 

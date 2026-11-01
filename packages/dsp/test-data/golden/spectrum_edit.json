@@ -1,0 +1,190 @@
+{
+  "algorithm": "spectrum_edit",
+  "cases": [
+    {
+      "expected": {
+        "samples": [
+          0.25,
+          -0.37500000000000006,
+          0.5625,
+          0.37500000000000006,
+          -1.5,
+          0.37500000000000006,
+          0.5625,
+          -0.37500000000000006
+        ]
+      },
+      "input": {
+        "sample_rate_hz": null,
+        "samples": [
+          0.25,
+          -0.5,
+          1.0,
+          0.0,
+          -1.5,
+          0.75,
+          0.125,
+          -0.25
+        ]
+      },
+      "name": "zeroIm_fixed8",
+      "params": {
+        "fftLengthSamples": 8,
+        "hermitian": true,
+        "preset": "zeroIm"
+      },
+      "tolerance": {
+        "atol": 0.0,
+        "rtol": 1e-12
+      }
+    },
+    {
+      "expected": {
+        "samples": [
+          0.0,
+          -0.125,
+          0.4375,
+          -0.375,
+          0.0,
+          0.375,
+          -0.4375,
+          0.125
+        ]
+      },
+      "input": {
+        "sample_rate_hz": null,
+        "samples": [
+          0.25,
+          -0.5,
+          1.0,
+          0.0,
+          -1.5,
+          0.75,
+          0.125,
+          -0.25
+        ]
+      },
+      "name": "zeroRe_fixed8",
+      "params": {
+        "fftLengthSamples": 8,
+        "hermitian": true,
+        "preset": "zeroRe"
+      },
+      "tolerance": {
+        "atol": 0.0,
+        "rtol": 1e-12
+      }
+    },
+    {
+      "expected": {
+        "samples": [
+          1.6217251107058346,
+          -0.44474495502945594,
+          -0.5755152449671125,
+          0.44474495502945594,
+          -0.3456946207716096,
+          0.44474495502945594,
+          -0.5755152449671125,
+          -0.44474495502945594
+        ]
+      },
+      "input": {
+        "sample_rate_hz": null,
+        "samples": [
+          0.25,
+          -0.5,
+          1.0,
+          0.0,
+          -1.5,
+          0.75,
+          0.125,
+          -0.25
+        ]
+      },
+      "name": "zeroPhase_fixed8",
+      "params": {
+        "fftLengthSamples": 8,
+        "hermitian": true,
+        "preset": "zeroPhase"
+      },
+      "tolerance": {
+        "atol": 0.0,
+        "rtol": 1e-12
+      }
+    },
+    {
+      "expected": {
+        "samples": [
+          1.6217251107058346,
+          -0.44474495502945594,
+          -0.5755152449671125,
+          0.44474495502945594,
+          -0.3456946207716096,
+          0.44474495502945594,
+          -0.5755152449671125,
+          -0.44474495502945594
+        ]
+      },
+      "input": {
+        "sample_rate_hz": null,
+        "samples": [
+          0.25,
+          -0.5,
+          1.0,
+          0.0,
+          -1.5,
+          0.75,
+          0.125,
+          -0.25
+        ]
+      },
+      "name": "magnitudeOnly_fixed8",
+      "params": {
+        "fftLengthSamples": 8,
+        "hermitian": true,
+        "preset": "magnitudeOnly"
+      },
+      "tolerance": {
+        "atol": 0.0,
+        "rtol": 1e-12
+      }
+    },
+    {
+      "expected": {
+        "samples": [
+          -0.03388093597121522,
+          0.024329474708966622,
+          0.1764278730510232,
+          -0.1140909508185218,
+          -0.9553939565221593,
+          0.0786757658159543,
+          -0.18715298055764867,
+          0.011085710293600885
+        ]
+      },
+      "input": {
+        "sample_rate_hz": null,
+        "samples": [
+          0.25,
+          -0.5,
+          1.0,
+          0.0,
+          -1.5,
+          0.75,
+          0.125,
+          -0.25
+        ]
+      },
+      "name": "phaseOnly_fixed8",
+      "params": {
+        "fftLengthSamples": 8,
+        "hermitian": true,
+        "preset": "phaseOnly"
+      },
+      "tolerance": {
+        "atol": 0.0,
+        "rtol": 1e-12
+      }
+    }
+  ]
+}
