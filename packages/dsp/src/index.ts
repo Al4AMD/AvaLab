@@ -117,6 +117,7 @@ export type {
 export { resampleRational } from "./resample/resample.js";
 export type { LowpassSincOptions } from "./resample/windowedSinc.js";
 export { designLowpassSinc } from "./resample/windowedSinc.js";
+export { aliasFrequencyHz } from "./signals/aliasing.js";
 export type {
   FloatArray,
   SignalType,
