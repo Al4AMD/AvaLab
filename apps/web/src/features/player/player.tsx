@@ -74,6 +74,7 @@ export function PlayerDock(): React.ReactElement {
   const player = usePlayer();
   const selection = useSessionStore((state) => state.selection);
   const original = useSessionStore((state) => state.original);
+  const clearProcessed = useSessionStore((state) => state.clearProcessed);
   const displayedSample = useDisplayedSample(player);
 
   // A source is present only when the transport actually holds samples
@@ -144,6 +145,43 @@ export function PlayerDock(): React.ReactElement {
       >
         {t("player.seek.forward", { seconds: SEEK_JUMP_SECONDS })}
       </Button>
+      <div title={t("player.ab.aria")} className="flex items-center gap-1">
+        <Button
+          size="sm"
+          variant={player.activeKind === "original" ? "default" : "outline"}
+          aria-pressed={player.activeKind === "original"}
+          data-testid="player.ab.original"
+          disabled={!hasSource}
+          onClick={() => {
+            player.setPlaybackMode("original");
+          }}
+        >
+          {t("player.ab.original")}
+        </Button>
+        <Button
+          size="sm"
+          variant={player.activeKind === "processed" ? "default" : "outline"}
+          aria-pressed={player.activeKind === "processed"}
+          data-testid="player.ab.processed"
+          disabled={!hasSource || !player.hasProcessed}
+          onClick={() => {
+            player.setPlaybackMode("processed");
+          }}
+        >
+          {t("player.ab.processed")}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          data-testid="player.reset"
+          disabled={!player.hasProcessed}
+          onClick={() => {
+            clearProcessed();
+          }}
+        >
+          {t("player.reset")}
+        </Button>
+      </div>
       <Button
         size="sm"
         variant="outline"
@@ -177,12 +215,16 @@ export function PlayerDock(): React.ReactElement {
           })}
         </span>
       )}
-      {hasSource && original && (
+      {hasSource && (player.activeKind === "processed" || original) && (
         <span
           data-testid="player.lane"
           className="ms-auto border border-line px-2 py-0.5 text-xs text-muted"
         >
-          {t(`player.lane.${original.sourceKind}`)}
+          {player.activeKind === "processed"
+            ? t("player.lane.processed")
+            : original
+              ? t(`player.lane.${original.sourceKind}`)
+              : ""}
         </span>
       )}
     </section>

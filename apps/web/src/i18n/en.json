@@ -218,8 +218,15 @@
       "offlineBrowser": "Browser decode (offline lane)",
       "demoClip": "Demo clip",
       "recording": "Microphone take",
-      "generated": "Generated signal"
-    }
+      "generated": "Generated signal",
+      "processed": "Tool result"
+    },
+    "ab": {
+      "aria": "Playback lane",
+      "original": "Original",
+      "processed": "Processed"
+    },
+    "reset": "Reset to original"
   },
   "spectrogram": {
     "controls": {

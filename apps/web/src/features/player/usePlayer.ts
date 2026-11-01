@@ -25,11 +25,12 @@
  */
 import { useEffect, useState, useSyncExternalStore } from "react";
 
-import type { SessionSource } from "../../session/store";
-import { useSessionStore } from "../../session/store";
+import type { PlaybackMode, ProcessedSource, SessionSource } from "../../session/store";
+import { selectPlaybackSource, useSessionStore } from "../../session/store";
 import { appPlayhead } from "./playhead";
 import {
   createTransport,
+  mapPlayheadSeconds,
   sourceToBufferLike,
   type Transport,
   type TransportState,
@@ -50,6 +51,10 @@ export type PlayerApi = {
   readonly togglePlay: () => void;
   readonly seekBySeconds: (deltaSeconds: number) => void;
   readonly seekToSample: (sample: number) => void;
+  /** Which lane is actually playing (processed falls back to original). */
+  readonly activeKind: "original" | "processed";
+  readonly hasProcessed: boolean;
+  readonly setPlaybackMode: (mode: PlaybackMode) => void;
 };
 
 /** Build one dock player around the session store. */
@@ -57,6 +62,10 @@ export function usePlayer(): PlayerApi {
   // Reference selector: `original` is replaced wholesale by loadSource, so
   // identity equality is exactly "this source" (no per-sample compares).
   const original: Readonly<SessionSource> | null = useSessionStore((state) => state.original);
+  const processed: Readonly<ProcessedSource> | null = useSessionStore((state) => state.processed);
+  const playbackMode: PlaybackMode = useSessionStore((state) => state.playbackMode);
+  const active = selectPlaybackSource({ original, processed, playbackMode });
+  const setStorePlaybackMode = useSessionStore((state) => state.setPlaybackMode);
 
   const [machine, setMachine] = useState<Transport | null>(null);
   useEffect(() => {
@@ -89,15 +98,26 @@ export function usePlayer(): PlayerApi {
   // state and the dock stays in its no-source posture; the warning keeps
   // the failure non-silent for developers.
   useEffect(() => {
-    if (machine === null || original === null) {
+    if (machine === null || active === null) {
       return;
     }
+    // A/B swap keeps the position in TIME (not sample index): capture the
+    // current seconds, attach the new lane, then seek the mapped sample.
+    // Playback resumes if it was playing before the swap (Task 3 contract).
+    const wasPlaying = machine.getState().phase === "playing";
+    const seconds =
+      machine.sampleRateHz > 0 ? machine.getCurrentSample() / machine.sampleRateHz : 0;
     try {
-      machine.setSource(sourceToBufferLike(original), original.sampleRateHz);
+      machine.setSource(sourceToBufferLike(active), active.sampleRateHz);
     } catch (error) {
       console.warn("avalab player: the platform cannot play this source", error);
+      return;
     }
-  }, [machine, original]);
+    machine.seekToSample(mapPlayheadSeconds(seconds, active.sampleRateHz, machine.lengthSamples));
+    if (wasPlaying) {
+      machine.play();
+    }
+  }, [machine, active]);
 
   // EXACTLY one rAF loop, ONLY while playing: publishes the interpolated
   // head each frame; the phase change tears it down (pause/end/source swap).
@@ -137,6 +157,11 @@ export function usePlayer(): PlayerApi {
     },
     seekToSample: (sample) => {
       machine?.seekToSample(sample);
+    },
+    activeKind: playbackMode === "processed" && processed !== null ? "processed" : "original",
+    hasProcessed: processed !== null,
+    setPlaybackMode: (mode) => {
+      setStorePlaybackMode(mode);
     },
   };
 }

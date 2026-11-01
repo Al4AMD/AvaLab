@@ -218,8 +218,15 @@
       "offlineBrowser": "ساخت با مرورگر (مسیر آفلاین)",
       "demoClip": "کلیپ نمونه",
       "recording": "ضبط میکروفون",
-      "generated": "سیگنال تولیدشده"
-    }
+      "generated": "سیگنال تولیدشده",
+      "processed": "نتیجهٔ ابزار"
+    },
+    "ab": {
+      "aria": "مسیر پخش",
+      "original": "اصلی",
+      "processed": "پردازش‌شده"
+    },
+    "reset": "بازگشت به اصلی"
   },
   "spectrogram": {
     "controls": {

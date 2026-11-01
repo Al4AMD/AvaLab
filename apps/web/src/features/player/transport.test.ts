@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   type AudioBufferLike,
   createTransport,
+  mapPlayheadSeconds,
   type Transport,
   type TransportBuffer,
   type TransportContext,
@@ -578,5 +579,23 @@ describe("transport: typed guards + subscribe", () => {
     unsubscribe();
     harness.transport.pause();
     expect(seen).toHaveLength(2); // no further delivery
+  });
+});
+
+describe("mapPlayheadSeconds", () => {
+  it("maps seconds to the target rate", () => {
+    expect(mapPlayheadSeconds(0.5, 48_000, 48_000)).toBe(24_000);
+    expect(mapPlayheadSeconds(0.5, 24_000, 24_000)).toBe(12_000);
+  });
+
+  it("clamps at zero and at the target length", () => {
+    expect(mapPlayheadSeconds(-1, 48_000, 48_000)).toBe(0);
+    expect(mapPlayheadSeconds(99, 48_000, 48_000)).toBe(48_000);
+    expect(mapPlayheadSeconds(0.5, 48_000, 0)).toBe(0);
+  });
+
+  it("treats non-finite input as zero", () => {
+    expect(mapPlayheadSeconds(Number.NaN, 48_000, 48_000)).toBe(0);
+    expect(mapPlayheadSeconds(Number.POSITIVE_INFINITY, 48_000, 48_000)).toBe(0);
   });
 });
