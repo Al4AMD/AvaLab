@@ -3,6 +3,7 @@ import {
   averagePower,
   classifySignalType,
   fft,
+  periodicExtend,
   reverse,
   signalEnergy,
   support,
@@ -70,6 +71,8 @@ function runSampleOperation(goldenCase: GoldenCase): Float64Array {
         paramNumber(goldenCase, "padStartSamples"),
         paramNumber(goldenCase, "padEndSamples"),
       );
+    case "periodicExtend":
+      return periodicExtend(samples, paramNumber(goldenCase, "repetitions"));
     default:
       throw new Error(`unsupported sample operation ${paramOperation(goldenCase)}`);
   }
@@ -100,6 +103,7 @@ describe("extent fixture", () => {
       "truncate_ramp10_start2_length5",
       "truncate_ramp10_start8_length5_clamped",
       "zero_pad_ramp10_start2_end3",
+      "periodic_extend_123_x3",
       "support_nonzero_threshold0",
       "support_silence_threshold0",
       "support_threshold_strict_0.5",
@@ -354,6 +358,53 @@ describe("zeroPad", () => {
   });
 });
 
+describe("periodicExtend", () => {
+  const samples = Float64Array.from([1, 2, 3]);
+
+  it("repeats the signal the requested number of times", () => {
+    expect(Array.from(periodicExtend(samples, 3))).toEqual([1, 2, 3, 1, 2, 3, 1, 2, 3]);
+  });
+
+  it("is the identity for one repetition", () => {
+    expect(Array.from(periodicExtend(samples, 1))).toEqual([1, 2, 3]);
+  });
+
+  it("returns an empty array for empty input", () => {
+    expect(periodicExtend(new Float64Array(0), 4).length).toBe(0);
+  });
+
+  const invalidRepetitions: Array<[string, number]> = [
+    ["0", 0],
+    ["-1", -1],
+    ["1.5", 1.5],
+    ["NaN", Number.NaN],
+    ["Infinity", Number.POSITIVE_INFINITY],
+  ];
+
+  it.each(invalidRepetitions)("throws RangeError for repetitions = %s", (_label, repetitions) => {
+    expect(() => periodicExtend(samples, repetitions)).toThrow(RangeError);
+  });
+
+  it("throws RangeError when the output length is unsafe", () => {
+    expect(() => periodicExtend(Float64Array.from([1, 2]), Number.MAX_SAFE_INTEGER)).toThrow(
+      /output length must be a non-negative safe integer/,
+    );
+  });
+
+  it("throws TypeError for non-finite samples", () => {
+    expect(() => periodicExtend(Float64Array.from([1, Number.NaN]), 2)).toThrow(TypeError);
+    expect(() => periodicExtend(Float64Array.from([1, Number.POSITIVE_INFINITY]), 2)).toThrow(
+      TypeError,
+    );
+  });
+
+  it("does not mutate its input", () => {
+    const copy = Float64Array.from(samples);
+    periodicExtend(samples, 2);
+    expect(Array.from(samples)).toEqual(Array.from(copy));
+  });
+});
+
 describe("support", () => {
   it("returns the first and last nonzero indices (inclusive)", () => {
     const samples = Float64Array.from([0, 0, 1, -2, 0, 3, 0, 0, 0, 0]);
@@ -517,6 +568,7 @@ describe("extent guards", () => {
       (samples) => reverse(samples),
       (samples) => truncate(samples, 0, 2),
       (samples) => zeroPad(samples, 1, 1),
+      (samples) => periodicExtend(samples, 2),
       (samples) => support(samples, { threshold: 0 }),
       (samples) => classifySignalType(samples),
       (samples) => signalEnergy(samples),
@@ -538,6 +590,7 @@ describe("extent guards", () => {
     reverse(samples);
     truncate(samples, 1, 2);
     zeroPad(samples, 1, 1);
+    periodicExtend(samples, 2);
     support(samples, { threshold: 0 });
     classifySignalType(samples);
     signalEnergy(samples);

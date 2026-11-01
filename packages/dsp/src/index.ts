@@ -127,6 +127,7 @@ export type {
 export {
   averagePower,
   classifySignalType,
+  periodicExtend,
   reverse,
   signalEnergy,
   support,

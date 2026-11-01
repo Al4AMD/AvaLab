@@ -18,6 +18,7 @@
  *   truncate(x, s, L)          y = x[s .. min(N, s + L) - 1] (no zero-fill;
  *                              the tail is clamped to the available samples)
  *   zeroPad(x, p, q)           y = [0]*p ++ x ++ [0]*q
+ *   periodicExtend(x, r)       y = x ++ x ++ ... (r copies), length N*r
  *   support(x, {threshold})    first and last n with |x[n]| > threshold;
  *                              empty support is {start: N, end: N - 1}
  *   classifySignalType(x)      "energy" ONLY if the nonzero support is strictly
@@ -237,6 +238,33 @@ export function zeroPad(
   const output = new Float64Array(outputLength);
   for (let n = 0; n < samples.length; n += 1) {
     output[padStartSamples + n] = samples[n] ?? 0;
+  }
+  return output;
+}
+
+/**
+ * Periodic extension: concatenate `repetitions` copies of the finite signal,
+ * y = [x, x, …, x] with length N·repetitions. This is the periodic-extension
+ * view used by the F07 lab: repeating a finite record creates a line spectrum
+ * at multiples of 1/T. `repetitions` must be an integer >= 1 and the output
+ * length a safe integer; N = 0 returns empty.
+ */
+export function periodicExtend(samples: FloatArray, repetitions: number): Float64Array {
+  assertFiniteSamples(samples, "periodicExtend");
+  assertIntegerParam(repetitions, "periodicExtend: repetitions");
+  if (repetitions < 1) {
+    throw new RangeError(
+      `periodicExtend: repetitions must be an integer >= 1 (got ${repetitions})`,
+    );
+  }
+  const outputLength = samples.length * repetitions;
+  assertSafeOutputLength(outputLength, "periodicExtend");
+  const output = new Float64Array(outputLength);
+  for (let repetition = 0; repetition < repetitions; repetition += 1) {
+    const offset = repetition * samples.length;
+    for (let n = 0; n < samples.length; n += 1) {
+      output[offset + n] = samples[n] ?? 0;
+    }
   }
   return output;
 }
