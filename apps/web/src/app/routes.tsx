@@ -1,6 +1,7 @@
 import { useEffect } from "react";
-import { useTranslation } from "react-i18next";
 import { createBrowserRouter, type RouteObject, redirect } from "react-router";
+import { FftView } from "../features/fftview/fftView";
+import { GeneratorView } from "../features/generator/generatorView";
 import { SpectrogramView } from "../features/spectrogram/spectrogramView";
 import { WaveformView } from "../features/waveform/waveformView";
 import { useSessionStore } from "../session/store";
@@ -11,32 +12,6 @@ export type ToolId = (typeof TOOL_IDS)[number];
 
 export function toolPath(toolId: ToolId): string {
   return `/tools/${toolId}`;
-}
-
-/** Tools whose view has not landed yet (Plan 02–05). */
-type StubToolId = "fftview" | "generator";
-
-/**
- * Stub body shown until each tool view lands later in this wave (Plan 02–05).
- * Keys are referenced as literal t() calls (not t(`tool.${id}`)) so the i18n
- * key checker sees every key without widening the dynamic allowlist.
- */
-function ToolStub({ tool }: { tool: StubToolId }) {
-  const { t } = useTranslation();
-  const titles: Record<StubToolId, string> = {
-    fftview: t("tool.fftview.title"),
-    generator: t("tool.generator.title"),
-  };
-  const stubTexts: Record<StubToolId, string> = {
-    fftview: t("tool.fftview.stub"),
-    generator: t("tool.generator.stub"),
-  };
-  return (
-    <section className="flex flex-col gap-2">
-      <h2 className="text-2xl font-semibold">{titles[tool]}</h2>
-      <p className="text-sm text-muted">{stubTexts[tool]}</p>
-    </section>
-  );
 }
 
 /**
@@ -87,8 +62,8 @@ export const appRoutes: RouteObject[] = [
         ),
       },
       { path: "tools/spectrogram", element: <SpectrogramView /> },
-      { path: "tools/fftview", element: <ToolStub tool="fftview" /> },
-      { path: "tools/generator", element: <ToolStub tool="generator" /> },
+      { path: "tools/fftview", element: <FftView /> },
+      { path: "tools/generator", element: <GeneratorView /> },
     ],
   },
 ];

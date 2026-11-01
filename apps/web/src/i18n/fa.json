@@ -96,13 +96,100 @@
       "title": "نمایشگر طیف‌نگاره (Spectrogram)"
     },
     "fftview": {
-      "title": "نمای فوریه: دامنه و فاز (FFT View)",
-      "stub": "این ابزار در ادامهٔ همین موج پیاده‌سازی می‌شود."
+      "title": "نمای فوریه: دامنه و فاز (FFT View)"
     },
     "generator": {
-      "title": "مولد سیگنال (Generator)",
-      "stub": "این ابزار در ادامهٔ همین موج پیاده‌سازی می‌شود."
+      "title": "مولد سیگنال (Generator)"
     }
+  },
+  "fftview": {
+    "controls": {
+      "windowFamily": "پنجرهٔ تحلیل",
+      "windowLength": "طول پنجره (نمونه)",
+      "magnitude": "نمایش دامنه",
+      "phase": "نمایش فاز",
+      "phaseMask": "آستانهٔ پوشش فاز"
+    },
+    "magnitude": {
+      "db": "دسی‌بل (dB)",
+      "linear": "خطی"
+    },
+    "phase": {
+      "wrapped": "پیچیده",
+      "unwrapped": "بازشده"
+    },
+    "meta": {
+      "sampleRate": "نرخ نمونه‌برداری",
+      "binWidth": "پهنای هر بین",
+      "fftLength": "طول FFT",
+      "analysisLength": "طول تحلیل",
+      "bins": "تعداد بین‌ها"
+    },
+    "capNotice": "طول تحلیل به {{samples}} نمونه محدود شد؛ برای پوشش کامل، بازهٔ انتخابی را کوچک‌تر کنید.",
+    "error": "محاسبهٔ طیف ناموفق بود.",
+    "empty": "برای محاسبهٔ طیف به یک قاب تحلیلی ناتهی نیاز است.",
+    "axis": {
+      "frequency": "فرکانس (Hz)",
+      "magnitude": "دامنه",
+      "phase": "فاز (rad)",
+      "level": "سطح (dB)",
+      "phaseNote": "بین‌های زیر {{threshold}} پوشانده شده‌اند؛ فاز آن‌ها فقط نوفهٔ عددی است."
+    },
+    "windowCompare": {
+      "title": "مقایسهٔ پنجره‌ها",
+      "loading": "پاسخ فرکانسی پنجره‌ها در حال محاسبه است…",
+      "label": "نمودار مقایسهٔ پاسخ فرکانسی پنجره‌ها",
+      "family": "پنجره",
+      "mainLobe": "لب اصلی",
+      "sideLobe": "لب کناری"
+    },
+    "chart": {
+      "magnitudeLabel": "نمودار دامنهٔ طیف",
+      "phaseLabel": "نمودار فاز طیف"
+    }
+  },
+  "generator": {
+    "controls": {
+      "waveform": "شکل‌موج",
+      "sampleRate": "نرخ نمونه‌برداری",
+      "duration": "مدت (ثانیه)",
+      "amplitude": "دامنه",
+      "frequency": "فرکانس (Hz)",
+      "dutyCycle": "چرخهٔ کار",
+      "impulseIndex": "اندیس ضربه (نمونه)",
+      "stepIndex": "اندیس پله (نمونه)",
+      "chirpFrom": "فرکانس شروع (Hz)",
+      "chirpTo": "فرکانس پایان (Hz)",
+      "chirpLog": "جاروب لگاریتمی",
+      "tone2": "تُن دوم (Hz)",
+      "seed": "بذر نوفه"
+    },
+    "waveform": {
+      "sine": "سینوسی",
+      "square": "مربعی",
+      "sawtooth": "دندانه‌اره‌ای",
+      "triangle": "مثلثی",
+      "impulse": "ضربه",
+      "step": "پله",
+      "whiteNoise": "نوفهٔ سفید",
+      "pinkNoise": "نوفهٔ صورتی",
+      "chirp": "جاروب فرکانسی",
+      "twoTone": "دو تُن"
+    },
+    "meta": {
+      "samples": "نمونه‌ها",
+      "duration": "مدت"
+    },
+    "preview": {
+      "label": "پیش‌نمایش شکل‌موج تولیدشده",
+      "loading": "در حال ساخت پیش‌نمایش…",
+      "error": "ساخت پیش‌نمایش ناموفق بود.",
+      "hint": "پیش‌نمایش از سطل‌های اوج کاهش‌یافته رسم می‌شود؛ سیگنال کامل هنگام بارگذاری ساخته می‌شود."
+    },
+    "load": "بارگذاری به‌عنوان منبع",
+    "loadingSource": "در حال ساخت…",
+    "sourceName": "{{waveform}} (تولیدشده)",
+    "error": "ساخت منبع ناموفق بود."
   },
   "player": {
     "title": "نوار پخش (Player)",

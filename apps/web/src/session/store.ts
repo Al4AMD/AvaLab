@@ -158,6 +158,17 @@ export type SessionStore = {
     params: DspOpParams<K>,
     payload?: TransferablePayload,
   ): DeriveTicket<K> | null;
+  /** Source-free op run for tools that must work before ANY audio exists
+   * (the F12 generator preview). Same worker lane and typed outcomes as
+   * `derive`, but no cache entry and no input hash: the params alone fully
+   * determine the result, and the generator's params change on every slider
+   * tick, so caching would only grow the map. `key` is always "" (nothing to
+   * cancel or poll); callers guard stale results with a generation counter. */
+  deriveStandalone<K extends DspOpName>(
+    opKey: K,
+    params: DspOpParams<K>,
+    payload?: TransferablePayload,
+  ): DeriveTicket<K>;
   /** Source-payload variant of `derive` for ops that operate on the whole
    * analysis lane (`waveformOverview`): posts a fresh COPY of
    * `original.samples` as the request payload (the transfer neuters the
@@ -391,6 +402,17 @@ export function createSessionStore(
         // whose result depends on the request payload must have that payload
         // pinned to the key's input hash (see deriveWithSource).
         return openDerivedJob(opKey, canonical, inputHash, () => rpc.call(opKey, params, payload));
+      },
+
+      deriveStandalone<K extends DspOpName>(
+        opKey: K,
+        params: DspOpParams<K>,
+        payload?: TransferablePayload,
+      ): DeriveTicket<K> {
+        // Same loud-validation rule as `derive` (canonicalJson throws on a
+        // typo'd param type before any frame leaves the main thread).
+        canonicalJson(params);
+        return { key: "", outcome: rpc.call(opKey, params, payload) };
       },
 
       /**

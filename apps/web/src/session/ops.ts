@@ -26,7 +26,22 @@
 import {
   computePeakBuckets,
   spectrogramTiles as computeSpectrogramTiles,
+  fft,
+  generateChirp,
+  generateImpulse,
+  generatePinkNoise,
+  generateSawtooth,
+  generateSine,
+  generateSquare,
+  generateStep,
+  generateTriangle,
+  generateTwoTone,
+  generateWhiteNoise,
+  kaiser,
+  magnitudeDb,
   type SpectrogramTilesParams,
+  unwrapPhase,
+  window,
 } from "@avalab/dsp";
 import type { TransferablePayload } from "./protocol";
 
@@ -294,6 +309,403 @@ export function spectrogramTiles(
   };
 }
 
+/** FFT length cap for the Fourier view (AGENTS §9 budgets): the whole-file
+ * case would otherwise transform millions of samples for a chart nobody can
+ * read. Longer selections analyse their first `FFT_MAX_LENGTH` samples and
+ * the view prints the cap (D-021). */
+export const FFT_MAX_LENGTH = 65_536;
+
+/** Periodic analysis window; kaiser uses the pinned beta 8.6 (spectrogram). */
+function windowForFamily(
+  family: SpectrogramTilesParams["windowFamily"],
+  length: number,
+): Float64Array {
+  return family === "kaiser" ? kaiser(length, 8.6) : window(family, length);
+}
+
+function nextPowerOfTwo(value: number): number {
+  let size = 2;
+  while (size < value) {
+    size *= 2;
+  }
+  return size;
+}
+
+export type FftSelectionParams = {
+  sampleRateHz: number;
+  startSample: number;
+  endSample: number;
+  windowFamily: SpectrogramTilesParams["windowFamily"];
+  windowLengthSamples: number;
+  magnitudeMode: "db" | "linear";
+  phaseMode: "wrapped" | "unwrapped";
+};
+export type FftSelectionResult = {
+  meta: {
+    sampleRateHz: number;
+    startSample: number;
+    endSample: number;
+    binCount: number;
+    fftLengthSamples: number;
+    analysisLengthSamples: number;
+    zeroPadSamples: number;
+    capped: boolean;
+    magnitudeMode: "db" | "linear";
+    phaseMode: "wrapped" | "unwrapped";
+  };
+  /** `[frequencyBinsHz | magnitude | phase]`, each `binCount` Float64. */
+  payload?: TransferablePayload;
+};
+
+/**
+ * Single-frame spectrum of the selection slice (F08): window → zero-pad to
+ * the next power of two → rfft. Magnitude is amplitude-referenced
+ * (`|X[k]| / Σw`, so 0 dB = full-scale sinusoid bin, matching D-020) and the
+ * phase is wrapped atan2 or dsp-unwrapped. No new math: the dsp `fft`,
+ * `window`, `magnitudeDb` and `unwrapPhase` do the work.
+ */
+export function fftSelection(
+  params: FftSelectionParams,
+  payload?: TransferablePayload,
+): FftSelectionResult {
+  if (
+    params === undefined ||
+    params === null ||
+    !Number.isFinite(params.sampleRateHz) ||
+    params.sampleRateHz <= 0 ||
+    !Number.isInteger(params.startSample) ||
+    !Number.isInteger(params.endSample) ||
+    params.startSample < 0 ||
+    params.endSample < params.startSample ||
+    !Number.isInteger(params.windowLengthSamples) ||
+    params.windowLengthSamples < 2 ||
+    (params.magnitudeMode !== "db" && params.magnitudeMode !== "linear") ||
+    (params.phaseMode !== "wrapped" && params.phaseMode !== "unwrapped")
+  ) {
+    throw new DspOpError("badParams", `fftSelection: invalid params ${String(params)}`);
+  }
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "fftSelection: a Float32 source payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError("badPayload", "fftSelection: payload must be Float32-aligned");
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  const analysisLength = Math.min(samples.length, FFT_MAX_LENGTH);
+  if (analysisLength < 1) {
+    throw new DspOpError("badParams", "fftSelection: the selection is empty");
+  }
+  const fftLengthSamples = nextPowerOfTwo(analysisLength);
+  const windowLengthSamples = Math.min(params.windowLengthSamples, fftLengthSamples);
+  const windowValues = windowForFamily(params.windowFamily, windowLengthSamples);
+  let windowSum = 0;
+  for (const value of windowValues) {
+    windowSum += value;
+  }
+  const frame = new Float64Array(fftLengthSamples);
+  for (let index = 0; index < windowLengthSamples; index += 1) {
+    frame[index] = (samples[index] ?? 0) * (windowValues[index] ?? 0);
+  }
+  const spectrum = fft(frame);
+  const binCount = spectrum.re.length;
+  const frequencies = new Float64Array(binCount);
+  const magnitudes = new Float64Array(binCount);
+  const phases = new Float64Array(binCount);
+  // 2/Σw: 0 dB = full-scale sinusoid bin (D-020 amplitude reference).
+  const scale = windowSum > 0 ? 2 / windowSum : 0;
+  for (let bin = 0; bin < binCount; bin += 1) {
+    frequencies[bin] = (bin * params.sampleRateHz) / fftLengthSamples;
+    magnitudes[bin] = Math.hypot(spectrum.re[bin] ?? 0, spectrum.im[bin] ?? 0) * scale;
+    phases[bin] = Math.atan2(spectrum.im[bin] ?? 0, spectrum.re[bin] ?? 0);
+  }
+  const magnitudeValues = params.magnitudeMode === "db" ? magnitudeDb(magnitudes) : magnitudes;
+  const phaseValues = params.phaseMode === "unwrapped" ? unwrapPhase(phases) : phases;
+  const packed = new Float64Array(binCount * 3);
+  packed.set(frequencies, 0);
+  packed.set(magnitudeValues, binCount);
+  packed.set(phaseValues, binCount * 2);
+  return {
+    meta: {
+      sampleRateHz: params.sampleRateHz,
+      startSample: params.startSample,
+      endSample: params.endSample,
+      binCount,
+      fftLengthSamples,
+      analysisLengthSamples: analysisLength,
+      zeroPadSamples: fftLengthSamples - analysisLength,
+      capped: params.endSample - params.startSample > FFT_MAX_LENGTH,
+      magnitudeMode: params.magnitudeMode,
+      phaseMode: params.phaseMode,
+    },
+    payload: { buffer: packed.buffer, byteOffset: 0, byteLength: packed.byteLength },
+  };
+}
+
+export type WindowProfilesParams = {
+  sampleRateHz: number;
+  windowLengthSamples: number;
+};
+export type WindowProfileFamily = "rect" | "hann" | "hamming" | "blackman" | "kaiser";
+export const WINDOW_PROFILE_FAMILIES: readonly WindowProfileFamily[] = [
+  "rect",
+  "hann",
+  "hamming",
+  "blackman",
+  "kaiser",
+];
+export type WindowProfilesResult = {
+  meta: {
+    families: WindowProfileFamily[];
+    binCount: number;
+    fftLengthSamples: number;
+    sampleRateHz: number;
+    windowLengthSamples: number;
+    mainLobeWidthsHz: number[];
+    sideLobeLevelsDb: number[];
+  };
+  /** `families.length * binCount` dB rows, family-major. */
+  payload?: TransferablePayload;
+};
+
+/**
+ * Window comparison profiles (F08): the same periodic windows used for
+ * analysis, zero-padded to `nextPow2(4L)` and transformed to a coherent-gain
+ * normalized dB response. Main-lobe width = twice the first response null
+ * (first local minimum away from DC); side-lobe level = the maximum dB
+ * outside that null. The dsp `windows` exports stay untouched.
+ */
+export function windowProfiles(
+  params: WindowProfilesParams,
+  _payload?: TransferablePayload,
+): WindowProfilesResult {
+  if (
+    params === undefined ||
+    params === null ||
+    !Number.isFinite(params.sampleRateHz) ||
+    params.sampleRateHz <= 0 ||
+    !Number.isInteger(params.windowLengthSamples) ||
+    params.windowLengthSamples < 8
+  ) {
+    throw new DspOpError("badParams", `windowProfiles: invalid params ${String(params)}`);
+  }
+  const fftLengthSamples = nextPowerOfTwo(Math.max(4096, params.windowLengthSamples * 4));
+  const binCount = fftLengthSamples / 2 + 1;
+  const packed = new Float64Array(WINDOW_PROFILE_FAMILIES.length * binCount);
+  const mainLobeWidthsHz: number[] = [];
+  const sideLobeLevelsDb: number[] = [];
+  for (let familyIndex = 0; familyIndex < WINDOW_PROFILE_FAMILIES.length; familyIndex += 1) {
+    const family = WINDOW_PROFILE_FAMILIES[familyIndex] ?? "rect";
+    const values = windowForFamily(family, params.windowLengthSamples);
+    let windowSum = 0;
+    for (const value of values) {
+      windowSum += value;
+    }
+    const frame = new Float64Array(fftLengthSamples);
+    frame.set(values, 0);
+    const spectrum = fft(frame);
+    const magnitudes = new Float64Array(binCount);
+    for (let bin = 0; bin < binCount; bin += 1) {
+      magnitudes[bin] = Math.hypot(spectrum.re[bin] ?? 0, spectrum.im[bin] ?? 0) / windowSum;
+    }
+    const decibels = magnitudeDb(magnitudes);
+    packed.set(decibels, familyIndex * binCount);
+    let firstNull = binCount - 1;
+    for (let bin = 1; bin < binCount - 1; bin += 1) {
+      const previous = decibels[bin - 1] ?? 0;
+      const current = decibels[bin] ?? 0;
+      const next = decibels[bin + 1] ?? 0;
+      if (current <= previous && current <= next) {
+        firstNull = bin;
+        break;
+      }
+    }
+    let sideLobe = Number.NEGATIVE_INFINITY;
+    for (let bin = firstNull + 1; bin < binCount; bin += 1) {
+      sideLobe = Math.max(sideLobe, decibels[bin] ?? sideLobe);
+    }
+    mainLobeWidthsHz.push((2 * firstNull * params.sampleRateHz) / fftLengthSamples);
+    sideLobeLevelsDb.push(Number.isFinite(sideLobe) ? sideLobe : -120);
+  }
+  return {
+    meta: {
+      families: [...WINDOW_PROFILE_FAMILIES],
+      binCount,
+      fftLengthSamples,
+      sampleRateHz: params.sampleRateHz,
+      windowLengthSamples: params.windowLengthSamples,
+      mainLobeWidthsHz,
+      sideLobeLevelsDb,
+    },
+    payload: { buffer: packed.buffer, byteOffset: 0, byteLength: packed.byteLength },
+  };
+}
+
+export type SynthWaveform =
+  | "sine"
+  | "square"
+  | "sawtooth"
+  | "triangle"
+  | "impulse"
+  | "step"
+  | "whiteNoise"
+  | "pinkNoise"
+  | "chirp"
+  | "twoTone";
+export type GenerateSynthParams = {
+  waveform: SynthWaveform;
+  sampleRateHz: number;
+  durationSeconds: number;
+  amplitude: number;
+  frequencyHz?: number;
+  dutyCycle?: number;
+  impulseIndex?: number;
+  stepIndex?: number;
+  chirpFromHz?: number;
+  chirpToHz?: number;
+  chirpLog?: boolean;
+  tone2Hz?: number;
+  seed?: number;
+  /** 0 = return the samples (load-as-source); > 0 = return that many
+   * min/max buckets for the preview canvas. */
+  previewBucketCount: number;
+};
+export type GenerateSynthResult = {
+  meta: {
+    waveform: SynthWaveform;
+    sampleCount: number;
+    sampleRateHz: number;
+    mode: "source" | "preview";
+    bucketCount: number;
+  };
+  payload?: TransferablePayload;
+};
+
+const SYNTH_WAVEFORMS: readonly SynthWaveform[] = [
+  "sine",
+  "square",
+  "sawtooth",
+  "triangle",
+  "impulse",
+  "step",
+  "whiteNoise",
+  "pinkNoise",
+  "chirp",
+  "twoTone",
+];
+
+/** F12 generator plumbing: map the UI params onto the wave-1 dsp generators
+ * unchanged, then either bucket for the preview or return the samples for
+ * `loadSource`. Validation beyond the dsp guards: the 300 s / 96 kHz source
+ * caps so a preview cannot allocate past the session contract. */
+export function generateSynth(
+  params: GenerateSynthParams,
+  _payload?: TransferablePayload,
+): GenerateSynthResult {
+  if (
+    params === undefined ||
+    params === null ||
+    !SYNTH_WAVEFORMS.includes(params.waveform) ||
+    !Number.isFinite(params.sampleRateHz) ||
+    params.sampleRateHz <= 0 ||
+    params.sampleRateHz > 96_000 ||
+    !Number.isFinite(params.durationSeconds) ||
+    params.durationSeconds < 0 ||
+    params.durationSeconds > 300 ||
+    !Number.isFinite(params.amplitude) ||
+    !Number.isInteger(params.previewBucketCount) ||
+    params.previewBucketCount < 0
+  ) {
+    throw new DspOpError("badParams", `generateSynth: invalid params ${String(params)}`);
+  }
+  const spec = {
+    sampleRateHz: params.sampleRateHz,
+    durationSeconds: params.durationSeconds,
+    amplitude: params.amplitude,
+  };
+  const sampleCount = Math.round(params.sampleRateHz * params.durationSeconds);
+  const clampIndex = (value: number): number =>
+    sampleCount === 0 ? 0 : Math.min(sampleCount - 1, Math.max(0, Math.round(value)));
+  let values: Float64Array;
+  switch (params.waveform) {
+    case "sine":
+      values = generateSine({ ...spec, frequencyHz: params.frequencyHz ?? 440 });
+      break;
+    case "square":
+      values = generateSquare({
+        ...spec,
+        frequencyHz: params.frequencyHz ?? 440,
+        dutyCycle: params.dutyCycle ?? 0.5,
+      });
+      break;
+    case "sawtooth":
+      values = generateSawtooth({ ...spec, frequencyHz: params.frequencyHz ?? 440 });
+      break;
+    case "triangle":
+      values = generateTriangle({ ...spec, frequencyHz: params.frequencyHz ?? 440 });
+      break;
+    case "impulse":
+      values = generateImpulse({
+        ...spec,
+        impulseSampleIndex: clampIndex(params.impulseIndex ?? 0),
+      });
+      break;
+    case "step":
+      values = generateStep({
+        ...spec,
+        stepSampleIndex: clampIndex(params.stepIndex ?? 0),
+        amplitudeBefore: 0,
+        amplitudeAfter: params.amplitude,
+      });
+      break;
+    case "whiteNoise":
+      values = generateWhiteNoise({ ...spec, seed: params.seed ?? 1 });
+      break;
+    case "pinkNoise":
+      values = generatePinkNoise({ ...spec, seed: params.seed ?? 1 });
+      break;
+    case "chirp":
+      values = generateChirp({
+        ...spec,
+        startFrequencyHz: params.chirpFromHz ?? 100,
+        endFrequencyHz: params.chirpToHz ?? 8000,
+        sweep: params.chirpLog === false ? "linear" : "logarithmic",
+      });
+      break;
+    case "twoTone":
+      values = generateTwoTone({
+        ...spec,
+        frequenciesHz: [params.frequencyHz ?? 440, params.tone2Hz ?? 880],
+      });
+      break;
+    default:
+      throw new DspOpError("badParams", `generateSynth: unknown waveform ${params.waveform}`);
+  }
+  if (params.previewBucketCount > 0) {
+    const minMax = computePeakBuckets(Float32Array.from(values), params.previewBucketCount);
+    return {
+      meta: {
+        waveform: params.waveform,
+        sampleCount: values.length,
+        sampleRateHz: params.sampleRateHz,
+        mode: "preview",
+        bucketCount: minMax.byteLength / 8,
+      },
+      payload: { buffer: minMax.buffer, byteOffset: 0, byteLength: minMax.byteLength },
+    };
+  }
+  const samples = Float32Array.from(values);
+  return {
+    meta: {
+      waveform: params.waveform,
+      sampleCount: samples.length,
+      sampleRateHz: params.sampleRateHz,
+      mode: "source",
+      bucketCount: 0,
+    },
+    payload: { buffer: samples.buffer, byteOffset: 0, byteLength: samples.byteLength },
+  };
+}
+
 export const dspOps = {
   waveformOverview: {
     // Type lenses only — the table is read for types (DspOpParams/Result);
@@ -308,6 +720,41 @@ export const dspOps = {
     params: { bucketCount: 0, sampleRateHz: 0, startSample: 0, endSample: 0 },
     result: undefined as unknown as WaveformRangeResult,
     handler: waveformRange,
+  },
+  fftSelection: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: {
+      sampleRateHz: 0,
+      startSample: 0,
+      endSample: 0,
+      windowFamily: "hann" as FftSelectionParams["windowFamily"],
+      windowLengthSamples: 0,
+      magnitudeMode: "db" as FftSelectionParams["magnitudeMode"],
+      phaseMode: "wrapped" as FftSelectionParams["phaseMode"],
+    },
+    result: undefined as unknown as FftSelectionResult,
+    handler: fftSelection,
+  },
+  windowProfiles: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: { sampleRateHz: 0, windowLengthSamples: 0 },
+    result: undefined as unknown as WindowProfilesResult,
+    handler: windowProfiles,
+  },
+  generateSynth: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: {
+      waveform: "sine" as GenerateSynthParams["waveform"],
+      sampleRateHz: 0,
+      durationSeconds: 0,
+      amplitude: 0,
+      previewBucketCount: 0,
+    },
+    result: undefined as unknown as GenerateSynthResult,
+    handler: generateSynth,
   },
   spectrogramTiles: {
     // Type lenses only — the table is read for types (DspOpParams/Result);

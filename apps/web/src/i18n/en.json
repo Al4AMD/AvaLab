@@ -96,13 +96,100 @@
       "title": "Spectrogram"
     },
     "fftview": {
-      "title": "FFT View",
-      "stub": "This tool lands later this wave."
+      "title": "FFT View"
     },
     "generator": {
-      "title": "Signal Generator",
-      "stub": "This tool lands later this wave."
+      "title": "Signal Generator"
     }
+  },
+  "fftview": {
+    "controls": {
+      "windowFamily": "Analysis window",
+      "windowLength": "Window length (samples)",
+      "magnitude": "Magnitude",
+      "phase": "Phase",
+      "phaseMask": "Phase mask threshold"
+    },
+    "magnitude": {
+      "db": "dB",
+      "linear": "Linear"
+    },
+    "phase": {
+      "wrapped": "Wrapped",
+      "unwrapped": "Unwrapped"
+    },
+    "meta": {
+      "sampleRate": "Sample rate",
+      "binWidth": "Bin width",
+      "fftLength": "FFT length",
+      "analysisLength": "Analysed length",
+      "bins": "Bins"
+    },
+    "capNotice": "Analysis is capped at {{samples}} samples; shrink the selection to cover it all.",
+    "error": "The spectrum could not be computed.",
+    "empty": "A non-empty analysis frame is required.",
+    "axis": {
+      "frequency": "Frequency (Hz)",
+      "magnitude": "Magnitude",
+      "phase": "Phase (rad)",
+      "level": "Level (dB)",
+      "phaseNote": "Bins below {{threshold}} are masked: their phase is numerical noise."
+    },
+    "windowCompare": {
+      "title": "Window comparison",
+      "loading": "Computing window responses…",
+      "label": "Window frequency response comparison chart",
+      "family": "Window",
+      "mainLobe": "Main lobe",
+      "sideLobe": "Side lobe"
+    },
+    "chart": {
+      "magnitudeLabel": "Spectrum magnitude chart",
+      "phaseLabel": "Spectrum phase chart"
+    }
+  },
+  "generator": {
+    "controls": {
+      "waveform": "Waveform",
+      "sampleRate": "Sample rate",
+      "duration": "Duration (s)",
+      "amplitude": "Amplitude",
+      "frequency": "Frequency (Hz)",
+      "dutyCycle": "Duty cycle",
+      "impulseIndex": "Impulse index (sample)",
+      "stepIndex": "Step index (sample)",
+      "chirpFrom": "Start frequency (Hz)",
+      "chirpTo": "End frequency (Hz)",
+      "chirpLog": "Logarithmic sweep",
+      "tone2": "Second tone (Hz)",
+      "seed": "Noise seed"
+    },
+    "waveform": {
+      "sine": "Sine",
+      "square": "Square",
+      "sawtooth": "Sawtooth",
+      "triangle": "Triangle",
+      "impulse": "Impulse",
+      "step": "Step",
+      "whiteNoise": "White noise",
+      "pinkNoise": "Pink noise",
+      "chirp": "Chirp",
+      "twoTone": "Two-tone"
+    },
+    "meta": {
+      "samples": "Samples",
+      "duration": "Duration"
+    },
+    "preview": {
+      "label": "Generated waveform preview",
+      "loading": "Building the preview…",
+      "error": "The preview could not be generated.",
+      "hint": "The preview is drawn from decimated peak buckets; the full signal is generated when you load it."
+    },
+    "load": "Load as source",
+    "loadingSource": "Generating…",
+    "sourceName": "{{waveform}} (generated)",
+    "error": "The source could not be generated."
   },
   "player": {
     "title": "Player",

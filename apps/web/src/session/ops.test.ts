@@ -11,10 +11,13 @@ import {
   type DspOpParams,
   type DspOpResult,
   dspOps,
+  fftSelection,
+  generateSynth,
   sessionPing,
   spectrogramTiles,
   waveformOverview,
   waveformRange,
+  windowProfiles,
 } from "./ops";
 import type { TransferablePayload } from "./protocol";
 import { float32PayloadOf, float32ValuesOf } from "./testDoubles";
@@ -158,11 +161,20 @@ describe("op table wiring", () => {
     expect(dspOps.waveformOverview.handler).toBe(waveformOverview);
     expect(dspOps.waveformRange.handler).toBe(waveformRange);
     expect(dspOps.spectrogramTiles.handler).toBe(spectrogramTiles);
+    expect(dspOps.fftSelection.handler).toBe(fftSelection);
+    expect(dspOps.windowProfiles.handler).toBe(windowProfiles);
+    expect(dspOps.generateSynth.handler).toBe(generateSynth);
   });
 
   it("derives typed params/results from the table (the add-one-entry lens)", () => {
     expectTypeOf<DspOpName>().toEqualTypeOf<
-      "sessionPing" | "spectrogramTiles" | "waveformOverview" | "waveformRange"
+      | "sessionPing"
+      | "spectrogramTiles"
+      | "waveformOverview"
+      | "waveformRange"
+      | "fftSelection"
+      | "windowProfiles"
+      | "generateSynth"
     >();
     expectTypeOf<DspOpParams<"sessionPing">>().toEqualTypeOf<{ count: number }>();
     expectTypeOf<DspOpResult<"sessionPing">>().toEqualTypeOf<{
@@ -223,5 +235,154 @@ describe("op table wiring", () => {
   it("type-level: unknown ops are not table keys", () => {
     // @ts-expect-error an op no plan ever adds — table keys stay closed.
     void dspOps.definitelyNotAnOp;
+  });
+});
+
+describe("fftSelection handler", () => {
+  const SAMPLE_RATE = 8192;
+  const TONE_HZ = 1000;
+  const SAMPLES = 8192;
+
+  function toneSamples(frequencyHz: number): TransferablePayload {
+    const values = Array.from({ length: SAMPLES }, (_, index) =>
+      Math.sin((2 * Math.PI * frequencyHz * index) / SAMPLE_RATE),
+    );
+    return float32PayloadOf(values);
+  }
+
+  function run(frequencyHz: number, family: "rect" | "hann") {
+    return fftSelection(
+      {
+        sampleRateHz: SAMPLE_RATE,
+        startSample: 0,
+        endSample: SAMPLES,
+        windowFamily: family,
+        windowLengthSamples: SAMPLES,
+        magnitudeMode: "db",
+        phaseMode: "wrapped",
+      },
+      toneSamples(frequencyHz),
+    );
+  }
+
+  it("puts a bin-centred full-scale tone at 0 dB in its bin", () => {
+    const result = run(TONE_HZ, "hann");
+    const payload = result.payload;
+    if (payload === undefined) {
+      throw new Error("missing payload");
+    }
+    const values = new Float64Array(payload.buffer, payload.byteOffset, payload.byteLength / 8);
+    const binCount = result.meta.binCount;
+    const magnitudes = values.subarray(binCount, binCount * 2);
+    let peakBin = 0;
+    for (let bin = 1; bin < binCount; bin += 1) {
+      if ((magnitudes[bin] ?? -Infinity) > (magnitudes[peakBin] ?? -Infinity)) {
+        peakBin = bin;
+      }
+    }
+    expect(peakBin).toBe(TONE_HZ);
+    expect(Math.abs(magnitudes[peakBin] ?? 0)).toBeLessThan(0.1);
+    expect(result.meta.fftLengthSamples).toBe(SAMPLES);
+    expect(result.meta.zeroPadSamples).toBe(0);
+    expect(result.meta.capped).toBe(false);
+  });
+
+  it("changes leakage when the window changes (off-bin tone)", () => {
+    const rect = run(TONE_HZ + 0.5, "rect");
+    const hann = run(TONE_HZ + 0.5, "hann");
+    const binCount = rect.meta.binCount;
+    const valuesOf = (result: typeof rect): Float64Array => {
+      const payload = result.payload;
+      if (payload === undefined) {
+        throw new Error("missing payload");
+      }
+      return new Float64Array(payload.buffer, payload.byteOffset, payload.byteLength / 8);
+    };
+    const rectValues = valuesOf(rect);
+    const hannValues = valuesOf(hann);
+    const rectLeak = rectValues[binCount + TONE_HZ + 100] ?? 0;
+    const hannLeak = hannValues[binCount + TONE_HZ + 100] ?? 0;
+    expect(hannLeak).toBeLessThan(rectLeak);
+  });
+
+  it("rejects an empty selection with a typed badParams", () => {
+    expect(() =>
+      fftSelection(
+        {
+          sampleRateHz: SAMPLE_RATE,
+          startSample: 0,
+          endSample: 0,
+          windowFamily: "hann",
+          windowLengthSamples: 1024,
+          magnitudeMode: "db",
+          phaseMode: "wrapped",
+        },
+        float32PayloadOf([]),
+      ),
+    ).toThrowError(DspOpError);
+  });
+});
+
+describe("windowProfiles handler", () => {
+  it("measures the textbook Hann side lobe and main-lobe width", () => {
+    const result = windowProfiles({ sampleRateHz: 48000, windowLengthSamples: 256 });
+    const payload = result.payload;
+    if (payload === undefined) {
+      throw new Error("missing payload");
+    }
+    const hannIndex = result.meta.families.indexOf("hann");
+    expect(hannIndex).toBeGreaterThanOrEqual(0);
+    expect(result.meta.sideLobeLevelsDb[hannIndex] ?? 0).toBeCloseTo(-31.5, 0);
+    const expectedWidthHz = (4 * 48000) / 256;
+    expect(result.meta.mainLobeWidthsHz[hannIndex] ?? 0).toBeCloseTo(expectedWidthHz, -1);
+    expect(result.meta.binCount).toBe(result.meta.fftLengthSamples / 2 + 1);
+    expect(payload.byteLength / 8).toBe(result.meta.families.length * result.meta.binCount);
+  });
+});
+
+describe("generateSynth handler", () => {
+  it("returns exact-duration sine samples for load-as-source", () => {
+    const result = generateSynth({
+      waveform: "sine",
+      sampleRateHz: 8000,
+      durationSeconds: 0.1,
+      amplitude: 0.5,
+      frequencyHz: 440,
+      previewBucketCount: 0,
+    });
+    expect(result.meta.mode).toBe("source");
+    expect(result.meta.sampleCount).toBe(800);
+    const payload = result.payload;
+    if (payload === undefined) {
+      throw new Error("missing payload");
+    }
+    const values = float32ValuesOf(payload);
+    expect(values).toHaveLength(800);
+    let energy = 0;
+    for (const value of values) {
+      energy += value * value;
+    }
+    const rms = Math.sqrt(energy / values.length);
+    expect(rms).toBeCloseTo(0.5 / Math.SQRT2, 2);
+  });
+
+  it("returns min/max buckets for the preview mode", () => {
+    const result = generateSynth({
+      waveform: "chirp",
+      sampleRateHz: 8000,
+      durationSeconds: 0.5,
+      amplitude: 0.8,
+      chirpFromHz: 100,
+      chirpToHz: 2000,
+      chirpLog: true,
+      previewBucketCount: 64,
+    });
+    expect(result.meta.mode).toBe("preview");
+    expect(result.meta.bucketCount).toBe(64);
+    const payload = result.payload;
+    if (payload === undefined) {
+      throw new Error("missing payload");
+    }
+    expect(float32ValuesOf(payload)).toHaveLength(128);
   });
 });
