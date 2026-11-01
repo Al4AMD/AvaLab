@@ -167,7 +167,7 @@ Wave 3 additions (machine-drafted, agent):
 
 ## Next recommended step
 
-Wave 3 plans 01–05 are complete; owner code review pending. Next: **owner review of `feat/wave-3` → PR to `main`**. Do not begin Wave 4 while any check is failing.
+Wave 3 is complete and merged to `main` (PR #9, merge `834b426`). Next: **plan Wave 4** (F04 codecs, F05 metrics UI, rate–distortion, F06 time-stretch). Do not begin Wave 4 while any check is failing.
 
 ## Session log
 
@@ -348,3 +348,10 @@ Wave 3 plans 01–05 are complete; owner code review pending. Next: **owner revi
 - Gates: `pnpm check` exit 0 (dsp 951/951, web 286/286, scripts 13/13, i18n OK, biome 188 files); `pnpm e2e` 37/37 with zero console errors in fa + en. Perf on that run: overview first paint 396 ms (< 1000 ms), spectrogram first tiles 495 ms (< 3000 ms).
 - Carries: all Wave 3 Persian copy still needs owner review; `present.md` still needs a keep/remove decision; full-band phase presets can produce very large share URLs (future fix: encode preset + seed); freehand spectrum drawing and full theory panels remain deferred; extent/reverb mini-waveform envelopes still bucket on the main thread (move to a worker envelope before whole-file 96 kHz sources); a pre-existing Wave 2 FFT phase-mask bug treats already-dB magnitudes as linear, so the default phase chart can be blank (fix separately).
 - **Next step:** owner review and PR `feat/wave-3` → `main`.
+
+## 2026-11-01 — Wave 3 merged (PR #9)
+
+- `main` fast-forwarded `ada6da8..834b426` (merge of `feat/wave-3`): 27 commits, 63 files, +11,357/−98. Wave 3 plans 01–05 are done and the audit fixes from `3224638` are in.
+- Re-verified on merged `main`: `pnpm check` exit 0; `pnpm e2e` 37/37 with zero console errors in fa + en; perf overview first paint 243 ms, spectrogram first tiles 326 ms.
+- Removed stale `present.md` (dated 2026-10-26, pre-Wave-2 close); recoverable from `754ad66`. Updated `docs/plans/README.md` Wave 3 status.
+- Carries unchanged: Wave 3 Persian review, huge full-band phase preset share URLs, pre-existing Wave 2 FFT phase-mask bug, main-thread waveform envelopes, deferred freehand/theory panels.
