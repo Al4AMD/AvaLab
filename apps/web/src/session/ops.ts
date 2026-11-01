@@ -25,6 +25,8 @@
 
 import {
   aliasFrequencyHz,
+  averagePower,
+  classifySignalType,
   computePeakBuckets,
   spectrogramTiles as computeSpectrogramTiles,
   fft,
@@ -41,6 +43,7 @@ import {
   kaiser,
   magnitudeDb,
   mse,
+  periodicExtend,
   pitchShift,
   psnrDb,
   quantizationError,
@@ -50,10 +53,16 @@ import {
   reverse,
   type SpectrogramTilesParams,
   segmentalSnrDb,
+  signalEnergy,
   snrDb,
+  support,
+  timeScale,
+  timeShift,
   timeStretch,
+  truncate,
   unwrapPhase,
   window,
+  zeroPad,
 } from "@avalab/dsp";
 import type { TransferablePayload } from "./protocol";
 
@@ -583,6 +592,191 @@ export type SpeedTransformResult = {
   payload?: TransferablePayload;
 };
 
+export type ExtentOperation =
+  | { operation: "identity" }
+  | { operation: "shift"; shiftSamples: number }
+  | { operation: "scale"; factor: number }
+  | { operation: "reverse" }
+  | { operation: "truncate"; startSampleIndex: number; lengthSamples: number }
+  | { operation: "zeroPad"; padStartSamples: number; padEndSamples: number }
+  | { operation: "periodicExtend"; repetitions: number };
+
+export type ExtentProcessParams = { sampleRateHz: number } & ExtentOperation;
+
+export type ExtentProcessResult = {
+  meta: {
+    outputSampleCount: number;
+    durationSeconds: number;
+    supportStartSample: number;
+    supportEndSample: number;
+    energy: number;
+    averagePower: number;
+    signalType: "energy" | "power";
+    elapsedMs: number;
+  };
+  payload?: TransferablePayload;
+};
+
+/** Processed-playback cap in seconds (same limit as `speedTransform`). */
+const MAX_EXTENT_OUTPUT_SECONDS = 300;
+
+function isNonNegativeInteger(value: number): boolean {
+  return Number.isInteger(value) && value >= 0;
+}
+
+function extentOperationError(operation: ExtentOperation): string | null {
+  switch (operation.operation) {
+    case "identity":
+    case "reverse":
+      return null;
+    case "shift":
+      return Number.isInteger(operation.shiftSamples) ? null : "shiftSamples must be an integer";
+    case "scale":
+      return Number.isFinite(operation.factor) && operation.factor > 0
+        ? null
+        : "factor must be positive and finite";
+    case "truncate":
+      return isNonNegativeInteger(operation.startSampleIndex) &&
+        isNonNegativeInteger(operation.lengthSamples)
+        ? null
+        : "truncate indices must be non-negative integers";
+    case "zeroPad":
+      return isNonNegativeInteger(operation.padStartSamples) &&
+        isNonNegativeInteger(operation.padEndSamples)
+        ? null
+        : "pad counts must be non-negative integers";
+    case "periodicExtend":
+      return Number.isInteger(operation.repetitions) && operation.repetitions >= 1
+        ? null
+        : "repetitions must be an integer >= 1";
+    default:
+      return "unknown operation";
+  }
+}
+
+function expectedExtentLength(operation: ExtentOperation, inputLength: number): number {
+  switch (operation.operation) {
+    case "identity":
+    case "shift":
+    case "reverse":
+      return inputLength;
+    case "scale":
+      return Math.round(inputLength / operation.factor);
+    case "truncate":
+      return Math.max(
+        0,
+        Math.min(inputLength, operation.startSampleIndex + operation.lengthSamples) -
+          operation.startSampleIndex,
+      );
+    case "zeroPad":
+      return inputLength + operation.padStartSamples + operation.padEndSamples;
+    case "periodicExtend":
+      return inputLength * operation.repetitions;
+    default:
+      return inputLength;
+  }
+}
+
+/**
+ * F07 signal-extent operation over the request payload (already the selected
+ * source slice). Applies exactly one dsp extent function (identity copies),
+ * then reports duration, support, energy, average power and the energy/power
+ * classification. Output above the 300 s processed cap is rejected before
+ * allocation; the view can play the result through the processed lane.
+ */
+export function extentProcess(
+  params: ExtentProcessParams,
+  payload?: TransferablePayload,
+): ExtentProcessResult {
+  if (
+    params === undefined ||
+    params === null ||
+    !Number.isFinite(params.sampleRateHz) ||
+    params.sampleRateHz <= 0 ||
+    params.sampleRateHz > 96_000
+  ) {
+    throw new DspOpError("badParams", `extentProcess: invalid params ${String(params)}`);
+  }
+  const operationError = extentOperationError(params);
+  if (operationError !== null) {
+    throw new DspOpError("badParams", `extentProcess: ${operationError}`);
+  }
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "extentProcess: a Float32 source payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError("badPayload", "extentProcess: payload must be Float32-aligned");
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  if (samples.length === 0) {
+    throw new DspOpError("badParams", "extentProcess: the selection is empty");
+  }
+
+  const expectedLength = expectedExtentLength(params, samples.length);
+  if (
+    Number.isSafeInteger(expectedLength) &&
+    expectedLength / params.sampleRateHz > MAX_EXTENT_OUTPUT_SECONDS
+  ) {
+    throw new DspOpError(
+      "tooLong",
+      `extentProcess: output is ${(expectedLength / params.sampleRateHz).toFixed(1)} s, ` +
+        `above the ${MAX_EXTENT_OUTPUT_SECONDS} s processed cap`,
+    );
+  }
+
+  const startedMs = performance.now();
+  const input = Float64Array.from(samples);
+  let output: Float64Array;
+  switch (params.operation) {
+    case "identity":
+      output = input.slice();
+      break;
+    case "shift":
+      output = timeShift(input, params.shiftSamples);
+      break;
+    case "scale":
+      output = timeScale(input, params.factor);
+      break;
+    case "reverse":
+      output = reverse(input);
+      break;
+    case "truncate":
+      output = truncate(input, params.startSampleIndex, params.lengthSamples);
+      break;
+    case "zeroPad":
+      output = zeroPad(input, params.padStartSamples, params.padEndSamples);
+      break;
+    case "periodicExtend":
+      output = periodicExtend(input, params.repetitions);
+      break;
+    default:
+      throw new DspOpError("badParams", "extentProcess: unknown operation");
+  }
+  if (output.length / params.sampleRateHz > MAX_EXTENT_OUTPUT_SECONDS) {
+    throw new DspOpError(
+      "tooLong",
+      `extentProcess: output is ${(output.length / params.sampleRateHz).toFixed(1)} s, ` +
+        `above the ${MAX_EXTENT_OUTPUT_SECONDS} s processed cap`,
+    );
+  }
+  const elapsedMs = performance.now() - startedMs;
+  const supportRange = support(output, { threshold: 0 });
+  const out = Float32Array.from(output);
+  return {
+    meta: {
+      outputSampleCount: out.length,
+      durationSeconds: out.length / params.sampleRateHz,
+      supportStartSample: supportRange.startSampleIndex,
+      supportEndSample: supportRange.endSampleIndex,
+      energy: signalEnergy(output),
+      averagePower: averagePower(output),
+      signalType: classifySignalType(output),
+      elapsedMs,
+    },
+    payload: { buffer: out.buffer, byteOffset: 0, byteLength: out.byteLength },
+  };
+}
+
 /** Processed-playback cap in seconds (mirrors the store's MAX_PROCESSED_SECONDS;
  * kept local so the worker op table never imports store state). */
 const MAX_SPEED_OUTPUT_SECONDS = 300;
@@ -1102,6 +1296,13 @@ export const dspOps = {
     },
     result: undefined as unknown as SpeedTransformResult,
     handler: speedTransform,
+  },
+  extentProcess: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: { sampleRateHz: 0, operation: "identity" } as ExtentProcessParams,
+    result: undefined as unknown as ExtentProcessResult,
+    handler: extentProcess,
   },
   samplingProcess: {
     // Type lenses only — the table is read for types (DspOpParams/Result);

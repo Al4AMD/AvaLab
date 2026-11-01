@@ -29,6 +29,7 @@ import {
   type DspOpParams,
   type DspOpResult,
   dspOps,
+  extentProcess,
   fftSelection,
   generateSynth,
   samplingProcess,
@@ -59,6 +60,7 @@ type DspOpHandlers = {
 
 const dspHandlers = {
   aliasDemo,
+  extentProcess,
   fftSelection,
   generateSynth,
   samplingProcess,
@@ -173,6 +175,10 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
       }
       case "aliasDemo": {
         const result = dspHandlers.aliasDemo(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "extentProcess": {
+        const result = dspHandlers.extentProcess(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       default: {

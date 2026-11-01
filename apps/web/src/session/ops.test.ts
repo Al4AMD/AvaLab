@@ -12,6 +12,8 @@ import {
   type DspOpParams,
   type DspOpResult,
   dspOps,
+  type ExtentOperation,
+  extentProcess,
   fftSelection,
   generateSynth,
   type SamplingProcessParams,
@@ -458,6 +460,126 @@ describe("aliasDemo handler", () => {
   });
 });
 
+describe("extentProcess handler", () => {
+  const SAMPLE_RATE = 48_000;
+
+  function run(operation: ExtentOperation, values: number[]) {
+    return extentProcess({ sampleRateHz: SAMPLE_RATE, ...operation }, float32PayloadOf(values));
+  }
+
+  function outputOf(result: ReturnType<typeof run>): number[] {
+    const payload = result.payload;
+    if (payload === undefined) {
+      throw new Error("missing payload");
+    }
+    return float32ValuesOf(payload);
+  }
+
+  it("identity copies the input and reports support, energy and power", () => {
+    const result = run({ operation: "identity" }, [0, 0, 1, 0, 0]);
+    expect(outputOf(result)).toEqual([0, 0, 1, 0, 0]);
+    expect(result.meta).toMatchObject({
+      outputSampleCount: 5,
+      durationSeconds: 5 / SAMPLE_RATE,
+      supportStartSample: 2,
+      supportEndSample: 2,
+      energy: 1,
+      averagePower: 0.2,
+      signalType: "energy",
+    });
+    expect(result.meta.elapsedMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("shift moves the support and keeps the length", () => {
+    const values = new Array<number>(1000).fill(0);
+    values[100] = 1;
+    const delayed = run({ operation: "shift", shiftSamples: 50 }, values);
+    const advanced = run({ operation: "shift", shiftSamples: -50 }, values);
+    expect(delayed.meta.outputSampleCount).toBe(1000);
+    expect(delayed.meta.supportStartSample).toBe(150);
+    expect(delayed.meta.supportEndSample).toBe(150);
+    expect(advanced.meta.supportStartSample).toBe(50);
+    expect(advanced.meta.supportEndSample).toBe(50);
+  });
+
+  it("scale 2 halves the duration and moves the support", () => {
+    const values = new Array<number>(1000).fill(0);
+    values[100] = 1;
+    const result = run({ operation: "scale", factor: 2 }, values);
+    expect(result.meta.outputSampleCount).toBe(500);
+    expect(result.meta.durationSeconds).toBe(500 / SAMPLE_RATE);
+    expect(result.meta.supportStartSample).toBe(50);
+    expect(result.meta.supportEndSample).toBe(50);
+  });
+
+  it("reverse flips the sample order", () => {
+    const result = run({ operation: "reverse" }, [1, 2, 3, 4]);
+    expect(outputOf(result)).toEqual([4, 3, 2, 1]);
+    expect(result.meta.supportStartSample).toBe(0);
+    expect(result.meta.supportEndSample).toBe(3);
+  });
+
+  it("truncate returns only the requested window", () => {
+    const values = Array.from({ length: 1000 }, (_, index) => index);
+    const result = run(
+      { operation: "truncate", startSampleIndex: 100, lengthSamples: 200 },
+      values,
+    );
+    expect(result.meta.outputSampleCount).toBe(200);
+    expect(outputOf(result)[0]).toBe(100);
+    expect(outputOf(result)[199]).toBe(299);
+    expect(result.meta.supportStartSample).toBe(0);
+    expect(result.meta.supportEndSample).toBe(199);
+  });
+
+  it("zero padding adds zeros and preserves energy", () => {
+    const result = run({ operation: "zeroPad", padStartSamples: 2, padEndSamples: 3 }, [0, 1, 0]);
+    expect(result.meta.outputSampleCount).toBe(8);
+    expect(result.meta.supportStartSample).toBe(3);
+    expect(result.meta.supportEndSample).toBe(3);
+    expect(result.meta.energy).toBe(1);
+    expect(outputOf(result)).toEqual([0, 0, 0, 1, 0, 0, 0, 0]);
+  });
+
+  it("periodic extension triples the length and repeats the energy", () => {
+    const result = run({ operation: "periodicExtend", repetitions: 3 }, [1, 2, 3]);
+    expect(result.meta.outputSampleCount).toBe(9);
+    expect(outputOf(result)).toEqual([1, 2, 3, 1, 2, 3, 1, 2, 3]);
+    expect(result.meta.energy).toBe(42);
+    expect(result.meta.signalType).toBe("power");
+  });
+
+  it("classifies an interior pulse as energy and a constant as power", () => {
+    expect(run({ operation: "identity" }, [0, 0, 1, 0]).meta.signalType).toBe("energy");
+    expect(run({ operation: "identity" }, [1, 1, 1, 1]).meta.signalType).toBe("power");
+  });
+
+  it("rejects an output above the 300 s processed cap before allocating", () => {
+    expect(() =>
+      run(
+        { operation: "zeroPad", padStartSamples: 0, padEndSamples: 300 * SAMPLE_RATE + 1 },
+        [1, 0],
+      ),
+    ).toThrowError(expect.objectContaining({ code: "tooLong" }));
+    expect(() =>
+      run({ operation: "periodicExtend", repetitions: 300 * SAMPLE_RATE + 1 }, [1]),
+    ).toThrowError(expect.objectContaining({ code: "tooLong" }));
+  });
+
+  it("throws badParams for invalid operation parameters", () => {
+    const bad = (operation: ExtentOperation): void => {
+      expect(() => run(operation, [1, 2, 3])).toThrowError(
+        expect.objectContaining({ code: "badParams" }),
+      );
+    };
+    bad({ operation: "scale", factor: 0 });
+    bad({ operation: "shift", shiftSamples: 1.5 });
+    bad({ operation: "zeroPad", padStartSamples: -1, padEndSamples: 0 });
+    bad({ operation: "periodicExtend", repetitions: 0 });
+    bad({ operation: "truncate", startSampleIndex: -1, lengthSamples: 2 });
+  });
+});
+
 describe("op table wiring", () => {
   it("carries the handler for dispatch", () => {
     expect(dspOps.sessionPing.handler).toBe(sessionPing);
@@ -470,6 +592,7 @@ describe("op table wiring", () => {
     expect(dspOps.speedTransform.handler).toBe(speedTransform);
     expect(dspOps.samplingProcess.handler).toBe(samplingProcess);
     expect(dspOps.aliasDemo.handler).toBe(aliasDemo);
+    expect(dspOps.extentProcess.handler).toBe(extentProcess);
   });
 
   it("derives typed params/results from the table (the add-one-entry lens)", () => {
@@ -484,6 +607,7 @@ describe("op table wiring", () => {
       | "speedTransform"
       | "samplingProcess"
       | "aliasDemo"
+      | "extentProcess"
     >();
     expectTypeOf<DspOpParams<"sessionPing">>().toEqualTypeOf<{ count: number }>();
     expectTypeOf<DspOpResult<"sessionPing">>().toEqualTypeOf<{
