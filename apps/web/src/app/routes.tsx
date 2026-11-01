@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { createBrowserRouter, type RouteObject, redirect } from "react-router";
+import { ExtentView } from "../features/extent/extentView";
 import { FftView } from "../features/fftview/fftView";
 import { GeneratorView } from "../features/generator/generatorView";
 import { SamplingView } from "../features/sampling/samplingView";
@@ -16,6 +17,7 @@ export const TOOL_IDS = [
   "generator",
   "speed",
   "sampling",
+  "extent",
 ] as const;
 export type ToolId = (typeof TOOL_IDS)[number];
 
@@ -75,6 +77,7 @@ export const appRoutes: RouteObject[] = [
       { path: "tools/generator", element: <GeneratorView /> },
       { path: "tools/speed", element: <SpeedView /> },
       { path: "tools/sampling", element: <SamplingView /> },
+      { path: "tools/extent", element: <ExtentView /> },
     ],
   },
 ];

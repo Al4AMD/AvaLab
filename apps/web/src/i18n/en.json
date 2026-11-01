@@ -22,7 +22,8 @@
     "fftview": "FFT View",
     "generator": "Generator",
     "speed": "Speed and direction",
-    "sampling": "Sampling and bit depth"
+    "sampling": "Sampling and bit depth",
+    "extent": "Signal extent"
   },
   "input": {
     "empty": {
@@ -108,6 +109,9 @@
     },
     "sampling": {
       "title": "Sampling and bit depth"
+    },
+    "extent": {
+      "title": "Signal extent"
     }
   },
   "fftview": {
@@ -395,6 +399,84 @@
       "aliasing": "Turn the anti-alias filter off and lower the target rate: a tone above the new Nyquist appears at a different frequency.",
       "dither": "At low bit depth, dither replaces correlated quantization distortion with a steady noise floor.",
       "snr": "Each extra bit adds about 6 dB of SNR; compare the measured value with the theoretical line."
+    }
+  },
+  "extent": {
+    "controls": {
+      "operation": "Operation",
+      "shiftSamples": "Shift (samples)",
+      "scaleFactor": "Time-scale factor",
+      "truncateStart": "Truncate start (samples)",
+      "truncateLength": "Truncate length (samples)",
+      "padStart": "Pad at start (samples)",
+      "padEnd": "Pad at end (samples)",
+      "repetitions": "Repetitions"
+    },
+    "operation": {
+      "identity": "Identity",
+      "shift": "Time shift x(t − t₀)",
+      "scale": "Time scale x(at)",
+      "reverse": "Time reversal x(−t)",
+      "truncate": "Truncate",
+      "zeroPad": "Zero-pad",
+      "periodic": "Periodic extension"
+    },
+    "range": {
+      "pattern": "Source range {{start}} – {{end}}"
+    },
+    "apply": {
+      "preview": "Preview range",
+      "whole": "Apply to whole file"
+    },
+    "result": {
+      "title": "Signal extent result"
+    },
+    "error": {
+      "tooLong": "The result would exceed the 300 s processed-playback cap.",
+      "failed": "The extent operation failed. Try a shorter range or different parameters."
+    },
+    "status": {
+      "computing": "Computing in the worker…"
+    },
+    "metrics": {
+      "duration": "Duration",
+      "samples": "Samples",
+      "support": "Non-zero support",
+      "emptySupport": "empty",
+      "supportPattern": "{{start}} – {{end}}",
+      "energy": "Energy",
+      "averagePower": "Average power",
+      "type": "Type",
+      "deltaF": "Bin width (Δf)"
+    },
+    "signalType": {
+      "energy": "Energy signal",
+      "power": "Power signal"
+    },
+    "waveform": {
+      "before": "Before",
+      "after": "After (support highlighted)",
+      "beforeAria": "Source waveform before the extent operation",
+      "afterAria": "Result waveform after the extent operation"
+    },
+    "spectrum": {
+      "before": "Spectrum before",
+      "after": "Spectrum after",
+      "beforeAria": "Magnitude spectrum of the source",
+      "afterAria": "Magnitude spectrum of the result",
+      "frequencyAxis": "Frequency",
+      "magnitudeAxis": "Magnitude"
+    },
+    "play": "Play processed result",
+    "observe": {
+      "title": "What to observe",
+      "truncate": "A shorter truncation widens the main lobe and raises the bin width Δf = fs / N.",
+      "zeroPad": "Zero-padding adds no new information: it samples the same spectrum more densely, so the main-lobe width stays the same.",
+      "tradeoff": "A signal that is narrow in time is wide in frequency (time–bandwidth uncertainty).",
+      "scale": "Time scaling moves the spectrum inversely: x(at) has spectrum |a|⁻¹ X(f/a).",
+      "periodic": "Periodic extension produces spectral lines at multiples of 1/T.",
+      "scaleNote": "Time scaling deliberately has no anti-alias filter. For the filtered comparison, use the sampling lab (F03).",
+      "units": "Energy and average power are amplitude-squared values; for normalized audio in [−1, 1] the unit is full-scale²."
     }
   }
 }
