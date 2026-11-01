@@ -29,6 +29,8 @@ import {
   classifySignalType,
   computePeakBuckets,
   spectrogramTiles as computeSpectrogramTiles,
+  convolveDirect,
+  convolveFft,
   fft,
   generateChirp,
   generateImpulse,
@@ -37,6 +39,7 @@ import {
   generateSine,
   generateSquare,
   generateStep,
+  generateSyntheticIr,
   generateTriangle,
   generateTwoTone,
   generateWhiteNoise,
@@ -52,6 +55,7 @@ import {
   resampleRational,
   reverse,
   type SpectrogramTilesParams,
+  type SyntheticIrKind,
   segmentalSnrDb,
   signalEnergy,
   snrDb,
@@ -777,6 +781,228 @@ export function extentProcess(
   };
 }
 
+export type ReverbIrParams = {
+  kind: SyntheticIrKind;
+  durationSeconds: number;
+  rt60Seconds: number;
+  seed: number;
+};
+
+export type ReverbProcessParams = {
+  sampleRateHz: number;
+  startSample: number;
+  endSample: number;
+  ir: ReverbIrParams;
+  uploadedIrSampleCount: number;
+  preDelayMs: number;
+  wetMix: number;
+  method: "fft" | "direct";
+};
+
+export type ReverbProcessResult = {
+  meta: {
+    outputSampleCount: number;
+    irSampleCount: number;
+    elapsedMs: number;
+    method: "fft" | "direct";
+    preDelaySamples: number;
+  };
+  payload?: TransferablePayload;
+};
+
+const MAX_REVERB_OUTPUT_SECONDS = 300;
+const MAX_DIRECT_INPUT_SECONDS = 2;
+const SYNTHETIC_IR_KINDS: readonly SyntheticIrKind[] = ["room", "hall", "plate", "telephone"];
+
+/**
+ * F10 reverb: convolve the source slice with a synthetic or uploaded impulse
+ * response, after an optional pre-delay, and mix the wet result with the dry
+ * signal zero-padded to the full convolution length. The output keeps the
+ * whole tail: `preDelay + N + M - 1` samples.
+ */
+export function reverbProcess(
+  params: ReverbProcessParams,
+  payload?: TransferablePayload,
+): ReverbProcessResult {
+  const ir = params?.ir;
+  if (
+    params === undefined ||
+    params === null ||
+    !Number.isFinite(params.sampleRateHz) ||
+    params.sampleRateHz <= 0 ||
+    params.sampleRateHz > 96_000 ||
+    !Number.isInteger(params.startSample) ||
+    !Number.isInteger(params.endSample) ||
+    params.startSample < 0 ||
+    params.endSample < params.startSample ||
+    ir === undefined ||
+    ir === null ||
+    !SYNTHETIC_IR_KINDS.includes(ir.kind) ||
+    !Number.isFinite(ir.durationSeconds) ||
+    ir.durationSeconds <= 0 ||
+    !Number.isFinite(ir.rt60Seconds) ||
+    ir.rt60Seconds <= 0 ||
+    !Number.isFinite(ir.seed) ||
+    !Number.isInteger(params.uploadedIrSampleCount) ||
+    params.uploadedIrSampleCount < 0 ||
+    !Number.isFinite(params.preDelayMs) ||
+    params.preDelayMs < 0 ||
+    !Number.isFinite(params.wetMix) ||
+    params.wetMix < 0 ||
+    params.wetMix > 1 ||
+    (params.method !== "fft" && params.method !== "direct")
+  ) {
+    throw new DspOpError("badParams", `reverbProcess: invalid params ${String(params)}`);
+  }
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "reverbProcess: a Float32 source payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError("badPayload", "reverbProcess: payload must be Float32-aligned");
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  const sourceLength = samples.length - params.uploadedIrSampleCount;
+  if (sourceLength <= 0) {
+    throw new DspOpError("badParams", "reverbProcess: the source or uploaded IR is empty");
+  }
+  if (params.method === "direct" && sourceLength / params.sampleRateHz > MAX_DIRECT_INPUT_SECONDS) {
+    throw new DspOpError(
+      "badParams",
+      `reverbProcess: direct convolution is limited to ${MAX_DIRECT_INPUT_SECONDS} s excerpts`,
+    );
+  }
+
+  const preDelaySamples = Math.round((params.preDelayMs * params.sampleRateHz) / 1000);
+  const expectedIrLength =
+    params.uploadedIrSampleCount > 0
+      ? params.uploadedIrSampleCount
+      : Math.round(ir.durationSeconds * params.sampleRateHz);
+  if (!Number.isSafeInteger(expectedIrLength) || expectedIrLength <= 0) {
+    throw new DspOpError("badParams", "reverbProcess: the impulse response is empty");
+  }
+  const outputLength = preDelaySamples + sourceLength + expectedIrLength - 1;
+  if (
+    !Number.isSafeInteger(outputLength) ||
+    outputLength / params.sampleRateHz > MAX_REVERB_OUTPUT_SECONDS
+  ) {
+    throw new DspOpError(
+      "tooLong",
+      `reverbProcess: output is ${(outputLength / params.sampleRateHz).toFixed(1)} s, ` +
+        `above the ${MAX_REVERB_OUTPUT_SECONDS} s processed cap`,
+    );
+  }
+
+  const startedMs = performance.now();
+  const source = Float64Array.from(samples.subarray(0, sourceLength));
+  let impulseResponse: Float64Array;
+  if (params.uploadedIrSampleCount > 0) {
+    impulseResponse = Float64Array.from(samples.subarray(sourceLength));
+  } else {
+    impulseResponse = generateSyntheticIr({
+      kind: ir.kind,
+      sampleRateHz: params.sampleRateHz,
+      durationSeconds: ir.durationSeconds,
+      rt60Seconds: ir.rt60Seconds,
+      seed: ir.seed,
+    });
+  }
+
+  const delayed = new Float64Array(preDelaySamples + source.length);
+  delayed.set(source, preDelaySamples);
+  const wet =
+    params.method === "direct"
+      ? convolveDirect(delayed, impulseResponse)
+      : convolveFft(delayed, impulseResponse);
+  const dry = new Float64Array(wet.length);
+  dry.set(source);
+  const output = new Float64Array(wet.length);
+  for (let index = 0; index < output.length; index += 1) {
+    output[index] = (1 - params.wetMix) * (dry[index] ?? 0) + params.wetMix * (wet[index] ?? 0);
+  }
+  const elapsedMs = performance.now() - startedMs;
+  const out = Float32Array.from(output);
+  return {
+    meta: {
+      outputSampleCount: out.length,
+      irSampleCount: impulseResponse.length,
+      elapsedMs,
+      method: params.method,
+      preDelaySamples,
+    },
+    payload: { buffer: out.buffer, byteOffset: 0, byteLength: out.byteLength },
+  };
+}
+
+export type ConvolutionStepsParams = {
+  signal: readonly number[];
+  ir: readonly number[];
+};
+
+export type ConvolutionStepsResult = {
+  meta: {
+    signalSampleCount: number;
+    irSampleCount: number;
+    stepCount: number;
+    outputSampleCount: number;
+  };
+  payload?: TransferablePayload;
+};
+
+function finiteNumberArray(values: readonly number[] | undefined): values is readonly number[] {
+  if (!Array.isArray(values) || values.length === 0) {
+    return false;
+  }
+  for (const value of values) {
+    if (!Number.isFinite(value)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * F10 teaching visualization: one partial convolution array per IR tap.
+ * `partial_m[m + i] = signal[i] * ir[m]`; summing the partials reproduces
+ * `convolveDirect(signal, ir)`. Runs in the worker because the visualization
+ * must not put DSP on the main thread.
+ */
+export function convolutionSteps(
+  params: ConvolutionStepsParams,
+  _payload?: TransferablePayload,
+): ConvolutionStepsResult {
+  if (
+    params === undefined ||
+    params === null ||
+    !finiteNumberArray(params.signal) ||
+    !finiteNumberArray(params.ir)
+  ) {
+    throw new DspOpError("badParams", `convolutionSteps: invalid params ${String(params)}`);
+  }
+  const signal = params.signal;
+  const ir = params.ir;
+  const outputLength = signal.length + ir.length - 1;
+  if (!Number.isSafeInteger(outputLength * ir.length)) {
+    throw new DspOpError("badParams", "convolutionSteps: step arrays are too large");
+  }
+  const partials = new Float32Array(outputLength * ir.length);
+  for (let step = 0; step < ir.length; step += 1) {
+    const offset = step * outputLength;
+    const tap = ir[step] ?? 0;
+    for (let index = 0; index < signal.length; index += 1) {
+      partials[offset + step + index] = (signal[index] ?? 0) * tap;
+    }
+  }
+  return {
+    meta: {
+      signalSampleCount: signal.length,
+      irSampleCount: ir.length,
+      stepCount: ir.length,
+      outputSampleCount: outputLength,
+    },
+    payload: { buffer: partials.buffer, byteOffset: 0, byteLength: partials.byteLength },
+  };
+}
+
 /** Processed-playback cap in seconds (mirrors the store's MAX_PROCESSED_SECONDS;
  * kept local so the worker op table never imports store state). */
 const MAX_SPEED_OUTPUT_SECONDS = 300;
@@ -1303,6 +1529,34 @@ export const dspOps = {
     params: { sampleRateHz: 0, operation: "identity" } as ExtentProcessParams,
     result: undefined as unknown as ExtentProcessResult,
     handler: extentProcess,
+  },
+  reverbProcess: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: {
+      sampleRateHz: 0,
+      startSample: 0,
+      endSample: 0,
+      ir: {
+        kind: "hall" as ReverbIrParams["kind"],
+        durationSeconds: 1,
+        rt60Seconds: 0.5,
+        seed: 1,
+      },
+      uploadedIrSampleCount: 0,
+      preDelayMs: 0,
+      wetMix: 1,
+      method: "fft" as ReverbProcessParams["method"],
+    },
+    result: undefined as unknown as ReverbProcessResult,
+    handler: reverbProcess,
+  },
+  convolutionSteps: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: { signal: [], ir: [] },
+    result: undefined as unknown as ConvolutionStepsResult,
+    handler: convolutionSteps,
   },
   samplingProcess: {
     // Type lenses only — the table is read for types (DspOpParams/Result);

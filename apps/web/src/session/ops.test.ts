@@ -7,6 +7,8 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
   aliasDemo,
+  type ConvolutionStepsParams,
+  convolutionSteps,
   DspOpError,
   type DspOpName,
   type DspOpParams,
@@ -16,6 +18,8 @@ import {
   extentProcess,
   fftSelection,
   generateSynth,
+  type ReverbProcessParams,
+  reverbProcess,
   type SamplingProcessParams,
   samplingProcess,
   sessionPing,
@@ -580,6 +584,172 @@ describe("extentProcess handler", () => {
   });
 });
 
+describe("reverbProcess handler", () => {
+  const SAMPLE_RATE = 48_000;
+  const IR = {
+    kind: "hall" as const,
+    durationSeconds: 0.2,
+    rt60Seconds: 0.4,
+    seed: 7,
+  };
+
+  function run(
+    source: number[],
+    uploadedIr: number[],
+    overrides: Partial<ReverbProcessParams> = {},
+  ) {
+    const values = [...source, ...uploadedIr];
+    const params: ReverbProcessParams = {
+      sampleRateHz: SAMPLE_RATE,
+      startSample: 0,
+      endSample: source.length,
+      ir: IR,
+      uploadedIrSampleCount: uploadedIr.length,
+      preDelayMs: 0,
+      wetMix: 1,
+      method: "fft",
+      ...overrides,
+    };
+    return reverbProcess(params, float32PayloadOf(values));
+  }
+
+  function outputOf(result: ReturnType<typeof run>): number[] {
+    const payload = result.payload;
+    if (payload === undefined) {
+      throw new Error("missing payload");
+    }
+    return float32ValuesOf(payload);
+  }
+
+  it("keeps an impulse unchanged through a delta IR", () => {
+    const result = run([1, 0, 0, 0], [1]);
+    expect(outputOf(result)).toEqual([1, 0, 0, 0]);
+    expect(result.meta).toMatchObject({
+      outputSampleCount: 4,
+      irSampleCount: 1,
+      method: "fft",
+      preDelaySamples: 0,
+    });
+  });
+
+  it("keeps the full convolution tail", () => {
+    const result = run([1, 2], [1, 1, 1]);
+    expect(result.meta.outputSampleCount).toBe(4);
+    expect(outputOf(result)).toEqual([1, 3, 3, 2]);
+  });
+
+  it("pads the dry signal to the convolution length for wetMix 0", () => {
+    const result = run([1, 2], [1, 1], { wetMix: 0 });
+    expect(outputOf(result)).toEqual([1, 2, 0]);
+  });
+
+  it("applies the pre-delay before convolution", () => {
+    const result = run([1], [1], { preDelayMs: 1000 / SAMPLE_RATE });
+    expect(result.meta.preDelaySamples).toBe(1);
+    expect(outputOf(result)).toEqual([0, 1]);
+  });
+
+  it("agrees between the FFT and direct methods on a one-second excerpt", () => {
+    const source = Array.from({ length: SAMPLE_RATE }, (_, index) =>
+      Math.sin((2 * Math.PI * 440 * index) / SAMPLE_RATE),
+    );
+    const uploadedIr = Array.from({ length: 64 }, (_, index) => 0.9 ** index);
+    const fft = run(source, uploadedIr, { method: "fft" });
+    const direct = run(source, uploadedIr, { method: "direct" });
+    const fftValues = outputOf(fft);
+    const directValues = outputOf(direct);
+    expect(fftValues.length).toBe(directValues.length);
+    let maxDifference = 0;
+    for (let index = 0; index < fftValues.length; index += 1) {
+      maxDifference = Math.max(
+        maxDifference,
+        Math.abs((fftValues[index] ?? 0) - (directValues[index] ?? 0)),
+      );
+    }
+    expect(maxDifference).toBeLessThan(1e-6);
+  });
+
+  it("rejects the direct method above two seconds of input", () => {
+    const source = new Array<number>(2 * SAMPLE_RATE + 1).fill(0);
+    expect(() => run(source, [1], { method: "direct" })).toThrowError(
+      expect.objectContaining({ code: "badParams" }),
+    );
+  });
+
+  it("rejects an output above the 300 s processed cap", () => {
+    expect(() => run([1], [1], { preDelayMs: 300_000 })).toThrowError(
+      expect.objectContaining({ code: "tooLong" }),
+    );
+  });
+
+  it("throws badParams for invalid parameters", () => {
+    const bad = (overrides: Partial<ReverbProcessParams>): void => {
+      expect(() => run([1, 2, 3], [1], overrides)).toThrowError(
+        expect.objectContaining({ code: "badParams" }),
+      );
+    };
+    bad({ wetMix: 1.5 });
+    bad({ preDelayMs: -1 });
+    bad({ method: "other" as ReverbProcessParams["method"] });
+    bad({ uploadedIrSampleCount: 9 });
+    bad({ startSample: -1 });
+    bad({ ir: { ...IR, durationSeconds: 0 } });
+  });
+});
+
+describe("convolutionSteps handler", () => {
+  function directConvolution(signal: number[], ir: number[]): number[] {
+    const output = new Array<number>(signal.length + ir.length - 1).fill(0);
+    for (let m = 0; m < ir.length; m += 1) {
+      for (let i = 0; i < signal.length; i += 1) {
+        output[m + i] = (output[m + i] ?? 0) + (signal[i] ?? 0) * (ir[m] ?? 0);
+      }
+    }
+    return output;
+  }
+
+  it("returns one partial per IR tap and the partials sum to the direct result", () => {
+    const signal = [1, 2, 3];
+    const ir = [4, 5];
+    const params: ConvolutionStepsParams = { signal, ir };
+    const result = convolutionSteps(params);
+    const payload = result.payload;
+    if (payload === undefined) {
+      throw new Error("missing payload");
+    }
+    const values = float32ValuesOf(payload);
+    const outputLength = signal.length + ir.length - 1;
+    expect(result.meta).toEqual({
+      signalSampleCount: 3,
+      irSampleCount: 2,
+      stepCount: 2,
+      outputSampleCount: 4,
+    });
+    expect(values.length).toBe(2 * outputLength);
+    expect(values.slice(0, outputLength)).toEqual([4, 8, 12, 0]);
+    expect(values.slice(outputLength)).toEqual([0, 5, 10, 15]);
+    const summed = new Array<number>(outputLength).fill(0);
+    for (let step = 0; step < 2; step += 1) {
+      for (let index = 0; index < outputLength; index += 1) {
+        summed[index] = (summed[index] ?? 0) + (values[step * outputLength + index] ?? 0);
+      }
+    }
+    expect(summed).toEqual(directConvolution(signal, ir));
+  });
+
+  it("throws badParams for empty or non-finite inputs", () => {
+    expect(() => convolutionSteps({ signal: [], ir: [1] })).toThrowError(
+      expect.objectContaining({ code: "badParams" }),
+    );
+    expect(() => convolutionSteps({ signal: [1], ir: [] })).toThrowError(
+      expect.objectContaining({ code: "badParams" }),
+    );
+    expect(() => convolutionSteps({ signal: [1, Number.NaN], ir: [1] })).toThrowError(
+      expect.objectContaining({ code: "badParams" }),
+    );
+  });
+});
+
 describe("op table wiring", () => {
   it("carries the handler for dispatch", () => {
     expect(dspOps.sessionPing.handler).toBe(sessionPing);
@@ -593,6 +763,8 @@ describe("op table wiring", () => {
     expect(dspOps.samplingProcess.handler).toBe(samplingProcess);
     expect(dspOps.aliasDemo.handler).toBe(aliasDemo);
     expect(dspOps.extentProcess.handler).toBe(extentProcess);
+    expect(dspOps.reverbProcess.handler).toBe(reverbProcess);
+    expect(dspOps.convolutionSteps.handler).toBe(convolutionSteps);
   });
 
   it("derives typed params/results from the table (the add-one-entry lens)", () => {
@@ -608,6 +780,8 @@ describe("op table wiring", () => {
       | "samplingProcess"
       | "aliasDemo"
       | "extentProcess"
+      | "reverbProcess"
+      | "convolutionSteps"
     >();
     expectTypeOf<DspOpParams<"sessionPing">>().toEqualTypeOf<{ count: number }>();
     expectTypeOf<DspOpResult<"sessionPing">>().toEqualTypeOf<{
