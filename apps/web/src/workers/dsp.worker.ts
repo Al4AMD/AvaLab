@@ -36,6 +36,7 @@ import {
   reverbProcess,
   samplingProcess,
   sessionPing,
+  spectrumEdit,
   spectrogramTiles,
   speedTransform,
   waveformOverview,
@@ -70,6 +71,7 @@ const dspHandlers = {
   samplingProcess,
   sessionPing,
   speedTransform,
+  spectrumEdit,
   spectrogramTiles,
   waveformOverview,
   waveformRange,
@@ -191,6 +193,10 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
       }
       case "convolutionSteps": {
         const result = dspHandlers.convolutionSteps(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "spectrumEdit": {
+        const result = dspHandlers.spectrumEdit(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       default: {

@@ -16,6 +16,7 @@ import {
   dspOps,
   type ExtentOperation,
   extentProcess,
+  FFT_MAX_LENGTH,
   fftSelection,
   generateSynth,
   type ReverbProcessParams,
@@ -23,6 +24,8 @@ import {
   type SamplingProcessParams,
   samplingProcess,
   sessionPing,
+  type SpectrumEditParams,
+  spectrumEdit,
   spectrogramTiles,
   speedTransform,
   waveformOverview,
@@ -758,6 +761,115 @@ describe("convolutionSteps handler", () => {
   });
 });
 
+describe("spectrumEdit handler", () => {
+  const SAMPLE_RATE = 8000;
+
+  function valuesOf(result: ReturnType<typeof spectrumEdit>): Float64Array {
+    const payload = result.payload;
+    if (payload === undefined) {
+      throw new Error("missing spectrumEdit payload");
+    }
+    return new Float64Array(payload.buffer, payload.byteOffset, payload.byteLength / 8);
+  }
+
+  function run(
+    values: readonly number[],
+    edits: SpectrumEditParams["edits"],
+    hermitian = true,
+  ): ReturnType<typeof spectrumEdit> {
+    return spectrumEdit(
+      {
+        sampleRateHz: SAMPLE_RATE,
+        startSample: 0,
+        endSample: values.length,
+        edits,
+        hermitian,
+      },
+      float32PayloadOf([...values]),
+    );
+  }
+
+  it("packs samples and the four one-sided spectra at fixed offsets", () => {
+    const input = [0.25, -0.5, 1, 0, -1.5, 0.75, 0.125, -0.25];
+    const result = run(input, [
+      { startBin: 0, endBin: 5, target: "mag", mode: "zero", value: 0 },
+    ]);
+    const values = valuesOf(result);
+    const { sampleCount, binCount } = result.meta;
+    expect(sampleCount).toBe(input.length);
+    expect(binCount).toBe(5);
+    expect(values.length).toBe(sampleCount + binCount * 4);
+    for (let index = 0; index < sampleCount; index += 1) {
+      expect(values[index] ?? 0).toBe(0);
+    }
+    for (let bin = 0; bin < binCount; bin += 1) {
+      expect(values[sampleCount + binCount + bin] ?? 0).toBe(0);
+    }
+  });
+
+  it("round-trips with no edits and Hermitian ON", () => {
+    const input = Array.from({ length: 1000 }, (_, index) => Math.sin(0.31 * index));
+    const result = run(input, []);
+    const values = valuesOf(result);
+    const rounded = new Float32Array(input);
+    for (let index = 0; index < input.length; index += 1) {
+      expect(values[index] ?? 0).toBeCloseTo(rounded[index] ?? 0, 6);
+    }
+    expect(result.meta.imaginaryEnergyRatio).toBeLessThan(1e-12);
+    expect(result.meta.fftLengthSamples).toBe(1024);
+    expect(result.meta.frequencyResolutionHz).toBeCloseTo(SAMPLE_RATE / 1024, 12);
+  });
+
+  it("keeps a real zero-imaginary result when zeroIm is applied", () => {
+    const input = Array.from({ length: 64 }, (_, index) =>
+      Math.cos((2 * Math.PI * 3 * index) / 64),
+    );
+    const result = run(input, [
+      { startBin: 0, endBin: 33, target: "im", mode: "zero", value: 0 },
+    ]);
+    const values = valuesOf(result);
+    expect(result.meta.imaginaryEnergyRatio).toBeLessThan(1e-12);
+    for (let index = 0; index < input.length; index += 1) {
+      expect(values[index] ?? 0).toBeCloseTo(new Float32Array(input)[index] ?? 0, 5);
+    }
+  });
+
+  it("reports imaginary energy when Hermitian symmetry is off", () => {
+    const result = run(
+      Array.from({ length: 64 }, (_, index) => Math.sin(0.31 * index)),
+      [{ startBin: 1, endBin: 2, target: "re", mode: "set", value: 1 }],
+      false,
+    );
+    expect(result.meta.imaginaryEnergyRatio).toBeGreaterThan(0);
+  });
+
+  it("caps the analysis at FFT_MAX_LENGTH and reports it", () => {
+    const input = new Array<number>(FFT_MAX_LENGTH + 100).fill(0);
+    const result = run(input, []);
+    expect(result.meta.capped).toBe(true);
+    expect(result.meta.sampleCount).toBe(FFT_MAX_LENGTH);
+    expect(result.meta.fftLengthSamples).toBe(FFT_MAX_LENGTH);
+  });
+
+  it("rejects empty selections and malformed edits with badParams", () => {
+    expect(() =>
+      spectrumEdit(
+        {
+          sampleRateHz: SAMPLE_RATE,
+          startSample: 0,
+          endSample: 0,
+          edits: [],
+          hermitian: true,
+        },
+        float32PayloadOf([]),
+      ),
+    ).toThrowError(expect.objectContaining({ code: "badParams" }));
+    expect(() =>
+      run([0, 0], [{ startBin: 2, endBin: 1, target: "re", mode: "set", value: 1 }]),
+    ).toThrowError(expect.objectContaining({ code: "badParams" }));
+  });
+});
+
 describe("op table wiring", () => {
   it("carries the handler for dispatch", () => {
     expect(dspOps.sessionPing.handler).toBe(sessionPing);
@@ -773,6 +885,7 @@ describe("op table wiring", () => {
     expect(dspOps.extentProcess.handler).toBe(extentProcess);
     expect(dspOps.reverbProcess.handler).toBe(reverbProcess);
     expect(dspOps.convolutionSteps.handler).toBe(convolutionSteps);
+    expect(dspOps.spectrumEdit.handler).toBe(spectrumEdit);
   });
 
   it("derives typed params/results from the table (the add-one-entry lens)", () => {
@@ -790,6 +903,7 @@ describe("op table wiring", () => {
       | "extentProcess"
       | "reverbProcess"
       | "convolutionSteps"
+      | "spectrumEdit"
     >();
     expectTypeOf<DspOpParams<"sessionPing">>().toEqualTypeOf<{ count: number }>();
     expectTypeOf<DspOpResult<"sessionPing">>().toEqualTypeOf<{

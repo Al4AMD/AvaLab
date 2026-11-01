@@ -31,6 +31,7 @@ import {
   spectrogramTiles as computeSpectrogramTiles,
   convolveDirect,
   convolveFft,
+  editSpectrum,
   fft,
   generateChirp,
   generateImpulse,
@@ -55,6 +56,7 @@ import {
   resampleRational,
   reverse,
   type SpectrogramTilesParams,
+  type SpectrumEdit,
   type SyntheticIrKind,
   segmentalSnrDb,
   signalEnergy,
@@ -461,6 +463,110 @@ export function fftSelection(
       capped: params.endSample - params.startSample > FFT_MAX_LENGTH,
       magnitudeMode: params.magnitudeMode,
       phaseMode: params.phaseMode,
+    },
+    payload: { buffer: packed.buffer, byteOffset: 0, byteLength: packed.byteLength },
+  };
+}
+
+export type SpectrumEditParams = {
+  sampleRateHz: number;
+  startSample: number;
+  endSample: number;
+  edits: readonly SpectrumEdit[];
+  hermitian: boolean;
+};
+export type SpectrumEditResult = {
+  meta: {
+    sampleRateHz: number;
+    startSample: number;
+    endSample: number;
+    sampleCount: number;
+    fftLengthSamples: number;
+    binCount: number;
+    frequencyResolutionHz: number;
+    imaginaryEnergyRatio: number;
+    capped: boolean;
+    editsApplied: number;
+  };
+  /** `[samples | re | im | magnitude | phase]`; samples are Float32 values
+   * widened to Float64, each spectrum section is `binCount` long. */
+  payload?: TransferablePayload;
+};
+
+/**
+ * F09 worker wrapper: copies the selected source prefix into Float64, runs
+ * the dsp `editSpectrum` (rectangular window, zero-pad, optional Hermitian
+ * mirroring) and packs the edited audio plus the post-edit one-sided spectra
+ * for the charts. Selection beyond `FFT_MAX_LENGTH` analyses the prefix and
+ * reports `capped` (D-021).
+ */
+export function spectrumEdit(
+  params: SpectrumEditParams,
+  payload?: TransferablePayload,
+): SpectrumEditResult {
+  if (
+    params === undefined ||
+    params === null ||
+    !Number.isFinite(params.sampleRateHz) ||
+    params.sampleRateHz <= 0 ||
+    params.sampleRateHz > 96_000 ||
+    !Number.isInteger(params.startSample) ||
+    !Number.isInteger(params.endSample) ||
+    params.startSample < 0 ||
+    params.endSample < params.startSample ||
+    !Array.isArray(params.edits) ||
+    typeof params.hermitian !== "boolean"
+  ) {
+    throw new DspOpError("badParams", `spectrumEdit: invalid params ${String(params)}`);
+  }
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "spectrumEdit: a Float32 source payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError("badPayload", "spectrumEdit: payload must be Float32-aligned");
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  const analysisLength = Math.min(samples.length, FFT_MAX_LENGTH);
+  if (analysisLength < 1) {
+    throw new DspOpError("badParams", "spectrumEdit: the selection is empty");
+  }
+  const input = new Float64Array(analysisLength);
+  for (let index = 0; index < analysisLength; index += 1) {
+    input[index] = samples[index] ?? 0;
+  }
+  const fftLengthSamples = analysisLength <= 1 ? 1 : nextPowerOfTwo(analysisLength);
+  let edited: ReturnType<typeof editSpectrum>;
+  try {
+    edited = editSpectrum(input, {
+      fftLengthSamples,
+      edits: params.edits,
+      hermitian: params.hermitian,
+    });
+  } catch (error) {
+    throw new DspOpError("badParams", `spectrumEdit: ${String(error)}`);
+  }
+  const sampleCount = edited.samples.length;
+  const binCount = edited.re.length;
+  const packed = new Float64Array(sampleCount + binCount * 4);
+  for (let index = 0; index < sampleCount; index += 1) {
+    packed[index] = Math.fround(edited.samples[index] ?? 0);
+  }
+  packed.set(edited.re, sampleCount);
+  packed.set(edited.im, sampleCount + binCount);
+  packed.set(edited.magnitude, sampleCount + binCount * 2);
+  packed.set(edited.phase, sampleCount + binCount * 3);
+  return {
+    meta: {
+      sampleRateHz: params.sampleRateHz,
+      startSample: params.startSample,
+      endSample: params.endSample,
+      sampleCount,
+      fftLengthSamples,
+      binCount,
+      frequencyResolutionHz: params.sampleRateHz / fftLengthSamples,
+      imaginaryEnergyRatio: edited.imaginaryEnergyRatio,
+      capped: params.endSample - params.startSample > FFT_MAX_LENGTH,
+      editsApplied: params.edits.length,
     },
     payload: { buffer: packed.buffer, byteOffset: 0, byteLength: packed.byteLength },
   };
@@ -1510,11 +1616,24 @@ export const dspOps = {
     handler: fftSelection,
   },
   windowProfiles: {
-    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // Type lenses only �?" the table is read for types (DspOpParams/Result);
     // runtime code dispatches through the worker switch.
     params: { sampleRateHz: 0, windowLengthSamples: 0 },
     result: undefined as unknown as WindowProfilesResult,
     handler: windowProfiles,
+  },
+  spectrumEdit: {
+    // Type lenses only �?" the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: {
+      sampleRateHz: 0,
+      startSample: 0,
+      endSample: 0,
+      edits: [] as readonly SpectrumEdit[],
+      hermitian: true,
+    },
+    result: undefined as unknown as SpectrumEditResult,
+    handler: spectrumEdit,
   },
   generateSynth: {
     // Type lenses only — the table is read for types (DspOpParams/Result);
