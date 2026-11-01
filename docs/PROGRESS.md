@@ -162,10 +162,11 @@ Wave 3 additions (machine-drafted, agent):
 - `speed.*` (F06 speed/direction lab)
 - `sampling.*` (F03 resampling/quantization/aliasing lab)
 - `extent.*` (F07 signal-extent lab), `nav.extent`, `tool.extent.title`
+- `reverb.*` (F10 reverse/reverb lab), `nav.reverb`, `tool.reverb.title`
 
 ## Next recommended step
 
-Wave 3 plans 01–03 are complete; owner code review pending. Next: **Wave 3 plan `04-reverse-reverb.md`** (`docs/plans/wave-3/04-reverse-reverb.md`), which reuses plan 03's reverse operation. Do not begin later plans while an earlier one has failing checks.
+Wave 3 plans 01–04 are complete; owner code review pending. Next: **Wave 3 plan `05-spectrum-editor.md`** (`docs/plans/wave-3/05-spectrum-editor.md`). Do not begin later plans while an earlier one has failing checks.
 
 ## Session log
 
@@ -309,3 +310,13 @@ Wave 3 plans 01–03 are complete; owner code review pending. Next: **Wave 3 pla
 - Gates: `pnpm check` exit 0 (dsp 919/919, web 256/256, scripts 13/13, i18n OK, biome 176 files); `pnpm e2e` 33/33 with zero console errors in fa + en, including both extent-lab locales and the seven-route sidebar sweep. Perf on the same run: overview first paint 219 ms (< 1000 ms), spectrogram first tiles 302 ms (< 3000 ms).
 - Carries: `extent.*` Persian copy needs owner review (added to the fa backlog); the view runs the before- and after-spectrum analyses sequentially because identical concurrent RPC params supersede each other; freehand/brush editing and full theory panels remain deferred.
 - **Next step:** Wave 3 plan 04 — `docs/plans/wave-3/04-reverse-reverb.md`.
+
+## 2026-11-01 — Wave 3, plan 04 CLOSED (F10 reverse + reverb)
+
+- Branch `feat/wave-3`. Commits: `7f00fc5` (`generateSyntheticIr`), `12c41c2` (`reverbProcess` + `convolutionSteps` ops), `dc136a0` (reverb lab + e2e), plus this close-out commit.
+- F10 shipped: `/tools/reverb` with a URL codec (`ir,rt,du,sd,pd,wm,me,from,to`), synthetic room/hall/plate/telephone IRs plus uploaded WAV IRs (mono downmix, ≤ 10 s, resampled to the source rate), pre-delay, wet/dry mix, FFT/direct method, selection-or-first-30-s preview vs explicit whole-file apply, IR waveform + spectrum, result waveform + spectrogram, FFT-vs-direct timing card, convolution flip-and-slide step card, reverse before/after magnitude/phase card, processed playback, and compact observe bullets.
+- Semantics pinned by D-024: synthetic IRs are deterministic per seed and energy-normalized; uploaded IRs keep their own level and are rate-converted with `resampleRational`; output length is `preDelay + N + M − 1`; direct convolution is limited to 2 s excerpts; reverse and reverb stay separate operations.
+- Gates: `pnpm check` exit 0 (dsp 926/926, web 273/273, scripts 13/13, i18n OK, biome 182 files); `pnpm e2e` 35/35 with zero console errors in fa + en, including both reverb-lab locales and the eight-route sidebar sweep. Perf on the same run: overview first paint 382 ms (< 1000 ms), spectrogram first tiles 479 ms (< 3000 ms).
+- Ledger ruling: the reverse card and the IR spectrum both analyse 65 536 samples; identical concurrent `fftSelection` params supersede each other through the params-only RPC key, so the reverse card uses Hann and the IR spectrum Hamming. Any future view with two same-length spectra must vary a param or run them sequentially.
+- Carries: `reverb.*` Persian copy needs owner review; uploaded IR level is not normalized by design; the result spectrogram shows the first 30 s with an explicit note.
+- **Next step:** Wave 3 plan 05 — `docs/plans/wave-3/05-spectrum-editor.md`.
