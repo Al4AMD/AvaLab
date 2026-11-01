@@ -32,6 +32,7 @@ import {
   generateSynth,
   sessionPing,
   spectrogramTiles,
+  speedTransform,
   waveformOverview,
   waveformRange,
   windowProfiles,
@@ -58,6 +59,7 @@ const dspHandlers = {
   fftSelection,
   generateSynth,
   sessionPing,
+  speedTransform,
   spectrogramTiles,
   waveformOverview,
   waveformRange,
@@ -155,6 +157,10 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
       }
       case "generateSynth": {
         const result = dspHandlers.generateSynth(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "speedTransform": {
+        const result = dspHandlers.speedTransform(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       default: {

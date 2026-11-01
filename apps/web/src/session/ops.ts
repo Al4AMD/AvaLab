@@ -39,7 +39,11 @@ import {
   generateWhiteNoise,
   kaiser,
   magnitudeDb,
+  pitchShift,
+  resampleRational,
+  reverse,
   type SpectrogramTilesParams,
+  timeStretch,
   unwrapPhase,
   window,
 } from "@avalab/dsp";
@@ -551,6 +555,134 @@ export type SynthWaveform =
   | "pinkNoise"
   | "chirp"
   | "twoTone";
+export type SpeedTransformParams = {
+  sampleRateHz: number;
+  startSample: number;
+  endSample: number;
+  mode: "resample" | "timeStretch";
+  speedFactor: number;
+  semitones: number;
+  reverse: boolean;
+};
+export type SpeedTransformResult = {
+  meta: {
+    outputSampleCount: number;
+    sampleRateHz: number;
+    actualSpeedFactor: number;
+    elapsedMs: number;
+    capped: boolean;
+  };
+  payload?: TransferablePayload;
+};
+
+/** Processed-playback cap in seconds (mirrors the store's MAX_PROCESSED_SECONDS;
+ * kept local so the worker op table never imports store state). */
+const MAX_SPEED_OUTPUT_SECONDS = 300;
+
+/**
+ * F06 speed/direction transform over the request payload (already the
+ * selected source slice):
+ * - `resample`: tape-style speed, pitch follows. `outputRateHz =
+ *   round(sampleRateHz / speedFactor)`, then the buffer is declared at the
+ *   SOURCE rate so playback lasts `1 / speedFactor` of the input and the
+ *   pitch scales by `speedFactor` (2x speed → 880 Hz from 440 Hz).
+ * - `timeStretch`: phase-vocoder stretch with pitch preserved; an optional
+ *   `pitchShift` runs after the stretch.
+ * - `reverse` applies last, so the waveform plays backwards at the chosen
+ *   speed.
+ */
+export function speedTransform(
+  params: SpeedTransformParams,
+  payload?: TransferablePayload,
+): SpeedTransformResult {
+  if (
+    params === undefined ||
+    params === null ||
+    !Number.isFinite(params.sampleRateHz) ||
+    params.sampleRateHz <= 0 ||
+    params.sampleRateHz > 96_000 ||
+    !Number.isInteger(params.startSample) ||
+    !Number.isInteger(params.endSample) ||
+    params.startSample < 0 ||
+    params.endSample < params.startSample ||
+    (params.mode !== "resample" && params.mode !== "timeStretch") ||
+    !Number.isFinite(params.speedFactor) ||
+    params.speedFactor < 0.25 ||
+    params.speedFactor > 4 ||
+    !Number.isFinite(params.semitones) ||
+    params.semitones < -12 ||
+    params.semitones > 12 ||
+    typeof params.reverse !== "boolean"
+  ) {
+    throw new DspOpError("badParams", `speedTransform: invalid params ${String(params)}`);
+  }
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "speedTransform: a Float32 source payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError("badPayload", "speedTransform: payload must be Float32-aligned");
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  if (samples.length === 0) {
+    throw new DspOpError("badParams", "speedTransform: the selection is empty");
+  }
+
+  const startedMs = performance.now();
+  const input = Float64Array.from(samples);
+  let output: Float64Array;
+  let actualSpeedFactor: number;
+  if (params.mode === "resample") {
+    const outputRateHz = Math.round(params.sampleRateHz / params.speedFactor);
+    if (outputRateHz < 1) {
+      throw new DspOpError(
+        "badParams",
+        `speedTransform: output rate would be ${outputRateHz} Hz (speedFactor ${params.speedFactor})`,
+      );
+    }
+    output = resampleRational(input, {
+      inputRateHz: params.sampleRateHz,
+      outputRateHz,
+      filter: "kaiserSinc",
+    });
+    actualSpeedFactor = params.sampleRateHz / outputRateHz;
+  } else {
+    output = timeStretch(input, {
+      stretchFactor: 1 / params.speedFactor,
+      windowLengthSamples: 2048,
+    });
+    if (params.semitones !== 0) {
+      output = pitchShift(output, {
+        semitones: params.semitones,
+        windowLengthSamples: 2048,
+        sampleRateHz: params.sampleRateHz,
+      });
+    }
+    actualSpeedFactor = params.speedFactor;
+  }
+  if (params.reverse) {
+    output = reverse(output);
+  }
+  if (output.length / params.sampleRateHz > MAX_SPEED_OUTPUT_SECONDS) {
+    throw new DspOpError(
+      "tooLong",
+      `speedTransform: output is ${(output.length / params.sampleRateHz).toFixed(1)} s, ` +
+        `above the ${MAX_SPEED_OUTPUT_SECONDS} s processed cap`,
+    );
+  }
+  const elapsedMs = performance.now() - startedMs;
+  const out = Float32Array.from(output);
+  return {
+    meta: {
+      outputSampleCount: out.length,
+      sampleRateHz: params.sampleRateHz,
+      actualSpeedFactor,
+      elapsedMs,
+      capped: false,
+    },
+    payload: { buffer: out.buffer, byteOffset: 0, byteLength: out.byteLength },
+  };
+}
+
 export type GenerateSynthParams = {
   waveform: SynthWaveform;
   sampleRateHz: number;
@@ -755,6 +887,21 @@ export const dspOps = {
     },
     result: undefined as unknown as GenerateSynthResult,
     handler: generateSynth,
+  },
+  speedTransform: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: {
+      sampleRateHz: 0,
+      startSample: 0,
+      endSample: 0,
+      mode: "resample" as SpeedTransformParams["mode"],
+      speedFactor: 1,
+      semitones: 0,
+      reverse: false,
+    },
+    result: undefined as unknown as SpeedTransformResult,
+    handler: speedTransform,
   },
   spectrogramTiles: {
     // Type lenses only — the table is read for types (DspOpParams/Result);

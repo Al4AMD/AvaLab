@@ -15,6 +15,7 @@ import {
   generateSynth,
   sessionPing,
   spectrogramTiles,
+  speedTransform,
   waveformOverview,
   waveformRange,
   windowProfiles,
@@ -155,6 +156,126 @@ describe("waveformOverview handler", () => {
   });
 });
 
+describe("speedTransform handler", () => {
+  const SAMPLE_RATE = 48_000;
+
+  function sine(seconds: number, frequencyHz: number): TransferablePayload {
+    const sampleCount = Math.round(SAMPLE_RATE * seconds);
+    const values = Array.from({ length: sampleCount }, (_, index) =>
+      Math.sin((2 * Math.PI * frequencyHz * index) / SAMPLE_RATE),
+    );
+    return float32PayloadOf(values);
+  }
+
+  function run(
+    mode: "resample" | "timeStretch",
+    speedFactor: number,
+    semitones = 0,
+    reverse = false,
+    payload = sine(1, 440),
+  ) {
+    return speedTransform(
+      {
+        sampleRateHz: SAMPLE_RATE,
+        startSample: 0,
+        endSample: SAMPLE_RATE,
+        mode,
+        speedFactor,
+        semitones,
+        reverse,
+      },
+      payload,
+    );
+  }
+
+  function zeroCrossingHz(values: number[], sampleRateHz: number): number {
+    let crossings = 0;
+    for (let index = 1; index < values.length; index += 1) {
+      if ((values[index - 1] ?? 0) < 0 !== (values[index] ?? 0) < 0) {
+        crossings += 1;
+      }
+    }
+    return (crossings * sampleRateHz) / (2 * values.length);
+  }
+
+  it("resamples 2x: half the samples, peak near 880 Hz at the source rate", () => {
+    const result = run("resample", 2);
+    const payload = result.payload;
+    if (payload === undefined) {
+      throw new Error("missing payload");
+    }
+    const values = float32ValuesOf(payload);
+    expect(values.length).toBeGreaterThan(23_500);
+    expect(values.length).toBeLessThan(24_500);
+    expect(result.meta.sampleRateHz).toBe(SAMPLE_RATE);
+    expect(result.meta.actualSpeedFactor).toBeCloseTo(2, 6);
+    expect(zeroCrossingHz(values, SAMPLE_RATE)).toBeGreaterThan(840);
+    expect(zeroCrossingHz(values, SAMPLE_RATE)).toBeLessThan(920);
+  });
+
+  it("time-stretches 2x: half the samples, pitch stays near 440 Hz", () => {
+    const result = run("timeStretch", 2);
+    const payload = result.payload;
+    if (payload === undefined) {
+      throw new Error("missing payload");
+    }
+    const values = float32ValuesOf(payload);
+    expect(values.length).toBeGreaterThan(23_500);
+    expect(values.length).toBeLessThan(24_500);
+    expect(result.meta.sampleRateHz).toBe(SAMPLE_RATE);
+    expect(result.meta.actualSpeedFactor).toBeCloseTo(2, 6);
+    expect(zeroCrossingHz(values, SAMPLE_RATE)).toBeGreaterThan(420);
+    expect(zeroCrossingHz(values, SAMPLE_RATE)).toBeLessThan(460);
+  });
+
+  it("pitch-shifts +12 semitones without changing the length", () => {
+    const result = run("timeStretch", 1, 12);
+    const payload = result.payload;
+    if (payload === undefined) {
+      throw new Error("missing payload");
+    }
+    const values = float32ValuesOf(payload);
+    expect(values.length).toBeGreaterThan(47_000);
+    expect(values.length).toBeLessThan(49_000);
+    expect(zeroCrossingHz(values, SAMPLE_RATE)).toBeGreaterThan(840);
+    expect(zeroCrossingHz(values, SAMPLE_RATE)).toBeLessThan(920);
+  });
+
+  it("reverses the output last", () => {
+    const result = run("resample", 1, 0, true, float32PayloadOf([0, 0.25, 0.5, 0.75, 1]));
+    const payload = result.payload;
+    if (payload === undefined) {
+      throw new Error("missing payload");
+    }
+    expect(float32ValuesOf(payload)).toEqual([1, 0.75, 0.5, 0.25, 0]);
+  });
+
+  it("throws tooLong for a 5-minute source slowed to 0.5x", () => {
+    const payload = float32PayloadOf(Array.from({ length: 3000 }, () => 0.1));
+    expect(() =>
+      speedTransform(
+        {
+          sampleRateHz: 10,
+          startSample: 0,
+          endSample: 3000,
+          mode: "resample",
+          speedFactor: 0.5,
+          semitones: 0,
+          reverse: false,
+        },
+        payload,
+      ),
+    ).toThrowError(expect.objectContaining({ code: "tooLong" }));
+  });
+
+  it("throws badParams for an out-of-range speed", () => {
+    expect(() => run("resample", 5)).toThrowError(expect.objectContaining({ code: "badParams" }));
+    expect(() => run("resample", Number.NaN)).toThrowError(
+      expect.objectContaining({ code: "badParams" }),
+    );
+  });
+});
+
 describe("op table wiring", () => {
   it("carries the handler for dispatch", () => {
     expect(dspOps.sessionPing.handler).toBe(sessionPing);
@@ -164,6 +285,7 @@ describe("op table wiring", () => {
     expect(dspOps.fftSelection.handler).toBe(fftSelection);
     expect(dspOps.windowProfiles.handler).toBe(windowProfiles);
     expect(dspOps.generateSynth.handler).toBe(generateSynth);
+    expect(dspOps.speedTransform.handler).toBe(speedTransform);
   });
 
   it("derives typed params/results from the table (the add-one-entry lens)", () => {
@@ -175,6 +297,7 @@ describe("op table wiring", () => {
       | "fftSelection"
       | "windowProfiles"
       | "generateSynth"
+      | "speedTransform"
     >();
     expectTypeOf<DspOpParams<"sessionPing">>().toEqualTypeOf<{ count: number }>();
     expectTypeOf<DspOpResult<"sessionPing">>().toEqualTypeOf<{
