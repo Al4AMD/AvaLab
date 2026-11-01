@@ -6,7 +6,7 @@ speed/direction.
 
 | Plan | Scope | Status |
 |---|---|---|
-| `01-playback-and-speed.md` | Processed-playback lane, dock A/B, F06 speed/direction | planned |
+| `01-playback-and-speed.md` | Processed-playback lane, dock A/B, F06 speed/direction | **done** (2026-11-01) |
 | `02-sampling-bit-depth.md` | F03 resampling, quantization, dither, aliasing demo | planned |
 | `03-signal-extent.md` | F07 shift/scale/reverse/truncate/zero-pad, support/energy/power | planned |
 | `04-reverse-reverb.md` | F10 reverse, synthetic/uploaded IRs, convolution timing | planned |
