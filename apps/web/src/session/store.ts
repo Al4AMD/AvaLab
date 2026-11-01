@@ -49,6 +49,9 @@ import { DspRpcError, dspWorkerRpc } from "./rpc";
 export const MAX_SAMPLE_RATE_HZ = 96_000;
 /** AGENTS §7/F01 duration cap (seconds) — 5 minutes. */
 export const MAX_DURATION_SECONDS = 300;
+/** Processed-playback cap (seconds) — same ceiling as the session source so
+ * the player never holds an unbounded derived buffer (D-022). */
+export const MAX_PROCESSED_SECONDS = MAX_DURATION_SECONDS;
 
 /** Where a session source came from (spec §2.4 lanes + generator). */
 export type SourceKind = "ingested" | "offlineBrowser" | "demoClip" | "recording" | "generated";
@@ -60,6 +63,24 @@ export type SessionSource = {
   readonly name: string;
   readonly sourceKind: SourceKind;
 };
+
+/** Playback lane: the immutable original or the current tool result. */
+export type PlaybackMode = "original" | "processed";
+
+/** A tool-produced playback source (F03/F06/F07/F09/F10). Owned by the
+ * store after `setProcessed`; callers must not mutate it. */
+export type ProcessedSource = {
+  readonly samples: Float32Array;
+  readonly sampleRateHz: number;
+  readonly label: string;
+};
+
+/** Structured rejection codes for `setProcessed` (frontend translates by
+ * code; mirrors `SourceErrorCode` plus `empty`). */
+export type ProcessedErrorCode = "invalidType" | "notFinite" | "rateTooHigh" | "tooLong" | "empty";
+
+/** Pre-flight result of `setProcessed`: structured, never a thrown error. */
+export type SetProcessedResult = { ok: true } | { ok: false; code: ProcessedErrorCode };
 
 /** Structured rejection codes for `loadSource` (frontend translates by code).
  * `invalidType` also covers domain errors that are neither too-long nor
@@ -118,6 +139,9 @@ export type DeriveTicket<K extends DspOpName> = {
 
 export type SessionStore = {
   readonly original: Readonly<SessionSource> | null;
+  /** Tool-produced playback source; cleared by loadSource (D-022). */
+  readonly processed: Readonly<ProcessedSource> | null;
+  readonly playbackMode: PlaybackMode;
   /** FNV-1a-64 hex of the current source's PCM bytes; null before any load.
    * (Wave pre-flight: hashed once per loadSource; load-time cost.) */
   readonly inputHash: string | null;
@@ -147,6 +171,14 @@ export type SessionStore = {
     name: string,
     sourceKind: SourceKind,
   ): LoadSourceResult;
+  /** Install a tool result as the processed playback source. Takes ownership
+   * (no copy); success switches `playbackMode` to `"processed"`. Rejects
+   * durations above `MAX_PROCESSED_SECONDS` instead of truncating. */
+  setProcessed(samples: Float32Array, sampleRateHz: number, label: string): SetProcessedResult;
+  /** Drop the processed source and return playback to the original. */
+  clearProcessed(): void;
+  /** Switch lanes. `"processed"` without a processed source is a no-op. */
+  setPlaybackMode(mode: PlaybackMode): void;
   /** Request `opKey` over the canonical cache key. Cache hit resolves the
    * ticket synchronously; a pending re-derive supersedes the old call via
    * the rpc layer (identical op+params) and the newer call wins. Returns
@@ -209,6 +241,17 @@ export type SessionStore = {
    * once per browser session. */
   sessionTroubleshootingPing(): void;
 };
+
+/** Effective playback source: processed only when selected AND present;
+ * otherwise the original (D-022 fallback rule). */
+export function selectPlaybackSource(
+  state: Pick<SessionStore, "original" | "processed" | "playbackMode">,
+): Readonly<SessionSource | ProcessedSource> | null {
+  if (state.playbackMode === "processed" && state.processed !== null) {
+    return state.processed;
+  }
+  return state.original;
+}
 
 const SOURCE_KINDS: readonly SourceKind[] = [
   "ingested",
@@ -328,6 +371,8 @@ export function createSessionStore(
 
     return {
       original: null,
+      processed: null,
+      playbackMode: "original",
       inputHash: null,
       derived: new Map<string, DerivedEntry>(),
       jobs: new Map<string, JobEntry>(),
@@ -375,12 +420,67 @@ export function createSessionStore(
         // hash guard makes any in-flight frames of the OLD source inert.
         set({
           original: { samples, sampleRateHz, name, sourceKind },
+          processed: null,
+          playbackMode: "original",
           inputHash,
           derived: new Map<string, DerivedEntry>(),
           jobs: new Map<string, JobEntry>(),
           selection: { startSample: 0, endSample: samples.length },
         });
         return { ok: true };
+      },
+
+      setProcessed(samples, sampleRateHz, label) {
+        if (
+          !(samples instanceof Float32Array) ||
+          typeof sampleRateHz !== "number" ||
+          typeof label !== "string"
+        ) {
+          return { ok: false, code: "invalidType" };
+        }
+        if (!Number.isFinite(sampleRateHz)) {
+          return { ok: false, code: "notFinite" };
+        }
+        if (sampleRateHz <= 0) {
+          return { ok: false, code: "invalidType" };
+        }
+        if (sampleRateHz > MAX_SAMPLE_RATE_HZ) {
+          return { ok: false, code: "rateTooHigh" };
+        }
+        if (samples.length === 0) {
+          return { ok: false, code: "empty" };
+        }
+        for (let index = 0; index < samples.length; index += 1) {
+          const sample: number | undefined = samples[index];
+          if (sample === undefined) {
+            throw new RangeError(`setProcessed: samples[${index}] read out of bounds`);
+          }
+          if (!Number.isFinite(sample)) {
+            return { ok: false, code: "notFinite" };
+          }
+        }
+        if (samples.length / sampleRateHz > MAX_PROCESSED_SECONDS) {
+          return { ok: false, code: "tooLong" };
+        }
+        set({
+          processed: { samples, sampleRateHz, label },
+          playbackMode: "processed",
+        });
+        return { ok: true };
+      },
+
+      clearProcessed() {
+        set({ processed: null, playbackMode: "original" });
+      },
+
+      setPlaybackMode(mode) {
+        if (mode !== "original" && mode !== "processed") {
+          throw new TypeError(`setPlaybackMode: unknown mode ${String(mode)}`);
+        }
+        if (mode === "processed" && get().processed === null) {
+          return;
+        }
+        set({ playbackMode: mode });
       },
 
       derive<K extends DspOpName>(

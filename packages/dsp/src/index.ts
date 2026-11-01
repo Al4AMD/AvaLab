@@ -87,6 +87,15 @@ export type {
   SpectrogramWindowFamily,
 } from "./fourier/spectrogramTiles.js";
 export { spectrogramTiles } from "./fourier/spectrogramTiles.js";
+export type {
+  EditSpectrumParams,
+  EditSpectrumResult,
+  SpectrumEdit,
+  SpectrumEditMode,
+  SpectrumEditTarget,
+  SpectrumPreset,
+} from "./fourier/spectrumEdit.js";
+export { buildSpectrumPreset, editSpectrum } from "./fourier/spectrumEdit.js";
 export type { StftParams, StftResult } from "./fourier/stft.js";
 export { istft, stft } from "./fourier/stft.js";
 export { fft, ifft } from "./fourier/transform.js";
@@ -117,6 +126,7 @@ export type {
 export { resampleRational } from "./resample/resample.js";
 export type { LowpassSincOptions } from "./resample/windowedSinc.js";
 export { designLowpassSinc } from "./resample/windowedSinc.js";
+export { aliasFrequencyHz } from "./signals/aliasing.js";
 export type {
   FloatArray,
   SignalType,
@@ -126,6 +136,7 @@ export type {
 export {
   averagePower,
   classifySignalType,
+  periodicExtend,
   reverse,
   signalEnergy,
   support,
@@ -152,6 +163,8 @@ export {
 export { generatePinkNoise, generateWhiteNoise, mulberry32 } from "./signals/noise.js";
 export type { ConvolveFftOptions } from "./systems/convolution.js";
 export { convolveDirect, convolveFft, nextPowerOfTwo } from "./systems/convolution.js";
+export type { SyntheticIrKind, SyntheticIrParams } from "./systems/impulseResponse.js";
+export { generateSyntheticIr } from "./systems/impulseResponse.js";
 export type { MdctParams, MdctResult } from "./timestretch/mdct.js";
 export { imdct, mdct } from "./timestretch/mdct.js";
 export type { PitchShiftParams, TimeStretchParams } from "./timestretch/phaseVocoder.js";

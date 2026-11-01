@@ -23,6 +23,7 @@ from avalab_golden.algorithms import (
     resample,
     rle,
     rfft,
+    spectrum_edit,
     stft,
     windows,
 )
@@ -47,6 +48,7 @@ GENERATORS: dict[str, Callable[[], list[GoldenCase]]] = {
     "resample": resample.cases,
     "rle": rle.cases,
     "rfft": rfft.cases,
+    "spectrum_edit": spectrum_edit.cases,
     "stft": stft.cases,
     "windows": windows.cases,
 }

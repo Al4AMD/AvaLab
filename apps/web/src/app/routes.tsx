@@ -1,13 +1,28 @@
 import { useEffect } from "react";
 import { createBrowserRouter, type RouteObject, redirect } from "react-router";
+import { ExtentView } from "../features/extent/extentView";
 import { FftView } from "../features/fftview/fftView";
 import { GeneratorView } from "../features/generator/generatorView";
+import { ReverbView } from "../features/reverb/reverbView";
+import { SamplingView } from "../features/sampling/samplingView";
 import { SpectrogramView } from "../features/spectrogram/spectrogramView";
+import { SpectrumEditView } from "../features/spectrumEdit/spectrumEditView";
+import { SpeedView } from "../features/speed/speedView";
 import { WaveformView } from "../features/waveform/waveformView";
 import { useSessionStore } from "../session/store";
 import { AppLayout } from "./layout";
 
-export const TOOL_IDS = ["waveform", "spectrogram", "fftview", "generator"] as const;
+export const TOOL_IDS = [
+  "waveform",
+  "spectrogram",
+  "fftview",
+  "generator",
+  "speed",
+  "sampling",
+  "extent",
+  "reverb",
+  "spectrum-edit",
+] as const;
 export type ToolId = (typeof TOOL_IDS)[number];
 
 export function toolPath(toolId: ToolId): string {
@@ -64,6 +79,11 @@ export const appRoutes: RouteObject[] = [
       { path: "tools/spectrogram", element: <SpectrogramView /> },
       { path: "tools/fftview", element: <FftView /> },
       { path: "tools/generator", element: <GeneratorView /> },
+      { path: "tools/speed", element: <SpeedView /> },
+      { path: "tools/sampling", element: <SamplingView /> },
+      { path: "tools/extent", element: <ExtentView /> },
+      { path: "tools/reverb", element: <ReverbView /> },
+      { path: "tools/spectrum-edit", element: <SpectrumEditView /> },
     ],
   },
 ];

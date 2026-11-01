@@ -21,7 +21,13 @@ import type {
   SessionStore,
   SourceKind,
 } from "./store";
-import { createSessionStore, MAX_DURATION_SECONDS, MAX_SAMPLE_RATE_HZ } from "./store";
+import {
+  createSessionStore,
+  MAX_DURATION_SECONDS,
+  MAX_PROCESSED_SECONDS,
+  MAX_SAMPLE_RATE_HZ,
+  selectPlaybackSource,
+} from "./store";
 import {
   cancelFramesOf,
   type FakeTransport,
@@ -650,6 +656,114 @@ describe("backendOnline flag", () => {
     store.getState().markBackendProbeSettled();
     expect(store.getState().backendProbeSettled).toBe(true);
     expect(store.getState().backendOnline).toBe(true);
+  });
+});
+
+describe("processed playback lane", () => {
+  it("installs a valid processed source, switches to it, and exposes it via the selector", () => {
+    const { store } = makeStore();
+    expectOk(store.getState().loadSource(fakeAudio(8), 48000, "clip.wav", "demoClip"));
+    const processed = fakeAudio(4, 2);
+    expect(store.getState().setProcessed(processed, 24000, "8 kHz")).toEqual({ ok: true });
+
+    const state = store.getState();
+    expect(state.processed).toEqual({ samples: processed, sampleRateHz: 24000, label: "8 kHz" });
+    expect(state.playbackMode).toBe("processed");
+    expect(selectPlaybackSource(state)?.samples).toBe(processed);
+  });
+
+  it("rejects malformed, non-finite, empty, over-rate and over-duration sources", () => {
+    const { store } = makeStore();
+    const asSamples = [0.1] as unknown as Float32Array;
+    expect(store.getState().setProcessed(asSamples, 48000, "x")).toEqual({
+      ok: false,
+      code: "invalidType",
+    });
+    expect(store.getState().setProcessed(fakeAudio(2), 48000, 42 as unknown as string)).toEqual({
+      ok: false,
+      code: "invalidType",
+    });
+    expect(store.getState().setProcessed(fakeAudio(2), Number.NaN, "x")).toEqual({
+      ok: false,
+      code: "notFinite",
+    });
+    expect(store.getState().setProcessed(fakeAudio(2), 0, "x")).toEqual({
+      ok: false,
+      code: "invalidType",
+    });
+    expect(store.getState().setProcessed(fakeAudio(2), MAX_SAMPLE_RATE_HZ + 1, "x")).toEqual({
+      ok: false,
+      code: "rateTooHigh",
+    });
+    expect(store.getState().setProcessed(new Float32Array([1, Number.NaN]), 48000, "x")).toEqual({
+      ok: false,
+      code: "notFinite",
+    });
+    expect(store.getState().setProcessed(new Float32Array(0), 48000, "x")).toEqual({
+      ok: false,
+      code: "empty",
+    });
+    expect(MAX_PROCESSED_SECONDS).toBe(300);
+    expect(
+      store.getState().setProcessed(new Float32Array(MAX_PROCESSED_SECONDS + 1), 1, "x"),
+    ).toEqual({ ok: false, code: "tooLong" });
+    expect(store.getState().processed).toBeNull();
+    expect(store.getState().playbackMode).toBe("original");
+  });
+
+  it("clearProcessed drops the lane and returns playback to the original", () => {
+    const { store } = makeStore();
+    expectOk(store.getState().loadSource(fakeAudio(8), 48000, "clip.wav", "demoClip"));
+    expect(store.getState().setProcessed(fakeAudio(4, 2), 24000, "8 kHz")).toEqual({ ok: true });
+    store.getState().clearProcessed();
+    expect(store.getState().processed).toBeNull();
+    expect(store.getState().playbackMode).toBe("original");
+    expect(selectPlaybackSource(store.getState())?.samples).toBe(
+      store.getState().original?.samples,
+    );
+  });
+
+  it("setPlaybackMode no-ops to processed without a lane and switches back freely otherwise", () => {
+    const { store } = makeStore();
+    store.getState().setPlaybackMode("processed");
+    expect(store.getState().playbackMode).toBe("original");
+
+    expectOk(store.getState().loadSource(fakeAudio(8), 48000, "clip.wav", "demoClip"));
+    expect(store.getState().setProcessed(fakeAudio(4, 2), 24000, "8 kHz")).toEqual({ ok: true });
+    store.getState().setPlaybackMode("original");
+    expect(store.getState().playbackMode).toBe("original");
+    expect(selectPlaybackSource(store.getState())?.samples).toBe(
+      store.getState().original?.samples,
+    );
+    store.getState().setPlaybackMode("processed");
+    expect(store.getState().playbackMode).toBe("processed");
+    expect(() =>
+      store.getState().setPlaybackMode("bogus" as unknown as "original" | "processed"),
+    ).toThrow(TypeError);
+  });
+
+  it("loadSource clears the processed lane and resets the mode", () => {
+    const { store } = makeStore();
+    expectOk(store.getState().loadSource(fakeAudio(8), 48000, "clip.wav", "demoClip"));
+    expect(store.getState().setProcessed(fakeAudio(4, 2), 24000, "8 kHz")).toEqual({ ok: true });
+    expectOk(store.getState().loadSource(fakeAudio(6, 3), 48000, "next.wav", "demoClip"));
+    expect(store.getState().processed).toBeNull();
+    expect(store.getState().playbackMode).toBe("original");
+  });
+
+  it("selector falls back to the original when processed is selected but absent", () => {
+    expect(
+      selectPlaybackSource({ original: null, processed: null, playbackMode: "processed" }),
+    ).toBeNull();
+    const original = {
+      samples: fakeAudio(2),
+      sampleRateHz: 48000,
+      name: "clip.wav",
+      sourceKind: "demoClip" as const,
+    };
+    expect(
+      selectPlaybackSource({ original, processed: null, playbackMode: "processed" })?.samples,
+    ).toBe(original.samples);
   });
 });
 

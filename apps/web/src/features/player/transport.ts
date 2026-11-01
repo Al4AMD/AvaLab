@@ -194,6 +194,23 @@ const EMPTY_STATE: TransportState = { phase: "empty" };
 const clampSample = (sample: number, length: number): number =>
   sample < 0 ? 0 : sample > length ? length : sample;
 
+/** Map a playhead position in seconds onto a target source's sample grid.
+ * Used when A/B swapping sources with different rates or lengths: the
+ * position in TIME is preserved, clamped to the last playable sample so an
+ * at-end swap does not hit `play()`'s restart-from-zero rule. Non-finite
+ * seconds map to 0 (mirrors the store's seek no-op convention). */
+export function mapPlayheadSeconds(
+  seconds: number,
+  targetRateHz: number,
+  targetLengthSamples: number,
+): number {
+  if (!Number.isFinite(seconds) || !Number.isFinite(targetRateHz) || targetRateHz <= 0) {
+    return 0;
+  }
+  const target = Math.round(seconds * targetRateHz);
+  return clampSample(target, Math.max(0, targetLengthSamples - 1));
+}
+
 /** Interpolated position of a playing node: the sample offset the node was
  * started at plus the elapsed context time scaled to samples. */
 function playingPosition(

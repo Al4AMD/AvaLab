@@ -6,6 +6,7 @@
  */
 import { type RefObject, useEffect, useRef, useState } from "react";
 
+import { useSessionStore } from "../../session/store";
 import { appPlayhead } from "../player/playhead";
 import { paintWaveform, type SampleRange, type WaveformPaintOptions } from "./paintWaveform";
 
@@ -49,6 +50,16 @@ export function WaveformCanvas(props: WaveformCanvasProps) {
   const canvasRef = props.canvasRef ?? localRef;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [widthPx, setWidthPx] = useState(640);
+  // This canvas plots original-source samples; the playhead publishes the
+  // ACTIVE lane's samples, so map back through time when a processed lane is
+  // playing at another rate.
+  const originalRateHz = useSessionStore((state) => state.original?.sampleRateHz ?? 0);
+  const activeRateHz = useSessionStore(
+    (state) =>
+      (state.playbackMode === "processed"
+        ? state.processed?.sampleRateHz
+        : state.original?.sampleRateHz) ?? 0,
+  );
 
   useEffect(() => {
     const host = hostRef.current;
@@ -91,11 +102,21 @@ export function WaveformCanvas(props: WaveformCanvasProps) {
     };
     draw();
     const unsubscribe = appPlayhead.subscribe((sample) => {
-      playheadSample = sample;
+      playheadSample =
+        originalRateHz > 0 && activeRateHz > 0 ? (sample * originalRateHz) / activeRateHz : sample;
       draw();
     });
     return unsubscribe;
-  }, [canvasRef, props.minMax, props.sampleRange, props.selectionRange, props.heightPx, widthPx]);
+  }, [
+    canvasRef,
+    props.minMax,
+    props.sampleRange,
+    props.selectionRange,
+    props.heightPx,
+    widthPx,
+    originalRateHz,
+    activeRateHz,
+  ]);
 
   const canvasClass =
     "block w-full rounded-md border border-surface " +

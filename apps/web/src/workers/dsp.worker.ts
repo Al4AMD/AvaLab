@@ -23,15 +23,22 @@
  * import `@avalab/dsp` (AGENTS §9 — no main-thread DSP).
  */
 import {
+  aliasDemo,
+  convolutionSteps,
   DspOpError,
   type DspOpName,
   type DspOpParams,
   type DspOpResult,
   dspOps,
+  extentProcess,
   fftSelection,
   generateSynth,
+  reverbProcess,
+  samplingProcess,
   sessionPing,
   spectrogramTiles,
+  spectrumEdit,
+  speedTransform,
   waveformOverview,
   waveformRange,
   windowProfiles,
@@ -55,9 +62,16 @@ type DspOpHandlers = {
 };
 
 const dspHandlers = {
+  aliasDemo,
+  convolutionSteps,
+  extentProcess,
   fftSelection,
   generateSynth,
+  reverbProcess,
+  samplingProcess,
   sessionPing,
+  speedTransform,
+  spectrumEdit,
   spectrogramTiles,
   waveformOverview,
   waveformRange,
@@ -155,6 +169,34 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
       }
       case "generateSynth": {
         const result = dspHandlers.generateSynth(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "speedTransform": {
+        const result = dspHandlers.speedTransform(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "samplingProcess": {
+        const result = dspHandlers.samplingProcess(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "aliasDemo": {
+        const result = dspHandlers.aliasDemo(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "extentProcess": {
+        const result = dspHandlers.extentProcess(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "reverbProcess": {
+        const result = dspHandlers.reverbProcess(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "convolutionSteps": {
+        const result = dspHandlers.convolutionSteps(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "spectrumEdit": {
+        const result = dspHandlers.spectrumEdit(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       default: {

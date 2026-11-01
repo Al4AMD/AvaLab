@@ -20,7 +20,12 @@
     "waveform": "Waveform",
     "spectrogram": "Spectrogram",
     "fftview": "FFT View",
-    "generator": "Generator"
+    "generator": "Generator",
+    "speed": "Speed and direction",
+    "sampling": "Sampling and bit depth",
+    "extent": "Signal extent",
+    "reverb": "Reverb",
+    "spectrumEdit": "Spectrum editor"
   },
   "input": {
     "empty": {
@@ -100,6 +105,97 @@
     },
     "generator": {
       "title": "Signal Generator"
+    },
+    "speed": {
+      "title": "Speed and direction"
+    },
+    "sampling": {
+      "title": "Sampling and bit depth"
+    },
+    "extent": {
+      "title": "Signal extent"
+    },
+    "reverb": {
+      "title": "Reverb"
+    },
+    "spectrumEdit": {
+      "title": "Spectrum editor"
+    }
+  },
+  "spectrumEdit": {
+    "controls": {
+      "bandStart": "Band start (Hz)",
+      "bandEnd": "Band end (Hz)",
+      "target": "Component",
+      "mode": "Operation",
+      "value": "Value",
+      "add": "Add edit",
+      "remove": "Remove",
+      "clear": "Clear edits",
+      "hermitian": "Enforce Hermitian symmetry",
+      "edits": "Edit list"
+    },
+    "target": {
+      "re": "Real part (Re)",
+      "im": "Imaginary part (Im)",
+      "mag": "Magnitude",
+      "phase": "Phase"
+    },
+    "mode": {
+      "zero": "Zero",
+      "scale": "Scale",
+      "set": "Set"
+    },
+    "preset": {
+      "title": "Presets",
+      "zeroIm": "Zero Im",
+      "zeroRe": "Zero Re",
+      "zeroPhase": "Zero phase",
+      "linearPhase": "Linear phase",
+      "randomPhase": "Random phase",
+      "magnitudeOnly": "Magnitude only",
+      "phaseOnly": "Phase only"
+    },
+    "chart": {
+      "re": "Real part",
+      "im": "Imaginary part",
+      "magnitude": "Magnitude",
+      "phase": "Phase"
+    },
+    "meta": {
+      "sampleCount": "Samples",
+      "fftLength": "FFT length",
+      "binWidth": "Bin width",
+      "imaginaryRatio": "Imaginary energy ratio"
+    },
+    "range": {
+      "pattern": "Analysis range {{start}} – {{end}}",
+      "hint": "With no selection, the first 65,536 samples are analyzed."
+    },
+    "status": {
+      "computing": "Computing in the worker…",
+      "empty": "No result yet."
+    },
+    "warning": {
+      "hermitianOff": "Hermitian symmetry is off, so the output is complex; only its real part is played."
+    },
+    "cap": {
+      "notice": "The selection is longer than 65,536 samples; only the first 65,536 are analyzed."
+    },
+    "error": {
+      "failed": "The spectrum edit failed."
+    },
+    "edits": {
+      "empty": "No edits added yet.",
+      "item": "[{{start}}, {{end}}) {{target}} {{mode}} {{value}}"
+    },
+    "play": "Play edited result",
+    "observe": {
+      "title": "What to observe",
+      "magnitude": "Editing magnitude keeps phase; zeroing magnitude zeros Re and Im together.",
+      "phase": "Editing phase keeps magnitude; zeroing phase sets it to zero.",
+      "hermitian": "With Hermitian symmetry on, the output stays real; turning it off shows why the symmetry is needed.",
+      "gibbs": "Zeroing a whole band produces Gibbs ringing in the output; sharp truncation causes it."
     }
   },
   "fftview": {
@@ -218,8 +314,15 @@
       "offlineBrowser": "Browser decode (offline lane)",
       "demoClip": "Demo clip",
       "recording": "Microphone take",
-      "generated": "Generated signal"
-    }
+      "generated": "Generated signal",
+      "processed": "Tool result"
+    },
+    "ab": {
+      "aria": "Playback lane",
+      "original": "Original",
+      "processed": "Processed"
+    },
+    "reset": "Reset to original"
   },
   "spectrogram": {
     "controls": {
@@ -275,5 +378,295 @@
     "original": "Original",
     "derived": "Processed",
     "pending": "No processed source yet. The original-vs-processed canvases appear here once processing results exist."
+  },
+  "speed": {
+    "mode": {
+      "resample": "Resample (tape speed, pitch follows)",
+      "timeStretch": "Time-stretch (pitch preserved)"
+    },
+    "controls": {
+      "mode": "Speed mode",
+      "customSpeed": "Speed factor",
+      "semitones": "Pitch shift (semitones)",
+      "reverse": "Reverse"
+    },
+    "preset": "{{factor}}×",
+    "range": {
+      "pattern": "Range {{start}} – {{end}}"
+    },
+    "apply": {
+      "preview": "Preview range",
+      "whole": "Apply to whole file"
+    },
+    "result": {
+      "title": "Processed result",
+      "duration": "Duration",
+      "actualSpeed": "Actual speed",
+      "elapsed": "Compute time",
+      "waveformAria": "Processed waveform",
+      "spectrogramAria": "Processed spectrogram"
+    },
+    "status": {
+      "computing": "Computing in the worker…",
+      "idle": "Adjust a control to process the preview."
+    },
+    "error": {
+      "tooLong": "The processed result would exceed the 300 s cap. Shorten the range or choose a faster speed.",
+      "failed": "The speed transform failed. Try a shorter range."
+    },
+    "observe": {
+      "title": "What to observe",
+      "resample": "Resample mode changes speed and pitch together; watch the spectrogram shift vertically.",
+      "timeStretch": "Time-stretch changes duration while the harmonic peaks stay put; the phase vocoder may smear transients.",
+      "reverse": "Reverse plays the result backwards; the magnitude spectrum is unchanged, the phase is not."
+    }
+  },
+  "sampling": {
+    "alias": {
+      "title": "Aliasing demo (no file needed)",
+      "description": "A sine is sampled at 48 kHz, then resampled to the target rate. With the anti-alias filter off, energy above the new Nyquist folds back to a lower frequency.",
+      "targetRate": "Target rate",
+      "frequency": "Input frequency",
+      "predicted": "Predicted alias",
+      "measured": "Measured peak",
+      "waveformAria": "Aliased sine waveform",
+      "play": "Play aliased result"
+    },
+    "controls": {
+      "targetRate": "Target sampling rate",
+      "custom": "Custom…",
+      "customRate": "Custom rate (Hz)",
+      "bits": "Bit depth",
+      "antiAlias": "Anti-alias filter",
+      "dither": "TPDF dither"
+    },
+    "error": {
+      "failed": "The sampling process failed. Try a shorter range or another rate."
+    },
+    "status": {
+      "computing": "Computing in the worker…",
+      "idle": "Adjust a control to process the preview."
+    },
+    "range": {
+      "pattern": "Range {{start}} – {{end}}"
+    },
+    "apply": {
+      "preview": "Preview range",
+      "whole": "Apply to whole file"
+    },
+    "result": {
+      "title": "Resampled and quantized result",
+      "before": "Reference (resampled, before quantization)",
+      "after": "Quantized",
+      "beforeAria": "Reference waveform before quantization",
+      "afterAria": "Quantized waveform",
+      "errorAria": "Quantization error waveform",
+      "timeAxis": "Time (s)",
+      "errorAxis": "Error"
+    },
+    "metrics": {
+      "snr": "SNR",
+      "segmentalSnr": "Segmental SNR",
+      "psnr": "PSNR",
+      "theorySnr": "Theoretical SNR",
+      "mse": "MSE",
+      "duration": "Duration",
+      "psnrNote": "PSNR peak = 1.0 (full scale of the normalized float signal).",
+      "theoryNote": "The theoretical 6.02·N + 1.76 dB assumes a full-scale sine and no dither."
+    },
+    "play": {
+      "processed": "Play quantized",
+      "residual": "Play residual"
+    },
+    "observe": {
+      "title": "What to observe",
+      "aliasing": "Turn the anti-alias filter off and lower the target rate: a tone above the new Nyquist appears at a different frequency.",
+      "dither": "At low bit depth, dither replaces correlated quantization distortion with a steady noise floor.",
+      "snr": "Each extra bit adds about 6 dB of SNR; compare the measured value with the theoretical line."
+    }
+  },
+  "extent": {
+    "controls": {
+      "operation": "Operation",
+      "shiftSamples": "Shift (samples)",
+      "scaleFactor": "Time-scale factor",
+      "truncateStart": "Truncate start (samples)",
+      "truncateLength": "Truncate length (samples)",
+      "padStart": "Pad at start (samples)",
+      "padEnd": "Pad at end (samples)",
+      "repetitions": "Repetitions"
+    },
+    "operation": {
+      "identity": "Identity",
+      "shift": "Time shift x(t − t₀)",
+      "scale": "Time scale x(at)",
+      "reverse": "Time reversal x(−t)",
+      "truncate": "Truncate",
+      "zeroPad": "Zero-pad",
+      "periodic": "Periodic extension"
+    },
+    "range": {
+      "pattern": "Source range {{start}} – {{end}}"
+    },
+    "apply": {
+      "preview": "Preview range",
+      "whole": "Apply to whole file"
+    },
+    "result": {
+      "title": "Signal extent result"
+    },
+    "error": {
+      "tooLong": "The result would exceed the 300 s processed-playback cap.",
+      "failed": "The extent operation failed. Try a shorter range or different parameters."
+    },
+    "status": {
+      "computing": "Computing in the worker…"
+    },
+    "metrics": {
+      "duration": "Duration",
+      "samples": "Samples",
+      "support": "Non-zero support",
+      "emptySupport": "empty",
+      "supportPattern": "{{start}} – {{end}}",
+      "energy": "Energy",
+      "averagePower": "Average power",
+      "type": "Type",
+      "deltaF": "Bin width (Δf)"
+    },
+    "signalType": {
+      "energy": "Energy signal",
+      "power": "Power signal"
+    },
+    "waveform": {
+      "before": "Before",
+      "after": "After (support highlighted)",
+      "beforeAria": "Source waveform before the extent operation",
+      "afterAria": "Result waveform after the extent operation"
+    },
+    "spectrum": {
+      "before": "Spectrum before",
+      "after": "Spectrum after",
+      "beforeAria": "Magnitude spectrum of the source",
+      "afterAria": "Magnitude spectrum of the result",
+      "frequencyAxis": "Frequency",
+      "magnitudeAxis": "Magnitude"
+    },
+    "play": "Play processed result",
+    "observe": {
+      "title": "What to observe",
+      "truncate": "A shorter truncation widens the main lobe and raises the bin width Δf = fs / N.",
+      "zeroPad": "Zero-padding adds no new information: it samples the same spectrum more densely, so the main-lobe width stays the same.",
+      "tradeoff": "A signal that is narrow in time is wide in frequency (time–bandwidth uncertainty).",
+      "scale": "Time scaling moves the spectrum inversely: x(at) has spectrum |a|⁻¹ X(f/a).",
+      "periodic": "Periodic extension produces spectral lines at multiples of 1/T.",
+      "scaleNote": "Time scaling deliberately has no anti-alias filter. For the filtered comparison, use the sampling lab (F03).",
+      "units": "Energy and average power are amplitude-squared values; for normalized audio in [−1, 1] the unit is full-scale²."
+    }
+  },
+  "reverb": {
+    "controls": {
+      "irPreset": "Impulse response",
+      "rt60": "RT60 (s)",
+      "duration": "IR duration (s)",
+      "seed": "Seed",
+      "preDelay": "Pre-delay (ms)",
+      "wetMix": "Wet mix",
+      "method": "Convolution method",
+      "upload": "Upload impulse response",
+      "uploadHint": "WAV, up to 10 s, mono downmix."
+    },
+    "irPreset": {
+      "room": "Room",
+      "hall": "Hall",
+      "plate": "Plate",
+      "telephone": "Telephone",
+      "upload": "Uploaded IR"
+    },
+    "method": {
+      "fft": "Fast (FFT)",
+      "direct": "Direct"
+    },
+    "range": {
+      "pattern": "Source range {{start}} – {{end}}"
+    },
+    "apply": {
+      "preview": "Preview range",
+      "whole": "Apply to whole file"
+    },
+    "status": {
+      "decodingIr": "Decoding impulse response…",
+      "computing": "Computing in the worker…"
+    },
+    "ir": {
+      "title": "Impulse response",
+      "uploadedName": "Uploaded: {{name}}",
+      "empty": "No impulse response yet.",
+      "waveform": "Impulse response waveform",
+      "waveformAria": "Impulse response waveform",
+      "spectrum": "Impulse response magnitude",
+      "spectrumAria": "Impulse response magnitude spectrum"
+    },
+    "frequencyAxis": "Frequency (Hz)",
+    "magnitudeAxis": "Magnitude (dB)",
+    "phaseAxis": "Phase (rad)",
+    "result": {
+      "title": "Reverb result",
+      "duration": "Duration",
+      "irSamples": "IR samples",
+      "preDelay": "Pre-delay",
+      "elapsed": "Elapsed",
+      "method": "Method",
+      "waveform": "Result waveform",
+      "waveformAria": "Reverb result waveform",
+      "spectrogram": "Result spectrogram",
+      "spectrogramAria": "Reverb result spectrogram",
+      "spectrogramNote": "Spectrogram shows the first 30 s."
+    },
+    "play": "Play processed result",
+    "timing": {
+      "title": "FFT vs direct convolution timing",
+      "measure": "Measure on a short excerpt",
+      "values": "FFT: {{fft}} ms · Direct: {{direct}} ms",
+      "note": "Measured on a 4096-sample excerpt with a short impulse response, not on the whole file."
+    },
+    "steps": {
+      "title": "Convolution step by step",
+      "empty": "No excerpt available.",
+      "step": "Partial for IR tap {{step}} of {{total}}",
+      "chartAria": "One convolution partial",
+      "sampleAxis": "Sample",
+      "amplitudeAxis": "Amplitude",
+      "note": "Each partial is the signal scaled by one IR tap and shifted by that tap's index. Their sum is the direct convolution."
+    },
+    "reverse": {
+      "title": "Reverse (time reversal)",
+      "note": "Reverse flips the signal in time. It is a separate operation from reverb: no impulse response and no wet/dry mix are involved.",
+      "empty": "Select at least two samples to compare spectra.",
+      "beforeMagnitude": "Magnitude before reverse",
+      "beforeMagnitudeAria": "Magnitude spectrum before time reversal",
+      "afterMagnitude": "Magnitude after reverse",
+      "afterMagnitudeAria": "Magnitude spectrum after time reversal",
+      "beforePhase": "Phase before reverse",
+      "beforePhaseAria": "Phase spectrum before time reversal",
+      "afterPhase": "Phase after reverse",
+      "afterPhaseAria": "Phase spectrum after time reversal"
+    },
+    "observe": {
+      "title": "What to observe",
+      "reverse": "Time reversal keeps the magnitude spectrum; the phase is conjugated plus a linear phase term. It is not reverb.",
+      "reverb": "Reverb convolves the signal with an impulse response; a longer IR adds a longer tail.",
+      "tail": "The output keeps the full convolution tail: pre-delay + source length + IR length − 1 samples.",
+      "direct": "Direct convolution is easy to read but grows with source length × IR length; the FFT path is faster for long inputs.",
+      "ir": "Changing the IR seed changes the noise detail, not the RT60 decay envelope or the overall energy."
+    },
+    "error": {
+      "tooLong": "The result would exceed the 300 s processed-playback cap.",
+      "directTooLong": "Direct convolution is limited to excerpts of 2 s or less. Shorten the range or use the FFT method.",
+      "irMissing": "Upload an impulse response or choose a synthetic preset.",
+      "irTooLong": "The impulse response must be 10 s or shorter.",
+      "irInvalid": "The impulse response contains invalid samples.",
+      "irDecode": "Could not decode that impulse response file. Try a WAV file.",
+      "failed": "The reverb operation failed. Try a shorter range or different parameters."
+    }
   }
 }

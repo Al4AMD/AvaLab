@@ -9,6 +9,7 @@ The NumPy reference implementations pin the same definitions as
     reverse     y[n] = x[N-1-n]
     truncate    y = x[start : min(N, start + length)] (no zero-fill)
     zeroPad     y = zeros(padStart) ++ x ++ zeros(padEnd)
+    periodicExtend  y = x ++ x ++ ... (repetitions copies)
     support     first/last n with abs(x[n]) > threshold; empty ->
                 {startSampleIndex: N, endSampleIndex: N-1}
 
@@ -168,6 +169,12 @@ def cases() -> list[GoldenCase]:
             np.concatenate(
                 [np.zeros(2, dtype=np.float64), ramp, np.zeros(3, dtype=np.float64)]
             ),
+        ),
+        _samples_case(
+            "periodic_extend_123_x3",
+            np.array([1.0, 2.0, 3.0]),
+            {"operation": "periodicExtend", "repetitions": 3},
+            np.tile(np.array([1.0, 2.0, 3.0]), 3),
         ),
         _case(
             "support_nonzero_threshold0",

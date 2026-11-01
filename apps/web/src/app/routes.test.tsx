@@ -69,6 +69,26 @@ it("renders each /tools/* stub page through the data router with its i18n title"
       title: i18n.t("tool.generator.title"),
       body: i18n.t("generator.load"),
     },
+    "/tools/speed": {
+      title: i18n.t("tool.speed.title"),
+      body: i18n.t("input.empty.hint"),
+    },
+    "/tools/sampling": {
+      title: i18n.t("tool.sampling.title"),
+      body: i18n.t("input.empty.hint"),
+    },
+    "/tools/extent": {
+      title: i18n.t("tool.extent.title"),
+      body: i18n.t("input.empty.hint"),
+    },
+    "/tools/reverb": {
+      title: i18n.t("tool.reverb.title"),
+      body: i18n.t("input.empty.hint"),
+    },
+    "/tools/spectrum-edit": {
+      title: i18n.t("tool.spectrumEdit.title"),
+      body: i18n.t("input.empty.hint"),
+    },
   };
 
   for (const [path, expectedBody] of Object.entries(expected)) {

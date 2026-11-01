@@ -157,9 +157,17 @@ Wave 2 plan 02 additions (machine-drafted, agent):
 
 (Future Persian copy: every wave's fa strings land in this section until the owner reviews them.)
 
+Wave 3 additions (machine-drafted, agent):
+
+- `speed.*` (F06 speed/direction lab)
+- `sampling.*` (F03 resampling/quantization/aliasing lab)
+- `extent.*` (F07 signal-extent lab), `nav.extent`, `tool.extent.title`
+- `reverb.*` (F10 reverse/reverb lab), `nav.reverb`, `tool.reverb.title`
+- `spectrumEdit.*` (F09 spectrum editor), `nav.spectrumEdit`, `tool.spectrumEdit.title`
+
 ## Next recommended step
 
-Plan `02-audio-sources-playback.md` is complete (Tasks 1–4 in `.superpowers/sdd/02-audio-sources-playback/`); owner code review pending. Then **Wave 2 plan `03-waveform-spectrogram.md`** (waveform + spectrogram canvases subscribe to `appPlayhead`, per Task 4's publish contract). Do not begin later plans while an earlier one has failing checks.
+Wave 3 plans 01–05 are complete; owner code review pending. Next: **owner review of `feat/wave-3` → PR to `main`**. Do not begin Wave 4 while any check is failing.
 
 ## Session log
 
@@ -276,3 +284,67 @@ Plan `02-audio-sources-playback.md` is complete (Tasks 1–4 in `.superpowers/sd
 - Carries into Wave 3: fa copy for `fftview.*` and `generator.*` needs owner review (added to the Wave-2 backlog); the Fourier view does not yet include the Cooley–Tukey butterfly step-through or a full-file STFT compare (F08 P0 subset, deferred); generator AM/FM and the Fourier-series harmonics slider stay Wave 4+ per the plan.
 - **Next step:** owner review of wave-2 branch → PR to `main`; then plan Wave 3 (F03 sampling/bit depth, F07 signal extent, F09 Re/Im editor, F10 reverse/reverb, F06 speed).
 
+## 2026-11-01 — Wave 3, plan 01 CLOSED (processed playback lane + F06 speed/direction)
+
+- Branch `feat/wave-3` (base `main` `ada6da8`; plan docs `7d67baa`). Commits: `cd81f83` (store lane), `5bb82ae` (`speedTransform` op), `0d85d26` (A/B playback), `c3c8258` (speed lab), plus this close-out commit.
+- F06 shipped: store-owned `processed` lane (`setProcessed`/`clearProcessed`/`setPlaybackMode`, `selectPlaybackSource`, typed `ProcessedErrorCode`, 300 s cap, `loadSource` reset); `speedTransform` worker op composing `resampleRational` (tape speed), `timeStretch` (pitch-preserving), optional `pitchShift`, and `reverse` last; dock A/B buttons with seconds-based playhead mapping that preserves play state; `/tools/speed` with URL codec (`sp,m,p,rv,from,to`), presets + custom speed, semitone input (disabled in resample mode), reverse, selection/first-30-s preview vs explicit whole-file apply, waveform + chunked spectrogram result, and the compare slot's processed pane.
+- Semantics pinned by D-022: `speedFactor > 1` is faster; resample changes speed and pitch; time-stretch changes speed only; `meta.sampleRateHz` is the source rate; processed output above 300 s is rejected (`tooLong`), never truncated; `transport.ts` playbackRate seam remains unused.
+- Gates: `pnpm check` exit 0 (dsp 900/900, web 225/225, scripts 13/13, i18n OK, biome 166 files); `pnpm e2e` 29/29 with zero console errors in fa + en, including both speed-lab locales and the five-route sidebar sweep. Perf on the same run: spectrogram first tiles 342 ms (< 3000 ms gate), overview first paint unchanged.
+- Ledger ruling: the plan's Task 2 expectation "time-stretch 2× yields ~96 000 samples" inverted F06 speed semantics; the shipped test pins ~24 000 samples with pitch preserved (formula kept per plan).
+- Carries: `speed.*` and the existing `player.*` Persian copy need owner review; the processed lane is intentionally not cached/evicted (tools recompute); a non-integer resample rate surfaces `resampleRational`'s `RangeError` as `opFailed` rather than `badParams` (latent, not reachable from the view's integer presets); the compare slot's original pane still renders the honest dash.
+- **Next step:** Wave 3 plan 02 — `docs/plans/wave-3/02-sampling-bit-depth.md`.
+
+## 2026-11-01 — Wave 3, plan 02 CLOSED (F03 sampling and bit depth)
+
+- Branch `feat/wave-3`. Commits: `08fa4ce` (`aliasFrequencyHz`), `da87149` (`samplingProcess` + `aliasDemo` worker ops), `5ab3ca9` (sampling lab view + e2e), plus this close-out commit.
+- F03 shipped: `/tools/sampling` with a URL codec (`tr,aa,bd,dt,seed,from,to`), target-rate presets + custom rate, anti-alias and TPDF-dither toggles, bit depth 1..16, selection/first-30-s preview vs explicit whole-file apply, measured SNR/segmental SNR/PSNR (peak 1.0 note)/theory SNR/MSE/duration, uPlot quantization-error chart, before/after mini waveforms, processed and residual playback, reset; source-free aliasing card (48 kHz sine, target 4/8/16 kHz, frequency 0..2×target, predicted and measured fold, play after a source exists).
+- Semantics pinned by D-023: metrics compare the quantized output with the RESAMPLED reference; residual = reference − quantized; theory SNR is labelled as a full-scale-sine reference; the aliasing card is source-free.
+- Gates: `pnpm check` exit 0 (dsp 907/907, web 240/240, scripts 13/13, i18n OK, biome 172 files); `pnpm e2e` 31/31 with zero console errors in fa + en, including both sampling-lab locales and the six-route sidebar sweep. Perf on the same run: overview first paint 342 ms (< 1000 ms), spectrogram first tiles 440 ms (< 3000 ms).
+- Carries: `sampling.*` Persian copy needs owner review (added to the fa backlog); the aliasing card's play button appears only after a source is loaded because it installs into the shared processed lane; the compare slot is unchanged.
+- **Next step:** Wave 3 plan 03 — `docs/plans/wave-3/03-signal-extent.md`.
+
+## 2026-11-01 — Wave 3, plan 03 CLOSED (F07 signal extent)
+
+- Branch `feat/wave-3`. Commits: `d5318c0` (`periodicExtend` dsp helper + golden), `090aea2` (ALGORITHMS row), `cb89b9a` (`extentProcess` worker op), `77dafe3` (extent lab view + e2e), plus this close-out commit.
+- F07 shipped: `/tools/extent` with a URL codec (`op,sh,sf,ts,tl,ps,pe,rp,from,to`), identity/shift/time-scale/reverse/truncate/zero-pad/periodic-extension operations, selection-or-first-30-s preview vs explicit whole-file apply, readouts (duration, sample count, support range, energy, average power, energy/power badge, Δf), support-highlighted before/after waveforms, sequential before/after uPlot spectra, periodic-extension card, processed playback, reset, and compact observe bullets.
+- Semantics: energy/power are amplitude-squared (the UI prints “full-scale²” for normalized sources); `timeScale` intentionally has no anti-alias filter and the UI points to F03; zero-padding is labelled interpolation (same main-lobe width, denser sampling), not improved resolution; truncation widens the main lobe and Δf is `fs/N` of the transformed length.
+- Gates: `pnpm check` exit 0 (dsp 919/919, web 256/256, scripts 13/13, i18n OK, biome 176 files); `pnpm e2e` 33/33 with zero console errors in fa + en, including both extent-lab locales and the seven-route sidebar sweep. Perf on the same run: overview first paint 219 ms (< 1000 ms), spectrogram first tiles 302 ms (< 3000 ms).
+- Carries: `extent.*` Persian copy needs owner review (added to the fa backlog); the view runs the before- and after-spectrum analyses sequentially because identical concurrent RPC params supersede each other; freehand/brush editing and full theory panels remain deferred.
+- **Next step:** Wave 3 plan 04 — `docs/plans/wave-3/04-reverse-reverb.md`.
+
+## 2026-11-01 — Wave 3, plan 04 CLOSED (F10 reverse + reverb)
+
+- Branch `feat/wave-3`. Commits: `7f00fc5` (`generateSyntheticIr`), `12c41c2` (`reverbProcess` + `convolutionSteps` ops), `dc136a0` (reverb lab + e2e), plus this close-out commit.
+- F10 shipped: `/tools/reverb` with a URL codec (`ir,rt,du,sd,pd,wm,me,from,to`), synthetic room/hall/plate/telephone IRs plus uploaded WAV IRs (mono downmix, ≤ 10 s, resampled to the source rate), pre-delay, wet/dry mix, FFT/direct method, selection-or-first-30-s preview vs explicit whole-file apply, IR waveform + spectrum, result waveform + spectrogram, FFT-vs-direct timing card, convolution flip-and-slide step card, reverse before/after magnitude/phase card, processed playback, and compact observe bullets.
+- Semantics pinned by D-024: synthetic IRs are deterministic per seed and energy-normalized; uploaded IRs keep their own level and are rate-converted with `resampleRational`; output length is `preDelay + N + M − 1`; direct convolution is limited to 2 s excerpts; reverse and reverb stay separate operations.
+- Gates: `pnpm check` exit 0 (dsp 926/926, web 273/273, scripts 13/13, i18n OK, biome 182 files); `pnpm e2e` 35/35 with zero console errors in fa + en, including both reverb-lab locales and the eight-route sidebar sweep. Perf on the same run: overview first paint 382 ms (< 1000 ms), spectrogram first tiles 479 ms (< 3000 ms).
+- Ledger ruling: the reverse card and the IR spectrum both analyse 65 536 samples; identical concurrent `fftSelection` params supersede each other through the params-only RPC key, so the reverse card uses Hann and the IR spectrum Hamming. Any future view with two same-length spectra must vary a param or run them sequentially.
+- Carries: `reverb.*` Persian copy needs owner review; uploaded IR level is not normalized by design; the result spectrogram shows the first 30 s with an explicit note.
+- **Next step:** Wave 3 plan 05 — `docs/plans/wave-3/05-spectrum-editor.md`.
+
+## 2026-11-01 — Wave 3, plan 05 CLOSED (F09 Re/Im spectrum editor)
+
+- Branch `feat/wave-3`. Commits: `754ad66` (`spectrumEdit` dsp module + presets + tests), `4353d6c` (NumPy golden fixture + ALGORITHMS row), `a60dbfb` (`spectrumEdit` worker op + packing tests), `fe80c39` (state/view/route/sidebar/i18n/e2e), plus this close-out commit.
+- F09 shipped: `/tools/spectrum-edit` with a URL codec (`h,ed,from,to`), band builder (Hz → bins, target Re/Im/magnitude/phase, zero/scale/set), edit list with remove/clear, seven presets, Hermitian toggle with complex-output warning and imaginary-energy ratio, uPlot charts for Re/Im/magnitude/phase, 200 ms debounced worker derive, capped selection with notice, and processed-lane playback; five golden presets at rtol 1e-12.
+- Semantics pinned by D-025: rectangular analysis frame (bin edits are unambiguous), next-power-of-two zero-pad, Hermitian ON mirrors and keeps output real; OFF computes the complex IFFT, reports `Σ(Im x)²/Σ(Re x)²`, and plays the real part as a labelled teaching mode; freehand brush stays deferred.
+- Gates: `pnpm check` exit 0 (dsp 951/951, web 286/286, scripts 13/13, i18n OK, biome 188 files); `pnpm e2e` 37/37 with zero console errors in fa + en, including both spectrum-editor locales and the nine-route sidebar sweep. Perf on the same run: overview first paint 393 ms (< 1000 ms gate), spectrogram first tiles 537 ms (< 3000 ms gate).
+- Test-infra ruling: the web Vitest timeout is 15 s (was Vitest's 5 s default) because the nine-route static-render sweep and one phase-vocoder op test legitimately exceeded 5 s under full-suite CPU contention; no assertion was weakened.
+- Carries: `spectrumEdit.*` Persian copy needs owner review (added to the fa backlog); the default range analyses the first 65 536 samples and the hint says so, while the cap notice appears only when an explicit longer range is requested; full-band `linearPhase`/`randomPhase` presets expand to one edit per bin, so their share URLs can be very large (future fix: encode preset name + seed); `present.md` (owner-friendly digest dated 2026-10-26) arrived in `754ad66` and still needs an owner keep/remove decision.
+- **Next step:** owner review of the completed Wave 3 branch → PR to `main`.
+
+## 2026-11-01 — Wave 3 audit close-out (F03/F06/F07/F10)
+
+- Independent review of `git diff origin/main...HEAD` found seven integration defects; all fixed in this audit commit:
+  - Reverb IR panel now pins `wetMix=1`/`preDelayMs=0`, so it shows the raw IR instead of a mixed delta.
+  - Reverse card reverses the same 65 536-sample analysis window it compares, instead of reversing the whole slice and analysing its tail.
+  - Uploaded-IR spectrum now maps Hz with the IR's own sample rate.
+  - Player selection readout uses the original source rate, not the active processed-lane rate.
+  - A/B playhead mapping clamps to `lengthSamples - 1`, so switching lanes at the end no longer restarts from zero.
+  - The waveform tool maps the active-lane playhead back into original-source samples, so a processed lane at another rate no longer misplaces the playhead.
+  - Aliasing demo receives the same frequency clamped to `2 * targetRateHz` that the readout displays.
+- Reverb conv-step chart now formats its sample-index x axis as integers, not Hz; extent spectra copy only the 65 536-sample analysis frame they use.
+- Extent `extentProcess` now returns `beforeSupportStartSample`/`beforeSupportEndSample`, and the before waveform highlights support as the plan requires.
+- Speed e2e now waits for the demo source to settle before clicking a preset; the prior 36/37 run was a race, not a product failure.
+- Gates: `pnpm check` exit 0 (dsp 951/951, web 286/286, scripts 13/13, i18n OK, biome 188 files); `pnpm e2e` 37/37 with zero console errors in fa + en. Perf on that run: overview first paint 396 ms (< 1000 ms), spectrogram first tiles 495 ms (< 3000 ms).
+- Carries: all Wave 3 Persian copy still needs owner review; `present.md` still needs a keep/remove decision; full-band phase presets can produce very large share URLs (future fix: encode preset + seed); freehand spectrum drawing and full theory panels remain deferred; extent/reverb mini-waveform envelopes still bucket on the main thread (move to a worker envelope before whole-file 96 kHz sources); a pre-existing Wave 2 FFT phase-mask bug treats already-dB magnitudes as linear, so the default phase chart can be blank (fix separately).
+- **Next step:** owner review and PR `feat/wave-3` → `main`.

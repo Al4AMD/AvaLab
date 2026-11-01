@@ -43,6 +43,31 @@ export function Sidebar() {
             {t("nav.generator")}
           </NavLink>
         </li>
+        <li>
+          <NavLink to="/tools/speed" className={linkClass}>
+            {t("nav.speed")}
+          </NavLink>
+        </li>
+        <li>
+          <NavLink to="/tools/sampling" className={linkClass}>
+            {t("nav.sampling")}
+          </NavLink>
+        </li>
+        <li>
+          <NavLink to="/tools/extent" className={linkClass}>
+            {t("nav.extent")}
+          </NavLink>
+        </li>
+        <li>
+          <NavLink to="/tools/reverb" className={linkClass}>
+            {t("nav.reverb")}
+          </NavLink>
+        </li>
+        <li>
+          <NavLink to="/tools/spectrum-edit" className={linkClass}>
+            {t("nav.spectrumEdit")}
+          </NavLink>
+        </li>
       </ul>
     </nav>
   );
