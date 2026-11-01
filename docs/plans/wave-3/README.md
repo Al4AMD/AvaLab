@@ -10,7 +10,7 @@ speed/direction.
 | `02-sampling-bit-depth.md` | F03 resampling, quantization, dither, aliasing demo | **done** (2026-11-01) |
 | `03-signal-extent.md` | F07 shift/scale/reverse/truncate/zero-pad, support/energy/power | **done** (2026-11-01) |
 | `04-reverse-reverb.md` | F10 reverse, synthetic/uploaded IRs, convolution timing | **done** (2026-11-01) |
-| `05-spectrum-editor.md` | F09 Re/Im/mag/phase edits, Hermitian toggle, presets | planned |
+| `05-spectrum-editor.md` | F09 Re/Im/mag/phase edits, Hermitian toggle, presets | **done** (2026-11-01) |
 
 Execution order: 01 → 02 → 03 → 04 → 05. Every plan depends on plan 01's
 processed lane; plan 04 reuses plan 03's reverse op.

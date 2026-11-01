@@ -68,8 +68,9 @@ test("Persian (default): edits, presets, Hermitian toggle, playback and URL rest
   await expect(page.getByTestId("spectrumEdit.edit.item")).toHaveCount(1);
 
   // Hermitian off: warning plus a non-zero imaginary-energy readout.
-  await page.getByTestId("spectrumEdit.control.hermitian").uncheck();
+  await page.getByTestId("spectrumEdit.control.hermitian").click();
   await expect(page).toHaveURL(/h=0/);
+  await expect(page.getByTestId("spectrumEdit.control.hermitian")).not.toBeChecked();
   await expect(page.getByTestId("spectrumEdit.warning.hermitian")).toBeVisible();
   await expect(page.getByTestId("spectrumEdit.meta.imaginaryRatio")).not.toHaveText("0.000e+0");
 

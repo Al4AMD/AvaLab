@@ -49,11 +49,11 @@
 - Algorithm: `L = fftLengthSamples ?? nextPowerOfTwo(N)` (must be `>= N` and a power of two); frame = input zero-padded to `L`; `X = fft(frame)`; apply edits in order (target mag/phase convert via `m·e^{jφ}`); Hermitian ON mirrors bins `1..L/2−1` and zeroes DC/Nyquist imaginary; `x = real(ifft(X))` truncated to `N`; return post-edit spectra and `imaginaryEnergyRatio = Σ(Im x)² / Σ(Re x)²` before truncation.
 - Guards: empty input → `RangeError`; non-finite sample → `TypeError`; bad bin ranges/mode/target/value → `RangeError`; `fftLengthSamples` not a power of two or `< N` → `RangeError`; inputs never mutated.
 
-- [ ] **Step 1: Write failing tests** for: no edits + Hermitian ON ≈ input (N = 1000 and N = 1024, tolerance 1e-9); zeroIm on a real input is a no-op; zeroRe produces a zero signal; magnitudeOnly ≈ zeroPhase; phaseOnly has unit magnitude; Hermitian OFF on an asymmetric edit yields non-zero imaginary energy and the returned samples are the real part; preset lengths and random-phase determinism; bad params throw.
-- [ ] **Step 2: Run** `pnpm --filter @avalab/dsp test -- spectrumEdit` — expected FAIL.
-- [ ] **Step 3: Implement** and export; add golden generator cases (NumPy reference for zeroIm, zeroRe, zeroPhase, magnitudeOnly, phaseOnly on a fixed 8-sample input).
-- [ ] **Step 4: Run** the test — expected PASS; add `ALGORITHMS` row.
-- [ ] **Step 5: Commit** `feat(F09): add spectrum edit dsp module`.
+- [x] **Step 1: Write failing tests** for: no edits + Hermitian ON ≈ input (N = 1000 and N = 1024, tolerance 1e-9); zeroIm on a real input is a no-op; zeroRe produces a zero signal; magnitudeOnly ≈ zeroPhase; phaseOnly has unit magnitude; Hermitian OFF on an asymmetric edit yields non-zero imaginary energy and the returned samples are the real part; preset lengths and random-phase determinism; bad params throw.
+- [x] **Step 2: Run** `pnpm --filter @avalab/dsp test -- spectrumEdit` — expected FAIL.
+- [x] **Step 3: Implement** and export; add golden generator cases (NumPy reference for zeroIm, zeroRe, zeroPhase, magnitudeOnly, phaseOnly on a fixed 8-sample input).
+- [x] **Step 4: Run** the test — expected PASS; add `ALGORITHMS` row.
+- [x] **Step 5: Commit** `feat(F09): add spectrum edit dsp module`.
 
 ### Task 2: Worker op `spectrumEdit`
 
@@ -68,11 +68,11 @@
 - Meta `{ sampleCount, fftLengthSamples, binCount, frequencyResolutionHz: sampleRateHz/fftLengthSamples, imaginaryEnergyRatio, capped, editsApplied }`.
 - Empty selection → `badParams`; malformed edits → `badParams`.
 
-- [ ] **Step 1: Write failing op tests** for packed offsets, no-edit round trip, zeroIm real result, Hermitian-off imaginary ratio > 0, cap notice, empty selection.
-- [ ] **Step 2: Run** `pnpm --filter @avalab/web test -- ops.test` — expected FAIL.
-- [ ] **Step 3: Implement** handler + worker case.
-- [ ] **Step 4: Run** the test — expected PASS.
-- [ ] **Step 5: Commit** `feat(F09): add spectrum edit worker op`.
+- [x] **Step 1: Write failing op tests** for packed offsets, no-edit round trip, zeroIm real result, Hermitian-off imaginary ratio > 0, cap notice, empty selection.
+- [x] **Step 2: Run** `pnpm --filter @avalab/web test -- ops.test` — expected FAIL.
+- [x] **Step 3: Implement** handler + worker case.
+- [x] **Step 4: Run** the test — expected PASS.
+- [x] **Step 5: Commit** `feat(F09): add spectrum edit worker op`.
 
 ### Task 3: Spectrum editor view
 
@@ -93,19 +93,19 @@
 - Compact “what to observe” bullets: magnitude vs phase information, Hermitian symmetry, Gibbs ringing from brick-wall masks.
 - Route `/tools/spectrum-edit`; `TOOL_IDS` + sidebar.
 
-- [ ] **Step 1: Write failing state tests** for URL round-trip, edit validation, Hz→bin conversion, preset replacement, Hermitian flag.
-- [ ] **Step 2: Run** `pnpm --filter @avalab/web test -- spectrumEditState` — expected FAIL.
-- [ ] **Step 3: Implement** state + view + route/sidebar + i18n (`spectrumEdit.*`, `nav.spectrumEdit`).
-- [ ] **Step 4: Run** `pnpm check` — expected PASS.
-- [ ] **Step 5: Write e2e** `spectrum-edit.spec.ts`: load demo; select a range; add a zero-magnitude band; charts paint; Hermitian off shows warning; preset `zeroIm`; play processed; en locale; zero console errors.
-- [ ] **Step 6: Run** `pnpm e2e -- spectrum-edit` — expected PASS.
-- [ ] **Step 7: Commit** `feat(F09): Re/Im spectrum editor`.
+- [x] **Step 1: Write failing state tests** for URL round-trip, edit validation, Hz→bin conversion, preset replacement, Hermitian flag.
+- [x] **Step 2: Run** `pnpm --filter @avalab/web test -- spectrumEditState` — expected FAIL.
+- [x] **Step 3: Implement** state + view + route/sidebar + i18n (`spectrumEdit.*`, `nav.spectrumEdit`).
+- [x] **Step 4: Run** `pnpm check` — expected PASS.
+- [x] **Step 5: Write e2e** `spectrum-edit.spec.ts`: load demo; select a range; add a zero-magnitude band; charts paint; Hermitian off shows warning; preset `zeroIm`; play processed; en locale; zero console errors.
+- [x] **Step 6: Run** `pnpm e2e -- spectrum-edit` — expected PASS.
+- [x] **Step 7: Commit** `feat(F09): Re/Im spectrum editor`.
 
 ### Task 4: Close-out
 
 **Files:**
 - Modify: `docs/PROGRESS.md`, `docs/plans/wave-3/README.md`, `docs/ALGORITHMS.md`, `docs/DECISIONS.md` (rectangular-window + real-part fallback semantics)
 
-- [ ] **Step 1: Run** full `pnpm check` + `pnpm e2e`; record numbers and fa-review backlog.
-- [ ] **Step 2: Update** plan status and docs.
-- [ ] **Step 3: Commit** `docs(F09): close spectrum editor plan`.
+- [x] **Step 1: Run** full `pnpm check` + `pnpm e2e`; record numbers and fa-review backlog.
+- [x] **Step 2: Update** plan status and docs.
+- [x] **Step 3: Commit** `docs(F09): close spectrum editor plan`.

@@ -163,10 +163,11 @@ Wave 3 additions (machine-drafted, agent):
 - `sampling.*` (F03 resampling/quantization/aliasing lab)
 - `extent.*` (F07 signal-extent lab), `nav.extent`, `tool.extent.title`
 - `reverb.*` (F10 reverse/reverb lab), `nav.reverb`, `tool.reverb.title`
+- `spectrumEdit.*` (F09 spectrum editor), `nav.spectrumEdit`, `tool.spectrumEdit.title`
 
 ## Next recommended step
 
-Wave 3 plans 01–04 are complete; owner code review pending. Next: **Wave 3 plan `05-spectrum-editor.md`** (`docs/plans/wave-3/05-spectrum-editor.md`). Do not begin later plans while an earlier one has failing checks.
+Wave 3 plans 01–05 are complete; owner code review pending. Next: **owner review of `feat/wave-3` → PR to `main`**. Do not begin Wave 4 while any check is failing.
 
 ## Session log
 
@@ -320,3 +321,13 @@ Wave 3 plans 01–04 are complete; owner code review pending. Next: **Wave 3 pla
 - Ledger ruling: the reverse card and the IR spectrum both analyse 65 536 samples; identical concurrent `fftSelection` params supersede each other through the params-only RPC key, so the reverse card uses Hann and the IR spectrum Hamming. Any future view with two same-length spectra must vary a param or run them sequentially.
 - Carries: `reverb.*` Persian copy needs owner review; uploaded IR level is not normalized by design; the result spectrogram shows the first 30 s with an explicit note.
 - **Next step:** Wave 3 plan 05 — `docs/plans/wave-3/05-spectrum-editor.md`.
+
+## 2026-11-01 — Wave 3, plan 05 CLOSED (F09 Re/Im spectrum editor)
+
+- Branch `feat/wave-3`. Commits: `754ad66` (`spectrumEdit` dsp module + presets + tests), `4353d6c` (NumPy golden fixture + ALGORITHMS row), `a60dbfb` (`spectrumEdit` worker op + packing tests), `fe80c39` (state/view/route/sidebar/i18n/e2e), plus this close-out commit.
+- F09 shipped: `/tools/spectrum-edit` with a URL codec (`h,ed,from,to`), band builder (Hz → bins, target Re/Im/magnitude/phase, zero/scale/set), edit list with remove/clear, seven presets, Hermitian toggle with complex-output warning and imaginary-energy ratio, uPlot charts for Re/Im/magnitude/phase, 200 ms debounced worker derive, capped selection with notice, and processed-lane playback; five golden presets at rtol 1e-12.
+- Semantics pinned by D-025: rectangular analysis frame (bin edits are unambiguous), next-power-of-two zero-pad, Hermitian ON mirrors and keeps output real; OFF computes the complex IFFT, reports `Σ(Im x)²/Σ(Re x)²`, and plays the real part as a labelled teaching mode; freehand brush stays deferred.
+- Gates: `pnpm check` exit 0 (dsp 951/951, web 286/286, scripts 13/13, i18n OK, biome 188 files); `pnpm e2e` 37/37 with zero console errors in fa + en, including both spectrum-editor locales and the nine-route sidebar sweep. Perf on the same run: overview first paint 393 ms (< 1000 ms gate), spectrogram first tiles 537 ms (< 3000 ms gate).
+- Test-infra ruling: the web Vitest timeout is 15 s (was Vitest's 5 s default) because the nine-route static-render sweep and one phase-vocoder op test legitimately exceeded 5 s under full-suite CPU contention; no assertion was weakened.
+- Carries: `spectrumEdit.*` Persian copy needs owner review (added to the fa backlog); the default range analyses the first 65 536 samples and the hint says so, while the cap notice appears only when an explicit longer range is requested; `present.md` (owner-friendly digest dated 2026-10-26) arrived in `754ad66` and still needs an owner keep/remove decision.
+- **Next step:** owner review of the completed Wave 3 branch → PR to `main`.
