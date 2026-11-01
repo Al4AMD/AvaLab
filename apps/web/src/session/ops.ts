@@ -794,6 +794,7 @@ export type ReverbProcessParams = {
   endSample: number;
   ir: ReverbIrParams;
   uploadedIrSampleCount: number;
+  uploadedIrSampleRateHz?: number;
   preDelayMs: number;
   wetMix: number;
   method: "fft" | "direct";
@@ -845,6 +846,11 @@ export function reverbProcess(
     !Number.isFinite(ir.seed) ||
     !Number.isInteger(params.uploadedIrSampleCount) ||
     params.uploadedIrSampleCount < 0 ||
+    (params.uploadedIrSampleCount > 0 &&
+      params.uploadedIrSampleRateHz !== undefined &&
+      (!Number.isFinite(params.uploadedIrSampleRateHz) ||
+        params.uploadedIrSampleRateHz <= 0 ||
+        params.uploadedIrSampleRateHz > 96_000)) ||
     !Number.isFinite(params.preDelayMs) ||
     params.preDelayMs < 0 ||
     !Number.isFinite(params.wetMix) ||
@@ -873,9 +879,10 @@ export function reverbProcess(
   }
 
   const preDelaySamples = Math.round((params.preDelayMs * params.sampleRateHz) / 1000);
+  const uploadedIrRateHz = params.uploadedIrSampleRateHz ?? params.sampleRateHz;
   const expectedIrLength =
     params.uploadedIrSampleCount > 0
-      ? params.uploadedIrSampleCount
+      ? Math.round((params.uploadedIrSampleCount * params.sampleRateHz) / uploadedIrRateHz)
       : Math.round(ir.durationSeconds * params.sampleRateHz);
   if (!Number.isSafeInteger(expectedIrLength) || expectedIrLength <= 0) {
     throw new DspOpError("badParams", "reverbProcess: the impulse response is empty");
@@ -897,6 +904,13 @@ export function reverbProcess(
   let impulseResponse: Float64Array;
   if (params.uploadedIrSampleCount > 0) {
     impulseResponse = Float64Array.from(samples.subarray(sourceLength));
+    if (uploadedIrRateHz !== params.sampleRateHz) {
+      impulseResponse = resampleRational(impulseResponse, {
+        inputRateHz: uploadedIrRateHz,
+        outputRateHz: params.sampleRateHz,
+        filter: "kaiserSinc",
+      });
+    }
   } else {
     impulseResponse = generateSyntheticIr({
       kind: ir.kind,
@@ -913,6 +927,13 @@ export function reverbProcess(
     params.method === "direct"
       ? convolveDirect(delayed, impulseResponse)
       : convolveFft(delayed, impulseResponse);
+  if (wet.length / params.sampleRateHz > MAX_REVERB_OUTPUT_SECONDS) {
+    throw new DspOpError(
+      "tooLong",
+      `reverbProcess: output is ${(wet.length / params.sampleRateHz).toFixed(1)} s, ` +
+        `above the ${MAX_REVERB_OUTPUT_SECONDS} s processed cap`,
+    );
+  }
   const dry = new Float64Array(wet.length);
   dry.set(source);
   const output = new Float64Array(wet.length);
@@ -1554,7 +1575,7 @@ export const dspOps = {
   convolutionSteps: {
     // Type lenses only — the table is read for types (DspOpParams/Result);
     // runtime code dispatches through the worker switch.
-    params: { signal: [], ir: [] },
+    params: { signal: [], ir: [] } as ConvolutionStepsParams,
     result: undefined as unknown as ConvolutionStepsResult,
     handler: convolutionSteps,
   },

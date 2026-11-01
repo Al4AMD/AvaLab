@@ -3,6 +3,7 @@ import { createBrowserRouter, type RouteObject, redirect } from "react-router";
 import { ExtentView } from "../features/extent/extentView";
 import { FftView } from "../features/fftview/fftView";
 import { GeneratorView } from "../features/generator/generatorView";
+import { ReverbView } from "../features/reverb/reverbView";
 import { SamplingView } from "../features/sampling/samplingView";
 import { SpectrogramView } from "../features/spectrogram/spectrogramView";
 import { SpeedView } from "../features/speed/speedView";
@@ -18,6 +19,7 @@ export const TOOL_IDS = [
   "speed",
   "sampling",
   "extent",
+  "reverb",
 ] as const;
 export type ToolId = (typeof TOOL_IDS)[number];
 
@@ -78,6 +80,7 @@ export const appRoutes: RouteObject[] = [
       { path: "tools/speed", element: <SpeedView /> },
       { path: "tools/sampling", element: <SamplingView /> },
       { path: "tools/extent", element: <ExtentView /> },
+      { path: "tools/reverb", element: <ReverbView /> },
     ],
   },
 ];

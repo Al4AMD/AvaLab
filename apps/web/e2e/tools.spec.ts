@@ -60,6 +60,12 @@ const TOOLS: ToolSpec[] = [
     label: /(گستردگی|Signal extent)/,
     title: /(گستردگی|Signal extent)/,
   },
+  {
+    path: "/tools/reverb",
+    url: /\/tools\/reverb$/,
+    label: /(پژواک|Reverb)/,
+    title: /(پژواک|Reverb)/,
+  },
 ];
 
 function watchForErrors(page: Page): string[] {
@@ -86,7 +92,7 @@ async function expectWaveformEmptyState(page: Page): Promise<void> {
   await expect(page.getByTestId("input.upload.button")).toBeVisible();
 }
 
-test("Persian (default): / redirects to the waveform tool and the sidebar reaches all seven routes", async ({
+test("Persian (default): / redirects to the waveform tool and the sidebar reaches all eight routes", async ({
   page,
 }) => {
   const errors = watchForErrors(page);
@@ -107,7 +113,7 @@ test("Persian (default): / redirects to the waveform tool and the sidebar reache
   expect(errors).toEqual([]);
 });
 
-test("English (persisted preference): the same seven routes with zero console errors", async ({
+test("English (persisted preference): the same eight routes with zero console errors", async ({
   page,
 }) => {
   const errors = watchForErrors(page);

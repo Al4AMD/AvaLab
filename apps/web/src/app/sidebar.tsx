@@ -58,6 +58,11 @@ export function Sidebar() {
             {t("nav.extent")}
           </NavLink>
         </li>
+        <li>
+          <NavLink to="/tools/reverb" className={linkClass}>
+            {t("nav.reverb")}
+          </NavLink>
+        </li>
       </ul>
     </nav>
   );

@@ -638,6 +638,14 @@ describe("reverbProcess handler", () => {
     expect(outputOf(result)).toEqual([1, 3, 3, 2]);
   });
 
+  it("resamples an uploaded IR that was decoded at a different sample rate", () => {
+    const result = run([1, 0], [1, 1], { uploadedIrSampleRateHz: 24_000 });
+    // 2 taps at 24 kHz become 4 taps at the 48 kHz source rate.
+    expect(result.meta.irSampleCount).toBe(4);
+    expect(result.meta.outputSampleCount).toBe(5);
+    expect(outputOf(result)).toHaveLength(5);
+  });
+
   it("pads the dry signal to the convolution length for wetMix 0", () => {
     const result = run([1, 2], [1, 1], { wetMix: 0 });
     expect(outputOf(result)).toEqual([1, 2, 0]);
