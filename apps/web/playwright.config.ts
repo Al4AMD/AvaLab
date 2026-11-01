@@ -3,6 +3,9 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
+  // The perf gates measure click→first-paint latency; concurrent workers
+  // contend for CPU and turn those gates into noise, so run one at a time.
+  workers: 1,
   forbidOnly: true,
   reporter: "list",
   use: {

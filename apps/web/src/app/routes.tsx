@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { createBrowserRouter, type RouteObject, redirect } from "react-router";
 import { SpectrogramView } from "../features/spectrogram/spectrogramView";
@@ -66,58 +66,6 @@ function WaveformStubPing() {
   );
 }
 
-/** Bucket width of the stub's waveform-overview plumbing probe (Plan 03
- * paints this envelope; the count only proves the pipeline here). */
-const WAVEFORM_STUB_BUCKET_COUNT = 32;
-
-/**
- * Plumbing probe for the waveform overview op (Plan 01 Task 4, adapted in
- * Plan 02 Tasks 1–2): fires the store's `deriveWithSource("waveformOverview", …)`
- * for the LOADED session source — the worker buckets the samples and the
- * readout renders the REAL sample count the worker read off the transferred
- * source bytes (op contract: `WaveformOverviewResult.meta.sampleCount`). The
- * Plan-01 deterministic probe seeding is retired: real sources now come from
- * the input empty state (upload, offline lane, demo clips). No canvas yet
- * (Plan 03); no i18n copy: raw technical readout (Latin digits, LTR).
- * Rejections (worker unavailable, noSource) render nothing and never surface
- * as unhandled console rejections.
- */
-function WaveformStubOverview() {
-  const derived = useSessionStore((state) => state.derived);
-  const original = useSessionStore((state) => state.original);
-  const [overviewKey, setOverviewKey] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (original === null) {
-      return;
-    }
-    const ticket = useSessionStore.getState().deriveWithSource("waveformOverview", {
-      bucketCount: WAVEFORM_STUB_BUCKET_COUNT,
-      sampleRateHz: original.sampleRateHz,
-    });
-    setOverviewKey(ticket.key);
-    // Store failures are the readout's to ignore (stub): swallow typedly.
-    ticket.outcome.catch(() => undefined);
-  }, [original]);
-
-  const entry = overviewKey === null ? undefined : derived.get(overviewKey);
-  if (entry === undefined) {
-    return null;
-  }
-  // DerivedEntry.result is unknown by contract; the overview result's shape
-  // is pinned by the op table (WaveformOverviewResult).
-  const meta = (entry.result as { meta?: { sampleCount?: unknown } }).meta;
-  const sampleCount = meta?.sampleCount;
-  if (typeof sampleCount !== "number" || !Number.isInteger(sampleCount)) {
-    return null;
-  }
-  return (
-    <span data-testid="waveform.stub.overview" dir="ltr" className="text-xs text-muted">
-      {sampleCount}
-    </span>
-  );
-}
-
 /** Data-router route table (spec §2.1/§2.5): layout shell + / redirect + /tools/<id>. */
 export const appRoutes: RouteObject[] = [
   {
@@ -134,7 +82,6 @@ export const appRoutes: RouteObject[] = [
         element: (
           <>
             <WaveformStubPing />
-            <WaveformStubOverview />
             <WaveformView />
           </>
         ),

@@ -143,7 +143,7 @@ test("Persian: drag selection, zoom controls, and the keyboard surface all work"
   await page.getByTestId("waveform.zoom.out").click();
   await expect.poll(async () => (await rangeValue.textContent()) ?? "").toBe(before);
 
-  await detail.focus();
+  await page.getByRole("slider").focus();
   const beforeKeyboard = (await rangeValue.textContent()) ?? "";
   await page.keyboard.press("]");
   await expect.poll(async () => (await rangeValue.textContent()) ?? "").not.toBe(beforeKeyboard);

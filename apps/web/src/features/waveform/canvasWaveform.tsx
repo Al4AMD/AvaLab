@@ -18,10 +18,10 @@ type WaveformCanvasProps = {
   readonly label: string;
   readonly interactive?: boolean;
   readonly canvasRef?: RefObject<HTMLCanvasElement | null>;
-  readonly onPointerDown?: (event: React.PointerEvent<HTMLCanvasElement>) => void;
-  readonly onPointerMove?: (event: React.PointerEvent<HTMLCanvasElement>) => void;
-  readonly onPointerUp?: (event: React.PointerEvent<HTMLCanvasElement>) => void;
-  readonly onKeyDown?: (event: React.KeyboardEvent<HTMLCanvasElement>) => void;
+  readonly onPointerDown?: (event: React.PointerEvent<HTMLElement>) => void;
+  readonly onPointerMove?: (event: React.PointerEvent<HTMLElement>) => void;
+  readonly onPointerUp?: (event: React.PointerEvent<HTMLElement>) => void;
+  readonly onKeyDown?: (event: React.KeyboardEvent<HTMLElement>) => void;
 };
 
 function cssColor(element: HTMLElement, variable: string, fallback: string): string {
@@ -97,6 +97,39 @@ export function WaveformCanvas(props: WaveformCanvasProps) {
     return unsubscribe;
   }, [canvasRef, props.minMax, props.sampleRange, props.selectionRange, props.heightPx, widthPx]);
 
+  const canvasClass =
+    "block w-full rounded-md border border-surface " +
+    (props.interactive === true ? "cursor-crosshair" : "");
+
+  if (props.interactive === true) {
+    return (
+      <div ref={hostRef} className="w-full">
+        <div
+          role="slider"
+          aria-label={props.label}
+          aria-valuemin={0}
+          aria-valuemax={props.sampleRange.endSample}
+          aria-valuenow={props.selectionRange.startSample}
+          tabIndex={0}
+          className="rounded-md outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          onPointerDown={props.onPointerDown}
+          onPointerMove={props.onPointerMove}
+          onPointerUp={props.onPointerUp}
+          onKeyDown={props.onKeyDown}
+        >
+          <canvas
+            ref={canvasRef}
+            data-testid={props.testId}
+            role="img"
+            aria-label={props.label}
+            className={canvasClass}
+            style={{ height: `${props.heightPx}px` }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div ref={hostRef} className="w-full">
       <canvas
@@ -104,18 +137,8 @@ export function WaveformCanvas(props: WaveformCanvasProps) {
         data-testid={props.testId}
         role="img"
         aria-label={props.label}
-        tabIndex={props.interactive === true ? 0 : undefined}
-        className={
-          "block w-full rounded-md border border-surface " +
-          (props.interactive === true
-            ? "cursor-crosshair focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            : "")
-        }
+        className={canvasClass}
         style={{ height: `${props.heightPx}px` }}
-        onPointerDown={props.onPointerDown}
-        onPointerMove={props.onPointerMove}
-        onPointerUp={props.onPointerUp}
-        onKeyDown={props.onKeyDown}
       />
     </div>
   );

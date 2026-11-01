@@ -182,5 +182,11 @@
     "loading": "Computing the spectrogram…",
     "error": "The spectrogram could not be computed.",
     "empty": "The source has no samples to analyse."
+  },
+  "compare": {
+    "title": "A/B compare",
+    "original": "Original",
+    "derived": "Processed",
+    "pending": "No processed source yet. The original-vs-processed canvases appear here once processing results exist."
   }
 }

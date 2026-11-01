@@ -11,6 +11,7 @@ import type { WaveformOverviewResult, WaveformRangeResult } from "../../session/
 import { type SessionSource, useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
 import { WaveformCanvas } from "./canvasWaveform";
+import { CompareSlot } from "./compareSlot";
 import {
   clampWindow,
   panWindow,
@@ -97,7 +98,7 @@ function useSliceEnvelope(
   }, [entry]);
 }
 
-function sampleAt(event: PointerEvent<HTMLCanvasElement>, range: SampleWindow): number {
+function sampleAt(event: PointerEvent<HTMLElement>, range: SampleWindow): number {
   const rect = event.currentTarget.getBoundingClientRect();
   const fraction = rect.width <= 0 ? 0 : (event.clientX - rect.left) / rect.width;
   const clamped = Math.max(0, Math.min(1, fraction));
@@ -143,14 +144,14 @@ export function WaveformView() {
     applyWindow(zoomWindow(window, sampleCount, factor, anchor));
   }
 
-  const onDetailPointerDown = (event: PointerEvent<HTMLCanvasElement>): void => {
+  const onDetailPointerDown = (event: PointerEvent<HTMLElement>): void => {
     const sample = sampleAt(event, detailRange);
     dragAnchor.current = sample;
     event.currentTarget.setPointerCapture(event.pointerId);
     setSelection(sample, sample);
   };
 
-  const onDetailPointerMove = (event: PointerEvent<HTMLCanvasElement>): void => {
+  const onDetailPointerMove = (event: PointerEvent<HTMLElement>): void => {
     const sample = sampleAt(event, detailRange);
     setCursorTime(sample / (original?.sampleRateHz ?? 1));
     if (dragAnchor.current !== null) {
@@ -159,12 +160,12 @@ export function WaveformView() {
     }
   };
 
-  const onDetailPointerUp = (event: PointerEvent<HTMLCanvasElement>): void => {
+  const onDetailPointerUp = (event: PointerEvent<HTMLElement>): void => {
     dragAnchor.current = null;
     event.currentTarget.releasePointerCapture(event.pointerId);
   };
 
-  const onDetailKeyDown = (event: KeyboardEvent<HTMLCanvasElement>): void => {
+  const onDetailKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
     const span = Math.max(1, selection.endSample - selection.startSample);
     const step = Math.max(1, Math.round(span * 0.1));
     if (event.key === "[") {
@@ -209,7 +210,7 @@ export function WaveformView() {
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-2xl font-semibold">{t("tool.waveform.title")}</h2>
-        <p dir="ltr" className="font-mono text-xs text-muted">
+        <p dir="ltr" data-testid="waveform.readout" className="font-mono text-xs text-muted">
           {t("waveform.readout", {
             duration: formatS(durationSeconds),
             rateHz: original.sampleRateHz,
@@ -238,7 +239,7 @@ export function WaveformView() {
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          className="rounded-md border border-surface px-3 py-1 text-sm"
+          className="rounded-md border border-surface px-3 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           onClick={() => zoom(0.5)}
           data-testid="waveform.zoom.in"
           aria-label={t("waveform.zoomIn")}
@@ -247,7 +248,7 @@ export function WaveformView() {
         </button>
         <button
           type="button"
-          className="rounded-md border border-surface px-3 py-1 text-sm"
+          className="rounded-md border border-surface px-3 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           onClick={() => zoom(2)}
           data-testid="waveform.zoom.out"
           aria-label={t("waveform.zoomOut")}
@@ -256,7 +257,7 @@ export function WaveformView() {
         </button>
         <button
           type="button"
-          className="rounded-md border border-surface px-3 py-1 text-sm"
+          className="rounded-md border border-surface px-3 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           onClick={() => applyWindow({ startSample: 0, endSample: sampleCount })}
           data-testid="waveform.zoom.reset"
         >
@@ -264,7 +265,7 @@ export function WaveformView() {
         </button>
         <button
           type="button"
-          className="rounded-md border border-surface px-3 py-1 text-sm"
+          className="rounded-md border border-surface px-3 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           onClick={() => applyWindow(panWindow(window, sampleCount, -0.5))}
           aria-label={t("waveform.panLeft")}
         >
@@ -272,7 +273,7 @@ export function WaveformView() {
         </button>
         <button
           type="button"
-          className="rounded-md border border-surface px-3 py-1 text-sm"
+          className="rounded-md border border-surface px-3 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           onClick={() => applyWindow(panWindow(window, sampleCount, 0.5))}
           aria-label={t("waveform.panRight")}
         >
@@ -312,6 +313,8 @@ export function WaveformView() {
           onKeyDown={onDetailKeyDown}
         />
       </figure>
+
+      <CompareSlot />
 
       <p dir="ltr" data-testid="waveform.selection.value" className="font-mono text-xs text-muted">
         {t("waveform.selectionReadout", {
