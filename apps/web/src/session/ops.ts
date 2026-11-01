@@ -24,15 +24,25 @@
  */
 
 import {
+  alawDecode,
+  alawEncode,
   aliasFrequencyHz,
   averagePower,
+  buildHistogram,
+  bytesToInt16Pcm,
   classifySignalType,
   computePeakBuckets,
   spectrogramTiles as computeSpectrogramTiles,
   convolveDirect,
   convolveFft,
+  decodeLosslessDeltaHuffman,
+  decodeMdct,
   editSpectrum,
+  encodeLosslessDeltaHuffman,
+  encodeMdct,
+  entropyBitsPerSymbol,
   fft,
+  floatToInt16Pcm,
   generateChirp,
   generateImpulse,
   generatePinkNoise,
@@ -44,9 +54,15 @@ import {
   generateTriangle,
   generateTwoTone,
   generateWhiteNoise,
+  huffmanDecode,
+  huffmanEncode,
+  int16PcmToBytes,
+  int16PcmToFloat,
   kaiser,
   magnitudeDb,
   mse,
+  mulawDecode,
+  mulawEncode,
   periodicExtend,
   pitchShift,
   psnrDb,
@@ -55,6 +71,8 @@ import {
   quantizeWithTpdfDither,
   resampleRational,
   reverse,
+  rleDecode,
+  rleEncode,
   type SpectrogramTilesParams,
   type SpectrumEdit,
   type SyntheticIrKind,
@@ -1346,6 +1364,255 @@ export function samplingProcess(
   };
 }
 
+export type CodecLabCodec = "rle" | "huffman" | "deltaHuffman" | "mulaw" | "alaw" | "mdct";
+
+export type CodecLabParams = {
+  codec: CodecLabCodec;
+  sampleRateHz: number;
+  startSample: number;
+  endSample: number;
+  mdctBitsPerSecond: number;
+};
+
+export type CodecLabMeta = {
+  codec: CodecLabCodec;
+  sampleCount: number;
+  sampleRateHz: number;
+  startSample: number;
+  endSample: number;
+  originalBytes: number;
+  compressedSizeBytes: number;
+  bitsPerSample: number;
+  bitrateKbps: number;
+  compressionRatio: number;
+  entropyBitsPerSymbol: number;
+  encodeMs: number;
+  decodeMs: number;
+  bitExact: boolean;
+  mse: number;
+  snrDb: number;
+  segmentalSnrDb: number;
+  psnrDb: number;
+  histogram: number[];
+  codeLengths: number[];
+  coefficientSparsity: number | null;
+  frameCount: number | null;
+  bitsTotal: number | null;
+};
+
+export type CodecLabResult = {
+  meta: CodecLabMeta;
+  payload?: TransferablePayload;
+};
+
+const CODEC_LAB_CODECS: readonly CodecLabCodec[] = [
+  "rle",
+  "huffman",
+  "deltaHuffman",
+  "mulaw",
+  "alaw",
+  "mdct",
+];
+
+const CODEC_LAB_MAX_SECONDS = 30;
+const CODEC_LAB_MDCT_FRAME_LENGTH = 512;
+
+function int16ArraysEqual(first: Int16Array, second: Int16Array): boolean {
+  if (first.length !== second.length) {
+    return false;
+  }
+  for (let index = 0; index < first.length; index += 1) {
+    if (first[index] !== second[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * F04 browser compression lab: encode the selected excerpt with one of the
+ * hand-written codecs, decode it, and return the decoded audio plus the
+ * teaching statistics (size, rate, entropy, timing, bit-exactness, metrics,
+ * histogram, Huffman lengths, MDCT sparsity). The payload is the source
+ * excerpt; the handler re-checks the 30 s cap even though the view slices.
+ */
+export function codecLabProcess(
+  params: CodecLabParams,
+  payload?: TransferablePayload,
+): CodecLabResult {
+  if (
+    params === undefined ||
+    params === null ||
+    !CODEC_LAB_CODECS.includes(params.codec) ||
+    !Number.isFinite(params.sampleRateHz) ||
+    params.sampleRateHz <= 0 ||
+    params.sampleRateHz > 96_000 ||
+    !Number.isInteger(params.startSample) ||
+    !Number.isInteger(params.endSample) ||
+    params.startSample < 0 ||
+    params.endSample < params.startSample ||
+    !Number.isFinite(params.mdctBitsPerSecond) ||
+    params.mdctBitsPerSecond < 8_000 ||
+    params.mdctBitsPerSecond > 512_000
+  ) {
+    throw new DspOpError("badParams", `codecLabProcess: invalid params ${String(params)}`);
+  }
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "codecLabProcess: a Float32 source payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError("badParams", "codecLabProcess: payload must be Float32-aligned");
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  if (samples.length === 0) {
+    throw new DspOpError("badParams", "codecLabProcess: the selection is empty");
+  }
+  const maxSamples = CODEC_LAB_MAX_SECONDS * params.sampleRateHz;
+  if (samples.length > maxSamples || params.endSample - params.startSample > maxSamples) {
+    throw new DspOpError("badParams", "codecLabProcess: the selection exceeds the 30 s cap");
+  }
+
+  const pcm16 = floatToInt16Pcm(samples);
+  const reference = int16PcmToFloat(pcm16);
+  const sourceBytes = int16PcmToBytes(pcm16);
+  const histogram = Array.from(buildHistogram(sourceBytes));
+  const sampleCount = pcm16.length;
+  const originalBytes = sampleCount * 2;
+
+  let decoded: Float32Array;
+  let decodedInt16: Int16Array | null = null;
+  let compressedSizeBytes: number;
+  let bitsTotal: number;
+  let entropy = 0;
+  let codeLengths: number[] = [];
+  let coefficientSparsity: number | null = null;
+  let frameCount: number | null = null;
+  let encodeMs = 0;
+  let decodeMs = 0;
+
+  if (params.codec === "rle") {
+    const encodeStart = performance.now();
+    const encoded = rleEncode(sourceBytes);
+    encodeMs = performance.now() - encodeStart;
+    const decodeStart = performance.now();
+    decodedInt16 = bytesToInt16Pcm(rleDecode(encoded));
+    decodeMs = performance.now() - decodeStart;
+    decoded = int16PcmToFloat(decodedInt16);
+    compressedSizeBytes = encoded.length;
+    bitsTotal = encoded.length * 8;
+    entropy = entropyBitsPerSymbol(sourceBytes);
+  } else if (params.codec === "huffman") {
+    const encodeStart = performance.now();
+    const encoded = huffmanEncode(sourceBytes);
+    encodeMs = performance.now() - encodeStart;
+    const decodeStart = performance.now();
+    decodedInt16 = bytesToInt16Pcm(
+      huffmanDecode(encoded.bits, encoded.bitLength, encoded.codebook),
+    );
+    decodeMs = performance.now() - decodeStart;
+    decoded = int16PcmToFloat(decodedInt16);
+    compressedSizeBytes = Math.ceil(encoded.bitLength / 8) + 256;
+    bitsTotal = encoded.bitLength;
+    entropy = entropyBitsPerSymbol(sourceBytes);
+    codeLengths = Array.from(encoded.codebook.codeLengths);
+  } else if (params.codec === "deltaHuffman") {
+    const encodeStart = performance.now();
+    const encoded = encodeLosslessDeltaHuffman(pcm16);
+    encodeMs = performance.now() - encodeStart;
+    const decodeStart = performance.now();
+    decodedInt16 = decodeLosslessDeltaHuffman(encoded.payload).samples;
+    decodeMs = performance.now() - decodeStart;
+    decoded = int16PcmToFloat(decodedInt16);
+    compressedSizeBytes = encoded.payload.length;
+    bitsTotal = encoded.bitLength;
+    entropy = encoded.stats.entropyBitsPerSymbol;
+    codeLengths = Array.from(encoded.codebook.codeLengths);
+  } else if (params.codec === "mulaw" || params.codec === "alaw") {
+    const encode = params.codec === "mulaw" ? mulawEncode : alawEncode;
+    const decode = params.codec === "mulaw" ? mulawDecode : alawDecode;
+    const encodeStart = performance.now();
+    const encoded = encode(Float64Array.from(reference), { bits: 8 });
+    encodeMs = performance.now() - encodeStart;
+    const decodeStart = performance.now();
+    decoded = Float32Array.from(decode(encoded));
+    decodeMs = performance.now() - decodeStart;
+    compressedSizeBytes = encoded.length;
+    bitsTotal = encoded.length * 8;
+    entropy = entropyBitsPerSymbol(encoded);
+  } else {
+    const encodeStart = performance.now();
+    const encoded = encodeMdct(Float32Array.from(reference), {
+      sampleRateHz: params.sampleRateHz,
+      frameLengthSamples: CODEC_LAB_MDCT_FRAME_LENGTH,
+      bitsPerSecond: params.mdctBitsPerSecond,
+    });
+    encodeMs = performance.now() - encodeStart;
+    const decodeStart = performance.now();
+    decoded = decodeMdct(encoded, {
+      sampleRateHz: params.sampleRateHz,
+      frameLengthSamples: CODEC_LAB_MDCT_FRAME_LENGTH,
+    }).slice(0, sampleCount);
+    decodeMs = performance.now() - decodeStart;
+    compressedSizeBytes = encoded.stats.compressedSizeBytes + 256 + encoded.steps.length * 8;
+    bitsTotal = encoded.bitsTotal;
+    frameCount = encoded.coefficients.length;
+    const hop = CODEC_LAB_MDCT_FRAME_LENGTH / 2;
+    const coefficientCount = frameCount * hop;
+    const flatCoefficients = new Int32Array(coefficientCount);
+    let zeroCount = 0;
+    let cursor = 0;
+    for (const frame of encoded.coefficients) {
+      for (let index = 0; index < hop; index += 1) {
+        const coefficient = frame[index] ?? 0;
+        flatCoefficients[cursor] = coefficient;
+        if (coefficient === 0) {
+          zeroCount += 1;
+        }
+        cursor += 1;
+      }
+    }
+    coefficientSparsity = coefficientCount === 0 ? 0 : zeroCount / coefficientCount;
+    entropy = entropyBitsPerSymbol(flatCoefficients);
+    codeLengths = Array.from(encoded.codebook.codeLengths);
+  }
+
+  const bitExact = decodedInt16 === null ? false : int16ArraysEqual(decodedInt16, pcm16);
+  const frameLengthSamples = Math.max(1, Math.round(0.02 * params.sampleRateHz));
+  const durationSeconds = sampleCount / params.sampleRateHz;
+  return {
+    meta: {
+      codec: params.codec,
+      sampleCount,
+      sampleRateHz: params.sampleRateHz,
+      startSample: params.startSample,
+      endSample: params.endSample,
+      originalBytes,
+      compressedSizeBytes,
+      bitsPerSample: (8 * compressedSizeBytes) / sampleCount,
+      bitrateKbps: (8 * compressedSizeBytes) / (durationSeconds * 1000),
+      compressionRatio: originalBytes / compressedSizeBytes,
+      entropyBitsPerSymbol: entropy,
+      encodeMs,
+      decodeMs,
+      bitExact,
+      mse: mse(reference, decoded),
+      snrDb: snrDb(reference, decoded),
+      segmentalSnrDb: segmentalSnrDb(reference, decoded, { frameLengthSamples }),
+      psnrDb: psnrDb(reference, decoded, { peak: 1 }),
+      histogram,
+      codeLengths,
+      coefficientSparsity,
+      frameCount,
+      bitsTotal,
+    },
+    payload: {
+      buffer: decoded.buffer as ArrayBuffer,
+      byteOffset: decoded.byteOffset,
+      byteLength: decoded.byteLength,
+    },
+  };
+}
+
 export type AliasDemoParams = {
   sourceRateHz: number;
   targetRateHz: number;
@@ -1639,6 +1906,19 @@ export const dspOps = {
     },
     result: undefined as unknown as SpectrumEditResult,
     handler: spectrumEdit,
+  },
+  codecLabProcess: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: {
+      codec: "rle" as CodecLabCodec,
+      sampleRateHz: 0,
+      startSample: 0,
+      endSample: 0,
+      mdctBitsPerSecond: 128_000,
+    },
+    result: undefined as unknown as CodecLabResult,
+    handler: codecLabProcess,
   },
   generateSynth: {
     // Type lenses only — the table is read for types (DspOpParams/Result);

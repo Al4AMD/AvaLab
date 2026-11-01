@@ -24,6 +24,7 @@
  */
 import {
   aliasDemo,
+  codecLabProcess,
   convolutionSteps,
   DspOpError,
   type DspOpName,
@@ -63,6 +64,7 @@ type DspOpHandlers = {
 
 const dspHandlers = {
   aliasDemo,
+  codecLabProcess,
   convolutionSteps,
   extentProcess,
   fftSelection,
@@ -193,6 +195,10 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
       }
       case "convolutionSteps": {
         const result = dspHandlers.convolutionSteps(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "codecLabProcess": {
+        const result = dspHandlers.codecLabProcess(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       case "spectrumEdit": {
