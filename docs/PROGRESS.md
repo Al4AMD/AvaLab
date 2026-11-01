@@ -167,7 +167,7 @@ Wave 3 additions (machine-drafted, agent):
 
 ## Next recommended step
 
-Wave 3 is complete and merged to `main` (PR #9, merge `834b426`). Next: **plan Wave 4** (F04 codecs, F05 metrics UI, rate–distortion, F06 time-stretch). Do not begin Wave 4 while any check is failing.
+Wave 3 is complete and merged to `main` (PR #9, merge `834b426`). Wave 4 is planned in `docs/plans/wave-4/` (F04 codecs, F05 metrics UI, rate–distortion, F06 verification). Next: **execute Wave 4 plan 01** — `docs/plans/wave-4/01-browser-codec-lab.md`. Do not begin while any check is failing.
 
 ## Session log
 
@@ -355,3 +355,13 @@ Wave 3 is complete and merged to `main` (PR #9, merge `834b426`). Next: **plan W
 - Re-verified on merged `main`: `pnpm check` exit 0; `pnpm e2e` 37/37 with zero console errors in fa + en; perf overview first paint 243 ms, spectrogram first tiles 326 ms.
 - Removed stale `present.md` (dated 2026-10-26, pre-Wave-2 close); recoverable from `754ad66`. Updated `docs/plans/README.md` Wave 3 status.
 - Carries unchanged: Wave 3 Persian review, huge full-band phase preset share URLs, pre-existing Wave 2 FFT phase-mask bug, main-thread waveform envelopes, deferred freehand/theory panels.
+
+## 2026-11-02 — Wave 4 plans written (F04/F05/F06)
+
+- Added `docs/plans/wave-4/README.md` plus four executable plans:
+  `01-browser-codec-lab.md`, `02-backend-real-codecs.md`,
+  `03-real-codec-ui-and-metrics.md`, `04-comparison-rate-distortion-closeout.md`.
+- Pinned decisions D-026…D-031: reuse `/ingest` with a 16-bit PCM excerpt;
+  cross-correlation delay/trim; PSNR peak 1.0 and 20 ms segmental frames;
+  `/health.codecs`; F06 verify-only; 30 s sequential comparison batch.
+- No code or dependencies changed. Next: execute plan 01.
