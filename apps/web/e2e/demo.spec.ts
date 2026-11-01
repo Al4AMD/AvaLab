@@ -45,12 +45,11 @@ test("Persian (default): a demo card loads through the offline lane and the over
 
   await page.getByTestId("input.demo.load.pinkNoise").click();
 
-  // The store now holds a source: the empty state yields to the stub body
-  // and the overview readout renders the worker-derived sample count.
+  // The store now holds a source: the empty state yields to the waveform
+  // view and its readout reports the real duration.
   await expect(page.getByTestId("input.upload.dropzone")).toHaveCount(0);
-  const overviewText = await page.getByTestId("waveform.stub.overview").textContent();
-  expect(overviewText).toMatch(/^[0-9]+$/); // a plain integer readout (Latin digits, LTR)
-  expect(Number(overviewText)).toBeGreaterThanOrEqual(1000); // a real count, not the 32-bucket stub
+  const readoutText = (await page.getByTestId("waveform.readout").textContent()) ?? "";
+  expect(readoutText).toContain("5.000 s");
   expect(errors).toEqual([]);
 });
 
@@ -67,7 +66,7 @@ test("English (persisted preference): the same demo path with zero console error
   await page.getByTestId("input.demo.load.clicks").click();
 
   await expect(page.getByTestId("input.upload.dropzone")).toHaveCount(0);
-  const overviewText = await page.getByTestId("waveform.stub.overview").textContent();
-  expect(Number(overviewText)).toBeGreaterThanOrEqual(1000);
+  const readoutText = (await page.getByTestId("waveform.readout").textContent()) ?? "";
+  expect(readoutText).toContain("5.000 s");
   expect(errors).toEqual([]);
 });

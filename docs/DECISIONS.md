@@ -159,3 +159,20 @@
 - Context: AGENTS §3/F16 require tool state serializable to the URL for shareable ready-made experiments (F16), routing deferred by D-015 to Wave 2.
 - Decision: `react-router` data routes at `/tools/<tool>?<params>`; every tool ships `paramsToSearch`/`searchToParams` codecs with canonical key ordering; controls write the URL via debounced `history.replaceState` (parameter state is primary in React, URL follows). User audio never enters the URL.
 - Consequences: F16 share-by-URL lands from day one per tool; params live as single-string source of truth to avoid history thrash on sliders.
+
+## D-020 — Spectrogram tiles: per-chunk op + amplitude-referenced dB
+
+- Date: 2026-11-01
+- Status: accepted (agent, Wave 2 Plan 03; owner may review)
+- Context: Plan 03 Task 3 assumed one `spectrogram` op returning a full row-major dB map. The owner's branch shipped `spectrogramTiles` (bounded frame chunk per call) so the store's `deriveWithSourceSlice` lane transfers only the needed source slice and the canvas paints progressively; the plan's single-payload contract and the old branch's streaming deviation (D-020 on `feat/wave-2-plan-03`) no longer apply.
+- Decision: keep the per-chunk op. Column decimation is explicit via `frameStride` (analysis hop multiplied by the stride, capped at 8192 frames / 4M cells); the view prints the factor. The op reports **coherent-gain-removed one-sided amplitude in dB** (`20·log10(|X| / Σw)`, +6.02 dB for a full-scale sinusoid bin): 0 dB = full-scale sinusoid for every window family, instead of the plan-literal `20·log10(|X|/1)` raw FFT magnitude (which made a full-scale tone read ≈ 42 dB at 1024 points and changed with window length).
+- Consequences: dB values are window-independent and physically interpretable; the UI floor is a display clamp only (worker clamps at −120 dB) so moving the slider never re-runs the STFT; tests pin 0 dB full-scale and −6.02 dB half-scale. Raw-magnitude comparisons against a textbook FFT need the gain back (documented in the op header).
+
+## D-021 — Fourier view: 65 536-sample analysis cap + source-free op lane
+
+- Date: 2026-11-01
+- Status: accepted (agent, Wave 2 Plan 04; owner may review)
+- Context: F08 asks for the DFT of "the selected segment or whole file", but a whole 5-minute 48 kHz file is 14.4M samples; a single frame that large is unreadable, slow, and its 7.2M bins cannot be drawn. Separately, the F12 generator must preview and load a signal before any source exists, while R23 keeps the store the sole view-tree RPC caller and every existing derive lane is source-bound.
+- Decision: (1) `fftSelection` analyses the first `min(selectionLength, 65 536)` samples (`F = nextPow2(...)`), returns `meta.capped`, and the view prints the cap notice; the cache key pins the FULL selection range while only the capped prefix is transferred. (2) The store gains `deriveStandalone(op, params)`: same worker lane and typed outcomes, no source, no cache entry, `key = ""` (nothing to cancel/poll); the generator preview guards staleness with a generation counter and debounces slider ticks by 120 ms.
+- Consequences: the Fourier view is O(F log F) with F ≤ 65 536 (fast enough for live window changes) and never transfers a whole file; the honest cap notice replaces silent truncation. The generator works offline and before any load; its preview re-synthesizes per param change (cheap for the capped demo durations, debounced for the 300 s end). Both deviations are documented in the ops headers and the ALGORITHMS table.
+

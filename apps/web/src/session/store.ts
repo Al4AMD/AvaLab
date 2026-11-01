@@ -158,6 +158,17 @@ export type SessionStore = {
     params: DspOpParams<K>,
     payload?: TransferablePayload,
   ): DeriveTicket<K> | null;
+  /** Source-free op run for tools that must work before ANY audio exists
+   * (the F12 generator preview). Same worker lane and typed outcomes as
+   * `derive`, but no cache entry and no input hash: the params alone fully
+   * determine the result, and the generator's params change on every slider
+   * tick, so caching would only grow the map. `key` is always "" (nothing to
+   * cancel or poll); callers guard stale results with a generation counter. */
+  deriveStandalone<K extends DspOpName>(
+    opKey: K,
+    params: DspOpParams<K>,
+    payload?: TransferablePayload,
+  ): DeriveTicket<K>;
   /** Source-payload variant of `derive` for ops that operate on the whole
    * analysis lane (`waveformOverview`): posts a fresh COPY of
    * `original.samples` as the request payload (the transfer neuters the
@@ -167,6 +178,16 @@ export type SessionStore = {
    * then meaningless (""). Bad params still throw TypeError through
    * `canonicalJson` before any frame (app-code bug fails loudly). */
   deriveWithSource<K extends DspOpName>(opKey: K, params: DspOpParams<K>): DeriveTicket<K>;
+  /** Bounded payload variant: posts only `[startSample, endSample)` from the
+   * source (a fresh copy, transferred). The CALLER must pin the same range in
+   * `params`, because the cache key is built from params + source hash — a
+   * range that is not part of the key would collide with other windows. */
+  deriveWithSourceSlice<K extends DspOpName>(
+    opKey: K,
+    params: DspOpParams<K>,
+    startSample: number,
+    endSample: number,
+  ): DeriveTicket<K>;
   /** Read a derivation's state by its cache key (spec polling interface). */
   getDerived(key: string): DerivedLookup;
   /** Cancel the pending job under `key`: detaches the worker frame id; a
@@ -383,6 +404,17 @@ export function createSessionStore(
         return openDerivedJob(opKey, canonical, inputHash, () => rpc.call(opKey, params, payload));
       },
 
+      deriveStandalone<K extends DspOpName>(
+        opKey: K,
+        params: DspOpParams<K>,
+        payload?: TransferablePayload,
+      ): DeriveTicket<K> {
+        // Same loud-validation rule as `derive` (canonicalJson throws on a
+        // typo'd param type before any frame leaves the main thread).
+        canonicalJson(params);
+        return { key: "", outcome: rpc.call(opKey, params, payload) };
+      },
+
       /**
        * Derive variant for ops that need the SOURCE SAMPLES as their request
        * payload (`waveformOverview` and friends). The payload is a fresh full
@@ -420,6 +452,38 @@ export function createSessionStore(
         const canonical = canonicalJson(params);
         return openDerivedJob(opKey, canonical, inputHash, () => {
           const copy = original.samples.slice();
+          return rpc.call(opKey, params, {
+            buffer: copy.buffer,
+            byteOffset: 0,
+            byteLength: copy.byteLength,
+          });
+        });
+      },
+
+      deriveWithSourceSlice<K extends DspOpName>(
+        opKey: K,
+        params: DspOpParams<K>,
+        startSample: number,
+        endSample: number,
+      ): DeriveTicket<K> {
+        const { original, inputHash } = get();
+        if (original === null || inputHash === null) {
+          const outcome = Promise.reject<DspOpOutcome<K>>(
+            new DspRpcError("noSource", "deriveWithSourceSlice: no source loaded"),
+          );
+          outcome.catch(() => undefined);
+          return { key: "", outcome };
+        }
+        const sampleCount = original.samples.length;
+        const start = Number.isFinite(startSample)
+          ? Math.max(0, Math.min(Math.round(startSample), sampleCount))
+          : 0;
+        const end = Number.isFinite(endSample)
+          ? Math.max(start, Math.min(Math.round(endSample), sampleCount))
+          : start;
+        const canonical = canonicalJson(params);
+        return openDerivedJob(opKey, canonical, inputHash, () => {
+          const copy = original.samples.slice(start, end);
           return rpc.call(opKey, params, {
             buffer: copy.buffer,
             byteOffset: 0,

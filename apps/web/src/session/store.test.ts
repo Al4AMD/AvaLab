@@ -387,6 +387,27 @@ describe("reload invalidates everything", () => {
   });
 });
 
+describe("deriveStandalone (source-free op lane, F12 generator preview)", () => {
+  it("dispatches without a loaded source and returns an uncached ticket", async () => {
+    const transport = makeFakeTransport();
+    const store = createSessionStore(createDspRpc(transport));
+    const ticket = store.getState().deriveStandalone("generateSynth", {
+      waveform: "sine",
+      sampleRateHz: 48000,
+      durationSeconds: 1,
+      amplitude: 0.5,
+      previewBucketCount: 32,
+    });
+    expect(ticket.key).toBe("");
+    expect(store.getState().original).toBeNull();
+    const outcome = await ticket.outcome;
+    expect("cancelled" in outcome).toBe(false);
+    const requests = requestsOf(transport);
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.op).toBe("generateSynth");
+  });
+});
+
 describe("deriveWithSource (source-payload derives, R24 copy path)", () => {
   const WAVEFORM_PARAMS = { bucketCount: 4, sampleRateHz: 48_000 } as const;
 
