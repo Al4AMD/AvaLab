@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 from avalab_api.errors import ApiError, ErrorCode
 from avalab_api.ml.models import (
@@ -60,11 +61,31 @@ class ModelRegistry:
                 f"Model {task} is not downloaded",
                 503,
             )
-        factory = _RUNNER_FACTORIES.get(task)
-        if factory is None:
-            raise ApiError(
-                ErrorCode.model_unavailable,
-                f"Model backend for {task} is not installed",
-                503,
-            )
+        factory = _runner_factory(task)
         return factory(model_dir(self.cache_dir, task))
+
+
+_BUILTIN_FACTORIES: dict[MlTask, tuple[str, str]] = {
+    "denoise": ("avalab_api.ml.denoise", "load_dpdfnet"),
+}
+
+
+def _runner_factory(task: MlTask) -> RunnerFactory:
+    """Return the registered factory, importing a built-in one on first use."""
+    factory = _RUNNER_FACTORIES.get(task)
+    if factory is not None:
+        return factory
+    builtin = _BUILTIN_FACTORIES.get(task)
+    if builtin is None:
+        raise ApiError(
+            ErrorCode.model_unavailable,
+            f"Model backend for {task} is not installed",
+            503,
+        )
+    module_name, attribute = builtin
+    from importlib import import_module
+
+    module = import_module(module_name)
+    loaded = cast(RunnerFactory, getattr(module, attribute))
+    _RUNNER_FACTORIES[task] = loaded
+    return loaded
