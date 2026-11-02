@@ -31,6 +31,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/codec/encode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Encode Codec
+         * @description Encode, decode, align and store one excerpt with the requested codec.
+         */
+        post: operations["encode_codec_api_v1_codec_encode_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -78,6 +98,60 @@ export interface components {
             file: string;
         };
         /**
+         * CodecEncodeRequest
+         * @description Reference to a stored canonical excerpt and the requested codec.
+         */
+        CodecEncodeRequest: {
+            /** Audio Id */
+            audio_id: string;
+            /**
+             * Codec
+             * @enum {string}
+             */
+            codec: "wav" | "flac" | "mp3" | "aac" | "opus" | "vorbis";
+            params?: components["schemas"]["CodecParams"];
+        };
+        /**
+         * CodecEncodeResponse
+         * @description Encoded size, aligned reference window and quality metadata.
+         */
+        CodecEncodeResponse: {
+            /** Aligned Sample Count */
+            aligned_sample_count: number;
+            /** Bit Exact */
+            bit_exact: boolean;
+            /** Bitrate Kbps */
+            bitrate_kbps: number;
+            /** Codec Delay Samples */
+            codec_delay_samples: number;
+            /** Duration S */
+            duration_s: number;
+            /** Encode Ms */
+            encode_ms: number;
+            /** Lossless */
+            lossless: boolean;
+            /** Reference Start Sample */
+            reference_start_sample: number;
+            /** Result Audio Id */
+            result_audio_id: string;
+            /** Sample Rate Hz */
+            sample_rate_hz: number;
+            /** Size Bytes */
+            size_bytes: number;
+        };
+        /**
+         * CodecParams
+         * @description Optional codec-specific quality controls; validated per codec.
+         */
+        CodecParams: {
+            /** Bitrate Kbps */
+            bitrate_kbps?: number | null;
+            /** Compression Level */
+            compression_level?: number | null;
+            /** Quality */
+            quality?: number | null;
+        };
+        /**
          * ErrorBody
          * @description Nested error payload: stable machine-readable code plus developer message.
          */
@@ -105,9 +179,11 @@ export interface components {
         };
         /**
          * HealthResponse
-         * @description Health payload: service status, API version, ffmpeg availability.
+         * @description Health payload: service status, API version, ffmpeg and codec availability.
          */
         HealthResponse: {
+            /** Codecs */
+            codecs: string[];
             /** Ffmpeg */
             ffmpeg: boolean;
             /** Status */
@@ -247,6 +323,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    encode_codec_api_v1_codec_encode_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodecEncodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodecEncodeResponse"];
+                };
+            };
+            /** @description Malformed request body (invalid_request) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unknown audio id or corrupt metadata (not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid codec/params, unavailable encoder or encode failure (invalid_request, codec_unavailable, encode_failed) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal storage failure (internal_error) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

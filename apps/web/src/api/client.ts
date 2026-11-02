@@ -20,6 +20,18 @@ export type HealthResponse = components["schemas"]["HealthResponse"];
 /** Canonical audio handle from `POST /ingest`. */
 export type IngestResponse = components["schemas"]["IngestResponse"];
 
+/** Codec-specific quality controls for `POST /codec/encode`. */
+export type CodecParams = components["schemas"]["CodecParams"];
+
+/** Request body for `POST /codec/encode`. */
+export type CodecEncodeRequest = components["schemas"]["CodecEncodeRequest"];
+
+/** Result metadata from `POST /codec/encode`. */
+export type CodecEncodeResponse = components["schemas"]["CodecEncodeResponse"];
+
+/** Public codec names accepted by `POST /codec/encode`. */
+export type CodecName = CodecEncodeRequest["codec"];
+
 export const DEFAULT_API_BASE_URL = "/api/v1";
 
 function resolveBaseUrl(): string {

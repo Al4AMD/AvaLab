@@ -31,7 +31,9 @@ def test_health_returns_ok_with_exact_keys(client: TestClient) -> None:
     assert body["status"] == "ok"
     assert body["version"] == API_VERSION
     assert isinstance(body["ffmpeg"], bool)
-    assert set(body) == {"status", "version", "ffmpeg"}
+    assert set(body) == {"status", "version", "ffmpeg", "codecs"}
+    assert isinstance(body["codecs"], list)
+    assert set(body["codecs"]) <= {"wav", "flac", "mp3", "aac", "opus", "vorbis"}
 
 
 def test_health_reports_ffmpeg_missing(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
