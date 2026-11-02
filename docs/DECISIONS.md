@@ -256,3 +256,43 @@
 - Context: comparing many codecs on a full 5-minute file would be slow and can exhaust browser/backend resources; concurrent encodes complicate progress and cancellation.
 - Decision: the comparison batch uses a 30 s excerpt and runs sequentially. Cancel stops scheduling new points and aborts the in-flight backend call. The current worker DSP call cannot be interrupted mid-transform.
 - Consequences: the comparison stays responsive and its progress is honest; it never implies full-file results, and the UI labels the excerpt. Implementation: failed points remain as translated error rows, lossless `∞` quality stays in the table but is excluded from the chart, and the CSV copy uses fixed 3-decimal numbers with `Infinity`/`NaN` literals.
+
+## D-032 — Denoising uses DPDFNet via `sherpa-onnx`
+
+- Date: 2026-11-03
+- Status: accepted (owner, Wave 5 brainstorm)
+- Context: F14 needs a small CPU denoiser with offline weights. DeepFilterNet3's Python package requires `numpy<2.0` and has no cp312 `deepfilterlib` wheel, which conflicts with the current NumPy line and would require porting its STFT/ERB/deep-filter DSP.
+- Decision: use `Ceva-IP/DPDFNet` revision `dd6818d00f50c836fed43a6243ebe49116de5964`, file `onnx/dpdfnet2_48khz_hr.onnx` (10.5 MB, Apache-2.0), through `sherpa-onnx==2.0.1`; the wrapper resamples to 48 kHz, denoises, and returns to the source rate.
+- Consequences: no custom denoiser DSP and no NumPy 1.x pin for the default environment; the model is speech-only, so denoising music or non-speech is a documented limitation rather than a target.
+
+## D-033 — ML dependencies are an optional `ml` extra
+
+- Date: 2026-11-03
+- Status: accepted (owner, Wave 5 brainstorm)
+- Context: the default API test run and CI must stay light, while the local demo needs PyTorch, ONNX Runtime, Demucs, and Transformers.
+- Decision: ML packages live in the `ml` extra in `apps/api/pyproject.toml`; default tests and CI do not install it. Docker and the local demo install `--extra ml`. Real-model tests run only with `AVALAB_RUN_ML_TESTS=1`.
+- Consequences: the plan's completion gate “no heavy ML import in the default pytest run” is enforced by construction; a deployment without the extra reports models unavailable instead of failing at import. Platform pins for Intel macOS are recorded as D-039.
+
+## D-034 — F14 uses one AI route with five task tabs
+
+- Date: 2026-11-03
+- Status: accepted (owner, Wave 5 brainstorm)
+- Context: five top-level sidebar routes would duplicate the source, model-status banner, job status, and 30 s excerpt controls.
+- Decision: ship one `/tools/ai` route with tabs `?task=denoise|superres|separation|asr|neural-codec`; the task is URL state, and the shared shell owns model availability and job lifecycle.
+- Consequences: switching experiments keeps the loaded source and URL-shareable task; tool-specific controls and result views plug into the same shell in Plans 02–03.
+
+## D-035 — In-process ML jobs with SSE and a 30 s excerpt cap
+
+- Date: 2026-11-03
+- Status: accepted (owner, Wave 5 brainstorm)
+- Context: the project has no database or Redis, CPU is the baseline, and ML calls are slow enough that request/response would block and lose progress.
+- Decision: use an in-process bounded job manager with maximum concurrency 1 and a queue limit, stream `progress`/`done`/`error`/`cancelled` through SSE, and enforce a 30 s excerpt cap on the backend even when the frontend already sliced. No Redis/Celery.
+- Consequences: one slow model cannot exhaust the laptop; cancellation and queue position are explicit; a restart loses queued jobs, which is acceptable without accounts and with TTL storage. The frontend mirrors the cap for early feedback but never replaces the server check.
+
+## D-036 — F14 demo audio is CC0 with pinned provenance
+
+- Date: 2026-11-03
+- Status: accepted (owner, Wave 5 brainstorm)
+- Context: the AI lab needs speech, noisy speech, and music clips that can be committed and redistributed with the public educational repository.
+- Decision: bundle three concatenated Kathleen utterances (CC0 `rhasspy/dataset-voice-kathleen`) as speech, a seeded pink-noise derivative at 5 dB SNR, and a 15 s excerpt of the CC0 “Life Turns to History” as music. Source URLs, revisions, and SHA-256 hashes live in `docs/THIRD_PARTY.md`; `tools/demo_clips/fetch_f14.py` regenerates and verifies them.
+- Consequences: demo experiments work offline and the repository carries no copyrighted music or uncleared voice. The noisy derivative is deterministic from the pinned seed, and asset drift fails the verifier.

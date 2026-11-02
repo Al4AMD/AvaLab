@@ -2,7 +2,7 @@
 
 **Status:** pending.
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** A working F14 platform: pinned model registry, optional ML dependency set, bounded in-process jobs with SSE, one AI route with five tabs, and CC0 speech/music demo assets. No model-specific inference yet.
 
@@ -50,12 +50,12 @@
 - Noisy derivative: deterministic pink noise at 5 dB SNR (`np.random.default_rng(20261103)`), clipped to [-1, 1], same rate/length.
 - Music: 48 kHz, 16-bit PCM, mono, 15 s from a fixed start offset; record the offset in the script.
 
-- [ ] **Step 1: Write `test_f14_assets.py`** with stdlib `unittest`: exact file names, WAV header (48 kHz/16-bit/mono), speech duration 18.5–20.5 s, music 14.5–15.5 s, transcript non-empty, noisy SNR within ±0.5 dB.
-- [ ] **Step 2: Run** `uv run --directory tools/demo_clips python -m unittest test_f14_assets -v` — expected FAIL (missing files).
-- [ ] **Step 3: Implement `fetch_f14.py`** with fixed source URLs, SHA-256 checks for downloads, `wave` module for output, and `--check` that verifies existing files without downloading.
-- [ ] **Step 4: Run** `uv run --directory tools/demo_clips python fetch_f14.py` then the unittest — expected PASS.
-- [ ] **Step 5: Update `docs/THIRD_PARTY.md`** with both CC0 sources, revisions/URLs, derived-file provenance, and the exact transcript source.
-- [ ] **Step 6: Commit** `feat(F14): add CC0 speech and music demo assets`.
+- [x] **Step 1: Write `test_f14_assets.py`** with stdlib `unittest`: exact file names, WAV header (48 kHz/16-bit/mono), speech duration 18.5–20.5 s, music 14.5–15.5 s, transcript non-empty, noisy SNR within ±0.5 dB.
+- [x] **Step 2: Run** `uv run --directory tools/demo_clips python -m unittest test_f14_assets -v` — expected FAIL (missing files).
+- [x] **Step 3: Implement `fetch_f14.py`** with fixed source URLs, SHA-256 checks for downloads, `wave` module for output, and `--check` that verifies existing files without downloading.
+- [x] **Step 4: Run** `uv run --directory tools/demo_clips python fetch_f14.py` then the unittest — expected PASS.
+- [x] **Step 5: Update `docs/THIRD_PARTY.md`** with both CC0 sources, revisions/URLs, derived-file provenance, and the exact transcript source.
+- [x] **Step 6: Commit** `feat(F14): add CC0 speech and music demo assets`.
 
 ### Task 2: ML config, dependencies, errors
 
@@ -70,11 +70,11 @@
 - ErrorCode add `model_unavailable`, `job_not_found`, `job_cancelled`, `ml_failed`, `ml_busy`.
 - `pyproject.toml` `[project.optional-dependencies] ml = [...]` pins `torch`, `torchaudio`, `transformers`, `demucs`, `sherpa-onnx`, `audiosronnx`, `onnxruntime`, `huggingface-hub`, `soundfile`; `uv.lock` regenerated. Platform markers implement D-039: Intel macOS gets NumPy 1.26/SciPy 1.16/torch 2.2.2, all other platforms keep NumPy 2.5/SciPy 1.18/torch 2.6+. Register the `ml` pytest marker (`markers = ["ml: real model tests, gated by AVALAB_RUN_ML_TESTS=1"]`).
 
-- [ ] **Step 1: Write `test_ml_config.py`** asserting defaults, env overrides (`AVALAB_ML_MAX_EXCERPT_SECONDS=10`), and the new error codes serialize as strings.
-- [ ] **Step 2: Run** `uv run --directory apps/api pytest -q tests/test_ml_config.py` — expected FAIL.
-- [ ] **Step 3: Implement config/errors and the optional extra**; keep ML imports out of default modules.
-- [ ] **Step 4: Run** `uv run --directory apps/api pytest -q tests/test_ml_config.py` and `uv run --directory apps/api ruff check .` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F14): add ML settings and optional dependencies`.
+- [x] **Step 1: Write `test_ml_config.py`** asserting defaults, env overrides (`AVALAB_ML_MAX_EXCERPT_SECONDS=10`), and the new error codes serialize as strings.
+- [x] **Step 2: Run** `uv run --directory apps/api pytest -q tests/test_ml_config.py` — expected FAIL.
+- [x] **Step 3: Implement config/errors and the optional extra**; keep ML imports out of default modules.
+- [x] **Step 4: Run** `uv run --directory apps/api pytest -q tests/test_ml_config.py` and `uv run --directory apps/api ruff check .` — expected PASS.
+- [x] **Step 5: Commit** `feat(F14): add ML settings and optional dependencies`.
 
 ### Task 3: Model registry, manifest, download script, `/models`
 
@@ -99,13 +99,13 @@
 - `GET /models` returns `ModelsResponse(models: list[ModelInfo])` with `state` in `available|missing|loading|error`, `license`, `revision`, `size_bytes`.
 - `apps/api/scripts/download_models.py` supports `--check` and `--all`; uses `huggingface_hub.snapshot_download` and direct DPDFNet download; writes a manifest.
 
-- [ ] **Step 1: Write `test_ml_registry.py`** with a temporary cache: missing models report `missing`; a fake spec with one existing file reports `available`; `require` on missing raises `ApiError(model_unavailable, 503)`; `/models` returns all five tasks.
-- [ ] **Step 2: Run** `uv run --directory apps/api pytest -q tests/test_ml_registry.py` — expected FAIL.
-- [ ] **Step 3: Implement specs/registry/route**; no heavy imports at module import time.
-- [ ] **Step 4: Implement `apps/api/scripts/download_models.py`** with `--check` first; `--all` downloads only after explicit flag.
-- [ ] **Step 5: Write `docs/MODELS.md`** with the five specs, licenses, sizes, input rates, and loaders.
-- [ ] **Step 6: Run** registry tests, `ruff`, `mypy` — expected PASS.
-- [ ] **Step 7: Commit** `feat(F14): add pinned model registry and download script`.
+- [x] **Step 1: Write `test_ml_registry.py`** with a temporary cache: missing models report `missing`; a fake spec with one existing file reports `available`; `require` on missing raises `ApiError(model_unavailable, 503)`; `/models` returns all five tasks.
+- [x] **Step 2: Run** `uv run --directory apps/api pytest -q tests/test_ml_registry.py` — expected FAIL.
+- [x] **Step 3: Implement specs/registry/route**; no heavy imports at module import time.
+- [x] **Step 4: Implement `apps/api/scripts/download_models.py`** with `--check` first; `--all` downloads only after explicit flag.
+- [x] **Step 5: Write `docs/MODELS.md`** with the five specs, licenses, sizes, input rates, and loaders.
+- [x] **Step 6: Run** registry tests, `ruff`, `mypy` — expected PASS.
+- [x] **Step 7: Commit** `feat(F14): add pinned model registry and download script`.
 
 ### Task 4: Bounded job manager and SSE routes
 
@@ -135,12 +135,12 @@
   - `DELETE /jobs/{job_id}` returns `{cancelled: bool}`.
   - Unknown job → 404 `job_not_found`; queue full → 429 `ml_busy`.
 
-- [ ] **Step 1: Write job-manager tests** with a fake runner that emits 0/50/100 progress and sleeps; assert one-at-a-time execution with two jobs, queue cap, cancel between progress events, audio/stem persistence, TTL cleanup (including stored WAVs), and no result after cancel.
-- [ ] **Step 2: Write route tests** with a fake runner injected into app state; assert 202, SSE frame order (`progress` then `done` with `result_audio_id`), `DELETE` cancellation, 404, 429, 30 s rejection.
-- [ ] **Step 3: Run** `uv run --directory apps/api pytest -q tests/test_ml_jobs.py tests/test_ml_routes.py` — expected FAIL.
-- [ ] **Step 4: Implement manager/audio/routes**; wire `app.state.ml_jobs`, `app.state.model_registry`, and storage in `create_app`; shut down in lifespan.
-- [ ] **Step 5: Run** focused tests, full API tests, `ruff`, `mypy` — expected PASS.
-- [ ] **Step 6: Commit** `feat(F14): add bounded ML jobs and SSE routes`.
+- [x] **Step 1: Write job-manager tests** with a fake runner that emits 0/50/100 progress and sleeps; assert one-at-a-time execution with two jobs, queue cap, cancel between progress events, audio/stem persistence, TTL cleanup (including stored WAVs), and no result after cancel.
+- [x] **Step 2: Write route tests** with a fake runner injected into app state; assert 202, SSE frame order (`progress` then `done` with `result_audio_id`), `DELETE` cancellation, 404, 429, 30 s rejection.
+- [x] **Step 3: Run** `uv run --directory apps/api pytest -q tests/test_ml_jobs.py tests/test_ml_routes.py` — expected FAIL.
+- [x] **Step 4: Implement manager/audio/routes**; wire `app.state.ml_jobs`, `app.state.model_registry`, and storage in `create_app`; shut down in lifespan.
+- [x] **Step 5: Run** focused tests, full API tests, `ruff`, `mypy` — expected PASS.
+- [x] **Step 6: Commit** `feat(F14): add bounded ML jobs and SSE routes`.
 
 ### Task 5: Frontend AI shell
 
@@ -169,13 +169,13 @@
 - `useAiJob` state: `idle | uploading | running | done | error | cancelled`; progress, result, errorKey; `run()`, `cancel()`.
 - `AiLabView`: five tabs, `?task=` sync, model status banner, disabled run buttons when backend/model missing, placeholder per tab.
 
-- [ ] **Step 1: Write `aiState.test.ts`** for task parsing/encoding and unknown fallback.
-- [ ] **Step 2: Write `aiClient.test.ts`** with a fake client seam: excerpt upload caps at 30 s, `startJob` body validation, SSE parser handles split frames/comments/multiple events, backend envelope errors map to keys.
-- [ ] **Step 3: Write `useAiJob.test.ts`** with a fake client: idle → uploading → running → done; cancel → cancelled; error keeps last progress; no state update after unmount.
-- [ ] **Step 4: Run** `pnpm --filter @avalab/web exec vitest run src/features/ai` — expected FAIL.
-- [ ] **Step 5: Implement state/client/hook/view**, add route + sidebar `nav.ai`, add `ai.*` keys.
-- [ ] **Step 6: Run** `pnpm check` — expected PASS.
-- [ ] **Step 7: Commit** `feat(F14): add AI lab shell and job client`.
+- [x] **Step 1: Write `aiState.test.ts`** for task parsing/encoding and unknown fallback.
+- [x] **Step 2: Write `aiClient.test.ts`** with a fake client seam: excerpt upload caps at 30 s, `startJob` body validation, SSE parser handles split frames/comments/multiple events, backend envelope errors map to keys.
+- [x] **Step 3: Write `useAiJob.test.ts`** with a fake client: idle → uploading → running → done; cancel → cancelled; error keeps last progress; no state update after unmount.
+- [x] **Step 4: Run** `pnpm --filter @avalab/web exec vitest run src/features/ai` — expected FAIL.
+- [x] **Step 5: Implement state/client/hook/view**, add route + sidebar `nav.ai`, add `ai.*` keys.
+- [x] **Step 6: Run** `pnpm check` — expected PASS.
+- [x] **Step 7: Commit** `feat(F14): add AI lab shell and job client`.
 
 ### Task 6: Generated client, docs, shell e2e
 
@@ -189,11 +189,11 @@
 - `pnpm gen:api` regenerates the schema from the running API.
 - E2E expects `/tools/ai` and a Persian/English “AI lab” heading; backend-absent run controls are disabled; zero console errors.
 
-- [ ] **Step 1: Start API, run** `pnpm gen:api`; commit only the generated schema change.
-- [ ] **Step 2: Update the e2e tool list** from “nine routes” to the actual count and add `/tools/ai` with loose fa/en title match.
-- [ ] **Step 3: Add D-032–D-036 entries** and update `PROGRESS.md` with Plan 01 status.
-- [ ] **Step 4: Run** `pnpm check`, `pnpm e2e`, API tests — expected PASS.
-- [ ] **Step 5: Commit** `docs(F14): close ML platform plan`.
+- [x] **Step 1: Start API, run** `pnpm gen:api`; commit only the generated schema change.
+- [x] **Step 2: Update the e2e tool list** from “nine routes” to the actual count and add `/tools/ai` with loose fa/en title match.
+- [x] **Step 3: Add D-032–D-036 entries** and update `PROGRESS.md` with Plan 01 status.
+- [x] **Step 4: Run** `pnpm check`, `pnpm e2e`, API tests — expected PASS.
+- [x] **Step 5: Commit** `docs(F14): close ML platform plan`.
 
 ## Completion Gate
 

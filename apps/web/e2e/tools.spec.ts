@@ -72,6 +72,24 @@ const TOOLS: ToolSpec[] = [
     label: /(ویرایشگر طیف|Spectrum editor)/,
     title: /(ویرایشگر طیف|Spectrum editor)/,
   },
+  {
+    path: "/tools/codec-lab",
+    url: /\/tools\/codec-lab$/,
+    label: /(فشرده‌سازی|Compression lab)/,
+    title: /(فشرده‌سازی|Compression lab)/,
+  },
+  {
+    path: "/tools/metrics",
+    url: /\/tools\/metrics$/,
+    label: /(سنجه‌های کیفیت|Quality metrics)/,
+    title: /(سنجه‌های کیفیت|Quality metrics)/,
+  },
+  {
+    path: "/tools/ai",
+    url: /\/tools\/ai$/,
+    label: /(هوش مصنوعی|AI lab)/,
+    title: /(هوش مصنوعی|AI lab)/,
+  },
 ];
 
 function watchForErrors(page: Page): string[] {
@@ -98,7 +116,18 @@ async function expectWaveformEmptyState(page: Page): Promise<void> {
   await expect(page.getByTestId("input.upload.button")).toBeVisible();
 }
 
-test("Persian (default): / redirects to the waveform tool and the sidebar reaches all nine routes", async ({
+/**
+ * Wave-5 Plan 01 Task 6: the AI shell must stay honest without a backend.
+ * Loading a demo proves the run controls render, and the backend-absent
+ * model state keeps the run button disabled instead of firing a request.
+ */
+async function expectAiShellBackendAbsent(page: Page): Promise<void> {
+  await expect(page.getByTestId("ai.placeholder")).toBeVisible();
+  await page.getByTestId("input.demo.load.chirp").click();
+  await expect(page.getByTestId("ai.run")).toBeDisabled();
+}
+
+test("Persian (default): / redirects to the waveform tool and the sidebar reaches every tool route", async ({
   page,
 }) => {
   const errors = watchForErrors(page);
@@ -114,12 +143,15 @@ test("Persian (default): / redirects to the waveform tool and the sidebar reache
     await page.getByRole("link", { name: tool.label }).click();
     await expect(page).toHaveURL(tool.url);
     await expect(page.getByRole("heading", { name: tool.title })).toBeVisible();
+    if (tool.path === "/tools/ai") {
+      await expectAiShellBackendAbsent(page);
+    }
   }
 
   expect(errors).toEqual([]);
 });
 
-test("English (persisted preference): the same nine routes with zero console errors", async ({
+test("English (persisted preference): the same tool routes with zero console errors", async ({
   page,
 }) => {
   const errors = watchForErrors(page);
@@ -135,6 +167,9 @@ test("English (persisted preference): the same nine routes with zero console err
     await page.getByRole("link", { name: tool.label }).click();
     await expect(page).toHaveURL(tool.url);
     await expect(page.getByRole("heading", { name: tool.title })).toBeVisible();
+    if (tool.path === "/tools/ai") {
+      await expectAiShellBackendAbsent(page);
+    }
   }
 
   expect(errors).toEqual([]);
