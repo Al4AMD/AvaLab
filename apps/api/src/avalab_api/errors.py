@@ -20,6 +20,8 @@ class ErrorCode(StrEnum):
     range_not_satisfiable = "range_not_satisfiable"
     invalid_request = "invalid_request"
     internal_error = "internal_error"
+    codec_unavailable = "codec_unavailable"
+    encode_failed = "encode_failed"
 
 
 class ApiError(Exception):

@@ -19,6 +19,8 @@ EXPECTED_ERROR_CODES = {
     "range_not_satisfiable",
     "invalid_request",
     "internal_error",
+    "codec_unavailable",
+    "encode_failed",
 }
 
 
