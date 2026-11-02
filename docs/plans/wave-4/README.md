@@ -9,7 +9,7 @@ verification.
 |---|---|---|
 | `01-browser-codec-lab.md` | PCM/WAV helpers, `codecLabProcess` worker op, hand-written codec lab UI | **done** (2026-11-02; commits `15d80ce`..`05f8389`) |
 | `02-backend-real-codecs.md` | ffmpeg codec specs, capability probe, `/codec/encode`, delay alignment | **done** (2026-11-02; commits `206dce9`..`4f5f133`) |
-| `03-real-codec-ui-and-metrics.md` | Real-codec panel, backend excerpt lane, F05 metrics view | **planned** |
+| `03-real-codec-ui-and-metrics.md` | Real-codec panel, backend excerpt lane, F05 metrics view | **done** (2026-11-02; commits `d5da56b`..`d2af73c`) |
 | `04-comparison-rate-distortion-closeout.md` | Comparison table, rate–distortion chart, F06 verification, close-out | **planned** |
 
 Execution order: 01 → 02 → 03 → 04. Plan 01 is browser-only and independent

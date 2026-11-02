@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** done (2026-11-02; commits `d5da56b`..`d2af73c`).
+
 **Goal:** The codec lab gains a real-codec panel that uploads the 16-bit PCM
 excerpt through `/ingest`, calls `/codec/encode`, fetches and decodes the
 aligned result, and shows size/bitrate/delay/bit-exactness. A new

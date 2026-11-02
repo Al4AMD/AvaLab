@@ -231,7 +231,7 @@
 - Status: accepted (agent, Wave 4 Plan 01; owner may review)
 - Context: PSNR and segmental SNR are ambiguous unless the peak and frame length are pinned, and codec comparisons must use one convention.
 - Decision: PSNR uses peak `1.0` (float full scale). Segmental SNR uses 20 ms frames. Both definitions appear in the UI and `docs/ALGORITHMS.md`; codec metrics compare the decoded result with the aligned 16-bit PCM reference.
-- Consequences: results are directly comparable across the hand-written and real-codec labs; a different peak convention would shift PSNR by a constant dB offset.
+- Consequences: results are directly comparable across the hand-written and real-codec labs; a different peak convention would shift PSNR by a constant dB offset. Plan 03 centralizes the convention in `computeQualityMetrics`, which rejects unequal lengths or a bad rate before calling the DSP metrics.
 
 ## D-029 — Codec availability is exposed through `GET /health.codecs`
 

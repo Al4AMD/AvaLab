@@ -169,9 +169,14 @@ Wave 4 plan 01 additions (machine-drafted, agent):
 
 - `codecLab.*` (F04 browser codec lab), `nav.codecLab`, `tool.codecLab.title`
 
+Wave 4 plan 03 additions (machine-drafted, agent):
+
+- `codecLab.real.*` (real-codec panel), `codecLab.error.*` (stable backend error codes)
+- `metrics.*` (F05 metrics lab), `nav.metrics`, `tool.metrics.title`
+
 ## Next recommended step
 
-Wave 4 plan 01 is complete on `feat/wave-4` (browser codec lab, F04). Next: **execute Wave 4 plan 02** — `docs/plans/wave-4/02-backend-real-codecs.md` (ffmpeg codec specs, capability probe, `/codec/encode`, delay alignment). Do not begin while any check is failing.
+Wave 4 plan 03 is complete on `feat/wave-4` (real-codec panel + F05 metrics lab). Next: **execute Wave 4 plan 04** — `docs/plans/wave-4/04-comparison-rate-distortion-closeout.md` (comparison table, rate–distortion chart, F06 verification, close-out). Do not begin while any check is failing.
 
 ## Session log
 
@@ -391,3 +396,11 @@ Wave 4 plan 01 is complete on `feat/wave-4` (browser codec lab, F04). Next: **ex
 - Gates: backend `pytest` 133/133, `ruff` clean, `mypy` clean (25 source files); `pnpm check` exit 0 (dsp 966/966, web 298/298, scripts 13/13, i18n OK); `pnpm e2e` 40/40, zero console errors in fa + en.
 - Carries: Docker ffmpeg codec availability is not verified in this session — the runtime probe and `/health.codecs` degrade honestly, and a missing encoder returns `codec_unavailable`. Real-codec UI/e2e belongs to Plan 03. No perceptual metric (PESQ/ViSQOL) in this wave. No new Persian strings in Plan 02.
 - **Next step:** execute Wave 4 plan 03 — `docs/plans/wave-4/03-real-codec-ui-and-metrics.md`.
+
+## 2026-11-02 — Wave 4 plan 03 complete (F04 real-codec panel + F05 metrics)
+
+- Tasks 1–5 complete on `feat/wave-4`: backend excerpt lane/cache (`d5da56b`), real-codec panel + URL state + copy (`1be1f11`), metrics wrapper and `/tools/metrics` (`c76cabf`), metrics/real-codec e2e (`d2af73c`), and this close-out.
+- Shipped: the codec lab uploads only the selected mono 16-bit PCM excerpt through `/ingest`, calls `/codec/encode`, fetches the aligned WAV, and shows size/bitrate/delay/bit-exactness plus MSE/SNR/segmental SNR/PSNR. `/health.codecs` disables missing encoders with a translated hint; with no backend the real card stays disabled and says offline. `/tools/metrics` compares the original and processed lanes only when rates and lengths match, and always shows the PSNR peak = 1.0 note.
+- Gates: `pnpm check` exit 0 after Task 3 (dsp 966/966, web 316/316, scripts 13/13, biome 199 files, i18n OK); `pnpm e2e` 43/43 (51 s), zero console errors in fa + en. Backend untouched in this plan, so its Plan 02 results stand.
+- Carries: `codecLab.real.*` and `metrics.*` Persian copy needs owner review. The metrics view computes the full-buffer metrics on the main thread; plan 03 mandates this wrapper, but a 5-minute comparison may warrant a worker op later. Real-codec e2e covers only the no-backend degradation path; pytest and unit tests cover the live backend. Metrics for arbitrary processed lanes cannot show compression ratio/bitrate/entropy (no codec metadata); the codec lab keeps those stats.
+- **Next step:** execute Wave 4 plan 04 — `docs/plans/wave-4/04-comparison-rate-distortion-closeout.md`.
