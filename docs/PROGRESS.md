@@ -404,3 +404,9 @@ Wave 4 plan 03 is complete on `feat/wave-4` (real-codec panel + F05 metrics lab)
 - Gates: `pnpm check` exit 0 after Task 3 (dsp 966/966, web 316/316, scripts 13/13, biome 199 files, i18n OK); `pnpm e2e` 43/43 (51 s), zero console errors in fa + en. Backend untouched in this plan, so its Plan 02 results stand.
 - Carries: `codecLab.real.*` and `metrics.*` Persian copy needs owner review. The metrics view computes the full-buffer metrics on the main thread; plan 03 mandates this wrapper, but a 5-minute comparison may warrant a worker op later. Real-codec e2e covers only the no-backend degradation path; pytest and unit tests cover the live backend. Metrics for arbitrary processed lanes cannot show compression ratio/bitrate/entropy (no codec metadata); the codec lab keeps those stats.
 - **Next step:** execute Wave 4 plan 04 — `docs/plans/wave-4/04-comparison-rate-distortion-closeout.md`.
+
+## 2026-11-02 — Wave 4 plan 04 Task 3 (F06 verified)
+
+- Extended `apps/web/e2e/speed.spec.ts` on `feat/wave-4`: resample 2× halves the demo duration to 2.500 s and disables semitones; time-stretch 2× also halves it and enables semitones; +12 semitones at 1× time-stretch keeps 5.000 s; both locales stay at zero console errors.
+- F06 shipped in Wave 3 Plan 01; Wave 4 Plan 04 only added coverage and made no implementation change. Verified with `pnpm e2e` 45/45 (1.5 min) after the Task 2 comparison test landed.
+- **Next step:** finish Wave 4 close-out (full gates, measured batch time, docs).
