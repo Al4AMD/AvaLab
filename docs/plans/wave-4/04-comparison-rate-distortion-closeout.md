@@ -1,5 +1,7 @@
 # Wave 4 · Plan 04 — Comparison, rate–distortion, F06 close-out
 
+**Status:** done (2026-11-02; commits `adedbb0`, `5e13c2e`, `2bd2352`, plus this close-out).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** One comparison table and one rate–distortion chart put every

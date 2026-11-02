@@ -247,7 +247,7 @@
 - Status: accepted (owner, Wave 4 brainstorm)
 - Context: Wave 3 already shipped the processed lane, resample speed, time-stretch, pitch shift, and reverse; F06 remains in the Wave 4 milestone.
 - Decision: Wave 4 verifies F06 with existing unit/e2e coverage and marks it done; no new F06 feature work is added.
-- Consequences: Wave 4 scope stays focused on F04/F05; any F06 defect found during verification is fixed as a bug, not expanded into a redesign.
+- Consequences: Wave 4 scope stays focused on F04/F05; any F06 defect found during verification is fixed as a bug, not expanded into a redesign. Verified 2026-11-02: e2e asserts resample and time-stretch both halve the duration at 2×, semitones are disabled only in resample mode, and +12 semitones at 1× time-stretch preserves the duration in both locales.
 
 ## D-031 — Comparison batch: 30 s excerpt, sequential, cancellable
 
@@ -255,4 +255,4 @@
 - Status: accepted (owner, Wave 4 brainstorm)
 - Context: comparing many codecs on a full 5-minute file would be slow and can exhaust browser/backend resources; concurrent encodes complicate progress and cancellation.
 - Decision: the comparison batch uses a 30 s excerpt and runs sequentially. Cancel stops scheduling new points and aborts the in-flight backend call. The current worker DSP call cannot be interrupted mid-transform.
-- Consequences: the comparison stays responsive and its progress is honest; it never implies full-file results, and the UI labels the excerpt.
+- Consequences: the comparison stays responsive and its progress is honest; it never implies full-file results, and the UI labels the excerpt. Implementation: failed points remain as translated error rows, lossless `∞` quality stays in the table but is excluded from the chart, and the CSV copy uses fixed 3-decimal numbers with `Infinity`/`NaN` literals.
