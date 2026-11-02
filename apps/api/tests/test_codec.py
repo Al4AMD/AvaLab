@@ -13,6 +13,7 @@ from audio_fixtures import audio_fixture_dir, wav_2s_44k1_mono
 from fastapi.testclient import TestClient
 from scipy.io import wavfile  # type: ignore[import-untyped]
 
+from avalab_api.codecs import available_codecs
 from avalab_api.config import Settings, get_settings
 from avalab_api.errors import ApiError, ErrorCode
 from avalab_api.main import API_PREFIX, create_app
@@ -141,6 +142,35 @@ def test_mp3_is_lossy_and_smaller(
         assert count == len(expected)
         assert not np.array_equal(stored.astype(np.float64), expected[start : start + count])
         assert np.all(np.isfinite(stored))
+
+    assert_temp_clean(temp_area)
+
+
+@pytest.mark.parametrize("codec", ["wav", "flac", "mp3", "aac", "opus", "vorbis"])
+def test_every_available_codec_round_trips(
+    storage_root: Path,
+    temp_area: Path,
+    wav_2s_44k1_mono: Path,
+    codec: str,
+) -> None:
+    if codec not in available_codecs():
+        pytest.skip(f"{codec} encoder is not available in this ffmpeg build")
+    with make_client(storage_root) as client:
+        audio_id = ingest_wav(client, wav_2s_44k1_mono)
+        response = client.post(
+            CODEC_URL, json={"audio_id": audio_id, "codec": codec, "params": {}}
+        )
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["aligned_sample_count"] > 0
+        assert isinstance(body["codec_delay_samples"], int)
+        if codec in {"wav", "flac"}:
+            assert body["lossless"] is True
+            assert body["bit_exact"] is True
+        else:
+            assert body["lossless"] is False
+            assert body["bit_exact"] is False
 
     assert_temp_clean(temp_area)
 

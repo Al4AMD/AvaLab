@@ -1,6 +1,7 @@
 """Codec specs, capability probing, parameter validation and ffmpeg arguments."""
 
 import subprocess
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,14 @@ SAMPLE_ENCODERS = """Encoders:
  A....D pcm_s16le            PCM signed 16-bit little-endian
  A....D vorbis               Vorbis
 """
+
+
+@pytest.fixture(autouse=True)
+def clear_encoder_cache() -> Iterator[None]:
+    """Keep the process-wide probe cache from leaking between tests."""
+    available_encoders.cache_clear()
+    yield
+    available_encoders.cache_clear()
 
 
 def completed(stdout: bytes) -> subprocess.CompletedProcess[bytes]:
@@ -85,7 +94,7 @@ def test_resolve_codec_prefers_first_available_spec(monkeypatch: pytest.MonkeyPa
 
     vorbis = resolve_codec("vorbis")
     assert vorbis.encoder == "vorbis"
-    assert vorbis.extra_args == ("-strict", "-2")
+    assert vorbis.extra_args == ("-ac", "2", "-strict", "-2")
 
 
 def test_resolve_codec_raises_when_encoder_is_unavailable(

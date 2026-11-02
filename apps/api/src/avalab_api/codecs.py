@@ -48,7 +48,16 @@ CODEC_SPECS: dict[CodecName, tuple[CodecSpec, ...]] = {
     "vorbis": (
         CodecSpec("vorbis", "libvorbis", False, ".ogg", "ogg", (), None, 5, None),
         CodecSpec(
-            "vorbis", "vorbis", False, ".ogg", "ogg", ("-strict", "-2"), None, 5, None
+            # Native experimental Vorbis rejects mono; duplicate to stereo, decoded path downmixes.
+            "vorbis",
+            "vorbis",
+            False,
+            ".ogg",
+            "ogg",
+            ("-ac", "2", "-strict", "-2"),
+            None,
+            5,
+            None,
         ),
     ),
 }
