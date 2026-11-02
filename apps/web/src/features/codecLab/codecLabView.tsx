@@ -42,6 +42,13 @@ import {
   isCodecLabStale,
   isRealCodecStale,
 } from "./codecLabState";
+import {
+  type ComparisonRow,
+  comparisonToCsv,
+  handwrittenRow,
+  realRow,
+  sortComparisonRows,
+} from "./comparison";
 
 const CONTROL_FOCUS_CLASSES =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
@@ -212,6 +219,7 @@ export function CodecLabView(): React.ReactElement {
   const [realStatus, setRealStatus] = useState<RealCodecStatus>("idle");
   const [realResult, setRealResult] = useState<RealCodecViewResult | null>(null);
   const [realErrorKey, setRealErrorKey] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "ok" | "error">("idle");
   const realRunIdRef = useRef(0);
   const realAbortRef = useRef<AbortController | null>(null);
 
@@ -225,6 +233,7 @@ export function CodecLabView(): React.ReactElement {
     setRealStatus("idle");
     setRealResult(null);
     setRealErrorKey(null);
+    setCopyStatus("idle");
     if (original === null) {
       return;
     }
@@ -259,6 +268,23 @@ export function CodecLabView(): React.ReactElement {
     },
     [],
   );
+
+  const comparisonRows = useMemo<ComparisonRow[]>(() => {
+    const rows: ComparisonRow[] = [];
+    if (result !== null) {
+      rows.push(handwrittenRow(result.meta, `codecLab.codec.${result.meta.codec}`));
+    }
+    if (realResult !== null) {
+      rows.push(
+        realRow(
+          realResult.run,
+          realResult.settings.realCodec,
+          `codecLab.real.codec.${realResult.settings.realCodec}`,
+        ),
+      );
+    }
+    return sortComparisonRows(rows);
+  }, [result, realResult]);
 
   const realMetrics = useMemo<QualityMetrics | null>(() => {
     if (realResult === null) {
@@ -430,6 +456,18 @@ export function CodecLabView(): React.ReactElement {
     alaw: t("codecLab.codec.alaw"),
     mdct: t("codecLab.codec.mdct"),
   };
+  async function copyComparison(): Promise<void> {
+    if (comparisonRows.length === 0) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(comparisonToCsv(comparisonRows));
+      setCopyStatus("ok");
+    } catch {
+      setCopyStatus("error");
+    }
+  }
+
   const realCodecLabels: Record<RealCodecName, string> = {
     wav: t("codecLab.real.codec.wav"),
     flac: t("codecLab.real.codec.flac"),
@@ -952,6 +990,128 @@ export function CodecLabView(): React.ReactElement {
             <p className="mt-2 text-xs text-muted">{t("codecLab.stats.psnrNote")}</p>
           </>
         ) : null}
+      </div>
+
+      <div className="rounded border border-surface p-3 text-sm" data-testid="codecLab.comparison">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-semibold">{t("codecLab.comparison.title")}</h3>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            data-testid="codecLab.comparison.copy"
+            disabled={comparisonRows.length === 0}
+            onClick={() => {
+              void copyComparison();
+            }}
+          >
+            {t("codecLab.comparison.copy")}
+          </Button>
+        </div>
+        {copyStatus === "ok" ? (
+          <p
+            data-testid="codecLab.comparison.copyStatus"
+            role="status"
+            className="text-xs text-accent"
+          >
+            {t("codecLab.comparison.copied")}
+          </p>
+        ) : null}
+        {copyStatus === "error" ? (
+          <p
+            data-testid="codecLab.comparison.copyStatus"
+            role="alert"
+            className="text-xs text-danger"
+          >
+            {t("codecLab.comparison.copyFailed")}
+          </p>
+        ) : null}
+        {comparisonRows.length === 0 ? (
+          <p data-testid="codecLab.comparison.empty" className="mt-2 text-xs text-muted">
+            {t("codecLab.comparison.empty")}
+          </p>
+        ) : (
+          <div className="mt-2 overflow-x-auto">
+            <table data-testid="codecLab.comparison.table" className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-surface text-start">
+                  <th className="py-1 pe-3 text-start font-medium">
+                    {t("codecLab.comparison.header.method")}
+                  </th>
+                  <th className="py-1 pe-3 text-start font-medium">
+                    {t("codecLab.comparison.header.family")}
+                  </th>
+                  <th className="py-1 pe-3 text-start font-medium">
+                    {t("codecLab.comparison.header.bitrate")}
+                  </th>
+                  <th className="py-1 pe-3 text-start font-medium">
+                    {t("codecLab.comparison.header.ratio")}
+                  </th>
+                  <th className="py-1 pe-3 text-start font-medium">
+                    {t("codecLab.comparison.header.snr")}
+                  </th>
+                  <th className="py-1 pe-3 text-start font-medium">
+                    {t("codecLab.comparison.header.psnr")}
+                  </th>
+                  <th className="py-1 pe-3 text-start font-medium">
+                    {t("codecLab.comparison.header.encodeMs")}
+                  </th>
+                  <th className="py-1 pe-3 text-start font-medium">
+                    {t("codecLab.comparison.header.bitExact")}
+                  </th>
+                  <th className="py-1 text-start font-medium">
+                    {t("codecLab.comparison.header.lossless")}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {comparisonRows.map((row) => (
+                  <tr
+                    key={row.id}
+                    data-testid={`codecLab.comparison.row.${row.id}`}
+                    className="border-b border-surface/60"
+                  >
+                    <td className="py-1 pe-3">{t(row.labelKey)}</td>
+                    <td className="py-1 pe-3">
+                      {row.family === "handwritten"
+                        ? t("codecLab.comparison.family.handwritten")
+                        : t("codecLab.comparison.family.real")}
+                    </td>
+                    {row.errorKey !== undefined ? (
+                      <td colSpan={7} className="py-1 text-danger">
+                        {t(row.errorKey)}
+                      </td>
+                    ) : (
+                      <>
+                        <td dir="ltr" className="py-1 pe-3 tabular-nums">
+                          {formatMetric(row.bitrateKbps, 2)}
+                        </td>
+                        <td dir="ltr" className="py-1 pe-3 tabular-nums">
+                          {formatMetric(row.compressionRatio, 3)}
+                        </td>
+                        <td dir="ltr" className="py-1 pe-3 tabular-nums">
+                          {formatMetric(row.snrDb, 2)}
+                        </td>
+                        <td dir="ltr" className="py-1 pe-3 tabular-nums">
+                          {formatMetric(row.psnrDb, 2)}
+                        </td>
+                        <td dir="ltr" className="py-1 pe-3 tabular-nums">
+                          {formatMetric(row.encodeMs, 2)}
+                        </td>
+                        <td className="py-1 pe-3">
+                          {row.bitExact ? t("codecLab.stats.yes") : t("codecLab.stats.no")}
+                        </td>
+                        <td className="py-1">
+                          {row.lossless ? t("codecLab.stats.yes") : t("codecLab.stats.no")}
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <details className="rounded border border-surface p-3 text-sm">

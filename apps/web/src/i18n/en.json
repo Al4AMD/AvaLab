@@ -206,6 +206,28 @@
       "symbol": "Symbol",
       "length": "Length (bits)"
     },
+    "comparison": {
+      "title": "Method comparison",
+      "empty": "Encode with a hand-written codec or a real codec to compare the measured rows here.",
+      "copy": "Copy CSV",
+      "copied": "CSV copied to the clipboard.",
+      "copyFailed": "Could not copy the CSV. Your browser may block clipboard access.",
+      "header": {
+        "method": "Method",
+        "family": "Family",
+        "bitrate": "Bitrate (kbps)",
+        "ratio": "Compression ratio",
+        "snr": "SNR (dB)",
+        "psnr": "PSNR (dB)",
+        "encodeMs": "Encode time (ms)",
+        "bitExact": "Bit-exact",
+        "lossless": "Lossless"
+      },
+      "family": {
+        "handwritten": "Hand-written",
+        "real": "Real (ffmpeg)"
+      }
+    },
     "theory": {
       "title": "Theory and what to observe",
       "rle": "RLE replaces runs of equal bytes with (count, value); it gains little on ordinary audio.",
