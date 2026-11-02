@@ -10,5 +10,8 @@
   "ai.superres.failed",
   "ai.superres.installFailed",
   "ai.separation.stems",
-  "ai.separation.installFailed"
+  "ai.separation.installFailed",
+  "ai.neuralCodec.point",
+  "ai.neuralCodec.installFailed",
+  "ai.neuralCodec.metricsFailed"
 ]

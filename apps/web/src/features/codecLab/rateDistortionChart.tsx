@@ -11,7 +11,12 @@ import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 
 import type { ComparisonRow } from "./comparison";
-import { type RateDistortionQuality, rateDistortionPoints } from "./comparisonRunner";
+import {
+  appendRateDistortionPoints,
+  type RateDistortionExtraPoint,
+  type RateDistortionQuality,
+  rateDistortionPoints,
+} from "./comparisonRunner";
 
 const CHART_HEIGHT_PX = 240;
 const POINT_COLORS = ["#8bd3c7", "#f59e0b", "#93c5fd", "#f472b6", "#a3e635", "#c4b5fd"];
@@ -20,15 +25,21 @@ export function RateDistortionChart({
   rows,
   heightPx = CHART_HEIGHT_PX,
   quality = "snrDb",
+  extraPoints = [],
 }: {
   readonly rows: readonly ComparisonRow[];
   readonly heightPx?: number;
   readonly quality?: RateDistortionQuality;
+  readonly extraPoints?: readonly RateDistortionExtraPoint[];
 }) {
   const { t } = useTranslation();
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [widthPx, setWidthPx] = useState(1);
-  const points = rateDistortionPoints(rows, quality);
+  const points = appendRateDistortionPoints(
+    rateDistortionPoints(rows, quality),
+    extraPoints,
+    quality,
+  );
 
   useEffect(() => {
     const host = hostRef.current;

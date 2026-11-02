@@ -892,13 +892,6 @@
       "asr": "Speech to text (ASR)",
       "neuralCodec": "Neural codec"
     },
-    "placeholder": {
-      "denoise": "A cleaned copy of the excerpt will appear here. The speech denoiser works best on speech, and it can remove details that ASR needs.",
-      "superres": "A band-extended copy of the excerpt will appear here. This tab pairs with downsampling: it estimates the high band that the sampling rate removed.",
-      "separation": "Four stems (vocals, drums, bass, other) will appear here. CPU separation is slow and works on short excerpts.",
-      "asr": "A transcript of the speech excerpt will appear here. The bundled speech demo includes a reference transcript for WER.",
-      "neuralCodec": "The decoded neural-codec result will appear here. Compare its bitrate and quality with the traditional codecs in the compression lab."
-    },
     "models": {
       "offline": "Server unreachable: model tools stay disabled until the server is back.",
       "loading": "Checking model availability…",
@@ -1000,6 +993,37 @@
         "other": "Other",
         "vocals": "Vocals"
       }
+    },
+    "neuralCodec": {
+      "intro": "Encodec is a learned codec. The excerpt is encoded and decoded at the selected bandwidth, then compared with the original. The decoded lane is an AI approximation, not a bit-exact reconstruction.",
+      "bandwidth": "Target bandwidth",
+      "bandwidthOption": "{{kbps}} kbps",
+      "model": "Model: {{modelId}}",
+      "modelMissing": "The Encodec model is not downloaded. Fetch it with the command below, then reload.",
+      "noSource": "Load audio to run the neural-codec A/B experiment.",
+      "stats": {
+        "bandwidth": "Target bandwidth",
+        "bandwidthValue": "{{kbps}} kbps",
+        "bitrate": "Estimated bitrate",
+        "bitrateValue": "{{kbps}} kbps (estimated)",
+        "size": "Estimated stream size",
+        "sizeValue": "{{bytes}} bytes (estimated)",
+        "duration": "Source duration",
+        "durationValue": "{{seconds}} s",
+        "snr": "Waveform SNR",
+        "snrValue": "{{db}} dB"
+      },
+      "estimatedNote": "Bitrate and stream size are estimated from the requested bandwidth and source duration; the encoded stream is not stored.",
+      "chart": {
+        "title": "Rate–distortion"
+      },
+      "point": "Encodec (neural)",
+      "ab": {
+        "original": "Original",
+        "decoded": "Encodec decoded"
+      },
+      "installFailed": "The decoded audio could not be installed for A/B playback.",
+      "metricsFailed": "The decoded audio could not be compared with the source."
     },
     "asr": {
       "intro": "Speech recognition runs Whisper tiny on the first 30 s of the source. The tab shows the transcript, timestamped segments, and — for the bundled speech demo — the word error rate (WER) against its reference transcript.",

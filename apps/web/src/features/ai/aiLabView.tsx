@@ -18,6 +18,7 @@ import { AI_MAX_EXCERPT_SECONDS, type AiModelInfo, type AiModelState, aiClient }
 import { AI_TASKS, type AiTask, aiTaskFromSearch } from "./aiState";
 import { AsrTab } from "./asrTab";
 import { DenoiseTab } from "./denoiseTab";
+import { NeuralCodecTab } from "./neuralCodecTab";
 import { SeparationTab } from "./separationTab";
 import { SuperresTab } from "./superresTab";
 import { useAiJob } from "./useAiJob";
@@ -37,21 +38,6 @@ function tabLabel(t: TFunction, task: AiTask): string {
       return t("ai.tab.asr");
     case "neural-codec":
       return t("ai.tab.neuralCodec");
-  }
-}
-
-function placeholder(t: TFunction, task: AiTask): string {
-  switch (task) {
-    case "denoise":
-      return t("ai.placeholder.denoise");
-    case "superres":
-      return t("ai.placeholder.superres");
-    case "separation":
-      return t("ai.placeholder.separation");
-    case "asr":
-      return t("ai.placeholder.asr");
-    case "neural-codec":
-      return t("ai.placeholder.neuralCodec");
   }
 }
 
@@ -221,15 +207,6 @@ export function AiLabView(): React.ReactElement {
         ))}
       </div>
 
-      {task === "denoise" ||
-      task === "superres" ||
-      task === "separation" ||
-      task === "asr" ? null : (
-        <p data-testid="ai.placeholder" className="text-sm">
-          {placeholder(t, task)}
-        </p>
-      )}
-
       <ModelBanner
         backendOnline={backendOnline}
         model={model}
@@ -245,6 +222,8 @@ export function AiLabView(): React.ReactElement {
         <SeparationTab backendOnline={backendOnline} model={model} />
       ) : task === "asr" ? (
         <AsrTab backendOnline={backendOnline} model={model} />
+      ) : task === "neural-codec" ? (
+        <NeuralCodecTab backendOnline={backendOnline} model={model} />
       ) : original === null ? (
         <UploadEmptyState />
       ) : (

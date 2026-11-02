@@ -154,11 +154,11 @@
 - AI tab renders one neural point plus any rows the user already produced in the codec comparison; no automatic codec batch.
 - Honest labels: “estimated bitrate” and “AI codec approximation”.
 
-- [ ] **Step 1: Write chart tests** for extra points and finite filtering; component tests for bandwidth/run/A-B/estimate labels.
-- [ ] **Step 2: Run** focused tests — expected FAIL.
-- [ ] **Step 3: Implement the tab and chart extension.**
-- [ ] **Step 4: Run** `pnpm check` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F14): add neural codec A/B and rate point`.
+- [x] **Step 1: Write chart tests** for extra points and finite filtering; component tests for bandwidth/run/A-B/estimate labels.
+- [x] **Step 2: Run** focused tests — expected FAIL.
+- [x] **Step 3: Implement the tab and chart extension.**
+- [x] **Step 4: Run** `pnpm check` — expected PASS.
+- [x] **Step 5: Commit** `feat(F14): add neural codec A/B and rate point`.
 
 ### Task 7: Docs and gated smoke
 
