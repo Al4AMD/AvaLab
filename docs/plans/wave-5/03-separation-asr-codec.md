@@ -132,11 +132,11 @@
   - stats `{bandwidth_kbps, estimated_size_bytes, estimated_bitrate_kbps, duration_s}`.
 - Estimated size = `bandwidth_kbps * 1000 / 8 * duration_s`; label `estimated`.
 
-- [ ] **Step 1: Write tests** with a fake encodec seam: bandwidth validation, estimate formula, length/rate restoration, silent input, real-model test `ml`.
-- [ ] **Step 2: Run** focused tests — expected FAIL.
-- [ ] **Step 3: Implement the adapter** with lazy `transformers`/torch imports.
-- [ ] **Step 4: Run** focused tests, `ruff`, `mypy` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F14): add Encodec neural-codec adapter`.
+- [x] **Step 1: Write tests** with a fake encodec seam: bandwidth validation, estimate formula, length/rate restoration, silent input, real-model test `ml`.
+- [x] **Step 2: Run** focused tests — expected FAIL.
+- [x] **Step 3: Implement the adapter** with lazy `transformers`/torch imports.
+- [x] **Step 4: Run** focused tests, `ruff`, `mypy` — expected PASS.
+- [x] **Step 5: Commit** `feat(F14): add Encodec neural-codec adapter`.
 
 ### Task 6: Neural-codec UI and rate–distortion point
 

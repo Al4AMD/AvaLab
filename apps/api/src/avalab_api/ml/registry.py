@@ -70,6 +70,7 @@ _BUILTIN_FACTORIES: dict[MlTask, tuple[str, str]] = {
     "superres": ("avalab_api.ml.superres", "load_lavasr"),
     "separation": ("avalab_api.ml.separation", "load_demucs"),
     "asr": ("avalab_api.ml.asr", "load_asr"),
+    "neural_codec": ("avalab_api.ml.neural_codec", "load_encodec"),
 }
 
 
