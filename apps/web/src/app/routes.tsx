@@ -4,6 +4,7 @@ import { CodecLabView } from "../features/codecLab/codecLabView";
 import { ExtentView } from "../features/extent/extentView";
 import { FftView } from "../features/fftview/fftView";
 import { GeneratorView } from "../features/generator/generatorView";
+import { MetricsView } from "../features/metrics/metricsView";
 import { ReverbView } from "../features/reverb/reverbView";
 import { SamplingView } from "../features/sampling/samplingView";
 import { SpectrogramView } from "../features/spectrogram/spectrogramView";
@@ -24,6 +25,7 @@ export const TOOL_IDS = [
   "reverb",
   "spectrum-edit",
   "codec-lab",
+  "metrics",
 ] as const;
 export type ToolId = (typeof TOOL_IDS)[number];
 
@@ -87,6 +89,7 @@ export const appRoutes: RouteObject[] = [
       { path: "tools/reverb", element: <ReverbView /> },
       { path: "tools/spectrum-edit", element: <SpectrumEditView /> },
       { path: "tools/codec-lab", element: <CodecLabView /> },
+      { path: "tools/metrics", element: <MetricsView /> },
     ],
   },
 ];

@@ -26,7 +26,8 @@
     "extent": "Signal extent",
     "reverb": "Reverb",
     "spectrumEdit": "Spectrum editor",
-    "codecLab": "Compression lab"
+    "codecLab": "Compression lab",
+    "metrics": "Quality metrics"
   },
   "input": {
     "empty": {
@@ -124,6 +125,9 @@
     },
     "codecLab": {
       "title": "Compression lab"
+    },
+    "metrics": {
+      "title": "Quality metrics"
     }
   },
   "codecLab": {
@@ -792,6 +796,35 @@
       "irInvalid": "The impulse response contains invalid samples.",
       "irDecode": "Could not decode that impulse response file. Try a WAV file.",
       "failed": "The reverb operation failed. Try a shorter range or different parameters."
+    }
+  },
+  "metrics": {
+    "missing": "No processed signal yet. Run a tool that installs a processed lane (for example the compression lab), then compare it here.",
+    "mismatch": {
+      "length": "The processed signal has a different length. Run a tool that preserves length, or compare codec-lab results against their aligned reference.",
+      "rate": "The processed signal has a different sample rate. Resample first or use a tool that preserves the rate."
+    },
+    "label": {
+      "mse": "MSE",
+      "snr": "SNR",
+      "segmentalSnr": "Segmental SNR (20 ms)",
+      "psnr": "PSNR",
+      "samples": "Compared samples"
+    },
+    "psnrNote": "PSNR uses peak = 1.0 (full scale); ∞ means the reconstruction is identical.",
+    "processedLabel": "Processed lane: {{label}}",
+    "codecNote": "The compressed lane stores no codec metadata, so compression ratio, bitrate and entropy stay in the compression lab.",
+    "theory": {
+      "title": "Definitions and what to observe",
+      "energy": "SNR compares signal energy with error energy; MSE averages the squared sample error and is sensitive to outliers.",
+      "segmental": "Segmental SNR averages per-frame SNR over 20 ms active frames, so a bad short passage is not hidden by a good average.",
+      "psnr": "PSNR = 10·log10(peak² / MSE) with peak = 1.0 for full-scale float audio."
+    },
+    "observe": {
+      "title": "What to observe",
+      "lossless": "A lossless codec still differs from the float original by 16-bit PCM quantization error; SNR is finite and PSNR is large.",
+      "lossy": "Lower lossy bitrates raise MSE and lower SNR/PSNR; listen to the same result for the perceptual difference.",
+      "bitrate": "Compare several codec settings and relate the metric change to the bitrate shown in the compression lab."
     }
   }
 }

@@ -73,6 +73,11 @@ export function Sidebar() {
             {t("nav.codecLab")}
           </NavLink>
         </li>
+        <li>
+          <NavLink to="/tools/metrics" className={linkClass}>
+            {t("nav.metrics")}
+          </NavLink>
+        </li>
       </ul>
     </nav>
   );

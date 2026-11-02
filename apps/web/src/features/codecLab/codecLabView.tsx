@@ -18,6 +18,7 @@ import { formatS } from "../../lib/format";
 import type { CodecLabCodec, CodecLabMeta, CodecLabResult } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
+import { computeQualityMetrics, formatMetric, type QualityMetrics } from "../metrics/metrics";
 import {
   availableRealCodecs,
   REAL_CODEC_NAMES,
@@ -258,6 +259,21 @@ export function CodecLabView(): React.ReactElement {
     },
     [],
   );
+
+  const realMetrics = useMemo<QualityMetrics | null>(() => {
+    if (realResult === null) {
+      return null;
+    }
+    try {
+      return computeQualityMetrics(
+        realResult.run.reference,
+        realResult.run.decoded,
+        realResult.run.stats.sampleRateHz,
+      );
+    } catch {
+      return null;
+    }
+  }, [realResult]);
 
   function updateSettings(patch: Partial<CodecLabSettings>): void {
     const next = { ...settings, ...patch };
@@ -862,52 +878,79 @@ export function CodecLabView(): React.ReactElement {
           <p className="mt-2 text-xs text-muted">{t("codecLab.real.idle")}</p>
         ) : null}
         {realResult !== null ? (
-          <dl className="mt-3 grid grid-cols-1 gap-x-6 text-xs sm:grid-cols-2">
-            <StatRow
-              label={t("codecLab.real.encodedSize")}
-              value={formatBytes(realResult.run.stats.sizeBytes)}
-              testId="codecLab.real.stat.size"
-            />
-            <StatRow
-              label={t("codecLab.stats.bitrate")}
-              value={`${formatNumber(realResult.run.stats.bitrateKbps)} kbps`}
-              testId="codecLab.real.stat.bitrate"
-            />
-            <StatRow
-              label={t("codecLab.stats.encodeMs")}
-              value={`${formatNumber(realResult.run.stats.encodeMs)} ms`}
-              testId="codecLab.real.stat.encodeMs"
-            />
-            <StatRow
-              label={t("codecLab.real.delaySamples")}
-              value={String(realResult.run.stats.codecDelaySamples)}
-              testId="codecLab.real.stat.delay"
-            />
-            <StatRow
-              label={t("codecLab.real.alignedSamples")}
-              value={String(realResult.run.stats.alignedSampleCount)}
-              testId="codecLab.real.stat.aligned"
-            />
-            <StatRow
-              label={t("codecLab.real.duration")}
-              value={`${formatNumber(realResult.run.stats.durationSeconds, 3)} s`}
-              testId="codecLab.real.stat.duration"
-            />
-            <StatRow
-              label={t("codecLab.stats.bitExact")}
-              value={
-                realResult.run.stats.bitExact ? t("codecLab.stats.yes") : t("codecLab.stats.no")
-              }
-              testId="codecLab.real.stat.bitExact"
-            />
-            <StatRow
-              label={t("codecLab.real.lossless")}
-              value={
-                realResult.run.stats.lossless ? t("codecLab.stats.yes") : t("codecLab.stats.no")
-              }
-              testId="codecLab.real.stat.lossless"
-            />
-          </dl>
+          <>
+            <dl className="mt-3 grid grid-cols-1 gap-x-6 text-xs sm:grid-cols-2">
+              <StatRow
+                label={t("codecLab.real.encodedSize")}
+                value={formatBytes(realResult.run.stats.sizeBytes)}
+                testId="codecLab.real.stat.size"
+              />
+              <StatRow
+                label={t("codecLab.stats.bitrate")}
+                value={`${formatNumber(realResult.run.stats.bitrateKbps)} kbps`}
+                testId="codecLab.real.stat.bitrate"
+              />
+              <StatRow
+                label={t("codecLab.stats.encodeMs")}
+                value={`${formatNumber(realResult.run.stats.encodeMs)} ms`}
+                testId="codecLab.real.stat.encodeMs"
+              />
+              <StatRow
+                label={t("codecLab.real.delaySamples")}
+                value={String(realResult.run.stats.codecDelaySamples)}
+                testId="codecLab.real.stat.delay"
+              />
+              <StatRow
+                label={t("codecLab.real.alignedSamples")}
+                value={String(realResult.run.stats.alignedSampleCount)}
+                testId="codecLab.real.stat.aligned"
+              />
+              <StatRow
+                label={t("codecLab.real.duration")}
+                value={`${formatNumber(realResult.run.stats.durationSeconds, 3)} s`}
+                testId="codecLab.real.stat.duration"
+              />
+              <StatRow
+                label={t("codecLab.stats.bitExact")}
+                value={
+                  realResult.run.stats.bitExact ? t("codecLab.stats.yes") : t("codecLab.stats.no")
+                }
+                testId="codecLab.real.stat.bitExact"
+              />
+              <StatRow
+                label={t("codecLab.real.lossless")}
+                value={
+                  realResult.run.stats.lossless ? t("codecLab.stats.yes") : t("codecLab.stats.no")
+                }
+                testId="codecLab.real.stat.lossless"
+              />
+              {realMetrics !== null ? (
+                <>
+                  <StatRow
+                    label={t("codecLab.stats.mse")}
+                    value={formatMetric(realMetrics.mse, 6)}
+                    testId="codecLab.real.stat.mse"
+                  />
+                  <StatRow
+                    label={t("codecLab.stats.snr")}
+                    value={`${formatMetric(realMetrics.snrDb)} dB`}
+                    testId="codecLab.real.stat.snr"
+                  />
+                  <StatRow
+                    label={t("codecLab.stats.segmentalSnr")}
+                    value={`${formatMetric(realMetrics.segmentalSnrDb)} dB`}
+                    testId="codecLab.real.stat.segmentalSnr"
+                  />
+                  <StatRow
+                    label={t("codecLab.stats.psnr")}
+                    value={`${formatMetric(realMetrics.psnrDb)} dB`}
+                    testId="codecLab.real.stat.psnr"
+                  />
+                </>
+              ) : null}
+            </dl>
+            <p className="mt-2 text-xs text-muted">{t("codecLab.stats.psnrNote")}</p>
+          </>
         ) : null}
       </div>
 
