@@ -957,6 +957,32 @@
         "denoised": "Denoised"
       }
     },
+    "superres": {
+      "intro": "This experiment pairs band-limiting with two restorers: a kaiser-sinc baseline restores the sample rate but cannot recreate the removed high band, while LavaSR estimates it. The excerpt is capped at 30 s.",
+      "loadDemo": "Load speech demo",
+      "demoLoading": "Loading demo…",
+      "noSource": "Load audio, or use the speech demo, to run the experiment.",
+      "rate": "Band-limit to",
+      "rateOption": "{{rate}} kHz",
+      "path": "Restore with",
+      "pathSinc": "Sinc interpolation (DSP baseline)",
+      "pathLavasr": "LavaSR (AI)",
+      "model": "Model: {{modelId}}",
+      "modelMissing": "The LavaSR model is not downloaded. Fetch it with the command below, then reload.",
+      "flexibleRate": "8–48",
+      "rates": "Model input {{input}} kHz · output {{output}} kHz",
+      "waveOriginal": "Original",
+      "waveBandlimited": "Band-limited ({{rate}} kHz)",
+      "waveRestored": "Restored",
+      "installFailed": "The restored audio could not be loaded.",
+      "failed": "The super-resolution experiment failed.",
+      "pathSincHint": "Sinc interpolation restores the sample rate but cannot recreate the band that downsampling removed. That is the audible difference from LavaSR.",
+      "ab": {
+        "original": "Original",
+        "bandlimited": "Band-limited",
+        "restored": "Restored"
+      }
+    },
     "caption": {
       "approximation": "AI-generated approximation: compare it with the original before drawing conclusions."
     }

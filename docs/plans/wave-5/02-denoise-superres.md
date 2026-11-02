@@ -125,12 +125,12 @@
 - Uses `speech-kathleen-19s.wav`; original is the reference, band-limited is derived in the worker, restored comes from the selected path.
 - Shows model rate, output rate, and “AI approximation” caption for LavaSR.
 
-- [ ] **Step 1: Write component tests** for downsample validation, sinc/LavaSR branch selection, disabled model state, and A/B labels.
-- [ ] **Step 2: Run** focused tests — expected FAIL.
-- [ ] **Step 3: Implement the tab + `ai.superres.*` keys.**
-- [ ] **Step 4: Add a link target** `?task=superres&demo=speech` for the F16 experiment (route wiring lands in Plan 05).
-- [ ] **Step 5: Run** `pnpm check` — expected PASS.
-- [ ] **Step 6: Commit** `feat(F14): add super-resolution A/B tab`.
+- [x] **Step 1: Write component tests** for downsample validation, sinc/LavaSR branch selection, disabled model state, and A/B labels.
+- [x] **Step 2: Run** focused tests — expected FAIL.
+- [x] **Step 3: Implement the tab + `ai.superres.*` keys.**
+- [x] **Step 4: Add a link target** `?task=superres&demo=speech` for the F16 experiment (route wiring lands in Plan 05).
+- [x] **Step 5: Run** `pnpm check` — expected PASS.
+- [x] **Step 6: Commit** `feat(F14): add super-resolution A/B tab`.
 
 ### Task 6: Docs and gated smoke
 

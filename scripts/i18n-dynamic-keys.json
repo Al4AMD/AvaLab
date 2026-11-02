@@ -6,5 +6,7 @@
   "input.demo",
   "player.lane",
   "ai.error",
-  "ai.denoise.installFailed"
+  "ai.denoise.installFailed",
+  "ai.superres.failed",
+  "ai.superres.installFailed"
 ]

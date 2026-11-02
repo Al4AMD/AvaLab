@@ -122,8 +122,11 @@ async function expectWaveformEmptyState(page: Page): Promise<void> {
  * model state keeps the run button disabled instead of firing a request.
  */
 async function expectAiShellBackendAbsent(page: Page): Promise<void> {
-  await expect(page.getByTestId("ai.placeholder")).toBeVisible();
-  await page.getByTestId("input.demo.load.chirp").click();
+  // The implemented denoise tab owns its own no-source state (no generic
+  // placeholder); loading its demo proves the run stays disabled offline.
+  await expect(page.getByTestId("ai.placeholder")).toHaveCount(0);
+  await expect(page.getByTestId("ai.tab.denoise")).toHaveAttribute("aria-selected", "true");
+  await page.getByTestId("ai.denoise.loadDemo").click();
   await expect(page.getByTestId("ai.run")).toBeDisabled();
 }
 

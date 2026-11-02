@@ -17,6 +17,7 @@ import { UploadEmptyState } from "../input/upload";
 import { AI_MAX_EXCERPT_SECONDS, type AiModelInfo, type AiModelState, aiClient } from "./aiClient";
 import { AI_TASKS, type AiTask, aiTaskFromSearch } from "./aiState";
 import { DenoiseTab } from "./denoiseTab";
+import { SuperresTab } from "./superresTab";
 import { useAiJob } from "./useAiJob";
 
 const CONTROL_FOCUS_CLASSES =
@@ -218,7 +219,7 @@ export function AiLabView(): React.ReactElement {
         ))}
       </div>
 
-      {task === "denoise" ? null : (
+      {task === "denoise" || task === "superres" ? null : (
         <p data-testid="ai.placeholder" className="text-sm">
           {placeholder(t, task)}
         </p>
@@ -233,6 +234,8 @@ export function AiLabView(): React.ReactElement {
 
       {task === "denoise" ? (
         <DenoiseTab backendOnline={backendOnline} model={model} />
+      ) : task === "superres" ? (
+        <SuperresTab backendOnline={backendOnline} model={model} />
       ) : original === null ? (
         <UploadEmptyState />
       ) : (
