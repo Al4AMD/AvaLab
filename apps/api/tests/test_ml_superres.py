@@ -127,7 +127,7 @@ def test_real_lavasr_increases_high_band_on_bandlimited_speech() -> None:
     if not DEMO_SPEECH.is_file():
         pytest.skip("speech demo clip is unavailable")
 
-    import soundfile
+    import soundfile  # type: ignore[import-untyped]
 
     from avalab_api.ml.audio import resample_to
 

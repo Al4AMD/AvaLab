@@ -38,7 +38,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _copy_from_hub(spec: ModelSpec, destination: Path) -> None:
-    from huggingface_hub import hf_hub_download  # type: ignore[import-not-found]
+    from huggingface_hub import hf_hub_download
 
     for filename in spec.files:
         source = hf_hub_download(
