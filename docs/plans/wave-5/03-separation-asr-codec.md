@@ -88,12 +88,12 @@
 - `wordErrorRate(reference: string, hypothesis: string): number` normalizes case/punctuation/whitespace, returns `(S+D+I)/N`, and throws `RangeError` only for an empty reference.
 - `normalizeTranscript(text: string): string` exported for tests.
 
-- [ ] **Step 1: Write backend tests** with a fake pipeline: text/segments, 16 kHz resample, empty audio error, real-model test `ml`.
-- [ ] **Step 2: Write `wer.test.ts`** with exact match, one substitution, insertion, deletion, punctuation/case, empty reference.
-- [ ] **Step 3: Run** `uv run --directory apps/api pytest -q tests/test_ml_asr.py` and `pnpm --filter @avalab/web exec vitest run src/features/ai/wer` — expected FAIL.
-- [ ] **Step 4: Implement both**, with lazy `transformers` import and a documented WER normalization rule.
-- [ ] **Step 5: Run** focused tests, `ruff`, `mypy` — expected PASS.
-- [ ] **Step 6: Commit** `feat(F14): add Whisper ASR and WER`.
+- [x] **Step 1: Write backend tests** with a fake pipeline: text/segments, 16 kHz resample, empty audio error, real-model test `ml`.
+- [x] **Step 2: Write `wer.test.ts`** with exact match, one substitution, insertion, deletion, punctuation/case, empty reference.
+- [x] **Step 3: Run** `uv run --directory apps/api pytest -q tests/test_ml_asr.py` and `pnpm --filter @avalab/web exec vitest run src/features/ai/wer` — expected FAIL.
+- [x] **Step 4: Implement both**, with lazy `transformers` import and a documented WER normalization rule.
+- [x] **Step 5: Run** focused tests, `ruff`, `mypy` — expected PASS.
+- [x] **Step 6: Commit** `feat(F14): add Whisper ASR and WER`.
 
 ### Task 4: ASR UI with reference transcript
 

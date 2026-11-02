@@ -69,6 +69,7 @@ _BUILTIN_FACTORIES: dict[MlTask, tuple[str, str]] = {
     "denoise": ("avalab_api.ml.denoise", "load_dpdfnet"),
     "superres": ("avalab_api.ml.superres", "load_lavasr"),
     "separation": ("avalab_api.ml.separation", "load_demucs"),
+    "asr": ("avalab_api.ml.asr", "load_asr"),
 }
 
 
