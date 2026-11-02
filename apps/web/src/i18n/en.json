@@ -156,7 +156,17 @@
     },
     "error": {
       "failed": "Encoding failed. Try a shorter excerpt or another codec.",
-      "playback": "The result could not be installed for playback (length or sample rate over the cap)."
+      "playback": "The result could not be installed for playback (length or sample rate over the cap).",
+      "codec_unavailable": "The backend encoder is unavailable. Choose another codec.",
+      "encode_failed": "ffmpeg could not encode this excerpt. Try another codec or a shorter excerpt.",
+      "not_found": "The excerpt expired on the server. Encode again.",
+      "invalid_request": "The backend rejected the codec parameters.",
+      "internal_error": "The backend failed while encoding. Try again.",
+      "file_too_large": "The excerpt is too large for the backend upload cap.",
+      "decode_failed": "The encoded result could not be decoded.",
+      "alignment_mismatch": "The decoded result does not match the reference window.",
+      "backend_unavailable": "The backend is unreachable. Browser codecs still work.",
+      "unknown": "The backend returned an unknown codec error."
     },
     "stats": {
       "title": "Compression statistics",
@@ -205,6 +215,35 @@
         "entropy": "Compare the lossless size with entropy; the coder approaches the theoretical bound.",
         "bitrate": "In MDCT, sweep the bitrate and watch SNR/PSNR against bitrate.",
         "sparsity": "MDCT coefficient sparsity shows how much quantization zeroes out."
+      }
+    },
+    "real": {
+      "title": "Real codecs (ffmpeg, backend)",
+      "codecLabel": "Backend codec",
+      "bitrateLabel": "Bitrate",
+      "qualityLabel": "Quality (0–10)",
+      "compressionLabel": "Compression level (0–12)",
+      "encode": "Encode with ffmpeg",
+      "running": "Encoding with ffmpeg…",
+      "play": "Play decoded result",
+      "stale": "Real-codec settings changed; encode again.",
+      "idle": "The backend encodes the selected excerpt and aligns it to the 16-bit PCM reference before measuring.",
+      "offline": "The backend is offline; real codecs are disabled. Browser codecs still work.",
+      "checking": "Checking backend codec availability…",
+      "none": "The backend reports no ffmpeg encoders.",
+      "codecUnavailable": "This codec is not available on the backend.",
+      "encodedSize": "Encoded size",
+      "delaySamples": "Codec delay",
+      "alignedSamples": "Aligned samples",
+      "duration": "Aligned duration",
+      "lossless": "Lossless",
+      "codec": {
+        "wav": "WAV (PCM)",
+        "flac": "FLAC (lossless)",
+        "mp3": "MP3",
+        "aac": "AAC",
+        "opus": "Opus",
+        "vorbis": "Vorbis"
       }
     }
   },

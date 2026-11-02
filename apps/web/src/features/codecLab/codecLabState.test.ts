@@ -8,6 +8,7 @@ import {
   codecLabSettingsToSearch,
   defaultCodecLabRange,
   isCodecLabStale,
+  isRealCodecStale,
 } from "./codecLabState";
 
 const SOURCE = { sampleCount: 2_400_000, sampleRateHz: 48_000 };
@@ -20,6 +21,10 @@ describe("codec lab state codec", () => {
       mdctBitsPerSecond: 320_000,
       startSample: 4800,
       endSample: 52_800,
+      realCodec: "vorbis",
+      realBitrateKbps: 192,
+      realQuality: 7,
+      realCompressionLevel: 9,
     };
     expect(
       codecLabSettingsFromSearch(`?${codecLabSettingsToSearch(settings)}`, SOURCE, FULL),
@@ -89,5 +94,25 @@ describe("codec lab state codec", () => {
     expect(isCodecLabStale(result, { ...result, codec: "mdct" })).toBe(true);
     expect(isCodecLabStale(result, { ...result, mdctBitsPerSecond: 64_000 })).toBe(true);
     expect(isCodecLabStale(result, { ...result, endSample: 12_000 })).toBe(true);
+  });
+
+  it("round-trips and clamps the real-codec controls", () => {
+    const parsed = codecLabSettingsFromSearch("?rc=mp3&rbr=999&rq=-4&rcl=99", SOURCE, FULL);
+    expect(parsed).toMatchObject({
+      realCodec: "mp3",
+      realBitrateKbps: 256,
+      realQuality: 0,
+      realCompressionLevel: 12,
+    });
+    expect(codecLabSettingsFromSearch("?rc=bogus", SOURCE, FULL).realCodec).toBe("flac");
+    expect(codecLabSettingsFromSearch("?rbr=70", SOURCE, FULL).realBitrateKbps).toBe(64);
+  });
+
+  it("marks only the real result stale when a real control changes", () => {
+    const result = { ...CODEC_LAB_DEFAULT_SETTINGS, startSample: 0, endSample: 24_000 };
+    expect(isRealCodecStale(result, result)).toBe(false);
+    expect(isRealCodecStale(result, { ...result, realBitrateKbps: 64 })).toBe(true);
+    expect(isRealCodecStale(result, { ...result, realCodec: "mp3" })).toBe(true);
+    expect(isRealCodecStale(result, { ...result, mdctBitsPerSecond: 64_000 })).toBe(false);
   });
 });

@@ -6,23 +6,40 @@
  * persists until the next encode, so changing a setting only raises the
  * translated stale hint. All numbers are Latin/dir="ltr" (AGENTS §6).
  */
+import type { TFunction } from "i18next";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 
+import type { HealthResponse } from "../../api/client";
+import { api } from "../../api/client";
 import { Button } from "../../components/ui/button";
 import { formatS } from "../../lib/format";
 import type { CodecLabCodec, CodecLabMeta, CodecLabResult } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
 import {
+  availableRealCodecs,
+  REAL_CODEC_NAMES,
+  RealCodecError,
+  type RealCodecName,
+  type RealCodecRun,
+  runRealCodec,
+} from "./backendCodecs";
+import {
   CODEC_LAB_CODECS,
   CODEC_LAB_MDCT_KBPS,
+  CODEC_LAB_REAL_BITRATES_KBPS,
+  CODEC_LAB_REAL_COMPRESSION_MAX,
+  CODEC_LAB_REAL_COMPRESSION_MIN,
+  CODEC_LAB_REAL_QUALITY_MAX,
+  CODEC_LAB_REAL_QUALITY_MIN,
   type CodecLabSettings,
   codecLabRangeFromSelection,
   codecLabSettingsFromSearch,
   codecLabSettingsToSearch,
   isCodecLabStale,
+  isRealCodecStale,
 } from "./codecLabState";
 
 const CONTROL_FOCUS_CLASSES =
@@ -39,6 +56,40 @@ type CodecLabViewResult = {
 
 type CodecLabStatus = "idle" | "running" | "ready" | "error";
 type CodecLabErrorKey = "codecLab.error.failed" | "codecLab.error.playback";
+
+type RealCodecViewResult = {
+  readonly run: RealCodecRun;
+  readonly settings: CodecLabSettings;
+};
+
+type RealCodecStatus = "idle" | "running" | "ready" | "error";
+
+function realErrorText(t: TFunction, key: string | null): string {
+  switch (key) {
+    case "codecLab.error.codec_unavailable":
+      return t("codecLab.error.codec_unavailable");
+    case "codecLab.error.encode_failed":
+      return t("codecLab.error.encode_failed");
+    case "codecLab.error.not_found":
+      return t("codecLab.error.not_found");
+    case "codecLab.error.invalid_request":
+      return t("codecLab.error.invalid_request");
+    case "codecLab.error.internal_error":
+      return t("codecLab.error.internal_error");
+    case "codecLab.error.file_too_large":
+      return t("codecLab.error.file_too_large");
+    case "codecLab.error.decode_failed":
+      return t("codecLab.error.decode_failed");
+    case "codecLab.error.alignment_mismatch":
+      return t("codecLab.error.alignment_mismatch");
+    case "codecLab.error.backend_unavailable":
+      return t("codecLab.error.backend_unavailable");
+    case "codecLab.error.unknown":
+      return t("codecLab.error.unknown");
+    default:
+      return t("codecLab.error.failed");
+  }
+}
 
 function unpackResult(outcome: CodecLabResult): Float32Array | null {
   if (outcome.payload === undefined) {
@@ -138,6 +189,7 @@ export function CodecLabView(): React.ReactElement {
   const { t } = useTranslation();
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
+  const backendOnline = useSessionStore((state) => state.backendOnline);
   const [searchParams, setSearchParams] = useSearchParams();
   const settings = useMemo(
     () =>
@@ -155,16 +207,57 @@ export function CodecLabView(): React.ReactElement {
   const [result, setResult] = useState<CodecLabViewResult | null>(null);
   const [errorKey, setErrorKey] = useState<CodecLabErrorKey | null>(null);
   const runIdRef = useRef(0);
+  const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [realStatus, setRealStatus] = useState<RealCodecStatus>("idle");
+  const [realResult, setRealResult] = useState<RealCodecViewResult | null>(null);
+  const [realErrorKey, setRealErrorKey] = useState<string | null>(null);
+  const realRunIdRef = useRef(0);
+  const realAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     runIdRef.current += 1;
     setStatus("idle");
     setResult(null);
     setErrorKey(null);
+    realRunIdRef.current += 1;
+    realAbortRef.current?.abort();
+    setRealStatus("idle");
+    setRealResult(null);
+    setRealErrorKey(null);
     if (original === null) {
       return;
     }
   }, [original]);
+
+  useEffect(() => {
+    if (!backendOnline) {
+      setHealth(null);
+      return;
+    }
+    let cancelled = false;
+    const controller = new AbortController();
+    api
+      .GET("/health", { signal: controller.signal })
+      .then(({ data, response }) => {
+        if (!cancelled && response.ok && data !== undefined) {
+          setHealth(data);
+        }
+      })
+      .catch(() => {
+        // The offline hint comes from the store flag; a failed probe is silent.
+      });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [backendOnline]);
+
+  useEffect(
+    () => () => {
+      realAbortRef.current?.abort();
+    },
+    [],
+  );
 
   function updateSettings(patch: Partial<CodecLabSettings>): void {
     const next = { ...settings, ...patch };
@@ -242,6 +335,77 @@ export function CodecLabView(): React.ReactElement {
     }
   }
 
+  const realAvailable = availableRealCodecs(health);
+  const realCodecAvailable = realAvailable.includes(settings.realCodec);
+
+  function runReal(): void {
+    if (
+      original === null ||
+      rangeEmpty ||
+      realStatus === "running" ||
+      !backendOnline ||
+      !realCodecAvailable
+    ) {
+      return;
+    }
+    const runId = realRunIdRef.current + 1;
+    realRunIdRef.current = runId;
+    realAbortRef.current?.abort();
+    const controller = new AbortController();
+    realAbortRef.current = controller;
+    const runSettings = settings;
+    setRealStatus("running");
+    setRealErrorKey(null);
+    runRealCodec(
+      {
+        samples: original.samples.subarray(runSettings.startSample, runSettings.endSample),
+        sampleRateHz: original.sampleRateHz,
+        startSample: runSettings.startSample,
+        endSample: runSettings.endSample,
+      },
+      {
+        codec: runSettings.realCodec,
+        bitrateKbps: runSettings.realBitrateKbps,
+        quality: runSettings.realQuality,
+        compressionLevel: runSettings.realCompressionLevel,
+      },
+      { signal: controller.signal },
+    ).then(
+      (run) => {
+        if (realRunIdRef.current !== runId) {
+          return;
+        }
+        setRealResult({ run, settings: runSettings });
+        setRealStatus("ready");
+      },
+      (error: unknown) => {
+        if (realRunIdRef.current !== runId || controller.signal.aborted) {
+          return;
+        }
+        setRealStatus("error");
+        setRealErrorKey(
+          error instanceof RealCodecError ? error.messageKey : "codecLab.error.failed",
+        );
+      },
+    );
+  }
+
+  function playRealResult(): void {
+    if (realResult === null) {
+      return;
+    }
+    const installed = useSessionStore
+      .getState()
+      .setProcessed(
+        realResult.run.decoded.slice(),
+        realResult.run.stats.sampleRateHz,
+        "codecLab.real",
+      );
+    if (!installed.ok) {
+      setRealErrorKey("codecLab.error.playback");
+    }
+  }
+
   const codecLabels: Record<CodecLabCodec, string> = {
     rle: t("codecLab.codec.rle"),
     huffman: t("codecLab.codec.huffman"),
@@ -249,6 +413,14 @@ export function CodecLabView(): React.ReactElement {
     mulaw: t("codecLab.codec.mulaw"),
     alaw: t("codecLab.codec.alaw"),
     mdct: t("codecLab.codec.mdct"),
+  };
+  const realCodecLabels: Record<RealCodecName, string> = {
+    wav: t("codecLab.real.codec.wav"),
+    flac: t("codecLab.real.codec.flac"),
+    mp3: t("codecLab.real.codec.mp3"),
+    aac: t("codecLab.real.codec.aac"),
+    opus: t("codecLab.real.codec.opus"),
+    vorbis: t("codecLab.real.codec.vorbis"),
   };
 
   if (original === null) {
@@ -261,6 +433,7 @@ export function CodecLabView(): React.ReactElement {
   }
 
   const stale = result !== null && isCodecLabStale(settings, result.settings);
+  const realStale = realResult !== null && isRealCodecStale(settings, realResult.settings);
   const codeLengths = result?.meta.codeLengths ?? [];
   const nonZeroCodeLengths = codeLengths
     .map((length, symbol) => ({ length, symbol }))
@@ -539,6 +712,204 @@ export function CodecLabView(): React.ReactElement {
           ) : null}
         </>
       ) : null}
+
+      <div className="rounded border border-surface p-3" data-testid="codecLab.real">
+        <h3 className="mb-2 text-sm font-semibold">{t("codecLab.real.title")}</h3>
+        {!backendOnline ? (
+          <p data-testid="codecLab.real.offline" className="mb-2 text-xs text-muted">
+            {t("codecLab.real.offline")}
+          </p>
+        ) : health === null ? (
+          <p className="mb-2 text-xs text-muted">{t("codecLab.real.checking")}</p>
+        ) : realAvailable.length === 0 ? (
+          <p data-testid="codecLab.real.unavailable" className="mb-2 text-xs text-muted">
+            {t("codecLab.real.none")}
+          </p>
+        ) : null}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="flex flex-col gap-1 text-xs">
+            <span className="font-medium">{t("codecLab.real.codecLabel")}</span>
+            <select
+              value={settings.realCodec}
+              data-testid="codecLab.real.codec"
+              disabled={!backendOnline || realAvailable.length === 0 || realStatus === "running"}
+              onChange={(event) => {
+                const next = event.currentTarget.value;
+                if ((REAL_CODEC_NAMES as readonly string[]).includes(next)) {
+                  updateSettings({ realCodec: next as RealCodecName });
+                }
+              }}
+              className={INPUT_CLASSES}
+            >
+              {REAL_CODEC_NAMES.map((name) => (
+                <option key={name} value={name} disabled={!realAvailable.includes(name)}>
+                  {realCodecLabels[name]}
+                </option>
+              ))}
+            </select>
+          </label>
+          {settings.realCodec === "mp3" ||
+          settings.realCodec === "aac" ||
+          settings.realCodec === "opus" ? (
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-medium">{t("codecLab.real.bitrateLabel")}</span>
+              <select
+                value={settings.realBitrateKbps}
+                data-testid="codecLab.real.bitrate"
+                disabled={realStatus === "running"}
+                onChange={(event) => {
+                  const kbps = Number(event.currentTarget.value);
+                  if (Number.isFinite(kbps)) {
+                    updateSettings({ realBitrateKbps: kbps });
+                  }
+                }}
+                className={INPUT_CLASSES}
+              >
+                {CODEC_LAB_REAL_BITRATES_KBPS.map((kbps) => (
+                  <option key={kbps} value={kbps}>
+                    {t("codecLab.bitrate.option", { kbps })}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          {settings.realCodec === "vorbis" ? (
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-medium">{t("codecLab.real.qualityLabel")}</span>
+              <select
+                value={settings.realQuality}
+                data-testid="codecLab.real.quality"
+                disabled={realStatus === "running"}
+                onChange={(event) => {
+                  const quality = Number(event.currentTarget.value);
+                  if (Number.isFinite(quality)) {
+                    updateSettings({ realQuality: quality });
+                  }
+                }}
+                className={INPUT_CLASSES}
+              >
+                {Array.from(
+                  { length: CODEC_LAB_REAL_QUALITY_MAX - CODEC_LAB_REAL_QUALITY_MIN + 1 },
+                  (_, index) => CODEC_LAB_REAL_QUALITY_MIN + index,
+                ).map((quality) => (
+                  <option key={quality} value={quality}>
+                    {quality}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          {settings.realCodec === "flac" ? (
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-medium">{t("codecLab.real.compressionLabel")}</span>
+              <select
+                value={settings.realCompressionLevel}
+                data-testid="codecLab.real.compression"
+                disabled={realStatus === "running"}
+                onChange={(event) => {
+                  const level = Number(event.currentTarget.value);
+                  if (Number.isFinite(level)) {
+                    updateSettings({ realCompressionLevel: level });
+                  }
+                }}
+                className={INPUT_CLASSES}
+              >
+                {Array.from(
+                  { length: CODEC_LAB_REAL_COMPRESSION_MAX - CODEC_LAB_REAL_COMPRESSION_MIN + 1 },
+                  (_, index) => CODEC_LAB_REAL_COMPRESSION_MIN + index,
+                ).map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button
+            data-testid="codecLab.real.encode"
+            disabled={
+              !backendOnline || !realCodecAvailable || realStatus === "running" || rangeEmpty
+            }
+            onClick={runReal}
+          >
+            {realStatus === "running" ? t("codecLab.real.running") : t("codecLab.real.encode")}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            data-testid="codecLab.real.play"
+            disabled={realResult === null}
+            onClick={playRealResult}
+          >
+            {t("codecLab.real.play")}
+          </Button>
+          {realStale ? (
+            <p data-testid="codecLab.real.stale" role="status" className="text-sm text-accent">
+              {t("codecLab.real.stale")}
+            </p>
+          ) : null}
+          {backendOnline && health !== null && !realCodecAvailable ? (
+            <p className="text-xs text-muted">{t("codecLab.real.codecUnavailable")}</p>
+          ) : null}
+        </div>
+        {realErrorKey !== null ? (
+          <p data-testid="codecLab.real.error" role="alert" className="mt-2 text-sm text-danger">
+            {realErrorText(t, realErrorKey)}
+          </p>
+        ) : realStatus === "idle" ? (
+          <p className="mt-2 text-xs text-muted">{t("codecLab.real.idle")}</p>
+        ) : null}
+        {realResult !== null ? (
+          <dl className="mt-3 grid grid-cols-1 gap-x-6 text-xs sm:grid-cols-2">
+            <StatRow
+              label={t("codecLab.real.encodedSize")}
+              value={formatBytes(realResult.run.stats.sizeBytes)}
+              testId="codecLab.real.stat.size"
+            />
+            <StatRow
+              label={t("codecLab.stats.bitrate")}
+              value={`${formatNumber(realResult.run.stats.bitrateKbps)} kbps`}
+              testId="codecLab.real.stat.bitrate"
+            />
+            <StatRow
+              label={t("codecLab.stats.encodeMs")}
+              value={`${formatNumber(realResult.run.stats.encodeMs)} ms`}
+              testId="codecLab.real.stat.encodeMs"
+            />
+            <StatRow
+              label={t("codecLab.real.delaySamples")}
+              value={String(realResult.run.stats.codecDelaySamples)}
+              testId="codecLab.real.stat.delay"
+            />
+            <StatRow
+              label={t("codecLab.real.alignedSamples")}
+              value={String(realResult.run.stats.alignedSampleCount)}
+              testId="codecLab.real.stat.aligned"
+            />
+            <StatRow
+              label={t("codecLab.real.duration")}
+              value={`${formatNumber(realResult.run.stats.durationSeconds, 3)} s`}
+              testId="codecLab.real.stat.duration"
+            />
+            <StatRow
+              label={t("codecLab.stats.bitExact")}
+              value={
+                realResult.run.stats.bitExact ? t("codecLab.stats.yes") : t("codecLab.stats.no")
+              }
+              testId="codecLab.real.stat.bitExact"
+            />
+            <StatRow
+              label={t("codecLab.real.lossless")}
+              value={
+                realResult.run.stats.lossless ? t("codecLab.stats.yes") : t("codecLab.stats.no")
+              }
+              testId="codecLab.real.stat.lossless"
+            />
+          </dl>
+        ) : null}
+      </div>
 
       <details className="rounded border border-surface p-3 text-sm">
         <summary className="cursor-pointer font-semibold">{t("codecLab.theory.title")}</summary>

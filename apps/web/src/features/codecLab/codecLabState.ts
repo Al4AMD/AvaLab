@@ -8,6 +8,7 @@
 
 import { decodeParams, encodeParams } from "../../lib/url-state";
 import type { CodecLabCodec } from "../../session/ops";
+import { REAL_CODEC_NAMES, type RealCodecName } from "./backendCodecs";
 
 export const CODEC_LAB_CODECS: readonly CodecLabCodec[] = [
   "rle",
@@ -23,12 +24,22 @@ export const CODEC_LAB_DEFAULT_MDCT_KBPS = 128;
 export const CODEC_LAB_PREVIEW_SECONDS = 30;
 export const CODEC_LAB_MIN_MDCT_KBPS = 32;
 export const CODEC_LAB_MAX_MDCT_KBPS = 512;
+export const CODEC_LAB_REAL_BITRATES_KBPS = [32, 64, 96, 128, 192, 256] as const;
+export const CODEC_LAB_DEFAULT_REAL_BITRATE_KBPS = 128;
+export const CODEC_LAB_REAL_QUALITY_MIN = 0;
+export const CODEC_LAB_REAL_QUALITY_MAX = 10;
+export const CODEC_LAB_REAL_COMPRESSION_MIN = 0;
+export const CODEC_LAB_REAL_COMPRESSION_MAX = 12;
 
 export type CodecLabSettings = {
   readonly codec: CodecLabCodec;
   readonly mdctBitsPerSecond: number;
   readonly startSample: number;
   readonly endSample: number;
+  readonly realCodec: RealCodecName;
+  readonly realBitrateKbps: number;
+  readonly realQuality: number;
+  readonly realCompressionLevel: number;
 };
 
 export type CodecLabRange = { readonly startSample: number; readonly endSample: number };
@@ -43,6 +54,10 @@ export const CODEC_LAB_DEFAULT_SETTINGS: CodecLabSettings = {
   mdctBitsPerSecond: CODEC_LAB_DEFAULT_MDCT_KBPS * 1000,
   startSample: 0,
   endSample: 0,
+  realCodec: "flac",
+  realBitrateKbps: CODEC_LAB_DEFAULT_REAL_BITRATE_KBPS,
+  realQuality: 5,
+  realCompressionLevel: 5,
 };
 
 function clampRange(
@@ -94,6 +109,25 @@ export function codecLabRangeFromSelection(
   return clampRange(selection.startSample, selection.endSample, sampleCount, sampleRateHz);
 }
 
+function clampInteger(raw: number, min: number, max: number, fallback: number): number {
+  if (!Number.isFinite(raw)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, Math.round(raw)));
+}
+
+function snapRealBitrate(raw: number): number {
+  if (!Number.isFinite(raw)) {
+    return CODEC_LAB_DEFAULT_REAL_BITRATE_KBPS;
+  }
+  const minKbps = CODEC_LAB_REAL_BITRATES_KBPS[0] ?? 32;
+  const maxKbps = CODEC_LAB_REAL_BITRATES_KBPS[CODEC_LAB_REAL_BITRATES_KBPS.length - 1] ?? 256;
+  const clamped = Math.max(minKbps, Math.min(maxKbps, Math.round(raw)));
+  return CODEC_LAB_REAL_BITRATES_KBPS.reduce((best, candidate) =>
+    Math.abs(candidate - clamped) < Math.abs(best - clamped) ? candidate : best,
+  );
+}
+
 function snapMdctKbps(raw: number): number {
   const clamped = Math.max(
     CODEC_LAB_MIN_MDCT_KBPS,
@@ -109,6 +143,10 @@ export function codecLabSettingsToSearch(settings: CodecLabSettings): string {
     c: settings.codec,
     from: settings.startSample,
     mbr: settings.mdctBitsPerSecond / 1000,
+    rc: settings.realCodec,
+    rbr: settings.realBitrateKbps,
+    rcl: settings.realCompressionLevel,
+    rq: settings.realQuality,
     to: settings.endSample,
   });
 }
@@ -124,7 +162,11 @@ export function codecLabSettingsFromSearch(
     return typeof value === "string" ? value : undefined;
   };
   const codec = scalar("c");
+  const realCodec = scalar("rc");
   const kbps = Number(scalar("mbr"));
+  const realBitrate = Number(scalar("rbr"));
+  const realQuality = Number(scalar("rq"));
+  const realCompression = Number(scalar("rcl"));
   const fallbackRange = defaultCodecLabRange(selection, source.sampleCount, source.sampleRateHz);
   const from = Number(scalar("from"));
   const to = Number(scalar("to"));
@@ -144,6 +186,22 @@ export function codecLabSettingsFromSearch(
       (Number.isFinite(kbps) ? snapMdctKbps(kbps) : CODEC_LAB_DEFAULT_MDCT_KBPS) * 1000,
     startSample: range.startSample,
     endSample: range.endSample,
+    realCodec: (REAL_CODEC_NAMES as readonly string[]).includes(realCodec ?? "")
+      ? (realCodec as RealCodecName)
+      : CODEC_LAB_DEFAULT_SETTINGS.realCodec,
+    realBitrateKbps: snapRealBitrate(realBitrate),
+    realQuality: clampInteger(
+      realQuality,
+      CODEC_LAB_REAL_QUALITY_MIN,
+      CODEC_LAB_REAL_QUALITY_MAX,
+      CODEC_LAB_DEFAULT_SETTINGS.realQuality,
+    ),
+    realCompressionLevel: clampInteger(
+      realCompression,
+      CODEC_LAB_REAL_COMPRESSION_MIN,
+      CODEC_LAB_REAL_COMPRESSION_MAX,
+      CODEC_LAB_DEFAULT_SETTINGS.realCompressionLevel,
+    ),
   };
 }
 
@@ -154,6 +212,20 @@ export function isCodecLabStale(
   return (
     current.codec !== resultSettings.codec ||
     current.mdctBitsPerSecond !== resultSettings.mdctBitsPerSecond ||
+    current.startSample !== resultSettings.startSample ||
+    current.endSample !== resultSettings.endSample
+  );
+}
+
+export function isRealCodecStale(
+  current: CodecLabSettings,
+  resultSettings: CodecLabSettings,
+): boolean {
+  return (
+    current.realCodec !== resultSettings.realCodec ||
+    current.realBitrateKbps !== resultSettings.realBitrateKbps ||
+    current.realQuality !== resultSettings.realQuality ||
+    current.realCompressionLevel !== resultSettings.realCompressionLevel ||
     current.startSample !== resultSettings.startSample ||
     current.endSample !== resultSettings.endSample
   );

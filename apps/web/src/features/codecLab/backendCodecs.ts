@@ -25,8 +25,9 @@ import {
   monoDownmix,
 } from "../input/ingest";
 
-const REAL_CODEC_NAMES = ["wav", "flac", "mp3", "aac", "opus", "vorbis"] as const;
+export const REAL_CODEC_NAMES = ["wav", "flac", "mp3", "aac", "opus", "vorbis"] as const;
 const UPLOAD_CACHE_LIMIT = 8;
+const BITRATE_CODECS = ["mp3", "aac", "opus"] as const;
 
 const KNOWN_BACKEND_CODES = new Set([
   "file_too_large",
@@ -260,10 +261,18 @@ export async function runRealCodec(
   const form = uploadForm(input);
   const audioId = await uploadExcerpt(client, input, form, signal);
   const codecParams: Record<string, number> = {};
-  if (params.bitrateKbps !== undefined) codecParams.bitrate_kbps = params.bitrateKbps;
-  if (params.quality !== undefined) codecParams.quality = params.quality;
-  if (params.compressionLevel !== undefined)
+  if (
+    (BITRATE_CODECS as readonly string[]).includes(params.codec) &&
+    params.bitrateKbps !== undefined
+  ) {
+    codecParams.bitrate_kbps = params.bitrateKbps;
+  }
+  if (params.codec === "vorbis" && params.quality !== undefined) {
+    codecParams.quality = params.quality;
+  }
+  if (params.codec === "flac" && params.compressionLevel !== undefined) {
     codecParams.compression_level = params.compressionLevel;
+  }
   const encoded = await request(
     () =>
       client.POST("/codec/encode", {
