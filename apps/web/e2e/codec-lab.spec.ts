@@ -99,6 +99,20 @@ test("Persian: Use selection copies the waveform selection into from/to", async 
   expect(errors).toEqual([]);
 });
 
+test("Persian: real codecs are disabled with an offline hint when no backend is served", async ({
+  page,
+}) => {
+  const errors = watchForErrors(page);
+  await page.goto("/tools/codec-lab");
+  await loadChirp(page);
+
+  await expect(page.getByTestId("codecLab.real")).toBeVisible();
+  await expect(page.getByTestId("codecLab.real.offline")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId("codecLab.real.encode")).toBeDisabled();
+  await expect(page.getByTestId("codecLab.real.codec")).toBeDisabled();
+  expect(errors).toEqual([]);
+});
+
 test("English (LTR): the codec lab encodes with zero console errors", async ({ page }) => {
   const errors = watchForErrors(page);
   await page.addInitScript(() => {
