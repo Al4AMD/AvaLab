@@ -18,12 +18,17 @@ Total download: about 383 MB, below the 2 GB budget and under 400 MB per model.
 
 - **DPDFNet**: 48 kHz speech denoiser, mono. The wrapper resamples the source
   to 48 kHz, runs the model, then resamples back to the source rate and
-  trims/pads to the input length.
+  trims/pads to the input length exactly. It is trained on speech; music and
+  strongly non-speech material may be altered. It is not a speech enhancer
+  for arbitrary noise types, and the first version processes only the requested
+  excerpt (no streaming).
 - **LavaSR**: accepts 8–48 kHz speech; internally processes at 16 kHz and
   restores 48 kHz. The spectral merge preserves the original band below
-  `min(source_rate, 16 kHz) / 2`. Output is resampled back to the source rate.
-  The optional `denoiser_core.onnx` is downloaded but the first version leaves
-  denoising off so the super-resolution experiment isolates bandwidth extension.
+  `min(source_rate, 16 kHz) / 2`. Output is resampled back to the source rate
+  and trimmed/padded to the input length. The restored high band is estimated,
+  not recovered exactly, and the model is speech-focused. The optional
+  `denoiser_core.onnx` is downloaded but the first version leaves denoising off
+  so the super-resolution experiment isolates bandwidth extension.
 - **HTDemucs**: 44.1 kHz, stereo; four stems (`drums`, `bass`, `other`,
   `vocals`). Mono input is duplicated to stereo, then stems are stored as mono
   unless both input channels exist. CPU jobs are capped to a short excerpt.
@@ -31,6 +36,22 @@ Total download: about 383 MB, below the 2 GB budget and under 400 MB per model.
   experiment; tiny is weak for Persian. Segments carry start/end seconds.
 - **EnCodec 48 kHz**: mono/stereo at 48 kHz; the wrapper reports estimated
   encoded size and decoded audio, not a real container bitstream.
+
+## Real-model smoke (2026-11-03)
+
+Command (cached weights, no network):
+
+```bash
+AVALAB_RUN_ML_TESTS=1 HF_HUB_OFFLINE=1 \
+  uv run --directory apps/api --extra ml pytest -q -m ml
+```
+
+Result: `2 passed, 172 deselected` in 1.55 s. DPDFNet ran a 0.5 s tone at
+16 kHz and returned finite, length-matched audio. LavaSR ran the 8–48 kHz
+speech fixture with the high band (10–20 kHz) increased by more than 3 dB.
+Both wrappers also have non-gated fake-model tests covering source rates
+8 000, 16 000, 22 050, 44 100, 48 000 and 96 000 Hz, exact output length,
+short-input padding/trimming, silence, empty input and non-finite rejection.
 
 ## License notes
 

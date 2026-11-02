@@ -1,6 +1,6 @@
 # Wave 5 · Plan 02 — Denoise and super-resolution
 
-**Status:** in progress — Tasks 1–3 done.
+**Status:** complete — Tasks 1–6 done; real-model smoke recorded in `docs/PROGRESS.md`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -139,10 +139,10 @@
 - Modify: `docs/ALGORITHMS.md`
 - Modify: `docs/PROGRESS.md`
 
-- [ ] **Step 1: Record DPDFNet and LavaSR input/output rates, licenses, and limitations.**
-- [ ] **Step 2: Document the sinc baseline formula and the comparison protocol.**
-- [ ] **Step 3: Run** `AVALAB_RUN_ML_TESTS=1 uv run --directory apps/api pytest -q -m ml` if models are present; otherwise record the skip.
-- [ ] **Step 4: Commit** `docs(F14): record denoise and super-resolution behavior`.
+- [x] **Step 1: Record DPDFNet and LavaSR input/output rates, licenses, and limitations.**
+- [x] **Step 2: Document the sinc baseline formula and the comparison protocol.**
+- [x] **Step 3: Run** `AVALAB_RUN_ML_TESTS=1 uv run --directory apps/api pytest -q -m ml` if models are present; otherwise record the skip.
+- [x] **Step 4: Commit** `docs(F14): record denoise and super-resolution behavior`.
 
 ## Completion Gate
 
