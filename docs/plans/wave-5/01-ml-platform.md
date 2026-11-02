@@ -68,7 +68,7 @@
 **Interfaces:**
 - Settings add `ml_enabled: bool = True`, `ml_max_concurrency: int = 1`, `ml_max_excerpt_seconds: int = 30`, `ml_model_cache_dir: Path = Path.home() / ".cache" / "avalab" / "models"`, `ml_device: str = "cpu"`.
 - ErrorCode add `model_unavailable`, `job_not_found`, `job_cancelled`, `ml_failed`, `ml_busy`.
-- `pyproject.toml` `[project.optional-dependencies] ml = [...]` pins `torch`, `torchaudio`, `transformers`, `demucs`, `sherpa-onnx`, `audiosronnx`, `onnxruntime`, `huggingface-hub`, `soundfile` with compatible lower bounds; `uv.lock` regenerated. Register the `ml` pytest marker (`markers = ["ml: real model tests, gated by AVALAB_RUN_ML_TESTS=1"]`).
+- `pyproject.toml` `[project.optional-dependencies] ml = [...]` pins `torch`, `torchaudio`, `transformers`, `demucs`, `sherpa-onnx`, `audiosronnx`, `onnxruntime`, `huggingface-hub`, `soundfile`; `uv.lock` regenerated. Platform markers implement D-039: Intel macOS gets NumPy 1.26/SciPy 1.16/torch 2.2.2, all other platforms keep NumPy 2.5/SciPy 1.18/torch 2.6+. Register the `ml` pytest marker (`markers = ["ml: real model tests, gated by AVALAB_RUN_ML_TESTS=1"]`).
 
 - [ ] **Step 1: Write `test_ml_config.py`** asserting defaults, env overrides (`AVALAB_ML_MAX_EXCERPT_SECONDS=10`), and the new error codes serialize as strings.
 - [ ] **Step 2: Run** `uv run --directory apps/api pytest -q tests/test_ml_config.py` — expected FAIL.

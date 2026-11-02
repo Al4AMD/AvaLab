@@ -45,6 +45,14 @@ F14 tool surfaces from 02–03.
   bandwidth extension.
 - **D-038:** F16 share links encode only bundled demo clips (`demoId`), never
   user uploads. Unknown ids fall back to the normal empty state.
+- **D-039:** Intel-macOS CPU compatibility is explicit. PyTorch stopped
+  publishing Intel-mac wheels after 2.2.2, and that wheel requires NumPy 1.x.
+  On `darwin`/`x86_64` the API therefore resolves `numpy>=1.26,<2`,
+  `scipy>=1.16,<1.17`, `torch>=2.1,<2.3`, `torchaudio>=2.1,<2.3`, and
+  `onnxruntime` resolves to its last Intel-mac build. Other platforms keep
+  NumPy 2.x and `torch>=2.6`. `transformers` stays `<5` so the 2.2 path is
+  supported. This is the owner's local demo target; it must be tested before
+  close-out.
 
 ## Global gates
 
