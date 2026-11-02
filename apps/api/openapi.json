@@ -15,6 +15,20 @@
         "title": "Body_ingest_api_v1_ingest_post",
         "type": "object"
       },
+      "CancelResponse": {
+        "description": "Cancellation result; false means the job had already finished.",
+        "properties": {
+          "cancelled": {
+            "title": "Cancelled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cancelled"
+        ],
+        "title": "CancelResponse",
+        "type": "object"
+      },
       "CodecEncodeRequest": {
         "description": "Reference to a stored canonical excerpt and the requested codec.",
         "properties": {
@@ -258,6 +272,108 @@
           "size_bytes"
         ],
         "title": "IngestResponse",
+        "type": "object"
+      },
+      "MlJobRequest": {
+        "description": "Reference to stored audio plus task-specific parameters.",
+        "properties": {
+          "audio_id": {
+            "title": "Audio Id",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          }
+        },
+        "required": [
+          "audio_id"
+        ],
+        "title": "MlJobRequest",
+        "type": "object"
+      },
+      "MlJobResponse": {
+        "description": "Accepted job reference.",
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "title": "MlJobResponse",
+        "type": "object"
+      },
+      "ModelInfo": {
+        "description": "One model row rendered by the AI lab model-status banner.",
+        "properties": {
+          "license": {
+            "title": "License",
+            "type": "string"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "state": {
+            "enum": [
+              "available",
+              "missing",
+              "loading",
+              "error"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "task": {
+            "enum": [
+              "denoise",
+              "superres",
+              "separation",
+              "asr",
+              "neural_codec"
+            ],
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task",
+          "model_id",
+          "revision",
+          "license",
+          "size_bytes",
+          "state"
+        ],
+        "title": "ModelInfo",
+        "type": "object"
+      },
+      "ModelsResponse": {
+        "description": "All five fixed tasks, in stable order.",
+        "properties": {
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelInfo"
+            },
+            "title": "Models",
+            "type": "array"
+          }
+        },
+        "required": [
+          "models"
+        ],
+        "title": "ModelsResponse",
         "type": "object"
       },
       "ValidationError": {
@@ -577,6 +693,160 @@
           }
         },
         "summary": "Ingest"
+      }
+    },
+    "/jobs/{job_id}": {
+      "delete": {
+        "description": "Cancel a queued or running job; unknown ids are 404.",
+        "operationId": "cancel_job_api_v1_jobs__job_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Job"
+      }
+    },
+    "/jobs/{job_id}/events": {
+      "get": {
+        "description": "Stream one snapshot, progress updates, then a terminal event.",
+        "operationId": "job_events_api_v1_jobs__job_id__events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Job Events"
+      }
+    },
+    "/ml/{task}": {
+      "post": {
+        "description": "Validate the excerpt/model and queue the task.",
+        "operationId": "start_job_api_v1_ml__task__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task",
+            "required": true,
+            "schema": {
+              "enum": [
+                "denoise",
+                "superres",
+                "separation",
+                "asr",
+                "neural_codec"
+              ],
+              "title": "Task",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MlJobRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MlJobResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Job"
+      }
+    },
+    "/models": {
+      "get": {
+        "description": "Report local availability without importing any ML backend.",
+        "operationId": "list_models_api_v1_models_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Models"
       }
     }
   },
