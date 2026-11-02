@@ -16,6 +16,7 @@ import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
 import { AI_MAX_EXCERPT_SECONDS, type AiModelInfo, type AiModelState, aiClient } from "./aiClient";
 import { AI_TASKS, type AiTask, aiTaskFromSearch } from "./aiState";
+import { DenoiseTab } from "./denoiseTab";
 import { useAiJob } from "./useAiJob";
 
 const CONTROL_FOCUS_CLASSES =
@@ -217,9 +218,11 @@ export function AiLabView(): React.ReactElement {
         ))}
       </div>
 
-      <p data-testid="ai.placeholder" className="text-sm">
-        {placeholder(t, task)}
-      </p>
+      {task === "denoise" ? null : (
+        <p data-testid="ai.placeholder" className="text-sm">
+          {placeholder(t, task)}
+        </p>
+      )}
 
       <ModelBanner
         backendOnline={backendOnline}
@@ -228,7 +231,9 @@ export function AiLabView(): React.ReactElement {
         loadFailed={modelsFailed}
       />
 
-      {original === null ? (
+      {task === "denoise" ? (
+        <DenoiseTab backendOnline={backendOnline} model={model} />
+      ) : original === null ? (
         <UploadEmptyState />
       ) : (
         <div className="flex flex-col gap-3 rounded-md border border-surface p-3">

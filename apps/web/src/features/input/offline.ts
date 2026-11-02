@@ -154,8 +154,10 @@ export async function loadOfflineFile(
  * Titles are i18n keys (`input.demo.<id>.title`); these fields stay
  * technical data (units in the names, AGENTS §10).
  */
+export type DemoClipId = "chirp" | "clicks" | "pinkNoise" | "speech" | "speechNoisy" | "music";
+
 export type DemoClip = {
-  readonly id: "chirp" | "clicks" | "pinkNoise";
+  readonly id: DemoClipId;
   readonly file: string;
   readonly seconds: number;
   readonly rateHz: number;
@@ -165,6 +167,14 @@ export const DEMO_CLIPS: readonly DemoClip[] = [
   { id: "chirp", file: "chirp-log-100to8000hz-5s.wav", seconds: 5, rateHz: 48_000 },
   { id: "clicks", file: "clicks-2hz-5s.wav", seconds: 5, rateHz: 48_000 },
   { id: "pinkNoise", file: "pink-noise-5s.wav", seconds: 5, rateHz: 48_000 },
+  { id: "speech", file: "speech-kathleen-19s.wav", seconds: 19.6, rateHz: 48_000 },
+  {
+    id: "speechNoisy",
+    file: "speech-kathleen-noisy-5db-19s.wav",
+    seconds: 19.6,
+    rateHz: 48_000,
+  },
+  { id: "music", file: "music-life-turns-15s.wav", seconds: 15, rateHz: 48_000 },
 ];
 
 /** URL the clip bytes load from (`public/` assets serve at the origin root). */

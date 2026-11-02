@@ -1,6 +1,6 @@
 # Wave 5 · Plan 02 — Denoise and super-resolution
 
-**Status:** pending.
+**Status:** in progress — Tasks 1–2 done.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -46,11 +46,11 @@
 - `MlResult`: `{kind: "audio", samples, sample_rate_hz, stats: {"model_id": str, "duration_s": float, "rms_in_db": float, "rms_out_db": float}}`.
 - Registry loader `load_dpdfnet(cache_dir) -> DenoiseRunner`.
 
-- [ ] **Step 1: Write `test_ml_denoise.py`** with a fake sherpa seam: asserts 48 kHz in/out, source-rate restoration, length preservation, finite output, silent input stable; real-model test marked `@pytest.mark.ml`.
-- [ ] **Step 2: Run** `uv run --directory apps/api pytest -q tests/test_ml_denoise.py` — expected FAIL.
-- [ ] **Step 3: Implement the adapter** with lazy `sherpa_onnx` import and a documented fallback error when the package is absent.
-- [ ] **Step 4: Run** focused tests, `ruff`, `mypy` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F14): add DPDFNet denoise adapter`.
+- [x] **Step 1: Write `test_ml_denoise.py`** with a fake sherpa seam: asserts 48 kHz in/out, source-rate restoration, length preservation, finite output, silent input stable; real-model test marked `@pytest.mark.ml`.
+- [x] **Step 2: Run** `uv run --directory apps/api pytest -q tests/test_ml_denoise.py` — expected FAIL.
+- [x] **Step 3: Implement the adapter** with lazy `sherpa_onnx` import and a documented fallback error when the package is absent.
+- [x] **Step 4: Run** focused tests, `ruff`, `mypy` — expected PASS.
+- [x] **Step 5: Commit** `feat(F14): add DPDFNet denoise adapter`.
 
 ### Task 2: Denoise UI
 
@@ -66,11 +66,11 @@
 - “Denoise” runs `useAiJob("denoise")`; the done event returns `result_audio_id`, fetched via `GET /audio/{result_audio_id}` and installed with `setProcessed`.
 - A/B buttons: original, noisy, denoised; RMS readout; model id caption.
 
-- [ ] **Step 1: Write component tests** with fake job/store/audio seams: disabled without model, run starts upload, progress renders, done installs processed source, cancel clears running state.
-- [ ] **Step 2: Run** `pnpm --filter @avalab/web exec vitest run src/features/ai/denoiseTab` — expected FAIL.
-- [ ] **Step 3: Implement the tab + i18n keys** `ai.denoise.*`, `ai.caption.approximation`.
-- [ ] **Step 4: Run** `pnpm check` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F14): add denoise A/B tab`.
+- [x] **Step 1: Write component tests** with fake job/store/audio seams: disabled without model, run starts upload, progress renders, done installs processed source, cancel clears running state.
+- [x] **Step 2: Run** `pnpm --filter @avalab/web exec vitest run src/features/ai/denoiseTab` — expected FAIL.
+- [x] **Step 3: Implement the tab + i18n keys** `ai.denoise.*`, `ai.caption.approximation`.
+- [x] **Step 4: Run** `pnpm check` — expected PASS.
+- [x] **Step 5: Commit** `feat(F14): add denoise A/B tab`.
 
 ### Task 3: LavaSR super-resolution adapter
 

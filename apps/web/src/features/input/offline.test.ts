@@ -228,12 +228,13 @@ describe("loadDemoClip", () => {
     await expect(loadDemoClip("nope", { fetch: fetchFn })).rejects.toThrow(TypeError);
   });
 
-  it("pins the bundled demo data (D-016: three 48 kHz / 5 s clips, unique ids)", () => {
-    expect(DEMO_CLIPS).toHaveLength(3);
+  it("pins the bundled demo data (48 kHz clips with unique ids)", () => {
+    expect(DEMO_CLIPS).toHaveLength(6);
     const ids = DEMO_CLIPS.map((clip) => clip.id);
-    expect(new Set(ids).size).toBe(3);
+    expect(new Set(ids).size).toBe(6);
+    const old = DEMO_CLIPS.filter((clip) => ["chirp", "clicks", "pinkNoise"].includes(clip.id));
+    expect(old.map((clip) => clip.seconds)).toEqual([5, 5, 5]);
     for (const clip of DEMO_CLIPS) {
-      expect(clip.seconds).toBe(5);
       expect(clip.rateHz).toBe(48_000);
       expect(clip.file.endsWith(".wav")).toBe(true);
     }

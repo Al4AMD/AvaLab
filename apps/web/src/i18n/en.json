@@ -51,6 +51,15 @@
       },
       "pinkNoise": {
         "title": "Pink noise"
+      },
+      "speech": {
+        "title": "Speech (clean, English)"
+      },
+      "speechNoisy": {
+        "title": "Noisy speech (5 dB SNR)"
+      },
+      "music": {
+        "title": "Music (CC0, 15 s)"
       }
     },
     "error": {
@@ -931,6 +940,25 @@
       "duration_too_long": "The audio is longer than the allowed limit.",
       "decode_failed": "The audio could not be decoded.",
       "file_too_large": "The file is larger than the upload limit."
+    },
+    "denoise": {
+      "intro": "Speech denoise removes steady background noise. The model works on a mono excerpt of up to 30 s and returns audio at the source sample rate.",
+      "loadDemo": "Load noisy speech demo (5 dB SNR)",
+      "demoLoading": "Loading demo…",
+      "model": "Model: {{modelId}}",
+      "modelMissing": "The denoise model is not downloaded. Fetch it with the command below, then reload.",
+      "noSource": "Load audio, or use the noisy speech demo, to run denoise.",
+      "rms": "RMS {{input}} dB → {{output}} dB",
+      "waveOriginal": "Original",
+      "waveDenoised": "Denoised",
+      "installFailed": "The denoised audio could not be loaded.",
+      "ab": {
+        "original": "Original (noisy)",
+        "denoised": "Denoised"
+      }
+    },
+    "caption": {
+      "approximation": "AI-generated approximation: compare it with the original before drawing conclusions."
     }
   }
 }
