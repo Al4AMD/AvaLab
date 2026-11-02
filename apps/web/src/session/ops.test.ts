@@ -3,11 +3,14 @@
  * the type-lens wiring (params/result types + worker switch exhaustiveness)
  * that the "add one entry" rule leans on (ops.ts header).
  */
-import { describe, expect, expectTypeOf, it } from "vitest";
 
+import { floatToInt16Pcm, int16PcmToFloat } from "@avalab/dsp";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   aliasDemo,
+  type CodecLabParams,
   type ConvolutionStepsParams,
+  codecLabProcess,
   convolutionSteps,
   DspOpError,
   type DspOpName,
@@ -870,6 +873,131 @@ describe("spectrumEdit handler", () => {
   });
 });
 
+describe("codecLabProcess handler", () => {
+  const SAMPLE_RATE = 48_000;
+  const SAMPLE_COUNT = 12_000;
+
+  function sinePayload(seconds = SAMPLE_COUNT / SAMPLE_RATE): TransferablePayload {
+    const count = Math.round(SAMPLE_RATE * seconds);
+    return float32PayloadOf(
+      Array.from({ length: count }, (_, index) =>
+        Math.sin((2 * Math.PI * 440 * index) / SAMPLE_RATE),
+      ),
+    );
+  }
+
+  function run(
+    overrides: Partial<CodecLabParams> = {},
+    payload: TransferablePayload = sinePayload(),
+  ) {
+    return codecLabProcess(
+      {
+        codec: "rle",
+        sampleRateHz: SAMPLE_RATE,
+        startSample: 0,
+        endSample: SAMPLE_COUNT,
+        mdctBitsPerSecond: 128_000,
+        ...overrides,
+      },
+      payload,
+    );
+  }
+
+  it("round-trips the lossless codecs bit-exactly", () => {
+    const payload = sinePayload();
+    const pcm16 = floatToInt16Pcm(
+      new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4),
+    );
+    const reference = int16PcmToFloat(pcm16);
+    for (const codec of ["rle", "huffman", "deltaHuffman"] as const) {
+      const result = run({ codec }, sinePayload());
+      const resultPayload = result.payload;
+      if (resultPayload === undefined) {
+        throw new Error(`missing ${codec} payload`);
+      }
+      expect(result.meta.codec).toBe(codec);
+      expect(result.meta.bitExact).toBe(true);
+      expect(result.meta.sampleCount).toBe(SAMPLE_COUNT);
+      expect(resultPayload.byteLength).toBe(SAMPLE_COUNT * 4);
+      expect(float32ValuesOf(resultPayload)).toEqual(Array.from(reference));
+    }
+  });
+
+  it("marks the lossy codecs as not bit-exact and trims MDCT to N", () => {
+    for (const codec of ["mulaw", "alaw", "mdct"] as const) {
+      const result = run({ codec }, sinePayload());
+      expect(result.meta.codec).toBe(codec);
+      expect(result.meta.bitExact).toBe(false);
+      expect(result.payload?.byteLength).toBe(SAMPLE_COUNT * 4);
+    }
+  });
+
+  it("computes the RLE statistics with the pinned formulas", () => {
+    const result = run();
+    const meta = result.meta;
+    expect(meta.originalBytes).toBe(2 * SAMPLE_COUNT);
+    expect(meta.bitsPerSample).toBeCloseTo((8 * meta.compressedSizeBytes) / SAMPLE_COUNT, 10);
+    expect(meta.bitrateKbps).toBeCloseTo(
+      (8 * meta.compressedSizeBytes) / ((SAMPLE_COUNT / SAMPLE_RATE) * 1000),
+      10,
+    );
+    expect(meta.compressionRatio).toBeCloseTo(meta.originalBytes / meta.compressedSizeBytes, 10);
+    expect(meta.bitsTotal).toBe(meta.compressedSizeBytes * 8);
+    expect(meta.histogram).toHaveLength(256);
+    expect(meta.histogram.reduce((sum, count) => sum + count, 0)).toBe(2 * SAMPLE_COUNT);
+    expect(meta.codeLengths).toEqual([]);
+    expect(meta.coefficientSparsity).toBeNull();
+    expect(meta.frameCount).toBeNull();
+  });
+
+  it("exposes the Huffman codebook lengths", () => {
+    for (const codec of ["huffman", "deltaHuffman"] as const) {
+      const meta = run({ codec }).meta;
+      expect(meta.codeLengths).toHaveLength(256);
+      expect(meta.codeLengths.some((length) => length > 0)).toBe(true);
+    }
+  });
+
+  it("reports MDCT sparsity, frame count and code lengths", () => {
+    const meta = run({ codec: "mdct" }, sinePayload()).meta;
+    expect(meta.coefficientSparsity).not.toBeNull();
+    expect(meta.coefficientSparsity ?? -1).toBeGreaterThanOrEqual(0);
+    expect(meta.coefficientSparsity ?? 2).toBeLessThanOrEqual(1);
+    expect(meta.frameCount).not.toBeNull();
+    expect(meta.frameCount ?? 0).toBeGreaterThan(0);
+    expect(meta.codeLengths).toHaveLength(256);
+  });
+
+  it("rejects invalid params and the 30 s cap", () => {
+    const expectBadParams = (act: () => unknown): void => {
+      expect(act).toThrowError(expect.objectContaining({ code: "badParams" }));
+    };
+    expectBadParams(() => run({ codec: "nope" as CodecLabParams["codec"] }));
+    expectBadParams(() => run({ mdctBitsPerSecond: 7_999 }));
+    expectBadParams(() => run({ mdctBitsPerSecond: 512_001 }));
+    expectBadParams(() => run({ mdctBitsPerSecond: Number.NaN }));
+    expectBadParams(() => run({ startSample: -1 }));
+    expectBadParams(() => run({ endSample: 1, startSample: 2 }));
+    expectBadParams(() =>
+      run(
+        {},
+        {
+          buffer: new ArrayBuffer(9),
+          byteOffset: 1,
+          byteLength: 8,
+        },
+      ),
+    );
+    expectBadParams(() =>
+      run(
+        { sampleRateHz: 1_000, startSample: 0, endSample: 31_000 },
+        float32PayloadOf(Array.from({ length: 31_000 }, () => 0)),
+      ),
+    );
+    expectBadParams(() => run({}, float32PayloadOf([])));
+  });
+});
+
 describe("op table wiring", () => {
   it("carries the handler for dispatch", () => {
     expect(dspOps.sessionPing.handler).toBe(sessionPing);
@@ -886,6 +1014,7 @@ describe("op table wiring", () => {
     expect(dspOps.reverbProcess.handler).toBe(reverbProcess);
     expect(dspOps.convolutionSteps.handler).toBe(convolutionSteps);
     expect(dspOps.spectrumEdit.handler).toBe(spectrumEdit);
+    expect(dspOps.codecLabProcess.handler).toBe(codecLabProcess);
   });
 
   it("derives typed params/results from the table (the add-one-entry lens)", () => {
@@ -904,6 +1033,7 @@ describe("op table wiring", () => {
       | "reverbProcess"
       | "convolutionSteps"
       | "spectrumEdit"
+      | "codecLabProcess"
     >();
     expectTypeOf<DspOpParams<"sessionPing">>().toEqualTypeOf<{ count: number }>();
     expectTypeOf<DspOpResult<"sessionPing">>().toEqualTypeOf<{

@@ -15,6 +15,140 @@
         "title": "Body_ingest_api_v1_ingest_post",
         "type": "object"
       },
+      "CodecEncodeRequest": {
+        "description": "Reference to a stored canonical excerpt and the requested codec.",
+        "properties": {
+          "audio_id": {
+            "title": "Audio Id",
+            "type": "string"
+          },
+          "codec": {
+            "enum": [
+              "wav",
+              "flac",
+              "mp3",
+              "aac",
+              "opus",
+              "vorbis"
+            ],
+            "title": "Codec",
+            "type": "string"
+          },
+          "params": {
+            "$ref": "#/components/schemas/CodecParams"
+          }
+        },
+        "required": [
+          "audio_id",
+          "codec"
+        ],
+        "title": "CodecEncodeRequest",
+        "type": "object"
+      },
+      "CodecEncodeResponse": {
+        "description": "Encoded size, aligned reference window and quality metadata.",
+        "properties": {
+          "aligned_sample_count": {
+            "title": "Aligned Sample Count",
+            "type": "integer"
+          },
+          "bit_exact": {
+            "title": "Bit Exact",
+            "type": "boolean"
+          },
+          "bitrate_kbps": {
+            "title": "Bitrate Kbps",
+            "type": "number"
+          },
+          "codec_delay_samples": {
+            "title": "Codec Delay Samples",
+            "type": "integer"
+          },
+          "duration_s": {
+            "title": "Duration S",
+            "type": "number"
+          },
+          "encode_ms": {
+            "title": "Encode Ms",
+            "type": "number"
+          },
+          "lossless": {
+            "title": "Lossless",
+            "type": "boolean"
+          },
+          "reference_start_sample": {
+            "title": "Reference Start Sample",
+            "type": "integer"
+          },
+          "result_audio_id": {
+            "title": "Result Audio Id",
+            "type": "string"
+          },
+          "sample_rate_hz": {
+            "title": "Sample Rate Hz",
+            "type": "integer"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "result_audio_id",
+          "size_bytes",
+          "bitrate_kbps",
+          "encode_ms",
+          "codec_delay_samples",
+          "reference_start_sample",
+          "aligned_sample_count",
+          "duration_s",
+          "sample_rate_hz",
+          "bit_exact",
+          "lossless"
+        ],
+        "title": "CodecEncodeResponse",
+        "type": "object"
+      },
+      "CodecParams": {
+        "description": "Optional codec-specific quality controls; validated per codec.",
+        "properties": {
+          "bitrate_kbps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bitrate Kbps"
+          },
+          "compression_level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compression Level"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality"
+          }
+        },
+        "title": "CodecParams",
+        "type": "object"
+      },
       "ErrorBody": {
         "description": "Nested error payload: stable machine-readable code plus developer message.",
         "properties": {
@@ -61,8 +195,15 @@
         "type": "object"
       },
       "HealthResponse": {
-        "description": "Health payload: service status, API version, ffmpeg availability.",
+        "description": "Health payload: service status, API version, ffmpeg and codec availability.",
         "properties": {
+          "codecs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Codecs",
+            "type": "array"
+          },
           "ffmpeg": {
             "title": "Ffmpeg",
             "type": "boolean"
@@ -79,7 +220,8 @@
         "required": [
           "status",
           "version",
-          "ffmpeg"
+          "ffmpeg",
+          "codecs"
         ],
         "title": "HealthResponse",
         "type": "object"
@@ -289,6 +431,75 @@
           }
         },
         "summary": "Get Audio"
+      }
+    },
+    "/codec/encode": {
+      "post": {
+        "description": "Encode, decode, align and store one excerpt with the requested codec.",
+        "operationId": "encode_codec_api_v1_codec_encode_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodecEncodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodecEncodeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Malformed request body (invalid_request)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown audio id or corrupt metadata (not_found)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid codec/params, unavailable encoder or encode failure (invalid_request, codec_unavailable, encode_failed)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal storage failure (internal_error)"
+          }
+        },
+        "summary": "Encode Codec"
       }
     },
     "/health": {

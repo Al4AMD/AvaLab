@@ -1,9 +1,10 @@
 """App-level contract tests: health endpoint, stable error body, settings, OpenAPI metadata."""
 
 from pathlib import Path
+from typing import cast
 
 import pytest
-from fastapi import APIRouter
+from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 
 from avalab_api.config import Settings, get_settings
@@ -19,6 +20,8 @@ EXPECTED_ERROR_CODES = {
     "range_not_satisfiable",
     "invalid_request",
     "internal_error",
+    "codec_unavailable",
+    "encode_failed",
 }
 
 
@@ -29,7 +32,9 @@ def test_health_returns_ok_with_exact_keys(client: TestClient) -> None:
     assert body["status"] == "ok"
     assert body["version"] == API_VERSION
     assert isinstance(body["ffmpeg"], bool)
-    assert set(body) == {"status", "version", "ffmpeg"}
+    assert set(body) == {"status", "version", "ffmpeg", "codecs"}
+    assert isinstance(body["codecs"], list)
+    assert set(body["codecs"]) <= {"wav", "flac", "mp3", "aac", "opus", "vorbis"}
 
 
 def test_health_reports_ffmpeg_missing(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -40,7 +45,7 @@ def test_health_reports_ffmpeg_missing(client: TestClient, monkeypatch: pytest.M
 
 
 def test_openapi_declares_versioned_server_and_server_relative_paths(client: TestClient) -> None:
-    schema = client.app.openapi()
+    schema = cast(FastAPI, client.app).openapi()
     assert schema["servers"] == [{"url": API_PREFIX}]
     assert "/health" in schema["paths"]
     assert f"{API_PREFIX}/health" not in schema["paths"]
@@ -180,7 +185,7 @@ def test_settings_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
         "AVALAB_CORS_ORIGINS",
     ):
         monkeypatch.delenv(key, raising=False)
-    settings = Settings(_env_file=None)
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]  # pydantic-settings keyword
     assert settings.max_upload_bytes == 104857600
     assert settings.max_duration_seconds == 300
     assert settings.max_sample_rate_hz == 96000

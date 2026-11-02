@@ -41,6 +41,8 @@
 | @biomejs/biome | 2.5.15 | MIT |
 | @types/node | 26.6.5 | MIT |
 
+Wave 4 added no new JS dependency. The comparison table and rate–distortion chart reuse the already-listed `uplot` 1.6.32 (MIT); real codecs keep using the separately-invoked `ffmpeg` binary.
+
 ## Python (apps/api/uv.lock, tools/golden/uv.lock, tools/demo_clips/uv.lock)
 
 | Component | Version | License |

@@ -165,9 +165,18 @@ Wave 3 additions (machine-drafted, agent):
 - `reverb.*` (F10 reverse/reverb lab), `nav.reverb`, `tool.reverb.title`
 - `spectrumEdit.*` (F09 spectrum editor), `nav.spectrumEdit`, `tool.spectrumEdit.title`
 
+Wave 4 plan 01 additions (machine-drafted, agent):
+
+- `codecLab.*` (F04 browser codec lab), `nav.codecLab`, `tool.codecLab.title`
+
+Wave 4 plan 03 additions (machine-drafted, agent):
+
+- `codecLab.real.*` (real-codec panel), `codecLab.error.*` (stable backend error codes)
+- `metrics.*` (F05 metrics lab), `nav.metrics`, `tool.metrics.title`
+
 ## Next recommended step
 
-Wave 3 is complete and merged to `main` (PR #9, merge `834b426`). Next: **plan Wave 4** (F04 codecs, F05 metrics UI, rate–distortion, F06 time-stretch). Do not begin Wave 4 while any check is failing.
+Wave 4 plan 03 is complete on `feat/wave-4` (real-codec panel + F05 metrics lab). Next: **execute Wave 4 plan 04** — `docs/plans/wave-4/04-comparison-rate-distortion-closeout.md` (comparison table, rate–distortion chart, F06 verification, close-out). Do not begin while any check is failing.
 
 ## Session log
 
@@ -355,3 +364,60 @@ Wave 3 is complete and merged to `main` (PR #9, merge `834b426`). Next: **plan W
 - Re-verified on merged `main`: `pnpm check` exit 0; `pnpm e2e` 37/37 with zero console errors in fa + en; perf overview first paint 243 ms, spectrogram first tiles 326 ms.
 - Removed stale `present.md` (dated 2026-10-26, pre-Wave-2 close); recoverable from `754ad66`. Updated `docs/plans/README.md` Wave 3 status.
 - Carries unchanged: Wave 3 Persian review, huge full-band phase preset share URLs, pre-existing Wave 2 FFT phase-mask bug, main-thread waveform envelopes, deferred freehand/theory panels.
+
+## 2026-11-02 — Wave 4 plans written (F04/F05/F06)
+
+- Added `docs/plans/wave-4/README.md` plus four executable plans:
+  `01-browser-codec-lab.md`, `02-backend-real-codecs.md`,
+  `03-real-codec-ui-and-metrics.md`, `04-comparison-rate-distortion-closeout.md`.
+- Pinned decisions D-026…D-031: reuse `/ingest` with a 16-bit PCM excerpt;
+  cross-correlation delay/trim; PSNR peak 1.0 and 20 ms segmental frames;
+  `/health.codecs`; F06 verify-only; 30 s sequential comparison batch.
+- No code or dependencies changed. Next: execute plan 01.
+
+## 2026-11-02 — Wave 4 plan 01 complete (F04 browser codec lab)
+
+- Tasks 1–4 complete on `feat/wave-4`: PCM/WAV seam (`15d80ce`), `codecLabProcess` worker op (`827995e`), `/tools/codec-lab` view + URL state + en/fa copy (`8f34c54`), and Persian/English e2e (`05f8389`).
+- The lab runs RLE, canonical Huffman, delta+Huffman, μ-law, A-law, and the MDCT toy codec in the worker; it shows bit-exact status, size/bitrate/ratio, entropy, MSE/SNR/segmental SNR/PSNR, byte histogram, Huffman code lengths, and MDCT sparsity/frame count. Lossless round-trips are bit-exact on the Int16 PCM grid; companding and MDCT are labelled lossy.
+- Stats convention: `bitsPerSample = 8·compressedSizeBytes/N`; Huffman/delta count the 256-byte codebook table; MDCT counts the Huffman table plus 8 bytes per frame step. PSNR uses peak 1.0 and segmental SNR 20 ms frames (D-028). The op caps a processed selection at 30 s (`badParams`); this is a preview decision, not a codec limit.
+- Test-infra fix: the phase-vocoder noise check no longer calls a matcher per sample (192 k samples exceeded its 24 s timeout); it now fails fast on the first non-finite sample and still asserts the same 10× RMS bound. Focused file 16/16.
+- Gates: `pnpm check` exit 0 (dsp 966/966, web 298/298, scripts 13/13, biome 194 files, i18n OK); `pnpm e2e` 40/40 (1.1 min), zero console errors in fa + en.
+- Carries: `codecLab.*` Persian copy needs owner review; if the measured 30 s MDCT worker time exceeds the §9 budget, lower the cap and record it; `e2e/tools.spec.ts` still names “nine routes” although `TOOL_IDS` now holds ten (codec lab has its own spec). No real-codec UI yet — plans 02–04.
+- **Next step:** execute Wave 4 plan 02 — `docs/plans/wave-4/02-backend-real-codecs.md`.
+
+## 2026-11-02 — Wave 4 plan 02 complete (F04 backend real codecs)
+
+- Tasks 1–4 complete on `feat/wave-4`: codec specs/probe (`206dce9`), delay alignment (`21b8162`), `POST /api/v1/codec/encode` (`5a2b244`), and `/health.codecs` + regenerated OpenAPI/TS client (`4f5f133`).
+- Shipped: `codecs.py` resolves WAV/FLAC/MP3/AAC/Opus/Vorbis from `ffmpeg -encoders`, validates per-codec params, and encodes with fixed argument arrays. `alignment.py` finds delay by normalized FFT cross-correlation, returns the trim offsets and count, and the route stores only the aligned decoded excerpt under a fresh `audio_id`. Lossless bit-exactness is checked after alignment on the Int16 PCM reference; lossy results are never labelled exact.
+- Codec availability on the dev Mac (ffmpeg 9.0.2): `wav`, `flac`, `mp3`, `aac`, `opus`, `vorbis`. Native experimental Vorbis rejects mono, so its spec encodes as stereo and the decode path downmixes back to mono; `/health.codecs` reports it and the route round-trips it.
+- Measured encode time, 30 s 44.1 kHz mono, one run each: WAV 70 ms, FLAC 92 ms, MP3 231 ms, AAC 389 ms, Opus 196 ms, Vorbis 304 ms. Faster than the §9 interaction budget for the default excerpt; these are single-run observations, not a benchmark suite.
+- Health/API contract: `GET /health` now returns `{status, version, ffmpeg, codecs}`; OpenAPI includes `/codec/encode`, `CodecEncodeRequest`, `CodecEncodeResponse`; `client.ts` exports `CodecName`, `CodecParams`, `CodecEncodeRequest`, `CodecEncodeResponse`.
+- Test-infra fix: `test_codecs.py` clears the process-wide `available_encoders` cache around every test; without it a mocked empty probe leaked into the route tests when both files ran in one process.
+- Gates: backend `pytest` 133/133, `ruff` clean, `mypy` clean (25 source files); `pnpm check` exit 0 (dsp 966/966, web 298/298, scripts 13/13, i18n OK); `pnpm e2e` 40/40, zero console errors in fa + en.
+- Carries: Docker ffmpeg codec availability is not verified in this session — the runtime probe and `/health.codecs` degrade honestly, and a missing encoder returns `codec_unavailable`. Real-codec UI/e2e belongs to Plan 03. No perceptual metric (PESQ/ViSQOL) in this wave. No new Persian strings in Plan 02.
+- **Next step:** execute Wave 4 plan 03 — `docs/plans/wave-4/03-real-codec-ui-and-metrics.md`.
+
+## 2026-11-02 — Wave 4 plan 03 complete (F04 real-codec panel + F05 metrics)
+
+- Tasks 1–5 complete on `feat/wave-4`: backend excerpt lane/cache (`d5da56b`), real-codec panel + URL state + copy (`1be1f11`), metrics wrapper and `/tools/metrics` (`c76cabf`), metrics/real-codec e2e (`d2af73c`), and this close-out.
+- Shipped: the codec lab uploads only the selected mono 16-bit PCM excerpt through `/ingest`, calls `/codec/encode`, fetches the aligned WAV, and shows size/bitrate/delay/bit-exactness plus MSE/SNR/segmental SNR/PSNR. `/health.codecs` disables missing encoders with a translated hint; with no backend the real card stays disabled and says offline. `/tools/metrics` compares the original and processed lanes only when rates and lengths match, and always shows the PSNR peak = 1.0 note.
+- Gates: `pnpm check` exit 0 after Task 3 (dsp 966/966, web 316/316, scripts 13/13, biome 199 files, i18n OK); `pnpm e2e` 43/43 (51 s), zero console errors in fa + en. Backend untouched in this plan, so its Plan 02 results stand.
+- Carries: `codecLab.real.*` and `metrics.*` Persian copy needs owner review. The metrics view computes the full-buffer metrics on the main thread; plan 03 mandates this wrapper, but a 5-minute comparison may warrant a worker op later. Real-codec e2e covers only the no-backend degradation path; pytest and unit tests cover the live backend. Metrics for arbitrary processed lanes cannot show compression ratio/bitrate/entropy (no codec metadata); the codec lab keeps those stats.
+- **Next step:** execute Wave 4 plan 04 — `docs/plans/wave-4/04-comparison-rate-distortion-closeout.md`.
+
+## 2026-11-02 — Wave 4 plan 04 Task 3 (F06 verified)
+
+- Extended `apps/web/e2e/speed.spec.ts` on `feat/wave-4`: resample 2× halves the demo duration to 2.500 s and disables semitones; time-stretch 2× also halves it and enables semitones; +12 semitones at 1× time-stretch keeps 5.000 s; both locales stay at zero console errors.
+- F06 shipped in Wave 3 Plan 01; Wave 4 Plan 04 only added coverage and made no implementation change. Verified with `pnpm e2e` 45/45 (1.5 min) after the Task 2 comparison test landed.
+- **Next step:** finish Wave 4 close-out (full gates, measured batch time, docs).
+
+## 2026-11-02 — Wave 4 plan 04 complete + Wave 4 CLOSED (F04/F05/F06)
+
+- Tasks 1–4 complete on `feat/wave-4`: comparison model/table (`adedbb0`), batch runner + rate–distortion chart (`5e13c2e`), F06 e2e verification (`2bd2352`), and this close-out.
+- Shipped: the codec lab builds `handwrittenRow`/`realRow` records, sorts errors last then by bitrate, and offers Copy CSV (fixed 3 decimals, `Infinity`/`NaN` literals). “Run comparison” executes the default list (RLE, Huffman, delta+Huffman, μ-law, A-law, MDCT 64/128/256 kbps, then available real codecs) sequentially on a 30 s-capped excerpt, appends rows as each point completes, reports `completed/total`, and cancels by stopping the queue and aborting the in-flight backend request. Failed points stay as translated error rows. The uPlot scatter plots finite SNR or PSNR against actual stream bitrate with labelled axes in LTR; lossless `∞` points stay in the table but not the chart.
+- Measured in the static-preview e2e (no backend, 5 s chirp): the full 8-point hand-written batch filled 8 rows and the chart in 6.8 s wall-clock including page load and assertions. This is an e2e observation, not a 30 s/real-codec benchmark.
+- Codec availability (dev Mac ffmpeg 9.0.2): `wav`, `flac`, `mp3`, `aac`, `opus`, `vorbis`; `/health.codecs` disables missing encoders. With no backend the batch still runs the hand-written points and the real card shows the translated offline note.
+- F06 verified, not changed: resample and time-stretch both halve the demo duration at 2× (2.500 s), semitones are disabled only in resample mode, and +12 semitones at 1× time-stretch keeps 5.000 s; fa + en, zero console errors.
+- Gates: `pnpm check` exit 0 (biome 205 files, dsp 966/966, web 327/327, scripts 13/13, i18n OK); `pnpm e2e` 45/45 (1.5 min), zero console errors in fa + en, perf overview 325 ms (< 1000 ms) and spectrogram first tiles 407 ms (< 3000 ms). Backend: `pytest` 133/133, `ruff` clean, `mypy` clean (25 source files).
+- Carries: Persian review backlog covers `codecLab.*` (including `comparison.*`), `metrics.*`, and `speed.*`. `realRow` and `/tools/metrics` compute metrics on the main thread (same wrapper ceiling; move to a worker op if a 5-minute comparison visibly blocks). Real-codec e2e remains offline-only in the static preview; pytest/unit tests cover the live lane. Docker ffmpeg codec availability is still unverified. No perceptual metric in the chart. `e2e/tools.spec.ts` still says “nine routes” although there are now more tools.
+- Wave 4 is closed with no push. **Next step:** plan Wave 5 — Intelligence & teaching (F14 ML jobs, F11 filters UI, F16 education); owner review of the Persian copy is still pending.

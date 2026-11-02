@@ -68,6 +68,16 @@ export function Sidebar() {
             {t("nav.spectrumEdit")}
           </NavLink>
         </li>
+        <li>
+          <NavLink to="/tools/codec-lab" className={linkClass}>
+            {t("nav.codecLab")}
+          </NavLink>
+        </li>
+        <li>
+          <NavLink to="/tools/metrics" className={linkClass}>
+            {t("nav.metrics")}
+          </NavLink>
+        </li>
       </ul>
     </nav>
   );

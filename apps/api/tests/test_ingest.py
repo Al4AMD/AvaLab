@@ -76,7 +76,7 @@ def make_client(
     ``route_max_upload_bytes`` pins the in-route cap to a different value than
     the middleware cap, so a test can prove which layer rejected the upload.
     """
-    settings = Settings(storage_dir=storage_root, **settings_overrides)
+    settings = Settings(storage_dir=storage_root).model_copy(update=settings_overrides)
     if monkeypatch is not None:
         monkeypatch.setattr("avalab_api.main.get_settings", lambda: settings)
     app = create_app()

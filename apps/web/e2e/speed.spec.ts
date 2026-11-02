@@ -51,10 +51,33 @@ test("Persian (default): 2x resample processes, paints, and activates the A/B la
   await expectCanvasPainted(page, "speed.result.spectrogram");
   await expect(page.getByTestId("player.ab.processed")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("speed.result.actualSpeed")).toHaveText("×2.00");
+  await expect(page.getByTestId("speed.result.duration")).toHaveText("2.500 s");
+  await expect(page.getByTestId("speed.control.semitones")).toBeDisabled();
 
   await page.getByTestId("speed.control.reverse").click();
   await expect(page.getByTestId("speed.control.reverse")).toBeChecked();
   await expect(page).toHaveURL(/rv=1/);
+  await expect(page.getByTestId("speed.result.waveform")).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("Persian: time-stretch 2x halves duration and +12 semitones keeps it", async ({ page }) => {
+  const errors = watchForErrors(page);
+  await page.goto("/tools/speed");
+  await page.getByTestId("input.demo.load.chirp").click();
+  await expect(page.getByTestId("input.upload.dropzone")).toHaveCount(0);
+
+  await page.getByTestId("speed.control.mode").selectOption("timeStretch");
+  await expect(page).toHaveURL(/m=timeStretch/);
+  await page.getByTestId("speed.preset.2").click();
+  await expect(page.getByTestId("speed.result.duration")).toHaveText("2.500 s");
+  await expect(page.getByTestId("speed.control.semitones")).toBeEnabled();
+
+  await page.getByTestId("speed.preset.1").click();
+  await expect(page.getByTestId("speed.result.duration")).toHaveText("5.000 s");
+  await page.getByTestId("speed.control.semitones").fill("12");
+  await expect(page).toHaveURL(/[?&]p=12/);
+  await expect(page.getByTestId("speed.result.duration")).toHaveText("5.000 s");
   await expect(page.getByTestId("speed.result.waveform")).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -70,5 +93,12 @@ test("English (LTR): the speed lab renders with zero console errors", async ({ p
   await page.getByTestId("speed.preset.2").click();
   await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
   await expectCanvasPainted(page, "speed.result.spectrogram");
+
+  await page.getByTestId("speed.control.mode").selectOption("timeStretch");
+  await page.getByTestId("speed.preset.1").click();
+  await expect(page.getByTestId("speed.result.duration")).toHaveText("5.000 s");
+  await page.getByTestId("speed.control.semitones").fill("12");
+  await expect(page).toHaveURL(/[?&]p=12/);
+  await expect(page.getByTestId("speed.result.duration")).toHaveText("5.000 s");
   expect(errors).toEqual([]);
 });

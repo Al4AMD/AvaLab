@@ -220,21 +220,25 @@ export type IngestClient = {
  * runtime body is FormData, and the WAV route's payload is declared
  * `unknown` while `parseAs: "arrayBuffer"` yields the bytes.
  */
-const defaultClient: IngestClient = {
-  async POST(path, options) {
-    const { data, error, response } = await api.POST(path, {
-      body: { file: options.body } as unknown as { file: string },
-    });
-    return { data, error, response };
-  },
-  async GET(path, options) {
-    const { data, error, response } = await api.GET(path, {
-      params: options.params,
-      parseAs: "arrayBuffer",
-    });
-    return { data: data as ArrayBuffer | undefined, error, response };
-  },
-};
+export function createDefaultIngestClient(): IngestClient {
+  return {
+    async POST(path, options) {
+      const { data, error, response } = await api.POST(path, {
+        body: { file: options.body } as unknown as { file: string },
+      });
+      return { data, error, response };
+    },
+    async GET(path, options) {
+      const { data, error, response } = await api.GET(path, {
+        params: options.params,
+        parseAs: "arrayBuffer",
+      });
+      return { data: data as ArrayBuffer | undefined, error, response };
+    },
+  };
+}
+
+const defaultClient = createDefaultIngestClient();
 
 /** Narrow store seam for the lane (app singleton and test stores satisfy it
  * structurally). */

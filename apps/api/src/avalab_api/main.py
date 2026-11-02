@@ -15,10 +15,12 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from avalab_api.codecs import available_codecs
 from avalab_api.config import get_settings
 from avalab_api.errors import ApiError, ErrorCode
 from avalab_api.openapi_utils import server_relative_schema
 from avalab_api.routes.audio import router as audio_router
+from avalab_api.routes.codec import router as codec_router
 from avalab_api.routes.ingest import router as ingest_router
 from avalab_api.storage import Storage
 from avalab_api.ttl import SWEEPER_TASK_NAME, sweep_loop
@@ -58,11 +60,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 class HealthResponse(BaseModel):
-    """Health payload: service status, API version, ffmpeg availability."""
+    """Health payload: service status, API version, ffmpeg and codec availability."""
 
     status: str
     version: str
     ffmpeg: bool
+    codecs: list[str]
 
 
 def create_app() -> FastAPI:
@@ -151,6 +154,7 @@ def create_app() -> FastAPI:
     api_router = APIRouter(prefix=API_PREFIX)
     api_router.include_router(ingest_router)
     api_router.include_router(audio_router)
+    api_router.include_router(codec_router)
 
     @api_router.get("/health")
     def health() -> HealthResponse:
@@ -158,6 +162,7 @@ def create_app() -> FastAPI:
             status="ok",
             version=API_VERSION,
             ffmpeg=shutil.which("ffmpeg") is not None,
+            codecs=list(available_codecs()),
         )
 
     app.include_router(api_router)
