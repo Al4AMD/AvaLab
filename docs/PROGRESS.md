@@ -379,3 +379,15 @@ Wave 4 plan 01 is complete on `feat/wave-4` (browser codec lab, F04). Next: **ex
 - Gates: `pnpm check` exit 0 (dsp 966/966, web 298/298, scripts 13/13, biome 194 files, i18n OK); `pnpm e2e` 40/40 (1.1 min), zero console errors in fa + en.
 - Carries: `codecLab.*` Persian copy needs owner review; if the measured 30 s MDCT worker time exceeds the §9 budget, lower the cap and record it; `e2e/tools.spec.ts` still names “nine routes” although `TOOL_IDS` now holds ten (codec lab has its own spec). No real-codec UI yet — plans 02–04.
 - **Next step:** execute Wave 4 plan 02 — `docs/plans/wave-4/02-backend-real-codecs.md`.
+
+## 2026-11-02 — Wave 4 plan 02 complete (F04 backend real codecs)
+
+- Tasks 1–4 complete on `feat/wave-4`: codec specs/probe (`206dce9`), delay alignment (`21b8162`), `POST /api/v1/codec/encode` (`5a2b244`), and `/health.codecs` + regenerated OpenAPI/TS client (`4f5f133`).
+- Shipped: `codecs.py` resolves WAV/FLAC/MP3/AAC/Opus/Vorbis from `ffmpeg -encoders`, validates per-codec params, and encodes with fixed argument arrays. `alignment.py` finds delay by normalized FFT cross-correlation, returns the trim offsets and count, and the route stores only the aligned decoded excerpt under a fresh `audio_id`. Lossless bit-exactness is checked after alignment on the Int16 PCM reference; lossy results are never labelled exact.
+- Codec availability on the dev Mac (ffmpeg 9.0.2): `wav`, `flac`, `mp3`, `aac`, `opus`, `vorbis`. Native experimental Vorbis rejects mono, so its spec encodes as stereo and the decode path downmixes back to mono; `/health.codecs` reports it and the route round-trips it.
+- Measured encode time, 30 s 44.1 kHz mono, one run each: WAV 70 ms, FLAC 92 ms, MP3 231 ms, AAC 389 ms, Opus 196 ms, Vorbis 304 ms. Faster than the §9 interaction budget for the default excerpt; these are single-run observations, not a benchmark suite.
+- Health/API contract: `GET /health` now returns `{status, version, ffmpeg, codecs}`; OpenAPI includes `/codec/encode`, `CodecEncodeRequest`, `CodecEncodeResponse`; `client.ts` exports `CodecName`, `CodecParams`, `CodecEncodeRequest`, `CodecEncodeResponse`.
+- Test-infra fix: `test_codecs.py` clears the process-wide `available_encoders` cache around every test; without it a mocked empty probe leaked into the route tests when both files ran in one process.
+- Gates: backend `pytest` 133/133, `ruff` clean, `mypy` clean (25 source files); `pnpm check` exit 0 (dsp 966/966, web 298/298, scripts 13/13, i18n OK); `pnpm e2e` 40/40, zero console errors in fa + en.
+- Carries: Docker ffmpeg codec availability is not verified in this session — the runtime probe and `/health.codecs` degrade honestly, and a missing encoder returns `codec_unavailable`. Real-codec UI/e2e belongs to Plan 03. No perceptual metric (PESQ/ViSQOL) in this wave. No new Persian strings in Plan 02.
+- **Next step:** execute Wave 4 plan 03 — `docs/plans/wave-4/03-real-codec-ui-and-metrics.md`.

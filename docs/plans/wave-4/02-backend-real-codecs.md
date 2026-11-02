@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** done (2026-11-02; commits `206dce9`..`4f5f133`).
+
 **Goal:** `POST /api/v1/codec/encode` encodes a stored canonical excerpt with
 ffmpeg (FLAC, WAV, MP3, AAC, Opus, Vorbis), decodes it back to canonical WAV,
 measures codec delay by cross-correlation, trims the decoded result, verifies

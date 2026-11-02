@@ -208,3 +208,51 @@
 - Context: F09 lets a student edit Re, Im, magnitude or phase of DFT bins. An analysis window would smear a single bin into its neighbours and make “zero bin k” ambiguous; on the other hand, dropping Hermitian symmetry produces a complex IFFT result, while the playback lane only accepts real audio.
 - Decision: (1) `editSpectrum` analyses a rectangular-window frame zero-padded to `L = fftLengthSamples ?? nextPow2(N)`; no post-IFFT window compensation. (2) Hermitian ON mirrors `X[L−k] = conj X[k]` and zeroes the DC/Nyquist imaginary parts, so the result is exactly real. (3) Hermitian OFF is a labelled teaching mode: `editSpectrum` computes the complex IFFT, reports `imaginaryEnergyRatio = Σ(Im x)² / Σ(Re x)²`, returns the real part, and the view warns that only that part is played. (4) Edits stay band-based (Hz→bins via the op's `frequencyResolutionHz`); freehand brush drawing remains deferred, and the selection cap follows D-021.
 - Consequences: bin edits mean what the UI says, and presets (`zeroIm`, `zeroRe`, `zeroPhase`, `linearPhase`, `randomPhase`, `magnitudeOnly`, `phaseOnly`) are exact in the bin domain; brick-wall band masks ring (Gibbs), which the UI labels as expected. OFF is not a real-signal construction and must never be presented as one; its ratio quantifies exactly how much information the playable real part discards.
+
+## D-026 — Real-codec input uses `/ingest` with a 16-bit PCM excerpt
+
+- Date: 2026-11-02
+- Status: accepted (owner, Wave 4 brainstorm)
+- Context: F04 needs real MP3/AAC/Opus/Vorbis/FLAC encodes while the browser already owns a decoded source buffer. Sending raw browser buffers would duplicate the validated ingest path and its limits.
+- Decision: The client sends a mono **16-bit PCM WAV excerpt** through the existing `POST /ingest`; the returned `audio_id` is the codec route input. “Bit-exact” for lossless codecs means the decoded samples equal that 16-bit PCM grid reference exactly.
+- Consequences: codec rights reuse the ingest validation, TTL, and storage model; arbitrary float sources are compared on the quantized grid, which the UI states. The backend never accepts client-supplied paths.
+
+## D-027 — Codec delay is measured by normalized cross-correlation and trimmed
+
+- Date: 2026-11-02
+- Status: accepted (agent, Wave 4 Plan 02)
+- Context: real codecs add encoder delay/padding; comparing unaligned signals would corrupt bit-exactness and quality metrics.
+- Decision: `estimate_alignment` removes the mean of the first `min(length, 10 s)` samples, computes `scipy.signal.correlate(test, reference, mode="full", method="fft")`, and scores `|corr| / sqrt(E_ref·E_test)` over `|lag| ≤ 8192`. Ties prefer the smaller `|lag|`, then the negative lag. A positive lag means the decoded signal is delayed. The route trims both signals to the common range and returns `codec_delay_samples`, `reference_start_sample`, and `aligned_sample_count`.
+- Consequences: metrics and stored output are compared on the same sample range; delays longer than the search window are not recoverable and the best in-window overlap is reported honestly. Silent inputs yield lag 0; invalid or non-overlapping arrays raise `ValueError`.
+
+## D-028 — F05 metric definitions
+
+- Date: 2026-11-02
+- Status: accepted (agent, Wave 4 Plan 01; owner may review)
+- Context: PSNR and segmental SNR are ambiguous unless the peak and frame length are pinned, and codec comparisons must use one convention.
+- Decision: PSNR uses peak `1.0` (float full scale). Segmental SNR uses 20 ms frames. Both definitions appear in the UI and `docs/ALGORITHMS.md`; codec metrics compare the decoded result with the aligned 16-bit PCM reference.
+- Consequences: results are directly comparable across the hand-written and real-codec labs; a different peak convention would shift PSNR by a constant dB offset.
+
+## D-029 — Codec availability is exposed through `GET /health.codecs`
+
+- Date: 2026-11-02
+- Status: accepted (agent, Wave 4 Plan 02)
+- Context: a deployment image may lack an encoder; offering a control that always fails is worse than disabling it.
+- Decision: `available_codecs()` parses `ffmpeg -hide_banner -encoders` and `GET /health` returns the available public names as `codecs`. `resolve_codec` raises `codec_unavailable` when no preferred encoder is present. Native experimental Vorbis is used with `-strict -2`; because it rejects mono, the encoder spec duplicates to stereo and the decode path downmixes back to mono.
+- Consequences: the UI can disable unavailable codecs before the user tries them; a probed encoder may still fail for an unsupported input, which maps to `encode_failed` rather than a silent fallback.
+
+## D-030 — F06 is verification-only in Wave 4
+
+- Date: 2026-11-02
+- Status: accepted (owner, Wave 4 brainstorm)
+- Context: Wave 3 already shipped the processed lane, resample speed, time-stretch, pitch shift, and reverse; F06 remains in the Wave 4 milestone.
+- Decision: Wave 4 verifies F06 with existing unit/e2e coverage and marks it done; no new F06 feature work is added.
+- Consequences: Wave 4 scope stays focused on F04/F05; any F06 defect found during verification is fixed as a bug, not expanded into a redesign.
+
+## D-031 — Comparison batch: 30 s excerpt, sequential, cancellable
+
+- Date: 2026-11-02
+- Status: accepted (owner, Wave 4 brainstorm)
+- Context: comparing many codecs on a full 5-minute file would be slow and can exhaust browser/backend resources; concurrent encodes complicate progress and cancellation.
+- Decision: the comparison batch uses a 30 s excerpt and runs sequentially. Cancel stops scheduling new points and aborts the in-flight backend call. The current worker DSP call cannot be interrupted mid-transform.
+- Consequences: the comparison stays responsive and its progress is honest; it never implies full-file results, and the UI labels the excerpt.
