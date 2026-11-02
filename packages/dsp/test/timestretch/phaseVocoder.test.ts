@@ -222,7 +222,9 @@ describe("timeStretch content preservation", () => {
     for (let n = 0; n < stretched.length; n += 1) {
       const value: number | undefined = stretched[n];
       if (value === undefined) throw new Error(`sample ${n} missing`);
-      expect(Number.isFinite(value), `sample ${n} finite`).toBe(true);
+      if (!Number.isFinite(value)) {
+        throw new Error(`sample ${n} not finite`);
+      }
       maxAbs = Math.max(maxAbs, Math.abs(value));
     }
     for (let n = 0; n < noise.length; n += 1) {
