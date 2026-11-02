@@ -78,6 +78,11 @@ export function Sidebar() {
             {t("nav.metrics")}
           </NavLink>
         </li>
+        <li>
+          <NavLink to="/tools/ai" className={linkClass}>
+            {t("nav.ai")}
+          </NavLink>
+        </li>
       </ul>
     </nav>
   );

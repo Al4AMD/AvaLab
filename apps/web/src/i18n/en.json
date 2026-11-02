@@ -27,7 +27,8 @@
     "reverb": "Reverb",
     "spectrumEdit": "Spectrum editor",
     "codecLab": "Compression lab",
-    "metrics": "Quality metrics"
+    "metrics": "Quality metrics",
+    "ai": "AI lab"
   },
   "input": {
     "empty": {
@@ -128,6 +129,9 @@
     },
     "metrics": {
       "title": "Quality metrics"
+    },
+    "ai": {
+      "title": "AI lab"
     }
   },
   "codecLab": {
@@ -863,6 +867,70 @@
       "lossless": "A lossless codec still differs from the float original by 16-bit PCM quantization error; SNR is finite and PSNR is large.",
       "lossy": "Lower lossy bitrates raise MSE and lower SNR/PSNR; listen to the same result for the perceptual difference.",
       "bitrate": "Compare several codec settings and relate the metric change to the bitrate shown in the compression lab."
+    }
+  },
+  "ai": {
+    "tabsLabel": "AI tools",
+    "intro": "Run a pinned small model on the current audio. Each job uses a mono excerpt of at most 30 s; model output is an approximation, not an exact DSP operation.",
+    "excerpt": "Runs on the first {{seconds}} s of the loaded audio.",
+    "run": "Run",
+    "cancel": "Cancel",
+    "disclaimer": "AI output is an approximation. Compare it with the original and use it as a teaching aid, not as ground truth.",
+    "tab": {
+      "denoise": "Denoise",
+      "superres": "Super-resolution",
+      "separation": "Source separation",
+      "asr": "Speech to text (ASR)",
+      "neuralCodec": "Neural codec"
+    },
+    "placeholder": {
+      "denoise": "A cleaned copy of the excerpt will appear here. The speech denoiser works best on speech, and it can remove details that ASR needs.",
+      "superres": "A band-extended copy of the excerpt will appear here. This tab pairs with downsampling: it estimates the high band that the sampling rate removed.",
+      "separation": "Four stems (vocals, drums, bass, other) will appear here. CPU separation is slow and works on short excerpts.",
+      "asr": "A transcript of the speech excerpt will appear here. The bundled speech demo includes a reference transcript for WER.",
+      "neuralCodec": "The decoded neural-codec result will appear here. Compare its bitrate and quality with the traditional codecs in the compression lab."
+    },
+    "models": {
+      "offline": "Server unreachable: model tools stay disabled until the server is back.",
+      "loading": "Checking model availability…",
+      "error": "Model availability could not be checked.",
+      "unlisted": "This task has no model row.",
+      "ready": "{{state}} · {{modelId}}",
+      "missingHint": "Download the pinned models with `uv run --directory apps/api python scripts/download_models.py --all`, then reload.",
+      "state": {
+        "available": "Model ready",
+        "missing": "Model missing",
+        "loading": "Model loading",
+        "error": "Model error"
+      }
+    },
+    "job": {
+      "uploading": "Uploading the excerpt…",
+      "running": "Running… {{percent}}%",
+      "done": "Finished.",
+      "cancelled": "Cancelled."
+    },
+    "result": {
+      "title": "Job result"
+    },
+    "error": {
+      "excerpt_too_long": "The excerpt is longer than the 30 s limit.",
+      "backend_unavailable": "The server is unreachable.",
+      "protocol": "The server response could not be read.",
+      "stream_ended": "The event stream ended without a final status.",
+      "failed": "The AI job failed.",
+      "unknown": "Unexpected server error.",
+      "model_unavailable": "The model is unavailable; download it first.",
+      "job_not_found": "The job was not found.",
+      "job_cancelled": "The job was cancelled.",
+      "ml_failed": "Model inference failed.",
+      "ml_busy": "The job queue is full; try again later.",
+      "not_found": "The uploaded audio was not found.",
+      "invalid_request": "The request is invalid.",
+      "internal_error": "The server had an internal error.",
+      "duration_too_long": "The audio is longer than the allowed limit.",
+      "decode_failed": "The audio could not be decoded.",
+      "file_too_large": "The file is larger than the upload limit."
     }
   }
 }

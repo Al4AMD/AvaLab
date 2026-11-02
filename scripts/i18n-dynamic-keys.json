@@ -4,5 +4,6 @@
   "app.health.offline",
   "input.error",
   "input.demo",
-  "player.lane"
+  "player.lane",
+  "ai.error"
 ]
