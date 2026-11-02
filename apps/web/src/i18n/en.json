@@ -226,6 +226,22 @@
       "family": {
         "handwritten": "Hand-written",
         "real": "Real (ffmpeg)"
+      },
+      "run": "Run comparison",
+      "running": "Running comparison…",
+      "cancel": "Cancel",
+      "progress": "{{completed}}/{{total}}",
+      "offline": "The backend is offline; the batch uses hand-written codecs only.",
+      "chart": {
+        "title": "Rate–distortion",
+        "quality": "Quality metric",
+        "snr": "SNR",
+        "psnr": "PSNR",
+        "x": "Bitrate (kbps)",
+        "ySnr": "SNR (dB)",
+        "yPsnr": "PSNR (dB)",
+        "empty": "No finite quality points to plot yet.",
+        "aria": "Scatter plot of quality against stream bitrate"
       }
     },
     "theory": {

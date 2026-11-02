@@ -49,6 +49,12 @@ import {
   realRow,
   sortComparisonRows,
 } from "./comparison";
+import {
+  COMPARISON_EXCERPT_SECONDS,
+  defaultComparisonRequests,
+  runComparison,
+} from "./comparisonRunner";
+import { RateDistortionChart } from "./rateDistortionChart";
 
 const CONTROL_FOCUS_CLASSES =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
@@ -220,6 +226,12 @@ export function CodecLabView(): React.ReactElement {
   const [realResult, setRealResult] = useState<RealCodecViewResult | null>(null);
   const [realErrorKey, setRealErrorKey] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "ok" | "error">("idle");
+  const [batchRows, setBatchRows] = useState<ComparisonRow[] | null>(null);
+  const [batchStatus, setBatchStatus] = useState<"idle" | "running">("idle");
+  const [batchCompleted, setBatchCompleted] = useState(0);
+  const [batchTotal, setBatchTotal] = useState(0);
+  const [chartQuality, setChartQuality] = useState<"snrDb" | "psnrDb">("snrDb");
+  const batchAbortRef = useRef<AbortController | null>(null);
   const realRunIdRef = useRef(0);
   const realAbortRef = useRef<AbortController | null>(null);
 
@@ -234,6 +246,12 @@ export function CodecLabView(): React.ReactElement {
     setRealResult(null);
     setRealErrorKey(null);
     setCopyStatus("idle");
+    batchAbortRef.current?.abort();
+    batchAbortRef.current = null;
+    setBatchStatus("idle");
+    setBatchRows(null);
+    setBatchCompleted(0);
+    setBatchTotal(0);
     if (original === null) {
       return;
     }
@@ -265,11 +283,12 @@ export function CodecLabView(): React.ReactElement {
   useEffect(
     () => () => {
       realAbortRef.current?.abort();
+      batchAbortRef.current?.abort();
     },
     [],
   );
 
-  const comparisonRows = useMemo<ComparisonRow[]>(() => {
+  const singleComparisonRows = useMemo<ComparisonRow[]>(() => {
     const rows: ComparisonRow[] = [];
     if (result !== null) {
       rows.push(handwrittenRow(result.meta, `codecLab.codec.${result.meta.codec}`));
@@ -285,6 +304,8 @@ export function CodecLabView(): React.ReactElement {
     }
     return sortComparisonRows(rows);
   }, [result, realResult]);
+
+  const comparisonRows = sortComparisonRows(batchRows ?? singleComparisonRows);
 
   const realMetrics = useMemo<QualityMetrics | null>(() => {
     if (realResult === null) {
@@ -354,6 +375,7 @@ export function CodecLabView(): React.ReactElement {
           return;
         }
         setResult({ meta: outcome.meta, samples, settings: runSettings });
+        setBatchRows(null);
         setStatus("ready");
       },
       () => {
@@ -418,6 +440,7 @@ export function CodecLabView(): React.ReactElement {
           return;
         }
         setRealResult({ run, settings: runSettings });
+        setBatchRows(null);
         setRealStatus("ready");
       },
       (error: unknown) => {
@@ -430,6 +453,109 @@ export function CodecLabView(): React.ReactElement {
         );
       },
     );
+  }
+
+  function runBatch(): void {
+    if (
+      original === null ||
+      rangeEmpty ||
+      batchStatus === "running" ||
+      status === "running" ||
+      realStatus === "running"
+    ) {
+      return;
+    }
+    const startSample = settings.startSample;
+    const cappedEnd = Math.min(
+      settings.endSample,
+      startSample + Math.round(COMPARISON_EXCERPT_SECONDS * original.sampleRateHz),
+    );
+    if (cappedEnd <= startSample) {
+      return;
+    }
+    const requests = defaultComparisonRequests(realAvailable);
+    const controller = new AbortController();
+    batchAbortRef.current = controller;
+    setBatchRows([]);
+    setBatchCompleted(0);
+    setBatchTotal(requests.length);
+    setBatchStatus("running");
+    void runComparison(
+      {
+        samples: original.samples,
+        sampleRateHz: original.sampleRateHz,
+        startSample,
+        endSample: cappedEnd,
+      },
+      requests,
+      {
+        runHandwritten: async (request) => {
+          const ticket = useSessionStore.getState().deriveWithSourceSlice(
+            "codecLabProcess",
+            {
+              codec: request.codec,
+              sampleRateHz: original.sampleRateHz,
+              startSample,
+              endSample: cappedEnd,
+              mdctBitsPerSecond: request.mdctBitsPerSecond,
+            },
+            startSample,
+            cappedEnd,
+          );
+          const outcome = await ticket.outcome;
+          if ("cancelled" in outcome) {
+            throw new Error("codecLabProcess cancelled");
+          }
+          return outcome.meta;
+        },
+        runReal: async (request) =>
+          runRealCodec(
+            {
+              samples: original.samples.subarray(startSample, cappedEnd),
+              sampleRateHz: original.sampleRateHz,
+              startSample,
+              endSample: cappedEnd,
+            },
+            request.params,
+            { signal: controller.signal },
+          ),
+        signal: controller.signal,
+        onProgress: (completed, total, row) => {
+          if (batchAbortRef.current !== controller) {
+            return;
+          }
+          setBatchCompleted(completed);
+          setBatchTotal(total);
+          setBatchRows((previous) => [...(previous ?? []), row]);
+        },
+      },
+    ).then(
+      (rows) => {
+        if (batchAbortRef.current !== controller) {
+          return;
+        }
+        batchAbortRef.current = null;
+        setBatchRows(rows);
+        setBatchCompleted(rows.length);
+        setBatchStatus("idle");
+      },
+      () => {
+        if (batchAbortRef.current === controller) {
+          batchAbortRef.current = null;
+          setBatchStatus("idle");
+        }
+      },
+    );
+  }
+
+  function cancelBatch(): void {
+    const controller = batchAbortRef.current;
+    if (controller === null) {
+      return;
+    }
+    batchAbortRef.current = null;
+    controller.abort();
+    setBatchStatus("idle");
   }
 
   function playRealResult(): void {
@@ -995,19 +1121,64 @@ export function CodecLabView(): React.ReactElement {
       <div className="rounded border border-surface p-3 text-sm" data-testid="codecLab.comparison">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-semibold">{t("codecLab.comparison.title")}</h3>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            data-testid="codecLab.comparison.copy"
-            disabled={comparisonRows.length === 0}
-            onClick={() => {
-              void copyComparison();
-            }}
-          >
-            {t("codecLab.comparison.copy")}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              data-testid="codecLab.comparison.run"
+              disabled={
+                batchStatus === "running" ||
+                rangeEmpty ||
+                status === "running" ||
+                realStatus === "running"
+              }
+              onClick={runBatch}
+            >
+              {batchStatus === "running"
+                ? t("codecLab.comparison.running")
+                : t("codecLab.comparison.run")}
+            </Button>
+            {batchStatus === "running" ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                data-testid="codecLab.comparison.cancel"
+                onClick={cancelBatch}
+              >
+                {t("codecLab.comparison.cancel")}
+              </Button>
+            ) : null}
+            <span
+              data-testid="codecLab.comparison.progress"
+              dir="ltr"
+              className="text-xs tabular-nums text-muted"
+            >
+              {t("codecLab.comparison.progress", {
+                completed: batchCompleted,
+                total: batchTotal,
+              })}
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              data-testid="codecLab.comparison.copy"
+              disabled={comparisonRows.length === 0}
+              onClick={() => {
+                void copyComparison();
+              }}
+            >
+              {t("codecLab.comparison.copy")}
+            </Button>
+          </div>
         </div>
+        {!backendOnline ? (
+          <p data-testid="codecLab.comparison.offline" className="mt-2 text-xs text-muted">
+            {t("codecLab.comparison.offline")}
+          </p>
+        ) : null}
         {copyStatus === "ok" ? (
           <p
             data-testid="codecLab.comparison.copyStatus"
@@ -1112,6 +1283,28 @@ export function CodecLabView(): React.ReactElement {
             </table>
           </div>
         )}
+        {comparisonRows.length > 0 ? (
+          <div className="mt-3 border-t border-surface pt-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h4 className="font-semibold">{t("codecLab.comparison.chart.title")}</h4>
+              <label className="flex items-center gap-2 text-xs">
+                <span>{t("codecLab.comparison.chart.quality")}</span>
+                <select
+                  data-testid="codecLab.comparison.chart.quality"
+                  className={INPUT_CLASSES}
+                  value={chartQuality}
+                  onChange={(event) => {
+                    setChartQuality(event.target.value === "psnrDb" ? "psnrDb" : "snrDb");
+                  }}
+                >
+                  <option value="snrDb">{t("codecLab.comparison.chart.snr")}</option>
+                  <option value="psnrDb">{t("codecLab.comparison.chart.psnr")}</option>
+                </select>
+              </label>
+            </div>
+            <RateDistortionChart rows={comparisonRows} quality={chartQuality} />
+          </div>
+        ) : null}
       </div>
 
       <details className="rounded border border-surface p-3 text-sm">

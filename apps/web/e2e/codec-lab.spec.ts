@@ -113,6 +113,26 @@ test("Persian: real codecs are disabled with an offline hint when no backend is 
   expect(errors).toEqual([]);
 });
 
+test("Persian: the comparison batch fills the table and rate-distortion chart", async ({
+  page,
+}) => {
+  const errors = watchForErrors(page);
+  await page.goto("/tools/codec-lab");
+  await loadChirp(page);
+  await expect(page.getByTestId("codecLab.comparison.empty")).toBeVisible();
+
+  await page.getByTestId("codecLab.comparison.run").click();
+  await expect(page.getByTestId("codecLab.comparison.progress")).toHaveText("8/8", {
+    timeout: 60_000,
+  });
+  await expect(page.locator('[data-testid^="codecLab.comparison.row."]')).toHaveCount(8);
+  await expect(page.getByTestId("codecLab.comparison.chart")).toBeVisible();
+  await expect(
+    page.getByTestId("codecLab.comparison.chart").locator("canvas").first(),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test("English (LTR): the codec lab encodes with zero console errors", async ({ page }) => {
   const errors = watchForErrors(page);
   await page.addInitScript(() => {
