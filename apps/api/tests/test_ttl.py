@@ -72,7 +72,7 @@ def make_client(
     ``monkeypatch`` is required so ``create_app`` and the lifespan sweeper both
     see the pinned settings.
     """
-    settings = Settings(storage_dir=storage_root, **settings_overrides)
+    settings = Settings(storage_dir=storage_root).model_copy(update=settings_overrides)
     monkeypatch.setattr("avalab_api.main.get_settings", lambda: settings)
     app = create_app()
     app.dependency_overrides[get_settings] = lambda: settings
