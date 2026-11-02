@@ -67,6 +67,7 @@ class ModelRegistry:
 
 _BUILTIN_FACTORIES: dict[MlTask, tuple[str, str]] = {
     "denoise": ("avalab_api.ml.denoise", "load_dpdfnet"),
+    "superres": ("avalab_api.ml.superres", "load_lavasr"),
 }
 
 

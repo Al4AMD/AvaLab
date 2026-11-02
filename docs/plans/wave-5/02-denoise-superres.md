@@ -1,6 +1,6 @@
 # Wave 5 · Plan 02 — Denoise and super-resolution
 
-**Status:** in progress — Tasks 1–2 done.
+**Status:** in progress — Tasks 1–3 done.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -87,11 +87,11 @@
   - Resamples input to model input rate, runs, resamples to source rate, trims/pads.
 - Real-model test verifies non-finite absence and that output high-band energy increases on a band-limited speech fixture.
 
-- [ ] **Step 1: Write `test_ml_superres.py`** with a fake enhancer seam: rate restoration, length preservation, silence, short input; a unit test reads and records `input_sample_rate_hz`/`output_sample_rate_hz`; real-model test marked `ml`.
-- [ ] **Step 2: Run** focused tests — expected FAIL.
-- [ ] **Step 3: Implement the adapter**; if `audiosronnx` only exposes `load_sr`, wrap it and document the pinned local path.
-- [ ] **Step 4: Run** focused tests, `ruff`, `mypy` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F14): add LavaSR super-resolution adapter`.
+- [x] **Step 1: Write `test_ml_superres.py`** with a fake enhancer seam: rate restoration, length preservation, silence, short input; a unit test reads and records `input_sample_rate_hz`/`output_sample_rate_hz`; real-model test marked `ml`.
+- [x] **Step 2: Run** focused tests — expected FAIL.
+- [x] **Step 3: Implement the adapter**; if `audiosronnx` only exposes `load_sr`, wrap it and document the pinned local path.
+- [x] **Step 4: Run** focused tests, `ruff`, `mypy` — expected PASS.
+- [x] **Step 5: Commit** `feat(F14): add LavaSR super-resolution adapter`.
 
 ### Task 4: Sinc baseline worker op
 
