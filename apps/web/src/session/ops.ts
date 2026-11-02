@@ -720,6 +720,23 @@ export type SpeedTransformResult = {
   payload?: TransferablePayload;
 };
 
+/** F14 sinc super-resolution baseline: band-limited input -> target rate via
+ * the same kaiser-sinc path the sampling lab uses. No model, fully offline. */
+export type SuperresBaselineParams = {
+  sampleRateHz: number;
+  targetRateHz: number;
+};
+export type SuperresBaselineResult = {
+  meta: {
+    sampleCount: number;
+    sampleRateHz: number;
+    inputSampleRateHz: number;
+    delaySamples: number;
+    elapsedMs: number;
+  };
+  payload?: TransferablePayload;
+};
+
 export type ExtentOperation =
   | { operation: "identity" }
   | { operation: "shift"; shiftSamples: number }
@@ -1256,6 +1273,67 @@ export function speedTransform(
       actualSpeedFactor,
       elapsedMs,
       capped: false,
+    },
+    payload: { buffer: out.buffer, byteOffset: 0, byteLength: out.byteLength },
+  };
+}
+
+/** Upsample `payload` from `sampleRateHz` to `targetRateHz` with the pinned
+ * kaiser-sinc low-pass (`resampleRational`, filter "kaiserSinc"). This is the
+ * non-AI baseline for F14 super-resolution: it restores the sample rate but
+ * NOT the bandwidth a downsample already destroyed. */
+export function superresBaseline(
+  params: SuperresBaselineParams,
+  payload?: TransferablePayload,
+): SuperresBaselineResult {
+  if (
+    params === undefined ||
+    params === null ||
+    !Number.isFinite(params.sampleRateHz) ||
+    !Number.isInteger(params.sampleRateHz) ||
+    params.sampleRateHz <= 0 ||
+    params.sampleRateHz > 96_000 ||
+    !Number.isFinite(params.targetRateHz) ||
+    !Number.isInteger(params.targetRateHz) ||
+    params.targetRateHz <= 0 ||
+    params.targetRateHz > 96_000
+  ) {
+    throw new DspOpError("badParams", `superresBaseline: invalid params ${String(params)}`);
+  }
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "superresBaseline: a Float32 source payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError("badPayload", "superresBaseline: payload must be Float32-aligned");
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  for (let index = 0; index < samples.length; index += 1) {
+    if (!Number.isFinite(samples[index])) {
+      throw new DspOpError("badParams", `superresBaseline: samples[${index}] is not finite`);
+    }
+  }
+
+  const startedMs = performance.now();
+  let output: Float64Array;
+  try {
+    output = resampleRational(Float64Array.from(samples), {
+      inputRateHz: params.sampleRateHz,
+      outputRateHz: params.targetRateHz,
+      filter: "kaiserSinc",
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new DspOpError("badParams", `superresBaseline: ${detail}`);
+  }
+  const elapsedMs = performance.now() - startedMs;
+  const out = Float32Array.from(output);
+  return {
+    meta: {
+      sampleCount: out.length,
+      sampleRateHz: params.targetRateHz,
+      inputSampleRateHz: params.sampleRateHz,
+      delaySamples: 0,
+      elapsedMs,
     },
     payload: { buffer: out.buffer, byteOffset: 0, byteLength: out.byteLength },
   };
@@ -1932,6 +2010,13 @@ export const dspOps = {
     },
     result: undefined as unknown as GenerateSynthResult,
     handler: generateSynth,
+  },
+  superresBaseline: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: { sampleRateHz: 0, targetRateHz: 0 },
+    result: undefined as unknown as SuperresBaselineResult,
+    handler: superresBaseline,
   },
   speedTransform: {
     // Type lenses only — the table is read for types (DspOpParams/Result);

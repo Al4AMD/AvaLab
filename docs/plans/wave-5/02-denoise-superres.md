@@ -105,11 +105,11 @@
 - Result: `{ samples: Float32Array; sampleRateHz: number; delaySamples: number }`.
 - Implementation converts the payload to `Float64Array`, calls `resampleRational(..., { filter: "kaiserSinc" })`, and returns a `Float32Array`; no new dependency.
 
-- [ ] **Step 1: Write the failing op test** with a 1 kHz sine at 8 kHz → 48 kHz; assert length ratio, finite samples, peak near 1 kHz, and no aliasing image.
-- [ ] **Step 2: Run** `pnpm --filter @avalab/web exec vitest run src/session/ops.superresBaseline` — expected FAIL.
-- [ ] **Step 3: Implement the op** and export its types.
-- [ ] **Step 4: Run** `pnpm check` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F14): add sinc super-resolution baseline op`.
+- [x] **Step 1: Write the failing op test** with a 1 kHz sine at 8 kHz → 48 kHz; assert length ratio, finite samples, peak near 1 kHz, and no aliasing image.
+- [x] **Step 2: Run** `pnpm --filter @avalab/web exec vitest run src/session/ops.superresBaseline` — expected FAIL.
+- [x] **Step 3: Implement the op** and export its types.
+- [x] **Step 4: Run** `pnpm check` — expected PASS.
+- [x] **Step 5: Commit** `feat(F14): add sinc super-resolution baseline op`.
 
 ### Task 5: Super-resolution UI and experiment link
 

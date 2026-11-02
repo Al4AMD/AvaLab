@@ -40,6 +40,7 @@ import {
   spectrogramTiles,
   spectrumEdit,
   speedTransform,
+  superresBaseline,
   waveformOverview,
   waveformRange,
   windowProfiles,
@@ -74,6 +75,7 @@ const dspHandlers = {
   sessionPing,
   speedTransform,
   spectrumEdit,
+  superresBaseline,
   spectrogramTiles,
   waveformOverview,
   waveformRange,
@@ -175,6 +177,10 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
       }
       case "speedTransform": {
         const result = dspHandlers.speedTransform(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "superresBaseline": {
+        const result = dspHandlers.superresBaseline(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       case "samplingProcess": {
