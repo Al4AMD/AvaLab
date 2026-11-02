@@ -47,11 +47,11 @@
   - stems ordered `drums, bass, other, vocals`.
 - The job manager persists each stem via `write_result_wav`; the done event carries `stems: [{name, result_audio_id, sample_rate_hz}]` in the fixed order.
 
-- [ ] **Step 1: Write `test_ml_separation.py`** with a fake separator: four stems, order, stereo duplication, rate restoration, length preservation; a stem failure raises `ml_failed`; real-model test marked `ml`.
-- [ ] **Step 2: Run** focused tests — expected FAIL.
-- [ ] **Step 3: Implement the adapter** with lazy `demucs` import and local weight resolution.
-- [ ] **Step 4: Run** focused tests, `ruff`, `mypy` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F14): add htdemucs separation adapter`.
+- [x] **Step 1: Write `test_ml_separation.py`** with a fake separator: four stems, order, stereo duplication, rate restoration, length preservation; a stem failure raises `ml_failed`; real-model test marked `ml`.
+- [x] **Step 2: Run** focused tests — expected FAIL.
+- [x] **Step 3: Implement the adapter** with lazy `demucs` import and local weight resolution.
+- [x] **Step 4: Run** focused tests, `ruff`, `mypy` — expected PASS.
+- [x] **Step 5: Commit** `feat(F14): add htdemucs separation adapter`.
 
 ### Task 2: Separation UI
 
