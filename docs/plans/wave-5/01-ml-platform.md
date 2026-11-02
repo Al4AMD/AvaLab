@@ -91,7 +91,7 @@
 - `ModelSpec(task, model_id, revision, license, size_bytes, files, loader_name)`.
 - `MODEL_SPECS: dict[MlTask, ModelSpec]` pins:
   - denoise: `Ceva-IP/DPDFNet` @ `dd6818d00f50c836fed43a6243ebe49116de5964`, `onnx/dpdfnet2_48khz_hr.onnx`, Apache-2.0, ~10.6 MB.
-  - superres: `YatharthS/LavaSR` @ `b98dc8be472da45ab7b6346ad7997e1dfeb5911d`, `enhancer_v2`, Apache-2.0, 56.3 MB; note the ONNX repo license gap.
+  - superres: `TigreGotico/audiosronnx-lavasr` @ `b3df8a262cf44e59bf84a40b7084f4479ca566b4`, `backbone.onnx` + `spec_head.onnx` + `denoiser_core.onnx`, Apache-2.0 (upstream LavaSR), 57.1 MB; the ONNX repo card has no license field (D-040).
   - separation: `adefossez/HTDemucs` @ `cbc8a9b1a87023b7fd74e7b3412e6321c0eab003`, 84 MB; note upstream MIT / card gap.
   - asr: `openai/whisper-tiny` @ `169d4a4341b33bc18d8881c4b69c2e104e1cc0af`, Apache-2.0, 151.1 MB.
   - neural_codec: `facebook/encodec_48khz` @ `c3def8e7185ac8c8efdce6eb8c4a651e487a503e`, MIT, 76.3 MB.

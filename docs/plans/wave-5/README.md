@@ -45,6 +45,11 @@ F14 tool surfaces from 02–03.
   bandwidth extension.
 - **D-038:** F16 share links encode only bundled demo clips (`demoId`), never
   user uploads. Unknown ids fall back to the normal empty state.
+- **D-040:** Super-resolution downloads the ONNX artifacts from
+  `TigreGotico/audiosronnx-lavasr` (the repo `audiosronnx` actually pins),
+  not the upstream PyTorch-only `YatharthS/LavaSR`. The ONNX repo card has no
+  license field; upstream LavaSR and the package declare Apache-2.0. Record
+  the gap and use the local flat files with `audiosronnx`.
 - **D-039:** Intel-macOS CPU compatibility is explicit. PyTorch stopped
   publishing Intel-mac wheels after 2.2.2, and that wheel requires NumPy 1.x.
   On `darwin`/`x86_64` the API therefore resolves `numpy>=1.26,<2`,
