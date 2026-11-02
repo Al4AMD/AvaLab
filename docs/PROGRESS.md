@@ -165,9 +165,13 @@ Wave 3 additions (machine-drafted, agent):
 - `reverb.*` (F10 reverse/reverb lab), `nav.reverb`, `tool.reverb.title`
 - `spectrumEdit.*` (F09 spectrum editor), `nav.spectrumEdit`, `tool.spectrumEdit.title`
 
+Wave 4 plan 01 additions (machine-drafted, agent):
+
+- `codecLab.*` (F04 browser codec lab), `nav.codecLab`, `tool.codecLab.title`
+
 ## Next recommended step
 
-Wave 3 is complete and merged to `main` (PR #9, merge `834b426`). Wave 4 is planned in `docs/plans/wave-4/` (F04 codecs, F05 metrics UI, rate–distortion, F06 verification). Next: **execute Wave 4 plan 01** — `docs/plans/wave-4/01-browser-codec-lab.md`. Do not begin while any check is failing.
+Wave 4 plan 01 is complete on `feat/wave-4` (browser codec lab, F04). Next: **execute Wave 4 plan 02** — `docs/plans/wave-4/02-backend-real-codecs.md` (ffmpeg codec specs, capability probe, `/codec/encode`, delay alignment). Do not begin while any check is failing.
 
 ## Session log
 
@@ -365,3 +369,13 @@ Wave 3 is complete and merged to `main` (PR #9, merge `834b426`). Wave 4 is plan
   cross-correlation delay/trim; PSNR peak 1.0 and 20 ms segmental frames;
   `/health.codecs`; F06 verify-only; 30 s sequential comparison batch.
 - No code or dependencies changed. Next: execute plan 01.
+
+## 2026-11-02 — Wave 4 plan 01 complete (F04 browser codec lab)
+
+- Tasks 1–4 complete on `feat/wave-4`: PCM/WAV seam (`15d80ce`), `codecLabProcess` worker op (`827995e`), `/tools/codec-lab` view + URL state + en/fa copy (`8f34c54`), and Persian/English e2e (`05f8389`).
+- The lab runs RLE, canonical Huffman, delta+Huffman, μ-law, A-law, and the MDCT toy codec in the worker; it shows bit-exact status, size/bitrate/ratio, entropy, MSE/SNR/segmental SNR/PSNR, byte histogram, Huffman code lengths, and MDCT sparsity/frame count. Lossless round-trips are bit-exact on the Int16 PCM grid; companding and MDCT are labelled lossy.
+- Stats convention: `bitsPerSample = 8·compressedSizeBytes/N`; Huffman/delta count the 256-byte codebook table; MDCT counts the Huffman table plus 8 bytes per frame step. PSNR uses peak 1.0 and segmental SNR 20 ms frames (D-028). The op caps a processed selection at 30 s (`badParams`); this is a preview decision, not a codec limit.
+- Test-infra fix: the phase-vocoder noise check no longer calls a matcher per sample (192 k samples exceeded its 24 s timeout); it now fails fast on the first non-finite sample and still asserts the same 10× RMS bound. Focused file 16/16.
+- Gates: `pnpm check` exit 0 (dsp 966/966, web 298/298, scripts 13/13, biome 194 files, i18n OK); `pnpm e2e` 40/40 (1.1 min), zero console errors in fa + en.
+- Carries: `codecLab.*` Persian copy needs owner review; if the measured 30 s MDCT worker time exceeds the §9 budget, lower the cap and record it; `e2e/tools.spec.ts` still names “nine routes” although `TOOL_IDS` now holds ten (codec lab has its own spec). No real-codec UI yet — plans 02–04.
+- **Next step:** execute Wave 4 plan 02 — `docs/plans/wave-4/02-backend-real-codecs.md`.

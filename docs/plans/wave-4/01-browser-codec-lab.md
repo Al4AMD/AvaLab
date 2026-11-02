@@ -9,6 +9,8 @@ ratio, entropy, encode/decode time, bit-exact status, the byte histogram,
 Huffman code lengths, and MDCT coefficient sparsity; the decoded audio plays
 through the existing processed lane.
 
+**Status:** done (2026-11-02; commits `15d80ce`..`05f8389`).
+
 **Architecture:** All codecs already exist in `packages/dsp`. This plan adds
 one pure PCM/WAV helper module and one worker op (`codecLabProcess`) that
 converts the source excerpt to the 16-bit PCM grid, runs the chosen codec,

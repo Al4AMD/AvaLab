@@ -7,7 +7,7 @@ verification.
 
 | Plan | Scope | Status |
 |---|---|---|
-| `01-browser-codec-lab.md` | PCM/WAV helpers, `codecLabProcess` worker op, hand-written codec lab UI | **planned** |
+| `01-browser-codec-lab.md` | PCM/WAV helpers, `codecLabProcess` worker op, hand-written codec lab UI | **done** (2026-11-02; commits `15d80ce`..`05f8389`) |
 | `02-backend-real-codecs.md` | ffmpeg codec specs, capability probe, `/codec/encode`, delay alignment | **planned** |
 | `03-real-codec-ui-and-metrics.md` | Real-codec panel, backend excerpt lane, F05 metrics view | **planned** |
 | `04-comparison-rate-distortion-closeout.md` | Comparison table, rate–distortion chart, F06 verification, close-out | **planned** |
