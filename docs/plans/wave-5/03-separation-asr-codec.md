@@ -67,11 +67,11 @@
 - Four stem rows with play buttons; selecting a stem fetches `GET /audio/{stem.result_audio_id}` and calls `setProcessed`.
 - Shows “CPU may take several minutes” ETA note and model id.
 
-- [ ] **Step 1: Write component tests** for four stems, play sets processed source, error row, disabled model, cancel.
-- [ ] **Step 2: Run** focused tests — expected FAIL.
-- [ ] **Step 3: Implement the tab + `ai.separation.*` keys.**
-- [ ] **Step 4: Run** `pnpm check` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F14): add stem separation tab`.
+- [x] **Step 1: Write component tests** for four stems, play sets processed source, error row, disabled model, cancel.
+- [x] **Step 2: Run** focused tests — expected FAIL.
+- [x] **Step 3: Implement the tab + `ai.separation.*` keys.**
+- [x] **Step 4: Run** `pnpm check` — expected PASS.
+- [x] **Step 5: Commit** `feat(F14): add stem separation tab`.
 
 ### Task 3: Whisper ASR adapter and WER util
 

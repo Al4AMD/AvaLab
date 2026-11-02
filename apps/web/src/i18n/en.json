@@ -983,6 +983,24 @@
         "restored": "Restored"
       }
     },
+    "separation": {
+      "intro": "Source separation splits the mono excerpt into four stems with htdemucs. It is slow on CPU, so each run is capped at 15 s; the stems stay aligned with the original and are stored separately.",
+      "loadDemo": "Load 15 s music demo",
+      "demoLoading": "Loading demo…",
+      "model": "Model: {{modelId}}",
+      "modelMissing": "The separation model is not downloaded. Fetch it with the command below, then reload.",
+      "noSource": "Load audio, or use the music demo, to separate stems.",
+      "eta": "CPU separation may take several minutes. Stay on this tab until the job finishes, or cancel it.",
+      "stemRate": "{{rate}} kHz",
+      "play": "Play",
+      "installFailed": "The selected stem could not be loaded.",
+      "stems": {
+        "drums": "Drums",
+        "bass": "Bass",
+        "other": "Other",
+        "vocals": "Vocals"
+      }
+    },
     "caption": {
       "approximation": "AI-generated approximation: compare it with the original before drawing conclusions."
     }
