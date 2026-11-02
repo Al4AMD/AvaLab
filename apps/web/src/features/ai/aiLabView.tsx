@@ -16,6 +16,7 @@ import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
 import { AI_MAX_EXCERPT_SECONDS, type AiModelInfo, type AiModelState, aiClient } from "./aiClient";
 import { AI_TASKS, type AiTask, aiTaskFromSearch } from "./aiState";
+import { AsrTab } from "./asrTab";
 import { DenoiseTab } from "./denoiseTab";
 import { SeparationTab } from "./separationTab";
 import { SuperresTab } from "./superresTab";
@@ -220,7 +221,10 @@ export function AiLabView(): React.ReactElement {
         ))}
       </div>
 
-      {task === "denoise" || task === "superres" || task === "separation" ? null : (
+      {task === "denoise" ||
+      task === "superres" ||
+      task === "separation" ||
+      task === "asr" ? null : (
         <p data-testid="ai.placeholder" className="text-sm">
           {placeholder(t, task)}
         </p>
@@ -239,6 +243,8 @@ export function AiLabView(): React.ReactElement {
         <SuperresTab backendOnline={backendOnline} model={model} />
       ) : task === "separation" ? (
         <SeparationTab backendOnline={backendOnline} model={model} />
+      ) : task === "asr" ? (
+        <AsrTab backendOnline={backendOnline} model={model} />
       ) : original === null ? (
         <UploadEmptyState />
       ) : (

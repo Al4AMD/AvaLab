@@ -25,9 +25,11 @@ function editDistance(reference: readonly string[], hypothesis: readonly string[
   for (let row = 1; row <= reference.length; row += 1) {
     const current = [row];
     for (let column = 1; column <= hypothesis.length; column += 1) {
-      const substitution =
-        previous[column - 1] + (reference[row - 1] === hypothesis[column - 1] ? 0 : 1);
-      current.push(Math.min(previous[column] + 1, current[column - 1] + 1, substitution));
+      const diagonal = previous[column - 1] ?? 0;
+      const substitution = diagonal + (reference[row - 1] === hypothesis[column - 1] ? 0 : 1);
+      current.push(
+        Math.min((previous[column] ?? 0) + 1, (current[column - 1] ?? 0) + 1, substitution),
+      );
     }
     previous = current;
   }

@@ -109,11 +109,11 @@
 - Run ASR; render transcript and segments; if reference present, show WER and a warning for empty reference.
 - “Use compressed input” hint links to the codec lab for E3; no automatic multi-codec batch in this task.
 
-- [ ] **Step 1: Write component tests** for transcript, segments, reference fetch, WER, missing reference, disabled model.
-- [ ] **Step 2: Run** focused tests — expected FAIL.
-- [ ] **Step 3: Implement the tab + `ai.asr.*` keys.**
-- [ ] **Step 4: Run** `pnpm check` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F14): add ASR transcript and WER tab`.
+- [x] **Step 1: Write component tests** for transcript, segments, reference fetch, WER, missing reference, disabled model.
+- [x] **Step 2: Run** focused tests — expected FAIL.
+- [x] **Step 3: Implement the tab + `ai.asr.*` keys.**
+- [x] **Step 4: Run** `pnpm check` — expected PASS.
+- [x] **Step 5: Commit** `feat(F14): add ASR transcript and WER tab`.
 
 ### Task 5: Encodec neural-codec adapter
 

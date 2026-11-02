@@ -1001,6 +1001,26 @@
         "vocals": "Vocals"
       }
     },
+    "asr": {
+      "intro": "Speech recognition runs Whisper tiny on the first 30 s of the source. The tab shows the transcript, timestamped segments, and — for the bundled speech demo — the word error rate (WER) against its reference transcript.",
+      "loadDemo": "Load speech demo",
+      "demoLoading": "Loading demo…",
+      "model": "Model: {{modelId}}",
+      "modelMissing": "The ASR model is not downloaded. Fetch it with the command below, then reload.",
+      "noSource": "Load audio, or use the speech demo, to transcribe speech.",
+      "transcript": "Transcript",
+      "language": "Language: {{language}}",
+      "segments": "Segments",
+      "segmentRange": "{{start}}–{{end}} s",
+      "reference": "Reference transcript",
+      "referenceLoading": "Loading the reference transcript…",
+      "referenceMissing": "The reference transcript is unavailable; WER is not computed.",
+      "referenceEmpty": "The reference transcript is empty; WER is not computed.",
+      "wer": "WER: {{percent}}%",
+      "werHint": "Normalized for Unicode form, case, punctuation and whitespace; WER = (S + D + I) / N.",
+      "compressedHint": "For E3, compress this clip in the codec lab, load the decoded WAV, then run ASR again.",
+      "openCodecLab": "Open codec lab"
+    },
     "caption": {
       "approximation": "AI-generated approximation: compare it with the original before drawing conclusions."
     }
