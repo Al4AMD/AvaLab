@@ -132,11 +132,11 @@
 - `demoDeepLink` reads `?demo=`, validates the id, loads once per navigation, and removes nothing from the URL.
 - Demo row gets a “Copy share link” button per clip; uploads never show it.
 
-- [ ] **Step 1: Write tests** for round-trip, unknown demo fallback, no upload serialization, one-load guard, and `demoId` stored on the source.
-- [ ] **Step 2: Run** focused tests — expected FAIL.
-- [ ] **Step 3: Implement the store/loader/share/deep-link changes and UI.**
-- [ ] **Step 4: Run** `pnpm check` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F16): add demo share links`.
+- [x] **Step 1: Write tests** for round-trip, unknown demo fallback, no upload serialization, one-load guard, and `demoId` stored on the source.
+- [x] **Step 2: Run** focused tests — expected FAIL.
+- [x] **Step 3: Implement the store/loader/share/deep-link changes and UI.**
+- [x] **Step 4: Run** `pnpm check` — expected PASS.
+- [x] **Step 5: Commit** `feat(F16): add demo share links`.
 
 ### Task 6: WAV and chart PNG export
 
