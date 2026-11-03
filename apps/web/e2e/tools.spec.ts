@@ -96,6 +96,12 @@ const TOOLS: ToolSpec[] = [
     label: /(هوش مصنوعی|AI lab)/,
     title: /(هوش مصنوعی|AI lab)/,
   },
+  {
+    path: "/experiments",
+    url: /\/experiments$/,
+    label: /(آزمایش‌های هدایت‌شده|Guided experiments)/,
+    title: /(آزمایش‌های هدایت‌شده|Guided experiments)/,
+  },
 ];
 
 function watchForErrors(page: Page): string[] {

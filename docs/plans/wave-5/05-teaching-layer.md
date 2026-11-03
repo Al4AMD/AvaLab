@@ -1,6 +1,6 @@
 # Wave 5 · Plan 05 — Teaching layer (F16)
 
-**Status:** pending.
+**Status:** done.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [x]`) syntax for tracking.
 
@@ -167,10 +167,10 @@
 - Modify: `apps/web/e2e/tools.spec.ts`
 - Modify: `docs/PROGRESS.md`
 
-- [ ] **Step 1: E2E** `/experiments`, theory panel, demo share link load, WAV/PNG download, both locales, zero console errors.
-- [ ] **Step 2: Run** `pnpm check`, `pnpm e2e` — expected PASS.
-- [ ] **Step 3: Update `PROGRESS.md` and flag Persian copy.**
-- [ ] **Step 4: Commit** `test(F16): verify teaching layer`.
+- [x] **Step 1: E2E** `/experiments`, theory panel, demo share link load, WAV/PNG download, both locales, zero console errors.
+- [x] **Step 2: Run** `pnpm check`, `pnpm e2e` — expected PASS.
+- [x] **Step 3: Update `PROGRESS.md` and flag Persian copy.**
+- [x] **Step 4: Commit** `test(F16): verify teaching layer`.
 
 ## Completion Gate
 

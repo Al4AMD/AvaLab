@@ -12,7 +12,7 @@ CPU is the floor (D-002).
 | `02-denoise-superres.md` | DPDFNet denoise and LavaSR super-resolution adapters + UI, sinc baseline | **done** |
 | `03-separation-asr-codec.md` | htdemucs separation, Whisper tiny ASR + WER, Encodec neural codec + rate–distortion point | **done** |
 | `04-filter-lab.md` | F11 worker ops, state/URL, filter-design UI, pole-zero/stability | **done** |
-| `05-teaching-layer.md` | F16 theory framework, F11/F14 theory, `/experiments`, demo share, WAV/PNG export | **pending** |
+| `05-teaching-layer.md` | F16 theory framework, F11/F14 theory, `/experiments`, demo share, WAV/PNG export | **done** |
 | `06-closeout.md` | Full gates, docs, offline/model smoke, Docker smoke, Persian review list | **pending** |
 
 Execution order: 01 → 02 → 03 → 04 → 05 → 06. Plan 04 is independent of the

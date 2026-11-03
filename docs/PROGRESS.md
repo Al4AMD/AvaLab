@@ -174,9 +174,16 @@ Wave 4 plan 03 additions (machine-drafted, agent):
 - `codecLab.real.*` (real-codec panel), `codecLab.error.*` (stable backend error codes)
 - `metrics.*` (F05 metrics lab), `nav.metrics`, `tool.metrics.title`
 
+Wave 5 plan 05 additions (machine-drafted, agent):
+
+- `theory.*` (shared theory-panel shell), `filters.theory.*`, `ai.theory.*`
+- `experiments.*`, `nav.experiments`, `tool.experiments.title`
+- `input.demo.shareButton/shareAria/shareCopied/shareFailed`
+- `filters.export.wav`, `ai.export.wav`, `codecLab.comparison.chart.exportPng/exportFailed`
+
 ## Next recommended step
 
-Wave 4 plan 03 is complete on `feat/wave-4` (real-codec panel + F05 metrics lab). Next: **execute Wave 4 plan 04** — `docs/plans/wave-4/04-comparison-rate-distortion-closeout.md` (comparison table, rate–distortion chart, F06 verification, close-out). Do not begin while any check is failing.
+Wave 5 plans 01–05 are complete on `feat/wave-5` (ML tools, filter lab, teaching layer). Next: **execute Wave 5 plan 06** — `docs/plans/wave-5/06-closeout.md` (full gates, backend/model/offline/Docker smoke, D-037–D-040, Persian review list, wave close-out). Do not begin while any check is failing.
 
 ## Session log
 
@@ -463,3 +470,15 @@ Wave 4 plan 03 is complete on `feat/wave-4` (real-codec panel + F05 metrics lab)
 - Gates: `pnpm check` exit 0 (biome 238 files, dsp 966/966, web 406/406 across 43 files, scripts 13/13, i18n OK); `pnpm e2e` 49/49 in 1.1 min, zero console errors in fa + en; the new filter spec covers the chirp demo, all six panels, kind/band/cutoff URL round-trips, invalid-cutoff rejection, apply-to-selection, and English apply-to-all with LTR axes.
 - Carries: `filters.*` Persian copy joins the Wave-5 owner-review backlog. FIR roots are omitted above 33 taps (documented in the UI); biquad supports only lowpass/highpass/notch/peaking; whole-file FIR apply returns the same length as the source because preview delay compensation is on. Backend untouched in this plan.
 - **Next step:** execute Wave 5 plan 05.
+
+## 2026-11-03 — Wave 5 plan 05 complete (F16 teaching layer)
+
+- Tasks 1–7 complete on `feat/wave-5`: theory framework + KaTeX (`ddde811`), F11 theory (`d827933`), F14 theory (`86bd062`), guided experiments (`32e6f10`), demo share links (`a62dcb9`, docs checkbox fix `3b07dc1`), WAV/PNG export (`e604e77`), and this e2e/docs close-out.
+- Shipped `/tools/filters` and all five `/tools/ai` tabs with collapsible theory panels: original academic sections, original formulas rendered LTR by KaTeX, “what to observe” bullets, and pitfalls. Failing TeX throws in tests; no raw HTML path.
+- Shipped `/experiments` with three guided experiments (filters, super-resolution, ASR + codec) and 11 deep links into real controls. Each step states the expected observation; links carry URL-serialized tool params. Sidebar and both locales included.
+- Shipped demo share-by-URL: each bundled demo card copies an absolute URL with tool params plus `demo=<id>`; on load the app validates the id from the closed union, boots the demo once per navigation, and never serializes uploads. `SessionSource.demoId` is optional and file sources stay undefined.
+- Shipped user-triggered exports: `filters.export.wav` (`avalab-filters.wav`), `ai.export.wav` (`avalab-ai-<task>.wav`), and `codecLab.comparison.chart.exportPng` (`avalab-rate-distortion.png`). WAV uses `encodeWavPcm16`; PNG captures the uPlot canvas and rejects an empty canvas.
+- E2E covers both locales: experiments, theory + KaTeX LTR, demo share clipboard → navigation → one demo request, WAV header (RIFF/WAVE/48000/16), PNG signature, and all five AI theory panels. The first run correctly exposed that the filter lab's empty state has no controls or theory panel; the spec now boots the demo before asserting them.
+- Gates: `pnpm check` exit 0 (biome 256 files, dsp 966/966, web 438/438 across 51 files, scripts 13/13, i18n OK); `pnpm e2e` 52/52 in 1.2 min with zero console errors in fa + en. Plan 05 touched no backend code; its Plan 03 backend results stand.
+- Carries: `theory.*`, `filters.theory.*`, `ai.theory.*`, `experiments.*`, `input.demo.share*`, and export copy join the Wave-5 Persian review backlog. The share bootstrap is mounted on demo-row pages only, so `/tools/ai?demo=…` does not boot a demo (super-resolution keeps its own speech-demo link); accepted because share buttons exist only on demo-row pages. Filtered AI results also show the AI WAV button; accepted simplification. D-037–D-040 still move to Wave-5 README close-out in Plan 06.
+- **Next step:** execute Wave 5 plan 06 — `docs/plans/wave-5/06-closeout.md`.
