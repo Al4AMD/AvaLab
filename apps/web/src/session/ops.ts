@@ -27,6 +27,7 @@ import {
   alawDecode,
   alawEncode,
   aliasFrequencyHz,
+  applyFilter,
   averagePower,
   biquadHighpass,
   biquadLowpass,
@@ -946,6 +947,119 @@ export function filterDesign(
       `filterDesign: ${cause instanceof Error ? cause.message : String(cause)}`,
     );
   }
+}
+
+export type FilterApplyParams = {
+  b: number[];
+  a: number[];
+  fir: boolean;
+  sampleRateHz: number;
+  compensateDelay: boolean;
+};
+
+export type FilterApplyResult = {
+  samples: Float32Array;
+  sampleRateHz: number;
+  delaySamples: number;
+  meta: {
+    sampleCount: number;
+    delaySamples: number;
+    compensated: boolean;
+    elapsedMs: number;
+  };
+  payload: TransferablePayload;
+};
+
+function filterApplyValid(params: FilterApplyParams | null | undefined): boolean {
+  if (params === null || params === undefined) {
+    return false;
+  }
+  return (
+    Number.isFinite(params.sampleRateHz) &&
+    params.sampleRateHz > 0 &&
+    params.sampleRateHz <= 96_000 &&
+    typeof params.fir === "boolean" &&
+    typeof params.compensateDelay === "boolean" &&
+    Array.isArray(params.b) &&
+    Array.isArray(params.a) &&
+    params.b.length > 0 &&
+    params.b.length <= 4096 &&
+    params.a.length > 0 &&
+    params.a.length <= 64 &&
+    params.b.every((value) => Number.isFinite(value)) &&
+    params.a.every((value) => Number.isFinite(value)) &&
+    (params.a[0] ?? 0) !== 0
+  );
+}
+
+/** F11 filter apply: FIR through FFT convolution or IIR through direct form.
+ * FIR reports its group delay and optionally trims it for preview alignment. */
+export function filterApply(
+  params: FilterApplyParams,
+  payload?: TransferablePayload,
+): FilterApplyResult {
+  if (!filterApplyValid(params)) {
+    throw new DspOpError("badParams", `filterApply: invalid params ${String(params)}`);
+  }
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "filterApply: a Float32 source payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError("badPayload", "filterApply: payload must be Float32-aligned");
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  if (samples.length === 0) {
+    throw new DspOpError("badParams", "filterApply: the selection is empty");
+  }
+  for (let index = 0; index < samples.length; index += 1) {
+    if (!Number.isFinite(samples[index])) {
+      throw new DspOpError("badParams", `filterApply: samples[${index}] is not finite`);
+    }
+  }
+
+  const startedMs = performance.now();
+  const input = Float64Array.from(samples);
+  let output: Float64Array;
+  let delaySamples: number;
+  try {
+    if (params.fir) {
+      const b = Float64Array.from(params.b);
+      const full = convolveFft(input, b);
+      delaySamples = Math.floor((params.b.length - 1) / 2);
+      output = params.compensateDelay
+        ? full.subarray(delaySamples, delaySamples + input.length)
+        : full;
+    } else {
+      const b = Float64Array.from(params.b);
+      const a = Float64Array.from(params.a);
+      output = applyFilter(input, { b, a });
+      const delay = groupDelaySamples(b, a, { numPoints: 8, sampleRateHz: params.sampleRateHz });
+      const firstDelay = delay[0] ?? 0;
+      delaySamples = Number.isFinite(firstDelay) ? Math.max(0, Math.round(firstDelay)) : 0;
+    }
+  } catch (cause) {
+    if (cause instanceof DspOpError) {
+      throw cause;
+    }
+    throw new DspOpError(
+      "badParams",
+      `filterApply: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  }
+
+  const out = Float32Array.from(output);
+  return {
+    samples: out,
+    sampleRateHz: params.sampleRateHz,
+    delaySamples,
+    meta: {
+      sampleCount: out.length,
+      delaySamples,
+      compensated: params.fir && params.compensateDelay,
+      elapsedMs: performance.now() - startedMs,
+    },
+    payload: { buffer: out.buffer, byteOffset: 0, byteLength: out.byteLength },
+  };
 }
 
 /** F14 sinc super-resolution baseline: band-limited input -> target rate via
@@ -2256,6 +2370,19 @@ export const dspOps = {
     } as FilterDesignParams,
     result: undefined as unknown as FilterDesignResult,
     handler: filterDesign,
+  },
+  filterApply: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: {
+      b: [1],
+      a: [1],
+      fir: true,
+      sampleRateHz: 0,
+      compensateDelay: false,
+    } as FilterApplyParams,
+    result: undefined as unknown as FilterApplyResult,
+    handler: filterApply,
   },
   superresBaseline: {
     // Type lenses only — the table is read for types (DspOpParams/Result);

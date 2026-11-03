@@ -21,6 +21,7 @@ import {
   extentProcess,
   FFT_MAX_LENGTH,
   fftSelection,
+  filterApply,
   filterDesign,
   generateSynth,
   type ReverbProcessParams,
@@ -1011,6 +1012,7 @@ describe("op table wiring", () => {
     expect(dspOps.windowProfiles.handler).toBe(windowProfiles);
     expect(dspOps.generateSynth.handler).toBe(generateSynth);
     expect(dspOps.speedTransform.handler).toBe(speedTransform);
+    expect(dspOps.filterApply.handler).toBe(filterApply);
     expect(dspOps.filterDesign.handler).toBe(filterDesign);
     expect(dspOps.superresBaseline.handler).toBe(superresBaseline);
     expect(dspOps.samplingProcess.handler).toBe(samplingProcess);
@@ -1033,6 +1035,7 @@ describe("op table wiring", () => {
       | "generateSynth"
       | "speedTransform"
       | "filterDesign"
+      | "filterApply"
       | "superresBaseline"
       | "samplingProcess"
       | "aliasDemo"
