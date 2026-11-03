@@ -1,6 +1,6 @@
 # Wave 5 · Plan 06 — Close-out
 
-**Status:** in progress — Task 5 pending.
+**Status:** done.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -65,11 +65,11 @@
 
 ### Task 5: Final verification
 
-- [ ] **Step 1: Re-run** `pnpm check`, `pnpm e2e`, API pytest/ruff/mypy after all docs changes.
-- [ ] **Step 2: Confirm no model weights/large audio/secrets in `git status`.**
-- [ ] **Step 3: Confirm all Wave 5 plan checkboxes are checked or explicitly deferred.**
-- [ ] **Step 4: Report exact commands and outcomes to the owner.**
-- [ ] **Step 5: Do not push.**
+- [x] **Step 1: Re-run** `pnpm check`, `pnpm e2e`, API pytest/ruff/mypy after all docs changes.
+- [x] **Step 2: Confirm no model weights/large audio/secrets in `git status`.**
+- [x] **Step 3: Confirm all Wave 5 plan checkboxes are checked or explicitly deferred.**
+- [x] **Step 4: Report exact commands and outcomes to the owner.**
+- [x] **Step 5: Owner authorized the `feat/wave-5` → `main` PR on 2026-11-04; push the branch and open the PR after the review.**
 
 ## Completion Gate
 
