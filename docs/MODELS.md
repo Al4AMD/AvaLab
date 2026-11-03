@@ -31,11 +31,20 @@ Total download: about 383 MB, below the 2 GB budget and under 400 MB per model.
   so the super-resolution experiment isolates bandwidth extension.
 - **HTDemucs**: 44.1 kHz, stereo; four stems (`drums`, `bass`, `other`,
   `vocals`). Mono input is duplicated to stereo, then stems are stored as mono
-  unless both input channels exist. CPU jobs are capped to a short excerpt.
-- **Whisper tiny**: 16 kHz mono. Use the English speech demo for the WER
-  experiment; tiny is weak for Persian. Segments carry start/end seconds.
-- **EnCodec 48 kHz**: mono/stereo at 48 kHz; the wrapper reports estimated
-  encoded size and decoded audio, not a real container bitstream.
+  unless both input channels exist. CPU jobs use the platform's 30 s excerpt
+  cap; the UI defaults to 15 s and shows an honest CPU wait message.
+- **Whisper tiny**: 16 kHz mono. The wrapper resamples the source, transcribes
+  one 30 s-bounded excerpt, and returns `text` plus segments whose timestamps
+  are relative to that excerpt. Empty or silent input is an error, not an empty
+  transcript. Use the English speech demo for the WER experiment; tiny is weak
+  for Persian. WER normalization and the `(S+D+I)/N` definition are documented
+  in `docs/ALGORITHMS.md`.
+- **EnCodec 48 kHz**: the 48 kHz processor expects stereo, so the wrapper
+  duplicates mono to two channels, runs encode/decode at the requested
+  bandwidth, and downmixes the decoded stereo back to mono. The wrapper reports
+  estimated encoded size and decoded audio, not a real container bitstream.
+  Length is restored exactly by trimming or zero-padding after resampling back
+  to the source rate.
 
 ## Real-model smoke (2026-11-03)
 
@@ -46,12 +55,20 @@ AVALAB_RUN_ML_TESTS=1 HF_HUB_OFFLINE=1 \
   uv run --directory apps/api --extra ml pytest -q -m ml
 ```
 
-Result: `2 passed, 172 deselected` in 1.55 s. DPDFNet ran a 0.5 s tone at
-16 kHz and returned finite, length-matched audio. LavaSR ran the 8–48 kHz
-speech fixture with the high band (10–20 kHz) increased by more than 3 dB.
-Both wrappers also have non-gated fake-model tests covering source rates
+Result after Plan 03: `5 passed, 198 deselected` in 13.2 s. DPDFNet ran a
+0.5 s tone at 16 kHz and returned finite, length-matched audio. LavaSR ran the
+8–48 kHz speech fixture with the high band (10–20 kHz) increased by more than
+3 dB. HTDemucs returned four length-matched 44.1 kHz stems, Whisper tiny
+returned non-empty text/segments at 16 kHz, and EnCodec decoded finite audio
+at the source rate and exact length. The first EnCodec run exposed that the
+48 kHz processor rejects mono; the wrapper now duplicates mono to stereo and
+downmixes the decoded output (commit `2d63be3`).
+
+All five wrappers also have non-gated fake-model tests covering source rates
 8 000, 16 000, 22 050, 44 100, 48 000 and 96 000 Hz, exact output length,
 short-input padding/trimming, silence, empty input and non-finite rejection.
+The EnCodec fake-backend test pins the stereo processor input and mono output
+without downloading weights.
 
 ## License notes
 

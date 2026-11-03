@@ -1,6 +1,6 @@
 # Wave 5 · Plan 03 — Separation, ASR, neural codec
 
-**Status:** pending.
+**Status:** done.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -167,9 +167,9 @@
 - Modify: `docs/ALGORITHMS.md`
 - Modify: `docs/PROGRESS.md`
 
-- [ ] **Step 1: Record htdemucs/Whisper/Encodec rates, licenses, limits, and WER normalization.**
-- [ ] **Step 2: Run** gated real-model tests if models are present; otherwise record skips.
-- [ ] **Step 3: Commit** `docs(F14): record separation, ASR and neural codec behavior`.
+- [x] **Step 1: Record htdemucs/Whisper/Encodec rates, licenses, limits, and WER normalization.**
+- [x] **Step 2: Run** gated real-model tests if models are present; otherwise record skips.
+- [x] **Step 3: Commit** `docs(F14): record separation, ASR and neural codec behavior`.
 
 ## Completion Gate
 
