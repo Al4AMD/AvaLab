@@ -263,7 +263,9 @@
         "ySnr": "SNR (dB)",
         "yPsnr": "PSNR (dB)",
         "empty": "No finite quality points to plot yet.",
-        "aria": "Scatter plot of quality against stream bitrate"
+        "aria": "Scatter plot of quality against stream bitrate",
+        "exportPng": "Export PNG",
+        "exportFailed": "Could not export the chart."
       }
     },
     "theory": {
@@ -1178,6 +1180,9 @@
           }
         }
       }
+    },
+    "export": {
+      "wav": "Export WAV"
     }
   },
   "filters": {
@@ -1307,6 +1312,9 @@
           "delay": "Phase delay and group delay are not the same; check the group-delay plot, not only the phase plot."
         }
       }
+    },
+    "export": {
+      "wav": "Export WAV"
     }
   },
   "theory": {

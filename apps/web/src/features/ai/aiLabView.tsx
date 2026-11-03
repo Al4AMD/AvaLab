@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 
 import { Button } from "../../components/ui/button";
+import { downloadWav } from "../../lib/download";
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
 import { TheoryPanel } from "../theory/TheoryPanel";
@@ -114,6 +115,7 @@ function ModelBanner({
 export function AiLabView(): React.ReactElement {
   const { t } = useTranslation();
   const original = useSessionStore((state) => state.original);
+  const processed = useSessionStore((state) => state.processed);
   const backendOnline = useSessionStore((state) => state.backendOnline);
   const [searchParams, setSearchParams] = useSearchParams();
   const task = aiTaskFromSearch(`?${searchParams.toString()}`);
@@ -186,7 +188,24 @@ export function AiLabView(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold">{t("tool.ai.title")}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-2xl font-semibold">{t("tool.ai.title")}</h2>
+        {processed !== null ? (
+          <Button
+            variant="outline"
+            data-testid="ai.export.wav"
+            onClick={() => {
+              downloadWav(
+                processed.samples,
+                processed.sampleRateHz,
+                `avalab-ai-${processed.label}.wav`,
+              );
+            }}
+          >
+            {t("ai.export.wav")}
+          </Button>
+        ) : null}
+      </div>
       <p className="text-sm text-muted">{t("ai.intro")}</p>
 
       <div role="tablist" aria-label={t("ai.tabsLabel")} className="flex flex-wrap gap-2">

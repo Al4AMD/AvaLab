@@ -154,11 +154,11 @@
 - `downloadChartPng(uplot: uPlot, filename: string): Promise<void>` wraps the plot canvas.
 - F11/F14 add “Export WAV”; plots add “Export PNG”; filenames are locale-free ASCII.
 
-- [ ] **Step 1: Write tests** for WAV header, filename sanitization, empty canvas rejection, and PNG non-empty blob.
-- [ ] **Step 2: Run** focused tests — expected FAIL.
-- [ ] **Step 3: Implement helpers and buttons.**
-- [ ] **Step 4: Run** `pnpm check` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F16): add WAV and PNG export`.
+- [x] **Step 1: Write tests** for WAV header, filename sanitization, empty canvas rejection, and PNG non-empty blob.
+- [x] **Step 2: Run** focused tests — expected FAIL.
+- [x] **Step 3: Implement helpers and buttons.**
+- [x] **Step 4: Run** `pnpm check` — expected PASS.
+- [x] **Step 5: Commit** `feat(F16): add WAV and PNG export`.
 
 ### Task 7: E2E, i18n, docs
 

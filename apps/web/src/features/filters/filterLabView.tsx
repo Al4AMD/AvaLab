@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 
 import { Button } from "../../components/ui/button";
+import { downloadWav } from "../../lib/download";
 import { formatDb, formatHz, formatS } from "../../lib/format";
 import type {
   FilterApplyParams,
@@ -61,6 +62,8 @@ export type FilterLabPanelProps = {
   readonly applyBusy: boolean;
   readonly applyError: string | null;
   readonly applied: FilterAppliedRange | null;
+  readonly exportAvailable?: boolean;
+  readonly onExportWav?: () => void;
 };
 
 export function filterBandsForKind(kind: FilterDesignKind): readonly FilterBand[] {
@@ -230,6 +233,8 @@ export function FilterLabPanel({
   applyBusy,
   applyError,
   applied,
+  exportAvailable = false,
+  onExportWav,
 }: FilterLabPanelProps): React.ReactElement {
   const { t } = useTranslation();
   const valid = filterSettingsValid(settings);
@@ -609,6 +614,15 @@ export function FilterLabPanel({
               >
                 {t("filters.apply.all")}
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="filters.export.wav"
+                disabled={!exportAvailable || onExportWav === undefined}
+                onClick={onExportWav}
+              >
+                {t("filters.export.wav")}
+              </Button>
               {applyBusy ? (
                 <span data-testid="filters.apply.busy" className="text-xs text-muted">
                   {t("filters.apply.busy")}
@@ -641,6 +655,7 @@ export function FilterLabView(): React.ReactElement {
   const { t } = useTranslation();
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
+  const processed = useSessionStore((state) => state.processed);
   const [searchParams, setSearchParams] = useSearchParams();
   const [design, setDesign] = useState<FilterDesignResult | null>(null);
   const [designBusy, setDesignBusy] = useState(false);
@@ -781,6 +796,14 @@ export function FilterLabView(): React.ReactElement {
       applyBusy={applyBusy}
       applyError={applyError}
       applied={applied}
+      exportAvailable={processed !== null && processed.label === PROCESSED_LABEL}
+      onExportWav={() => {
+        const filtered = useSessionStore.getState().processed;
+        if (filtered === null || filtered.label !== PROCESSED_LABEL) {
+          return;
+        }
+        downloadWav(filtered.samples, filtered.sampleRateHz, "avalab-filters.wav");
+      }}
     />
   );
 }

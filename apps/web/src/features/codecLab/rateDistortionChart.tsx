@@ -10,6 +10,8 @@ import { useTranslation } from "react-i18next";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 
+import { Button } from "../../components/ui/button";
+import { downloadChartPng } from "../../lib/download";
 import type { ComparisonRow } from "./comparison";
 import {
   appendRateDistortionPoints,
@@ -34,6 +36,8 @@ export function RateDistortionChart({
 }) {
   const { t } = useTranslation();
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const plotRef = useRef<uPlot | null>(null);
+  const [exportFailed, setExportFailed] = useState(false);
   const [widthPx, setWidthPx] = useState(1);
   const points = appendRateDistortionPoints(
     rateDistortionPoints(rows, quality),
@@ -117,7 +121,11 @@ export function RateDistortionChart({
       ],
     };
     const plot = new uPlot(options, data, host);
+    plotRef.current = plot;
     return () => {
+      if (plotRef.current === plot) {
+        plotRef.current = null;
+      }
       plot.destroy();
     };
   }, [heightPx, points, quality, t, widthPx]);
@@ -127,12 +135,38 @@ export function RateDistortionChart({
       {t("codecLab.comparison.chart.empty")}
     </p>
   ) : (
-    <div
-      ref={hostRef}
-      dir="ltr"
-      role="img"
-      aria-label={t("codecLab.comparison.chart.aria")}
-      data-testid="codecLab.comparison.chart"
-    />
+    <div className="flex flex-col gap-1">
+      <div
+        ref={hostRef}
+        dir="ltr"
+        role="img"
+        aria-label={t("codecLab.comparison.chart.aria")}
+        data-testid="codecLab.comparison.chart"
+      />
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          variant="outline"
+          data-testid="codecLab.comparison.chart.export"
+          onClick={() => {
+            const plot = plotRef.current;
+            if (plot === null) {
+              return;
+            }
+            setExportFailed(false);
+            void downloadChartPng(plot, "avalab-rate-distortion.png").catch(() => {
+              setExportFailed(true);
+            });
+          }}
+        >
+          {t("codecLab.comparison.chart.exportPng")}
+        </Button>
+      </div>
+      {exportFailed ? (
+        <p role="alert" className="text-xs text-danger">
+          {t("codecLab.comparison.chart.exportFailed")}
+        </p>
+      ) : null}
+    </div>
   );
 }

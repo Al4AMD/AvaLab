@@ -90,6 +90,18 @@ describe("filter lab view", () => {
     expect(markup).toContain(modules.t("filters.controls.cutoff"));
   });
 
+  it("offers WAV export only after a filtered result is installed", () => {
+    const disabled = renderToStaticMarkup(<modules.FilterLabPanel {...panelProps()} />);
+    expect(disabled).toMatch(/data-testid="filters\.export\.wav"[^>]*disabled/);
+
+    const enabled = renderToStaticMarkup(
+      <modules.FilterLabPanel {...panelProps({ exportAvailable: true, onExportWav: () => {} })} />,
+    );
+    expect(enabled).toContain(modules.t("filters.export.wav"));
+    expect(enabled).toMatch(/data-testid="filters\.export\.wav"/);
+    expect(enabled).not.toMatch(/data-testid="filters\.export\.wav"[^>]*disabled/);
+  });
+
   it("flags an invalid cutoff and disables both apply buttons", () => {
     const markup = renderToStaticMarkup(
       <modules.FilterLabPanel
