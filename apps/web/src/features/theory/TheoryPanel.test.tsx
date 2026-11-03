@@ -54,6 +54,7 @@ describe("theory panel", () => {
           {
             headingKey: "filters.controls.band",
             bodyKey: "filters.controls.order",
+            bulletKeys: ["filters.controls.window", "filters.controls.taps"],
           },
         ]}
       />,
@@ -66,6 +67,9 @@ describe("theory panel", () => {
     expect(markup).toContain(modules.t("filters.controls.cutoff"));
     expect(markup).toContain(modules.t("filters.controls.band"));
     expect(markup).toContain(modules.t("filters.controls.order"));
+    expect(markup).toContain("<ul");
+    expect(markup).toContain(modules.t("filters.controls.window"));
+    expect(markup).toContain(modules.t("filters.controls.taps"));
     expect(markup).toContain('dir="ltr"');
     expect(markup).toContain("katex-display");
   });

@@ -23,6 +23,7 @@ import type {
 } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
+import { TheoryPanel } from "../theory/TheoryPanel";
 import { FilterLinePlot } from "./filterPlots";
 import {
   FILTER_DESIGN_KINDS,
@@ -34,6 +35,7 @@ import {
   loadFilterSettings,
   saveFilterSettings,
 } from "./filterState";
+import { FILTER_THEORY_SECTIONS, FILTER_THEORY_TITLE_KEY } from "./filterTheory";
 import { PoleZeroPlot } from "./poleZeroPlot";
 
 const CONTROL_FOCUS_CLASSES =
@@ -630,6 +632,7 @@ export function FilterLabPanel({
           </>
         ) : null}
       </div>
+      <TheoryPanel titleKey={FILTER_THEORY_TITLE_KEY} sections={FILTER_THEORY_SECTIONS} />
     </section>
   );
 }

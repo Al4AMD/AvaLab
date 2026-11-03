@@ -1134,6 +1134,52 @@
       "all": "Apply to whole file",
       "busy": "Applying…",
       "done": "Applied {{start}} – {{end}} · delay {{delay}} samples"
+    },
+    "theory": {
+      "title": "Theory and what to observe",
+      "transfer": {
+        "heading": "Transfer function",
+        "body": "A linear time-invariant filter is described by a rational transfer function in z. The roots of the numerator are zeros and the roots of the denominator are poles."
+      },
+      "fir": {
+        "heading": "FIR window method",
+        "body": "Sample the ideal response and truncate it with a window. A wider window narrows the transition band; a smoother window lowers the side lobes."
+      },
+      "butterworth": {
+        "heading": "Butterworth response",
+        "body": "Butterworth is maximally flat in the passband and steepens as the order rises."
+      },
+      "chebyshev": {
+        "heading": "Chebyshev type I response",
+        "body": "Chebyshev type I accepts small passband ripple to get a sharper transition at the same order."
+      },
+      "groupDelay": {
+        "heading": "Group delay",
+        "body": "Group delay is the derivative of phase with frequency; it describes the delay of a narrow-band envelope, not the phase delay of each sinusoid."
+      },
+      "poles": {
+        "heading": "Poles and stability",
+        "body": "Inside the unit circle is stable, outside is unstable, and on the circle is marginal. A pole closer to the circle produces a sharper resonance and slower decay."
+      },
+      "observe": {
+        "heading": "What to observe",
+        "body": "Change one control at a time and compare these four effects.",
+        "bullets": {
+          "cutoff": "Cutoff sets the edge; the transition width depends on the order or the FIR tap count and window.",
+          "order": "Higher order or a longer FIR gives a steeper transition but more ringing near the edge.",
+          "linearPhase": "A symmetric FIR has linear phase; the price is a delay of about (taps − 1) / 2 samples.",
+          "poles": "Poles near the unit circle produce a visible resonance and a longer impulse response."
+        }
+      },
+      "pitfalls": {
+        "heading": "Common pitfalls",
+        "body": "These three mistakes cause most confusion.",
+        "bullets": {
+          "nyquist": "A cutoff at or above Nyquist is invalid; the design is rejected.",
+          "unstable": "An IIR design with a pole outside the unit circle is unstable and must not be applied.",
+          "delay": "Phase delay and group delay are not the same; check the group-delay plot, not only the phase plot."
+        }
+      }
     }
   },
   "theory": {

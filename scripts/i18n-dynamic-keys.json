@@ -11,6 +11,7 @@
   "app.health.loading",
   "app.health.offline",
   "app.health.ok",
+  "filters.theory",
   "input.demo",
   "input.error",
   "player.lane",

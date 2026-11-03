@@ -63,11 +63,11 @@
 - “What to observe” bullets: cutoff vs transition width, order vs ringing, linear-phase FIR delay, poles near unit circle.
 - Pitfalls: cutoff above Nyquist, unstable IIR, confusing phase delay with group delay.
 
-- [ ] **Step 1: Write a data test** asserting every section has fa/en keys and every formula is non-empty.
-- [ ] **Step 2: Run** focused test — expected FAIL.
-- [ ] **Step 3: Implement content in both locales; place the panel in the filter lab.**
-- [ ] **Step 4: Run** `pnpm check` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F16): add filter theory panel`.
+- [x] **Step 1: Write a data test** asserting every section has fa/en keys and every formula is non-empty.
+- [x] **Step 2: Run** focused test — expected FAIL.
+- [x] **Step 3: Implement content in both locales; place the panel in the filter lab.**
+- [x] **Step 4: Run** `pnpm check` — expected PASS.
+- [x] **Step 5: Commit** `feat(F16): add filter theory panel`.
 
 ### Task 3: F14 theory content
 
