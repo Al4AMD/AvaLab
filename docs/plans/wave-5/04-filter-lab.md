@@ -1,8 +1,8 @@
 # Wave 5 · Plan 04 — Filter-design lab (F11)
 
-**Status:** pending.
+**Status:** complete.
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** F11 filter-design UI: FIR/window, Butterworth, Chebyshev I and RBJ biquad design; magnitude/phase/group-delay plots; pole-zero/stability; apply to the source with preview.
 
@@ -46,11 +46,11 @@
 - Validation: finite params, `0 < cutoff < Nyquist`, order 1–8 (FIR taps 3–257, odd), positive Q.
 - Pole-zero roots are computed for IIR designs; for FIR they are computed only when `taps <= 33` (higher degrees are expensive in the root solver), otherwise the arrays stay empty and the UI says roots are omitted.
 
-- [ ] **Step 1: Write failing op tests** for a 1 kHz low-pass at 48 kHz: magnitude near 0 dB at 100 Hz, below -20 dB at 8 kHz; FIR impulse symmetry; Butterworth poles inside unit circle; invalid cutoff throws `badParams`.
-- [ ] **Step 2: Run** `pnpm --filter @avalab/web exec vitest run src/session/ops.filterDesign` — expected FAIL.
-- [ ] **Step 3: Implement the op** and export its types.
-- [ ] **Step 4: Run** focused test + `pnpm check` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F11): add filter design worker op`.
+- [x] **Step 1: Write failing op tests** for a 1 kHz low-pass at 48 kHz: magnitude near 0 dB at 100 Hz, below -20 dB at 8 kHz; FIR impulse symmetry; Butterworth poles inside unit circle; invalid cutoff throws `badParams`.
+- [x] **Step 2: Run** `pnpm --filter @avalab/web exec vitest run src/session/ops.filterDesign` — expected FAIL.
+- [x] **Step 3: Implement the op** and export its types.
+- [x] **Step 4: Run** focused test + `pnpm check` — expected PASS.
+- [x] **Step 5: Commit** `feat(F11): add filter design worker op`.
 
 ### Task 2: Filter apply worker op
 
@@ -64,11 +64,11 @@
 - FIR: `convolveFft` with the impulse response; trim `delaySamples` when `compensateDelay`.
 - IIR: `applyFilter`; report `groupDelaySamples` at DC/low frequency as metadata, but do not trim causal response.
 
-- [ ] **Step 1: Write failing tests** for an impulse through a known FIR (output equals coefficients), a sine through a low-pass (attenuation), length/delay contract, and empty input rejection.
-- [ ] **Step 2: Run** focused test — expected FAIL.
-- [ ] **Step 3: Implement the op.**
-- [ ] **Step 4: Run** focused test + `pnpm check` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F11): add filter apply worker op`.
+- [x] **Step 1: Write failing tests** for an impulse through a known FIR (output equals coefficients), a sine through a low-pass (attenuation), length/delay contract, and empty input rejection.
+- [x] **Step 2: Run** focused test — expected FAIL.
+- [x] **Step 3: Implement the op.**
+- [x] **Step 4: Run** focused test + `pnpm check` — expected PASS.
+- [x] **Step 5: Commit** `feat(F11): add filter apply worker op`.
 
 ### Task 3: Filter state, URL, localStorage
 
@@ -82,11 +82,11 @@
 - `filterSettingsToSearch`, `filterSettingsFromSearch` use `lib/url-state`; booleans as `0/1`; per-field fallback.
 - `FILTER_STORAGE_KEY = "avalab.filters.last"`; load/save best-effort.
 
-- [ ] **Step 1: Write tests** for round-trip, unknown values, cutoff clamped to Nyquist, and localStorage fallback.
-- [ ] **Step 2: Run** focused test — expected FAIL.
-- [ ] **Step 3: Implement state codec.**
-- [ ] **Step 4: Run** focused test + `pnpm check` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F11): add filter lab state and URL codec`.
+- [x] **Step 1: Write tests** for round-trip, unknown values, cutoff clamped to Nyquist, and localStorage fallback.
+- [x] **Step 2: Run** focused test — expected FAIL.
+- [x] **Step 3: Implement state codec.**
+- [x] **Step 4: Run** focused test + `pnpm check` — expected PASS.
+- [x] **Step 5: Commit** `feat(F11): add filter lab state and URL codec`.
 
 ### Task 4: Filter lab view
 
@@ -107,11 +107,11 @@
 - Apply: selection or all; runs `filterApply`; `setProcessed`; shows delay and excerpt label.
 - Uses `useSessionStore` for source/selection/derive; no direct worker calls from components.
 
-- [ ] **Step 1: Write component tests** with a fake store: controls render, invalid cutoff disabled, apply calls the op with expected params, unstable design shows warning, plots receive finite arrays.
-- [ ] **Step 2: Run** focused tests — expected FAIL.
-- [ ] **Step 3: Implement view/plots + route + `nav.filters` + `filters.*` keys.**
-- [ ] **Step 4: Run** `pnpm check` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F11): add filter design lab`.
+- [x] **Step 1: Write component tests** with a fake store: controls render, invalid cutoff disabled, apply calls the op with expected params, unstable design shows warning, plots receive finite arrays.
+- [x] **Step 2: Run** focused tests — expected FAIL.
+- [x] **Step 3: Implement view/plots + route + `nav.filters` + `filters.*` keys.**
+- [x] **Step 4: Run** `pnpm check` — expected PASS.
+- [x] **Step 5: Commit** `feat(F11): add filter design lab`.
 
 ### Task 5: E2E, performance, docs
 
@@ -121,11 +121,11 @@
 - Modify: `docs/ALGORITHMS.md`
 - Modify: `docs/PROGRESS.md`
 
-- [ ] **Step 1: Add e2e** for `/tools/filters`: load chirp demo, design low-pass, see plots, apply, no console errors; both locales.
-- [ ] **Step 2: Add a performance assertion** or a documented measurement for 30 s design under 300 ms.
-- [ ] **Step 3: Document the design/apply formulas and delay handling.**
-- [ ] **Step 4: Run** `pnpm check`, `pnpm e2e` — expected PASS.
-- [ ] **Step 5: Commit** `test(F11): verify filter lab e2e`.
+- [x] **Step 1: Add e2e** for `/tools/filters`: load chirp demo, design low-pass, see plots, apply, no console errors; both locales.
+- [x] **Step 2: Add a performance assertion** or a documented measurement for 30 s design under 300 ms.
+- [x] **Step 3: Document the design/apply formulas and delay handling.**
+- [x] **Step 4: Run** `pnpm check`, `pnpm e2e` — expected PASS.
+- [x] **Step 5: Commit** `test(F11): verify filter lab e2e`.
 
 ## Completion Gate
 

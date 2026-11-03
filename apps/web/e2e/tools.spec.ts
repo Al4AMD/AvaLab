@@ -37,6 +37,12 @@ const TOOLS: ToolSpec[] = [
     title: /(دامنه و فاز|FFT View)/,
   },
   {
+    path: "/tools/filters",
+    url: /\/tools\/filters$/,
+    label: /(طراحی فیلتر|Filter design)/,
+    title: /(آزمایشگاه طراحی فیلتر|Filter design)/,
+  },
+  {
     path: "/tools/generator",
     url: /\/tools\/generator$/,
     label: /(مولد سیگنال|Generator)/,
