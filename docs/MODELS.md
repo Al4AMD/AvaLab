@@ -70,6 +70,27 @@ short-input padding/trimming, silence, empty input and non-finite rejection.
 The EnCodec fake-backend test pins the stereo processor input and mono output
 without downloading weights.
 
+## Measured CPU latency (2026-11-03)
+
+Single-run observations on the owner's Intel Core i9-8950HK laptop, CPU only,
+cached weights, `HF_HUB_OFFLINE=1`. “Load” is the one-time lazy model/backend
+load in the API process; “run” is the adapter call on the shipped demo excerpt
+after loading. These are observations, not a benchmark suite, and they will
+vary with CPU, thread count and excerpt content.
+
+| Task | Demo excerpt | Load (ms) | Run (ms) |
+|---|---|---:|---:|
+| denoise | 19.6 s noisy speech, 48 kHz | 185 | 5 552 |
+| superres | 19.6 s speech band-limited to 8 kHz, 48 kHz | 192 | 1 738 |
+| separation | 15.0 s music, 48 kHz | 1 729 | 14 398 |
+| asr | 19.6 s speech, 48 kHz → 16 kHz | 1 402 | 2 862 |
+| neural codec | 19.6 s speech, 6 kbps, 48 kHz | 110 | 6 254 |
+
+The API loads each backend once and keeps it for the process lifetime. Jobs
+have a 30 s excerpt cap (D-035); the demo clips are shorter, so the table
+reflects the full shipped excerpts. Separation is the slowest tool; the UI
+defaults to 15 s and shows the CPU wait note.
+
 ## License notes
 
 - LavaSR upstream `YatharthS/LavaSR` is Apache-2.0. The ONNX export repo
@@ -88,3 +109,13 @@ HF_HUB_OFFLINE=1 uv run --directory apps/api --extra ml python scripts/download_
 
 The second command proves the cache is complete without network access. The API
 `GET /api/v1/models` reports `available` only when every pinned file exists.
+With `HF_HUB_OFFLINE=1` and the populated cache, `GET /api/v1/models` returned
+all five entries as `available` and no network access was needed.
+
+The missing-cache path was checked by starting the API with an empty
+`AVALAB_ML_MODEL_CACHE_DIR`. `GET /api/v1/models` reported `missing` for all
+five tasks, `/tools/ai` rendered all tabs, and the model-bearing run controls
+were disabled with a translated missing-model hint. The super-resolution
+`path=sinc` baseline stays enabled because it is a signal-processing baseline,
+not a learned model; switching to `path=lavasr` shows the missing-model hint
+and disables the run control.
