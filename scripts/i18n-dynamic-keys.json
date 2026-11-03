@@ -12,6 +12,7 @@
   "app.health.loading",
   "app.health.offline",
   "app.health.ok",
+  "experiments",
   "filters.theory",
   "input.demo",
   "input.error",

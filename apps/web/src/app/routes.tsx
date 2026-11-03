@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { createBrowserRouter, type RouteObject, redirect } from "react-router";
 import { AiLabView } from "../features/ai/aiLabView";
 import { CodecLabView } from "../features/codecLab/codecLabView";
+import { ExperimentsView } from "../features/education/experimentsView";
 import { ExtentView } from "../features/extent/extentView";
 import { FftView } from "../features/fftview/fftView";
 import { FilterLabView } from "../features/filters/filterLabView";
@@ -75,6 +76,7 @@ export const appRoutes: RouteObject[] = [
         // layer — testable without a DOM render and works on first paint.
         loader: () => redirect(toolPath("waveform")),
       },
+      { path: "experiments", element: <ExperimentsView /> },
       {
         path: "tools/waveform",
         element: (

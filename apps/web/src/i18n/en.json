@@ -29,7 +29,8 @@
     "codecLab": "Compression lab",
     "metrics": "Quality metrics",
     "ai": "AI lab",
-    "filters": "Filter design"
+    "filters": "Filter design",
+    "experiments": "Guided experiments"
   },
   "input": {
     "empty": {
@@ -1306,5 +1307,73 @@
   },
   "theory": {
     "title": "Theory and what to observe"
+  },
+  "experiments": {
+    "title": "Guided experiments",
+    "intro": "Each card is a short lab sheet. Open the linked lab, change one control at a time, and compare what you hear and see with the expected observation.",
+    "observationLabel": "Expected observation",
+    "openLab": "Open the lab",
+    "filters": {
+      "title": "Filter design: cutoff, order, and group delay",
+      "goal": "See how cutoff and order change the transition band, ringing, and group delay.",
+      "steps": {
+        "taps": {
+          "instruction": "Load the chirp demo and design an FIR low-pass with 101 taps at 4 kHz using a Hamming window.",
+          "observation": "With 101 taps the transition is wide and the magnitude rolls off around 4 kHz."
+        },
+        "order": {
+          "instruction": "Switch to Butterworth with order 8 and keep the same cutoff.",
+          "observation": "A higher order narrows the transition but adds ringing near the edge."
+        },
+        "ripple": {
+          "instruction": "Switch to Chebyshev type I with order 8 and 0.5 dB ripple.",
+          "observation": "Passband ripple appears, and the group delay peaks near the cutoff."
+        },
+        "groupDelay": {
+          "instruction": "Return to FIR and read the group-delay and impulse-response plots.",
+          "observation": "The symmetric FIR has a flat group delay away from the transition."
+        }
+      }
+    },
+    "superres": {
+      "title": "Sampling and super-resolution: 8 kHz to full band",
+      "goal": "Separate a sample-rate change from true bandwidth extension on speech.",
+      "steps": {
+        "load": {
+          "instruction": "Load the clean speech demo in the super-resolution tab.",
+          "observation": "The original spectrum fills the full band of the source rate."
+        },
+        "sinc": {
+          "instruction": "Band-limit to 8 kHz and choose the sinc path.",
+          "observation": "Sinc restores the sample rate but leaves a hard edge at 4 kHz; it creates no new high-band energy."
+        },
+        "lavasr": {
+          "instruction": "Switch the restore path to LavaSR and compare the spectrum above 4 kHz.",
+          "observation": "LavaSR adds energy above 4 kHz; judge whether the detail is plausible or artificial."
+        }
+      }
+    },
+    "asrCodec": {
+      "title": "Compression and recognition: bitrate versus WER",
+      "goal": "Connect codec bitrate, listening quality, and the transcript quality of a speech recognizer.",
+      "steps": {
+        "low": {
+          "instruction": "Load the speech demo and encode MDCT at 32 kbps.",
+          "observation": "At 32 kbps the envelope survives but fine detail smears."
+        },
+        "mid": {
+          "instruction": "Encode the same excerpt at 128 kbps.",
+          "observation": "Artifacts weaken and the waveform and spectrogram move closer to the original."
+        },
+        "high": {
+          "instruction": "Repeat at 320 kbps.",
+          "observation": "For speech the result is close to transparent."
+        },
+        "asr": {
+          "instruction": "Run ASR and compare the transcript with the bundled reference.",
+          "observation": "WER usually rises at low bitrates; do not judge from one setting alone."
+        }
+      }
+    }
   }
 }

@@ -105,6 +105,10 @@ it("renders each /tools/* stub page through the data router with its i18n title"
       title: i18n.t("tool.ai.title"),
       body: i18n.t("input.empty.hint"),
     },
+    "/experiments": {
+      title: i18n.t("experiments.title"),
+      body: i18n.t("experiments.intro"),
+    },
   };
 
   for (const [path, expectedBody] of Object.entries(expected)) {

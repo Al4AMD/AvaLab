@@ -88,6 +88,11 @@ export function Sidebar() {
             {t("nav.ai")}
           </NavLink>
         </li>
+        <li>
+          <NavLink to="/experiments" className={linkClass}>
+            {t("nav.experiments")}
+          </NavLink>
+        </li>
       </ul>
     </nav>
   );

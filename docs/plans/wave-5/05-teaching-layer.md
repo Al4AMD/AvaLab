@@ -105,12 +105,12 @@
 - `/experiments` route lists three cards; each step links to the relevant lab with params.
 - Sidebar `nav.experiments`; no new dependency.
 
-- [ ] **Step 1: Write data tests** for three experiments, non-empty steps, valid links, and fa/en key parity.
-- [ ] **Step 2: Write view tests** for cards, steps, and links.
-- [ ] **Step 3: Run** focused tests — expected FAIL.
-- [ ] **Step 4: Implement data/view/route/sidebar/i18n.**
-- [ ] **Step 5: Run** `pnpm check` — expected PASS.
-- [ ] **Step 6: Commit** `feat(F16): add guided experiments`.
+- [x] **Step 1: Write data tests** for three experiments, non-empty steps, valid links, and fa/en key parity.
+- [x] **Step 2: Write view tests** for cards, steps, and links.
+- [x] **Step 3: Run** focused tests — expected FAIL.
+- [x] **Step 4: Implement data/view/route/sidebar/i18n.**
+- [x] **Step 5: Run** `pnpm check` — expected PASS.
+- [x] **Step 6: Commit** `feat(F16): add guided experiments`.
 
 ### Task 5: Demo share-by-URL
 
