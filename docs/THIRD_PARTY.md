@@ -31,6 +31,7 @@
 | openapi-typescript | 7.13.0 | MIT |
 | zustand | 5.0.16 | MIT |
 | uplot | 1.6.32 | MIT |
+| katex | 0.19.1 | MIT |
 | vite | 8.3.4 | MIT |
 | @vitejs/plugin-react | 6.1.2 | MIT |
 | vitest | 5.0.5 | MIT |
@@ -41,7 +42,7 @@
 | @biomejs/biome | 2.5.15 | MIT |
 | @types/node | 26.6.5 | MIT |
 
-Wave 4 added no new JS dependency. The comparison table and rate–distortion chart reuse the already-listed `uplot` 1.6.32 (MIT); real codecs keep using the separately-invoked `ffmpeg` binary.
+Wave 5 added `katex` 0.19.1 (MIT) for the theory panels; Wave 4 added no new JS dependency. The comparison table and rate–distortion chart reuse the already-listed `uplot` 1.6.32 (MIT); real codecs keep using the separately-invoked `ffmpeg` binary.
 
 ## Python (apps/api/uv.lock, tools/golden/uv.lock, tools/demo_clips/uv.lock)
 
@@ -86,6 +87,22 @@ Wave 4 added no new JS dependency. The comparison table and rate–distortion ch
 | uvloop | 0.23.0 | MIT |
 | watchfiles | 1.3.0 | MIT |
 | websockets | 17.2 | BSD-3-Clause |
+
+### ML extra (`apps/api[ml]`, not installed by default or in CI)
+
+| Component | Version | License |
+|---|---|---|
+| torch | 2.15.0 (Linux/Docker, `+cpu` wheel), 2.2.2 (Intel macOS) | BSD-3-Clause |
+| torchaudio | 2.11.1 (Linux/Docker, `+cpu` wheel), 2.2.2 (Intel macOS) | BSD-2-Clause |
+| transformers | 4.57.6 | Apache-2.0 |
+| demucs | 4.1.0 | MIT |
+| sherpa-onnx | 2.0.1 | Apache-2.0 |
+| audiosronnx | 0.0.1 | Apache-2.0 |
+| onnxruntime | 1.31.1 (Linux), 1.23.2 (Intel macOS) | MIT |
+| huggingface-hub | 0.36.2 | Apache-2.0 |
+| soundfile | 0.14.0 | BSD-3-Clause |
+
+Model weights are third-party assets tracked with revisions and licenses in `docs/MODELS.md`; they are downloaded at setup time, never committed or bundled.
 
 ## Fonts
 

@@ -13,11 +13,16 @@ CPU is the floor (D-002).
 | `03-separation-asr-codec.md` | htdemucs separation, Whisper tiny ASR + WER, Encodec neural codec + rate–distortion point | **done** |
 | `04-filter-lab.md` | F11 worker ops, state/URL, filter-design UI, pole-zero/stability | **done** |
 | `05-teaching-layer.md` | F16 theory framework, F11/F14 theory, `/experiments`, demo share, WAV/PNG export | **done** |
-| `06-closeout.md` | Full gates, docs, offline/model smoke, Docker smoke, Persian review list | **pending** |
+| `06-closeout.md` | Full gates, docs, offline/model smoke, Docker smoke, Persian review list | **done** |
 
 Execution order: 01 → 02 → 03 → 04 → 05 → 06. Plan 04 is independent of the
 ML plans and may run in parallel with 01–03. Plan 05 depends on 04 and on the
 F14 tool surfaces from 02–03.
+
+Commit ranges on `feat/wave-5`: Plan 01 `e5140e6..25071b1`, Plan 02
+`bf44536..2db84e7`, Plan 03 `2680939..ed480ee`, Plan 04 `71956df..65c4a3c`,
+Plan 05 `ddde811..bf6a358`, Plan 06 `c1ba2e4..HEAD`. The plan-docs commit
+`ca491b8` precedes Plan 01.
 
 ## Decisions pinned for this wave
 
@@ -45,11 +50,6 @@ F14 tool surfaces from 02–03.
   bandwidth extension.
 - **D-038:** F16 share links encode only bundled demo clips (`demoId`), never
   user uploads. Unknown ids fall back to the normal empty state.
-- **D-040:** Super-resolution downloads the ONNX artifacts from
-  `TigreGotico/audiosronnx-lavasr` (the repo `audiosronnx` actually pins),
-  not the upstream PyTorch-only `YatharthS/LavaSR`. The ONNX repo card has no
-  license field; upstream LavaSR and the package declare Apache-2.0. Record
-  the gap and use the local flat files with `audiosronnx`.
 - **D-039:** Intel-macOS CPU compatibility is explicit. PyTorch stopped
   publishing Intel-mac wheels after 2.2.2, and that wheel requires NumPy 1.x.
   On `darwin`/`x86_64` the API therefore resolves `numpy>=1.26,<2`,
@@ -58,6 +58,14 @@ F14 tool surfaces from 02–03.
   NumPy 2.x and `torch>=2.6`. `transformers` stays `<5` so the 2.2 path is
   supported. This is the owner's local demo target; it must be tested before
   close-out.
+- **D-040:** Super-resolution downloads the ONNX artifacts from
+  `TigreGotico/audiosronnx-lavasr` (the repo `audiosronnx` actually pins),
+  not the upstream PyTorch-only `YatharthS/LavaSR`. The ONNX repo card has no
+  license field; upstream LavaSR and the package declare Apache-2.0. Record
+  the gap and use the local flat files with `audiosronnx`.
+- **D-041:** Linux/Docker pins `torch` and `torchaudio` to the PyTorch CPU
+  index, so the image has no CUDA packages or `triton`; macOS keeps its PyPI
+  pins. The uv cache mount makes Docker retries cheap.
 
 ## Global gates
 
@@ -75,7 +83,9 @@ F14 tool surfaces from 02–03.
 - No main-thread DSP; F11 uses the DSP worker.
 - All strings through i18n; Persian copy is machine-drafted and flagged for
   owner review.
-- Do not push or deploy without the owner’s request.
+- Do not push or deploy without the owner’s request. (The owner requested the
+  `feat/wave-5` → `main` PR on 2026-11-04; close-out commits and the branch
+  push are authorized.)
 
 ## Carries
 

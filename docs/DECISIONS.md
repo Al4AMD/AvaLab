@@ -297,7 +297,39 @@
 - Decision: bundle three concatenated Kathleen utterances (CC0 `rhasspy/dataset-voice-kathleen`) as speech, a seeded pink-noise derivative at 5 dB SNR, and a 15 s excerpt of the CC0 “Life Turns to History” as music. Source URLs, revisions, and SHA-256 hashes live in `docs/THIRD_PARTY.md`; `tools/demo_clips/fetch_f14.py` regenerates and verifies them.
 - Consequences: demo experiments work offline and the repository carries no copyrighted music or uncleared voice. The noisy derivative is deterministic from the pinned seed, and asset drift fails the verifier.
 
-## D-037 — Linux/Docker installs CPU-only PyTorch wheels
+## D-037 — Super-resolution compares LavaSR against the sinc resampler
+
+- Date: 2026-11-03
+- Status: accepted (owner, Wave 5 brainstorm)
+- Context: F14 super-resolution must show what a learned bandwidth extension adds. Comparing LavaSR only against the original source would hide the effect of the bandwidth loss itself; comparing against a strong classical baseline isolates the learned contribution.
+- Decision: the A/B experiment runs three lanes on the same excerpt: the band-limited low-rate source, the existing `resampleRational` windowed-sinc path upsampled back to the source rate, and the LavaSR backend job. The sinc lane reuses the Wave-3 resampler; no new baseline algorithm is added.
+- Consequences: the chart attributes only the difference between the learned model and a good classical interpolation to learning. The sinc path cannot restore missing high-band content, so the comparison is honest, and results stay reproducible offline.
+
+## D-038 — F16 share links encode only bundled demo clips
+
+- Date: 2026-11-03
+- Status: accepted (owner, Wave 5 brainstorm)
+- Context: instructors need URL-ready experiments, but user uploads are private and the URL is public by nature.
+- Decision: share links carry the tool, its parameters, and a `demoId` from the bundled CC0 clip set. They never encode user-uploaded audio, file names, or `audio_id`s. An unknown or missing id falls back to the normal empty state with an explanation.
+- Consequences: links are safe to paste into a class and never leak uploads; an experiment built on a user file is shareable only as its parameter set, and the recipient must load audio first.
+
+## D-039 — Intel-macOS CPU compatibility is explicit
+
+- Date: 2026-11-03
+- Status: accepted (owner, Wave 5 closeout; verified 2026-11-04)
+- Context: PyTorch stopped publishing Intel-mac wheels after 2.2.2, and that wheel requires NumPy 1.x. The owner presents from an Intel macOS laptop, so the default NumPy 2.x/torch 2.6+ resolution would break the live demo.
+- Decision: on `darwin`/`x86_64` the API resolves `numpy>=1.26,<2`, `scipy>=1.16,<1.17`, `torch>=2.1,<2.3`, `torchaudio>=2.1,<2.3`, and the last Intel-mac `onnxruntime` build. `transformers` stays `<5` so the 2.2 path is supported. Other platforms keep NumPy 2.x and `torch>=2.6`.
+- Consequences: the owner's laptop runs the real models locally; the two lock resolutions must both stay green (`pnpm check` plus the API suite and mypy on this host). CI and Docker use the modern Linux line, so an Intel-only regression must be caught by the owner's gated model smoke.
+
+## D-040 — LavaSR uses the pinned ONNX export despite a license-metadata gap
+
+- Date: 2026-11-03
+- Status: accepted (owner, Wave 5 closeout)
+- Context: `audiosronnx` pins `TigreGotico/audiosronnx-lavasr`, not the upstream PyTorch-only `YatharthS/LavaSR`. The ONNX repo card has no license field, while upstream LavaSR and the `audiosronnx` package declare Apache-2.0 and the export cites the upstream.
+- Decision: download the ONNX artifacts from the pinned ONNX repo at revision `b3df8a262cf44e59bf84a40b7084f4479ca566b4` and load them through the local flat-file path in `audiosronnx`. Record the metadata gap in `docs/MODELS.md` and here instead of assuming a license.
+- Consequences: the offline super-resolution demo works on CPU with a documented provenance gap. If the ONNX repo later changes license or disappears, the pinned revision and the upstream Apache-2.0 provenance are the fallback evidence; a redistributor must review this item.
+
+## D-041 — Linux/Docker installs CPU-only PyTorch wheels
 
 - Date: 2026-11-04
 - Status: accepted (owner, Wave 5 closeout)

@@ -1,6 +1,6 @@
 # Wave 5 · Plan 06 — Close-out
 
-**Status:** pending.
+**Status:** in progress — Task 5 pending.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -29,20 +29,20 @@
 
 ### Task 1: Full static and unit gates
 
-- [ ] **Step 1: Run** `pnpm check` — lint, typecheck, dsp/web/scripts tests, i18n parity. Fix failures.
-- [ ] **Step 2: Run** `uv run --directory apps/api pytest -q` — default suite without heavy models. Fix failures.
-- [ ] **Step 3: Run** `uv run --directory apps/api ruff check .` and `uv run --directory apps/api mypy .` — fix failures.
-- [ ] **Step 4: Run** `pnpm e2e` — both locales, zero console errors. Fix failures.
-- [ ] **Step 5: Commit** `test(F14/F11/F16): pass wave 5 gates`.
+- [x] **Step 1: Run** `pnpm check` — lint, typecheck, dsp/web/scripts tests, i18n parity. Fix failures.
+- [x] **Step 2: Run** `uv run --directory apps/api pytest -q` — default suite without heavy models. Fix failures.
+- [x] **Step 3: Run** `uv run --directory apps/api ruff check .` and `uv run --directory apps/api mypy .` — fix failures.
+- [x] **Step 4: Run** `pnpm e2e` — both locales, zero console errors. Fix failures.
+- [x] **Step 5: Commit** `test(F14/F11/F16): pass wave 5 gates`.
 
 ### Task 2: Model and offline smoke
 
-- [ ] **Step 1: Run** `uv run --directory apps/api python scripts/download_models.py --check` — expected: all five specs listed, cache state reported, no download.
-- [ ] **Step 2: If models are cached, run** `AVALAB_RUN_ML_TESTS=1 uv run --directory apps/api pytest -q -m ml` — record pass/skip per model.
-- [ ] **Step 3: Run** `HF_HUB_OFFLINE=1 uv run --directory apps/api uvicorn avalab_api.main:app --port 8001` and `curl /api/v1/models` — expected: list with `available`, no network attempt.
-- [ ] **Step 4: With an empty cache, start the API and open `/tools/ai` — expected: tabs render, run disabled, reason key shown.**
-- [ ] **Step 5: Record measured CPU latency for denoise, super-resolution, separation, ASR, and neural codec on the demo excerpts in `docs/MODELS.md`; label estimates as estimates.**
-- [ ] **Step 6: Commit** `test(F14): record model and offline smoke`.
+- [x] **Step 1: Run** `uv run --directory apps/api python scripts/download_models.py --check` — expected: all five specs listed, cache state reported, no download.
+- [x] **Step 2: If models are cached, run** `AVALAB_RUN_ML_TESTS=1 uv run --directory apps/api pytest -q -m ml` — record pass/skip per model.
+- [x] **Step 3: Run** `HF_HUB_OFFLINE=1 uv run --directory apps/api uvicorn avalab_api.main:app --port 8001` and `curl /api/v1/models` — expected: list with `available`, no network attempt.
+- [x] **Step 4: With an empty cache, start the API and open `/tools/ai` — expected: tabs render, run disabled, reason key shown.**
+- [x] **Step 5: Record measured CPU latency for denoise, super-resolution, separation, ASR, and neural codec on the demo excerpts in `docs/MODELS.md`; label estimates as estimates.**
+- [x] **Step 6: Commit** `test(F14): record model and offline smoke`.
 
 ### Task 3: Docker CPU smoke
 
@@ -55,13 +55,13 @@
 
 ### Task 4: Documentation and review list
 
-- [ ] **Step 1: Update `docs/MODELS.md`** with final revisions, licenses (including LavaSR/htdemucs gaps), sizes, input/output rates, CPU timings, and limitations.
-- [ ] **Step 2: Update `docs/DECISIONS.md`** with D-032–D-038 final text and any implementation deviations.
-- [ ] **Step 3: Update `docs/ALGORITHMS.md`** with F11 design/apply details, sinc baseline, WER normalization, and Encodec estimate formula.
-- [ ] **Step 4: Update `docs/THIRD_PARTY.md`** with KaTeX, ML packages, and demo asset provenance.
-- [ ] **Step 5: Update `docs/PROGRESS.md`** with done/partial/cut, known issues, Persian review list, next-wave recommendation.
-- [ ] **Step 6: Update `docs/plans/wave-5/README.md`** statuses and commit ranges.
-- [ ] **Step 7: Commit** `docs(F14/F11/F16): close wave 5`.
+- [x] **Step 1: Update `docs/MODELS.md`** with final revisions, licenses (including LavaSR/htdemucs gaps), sizes, input/output rates, CPU timings, and limitations.
+- [x] **Step 2: Update `docs/DECISIONS.md`** with D-032–D-038 final text and any implementation deviations.
+- [x] **Step 3: Update `docs/ALGORITHMS.md`** with F11 design/apply details, sinc baseline, WER normalization, and Encodec estimate formula.
+- [x] **Step 4: Update `docs/THIRD_PARTY.md`** with KaTeX, ML packages, and demo asset provenance.
+- [x] **Step 5: Update `docs/PROGRESS.md`** with done/partial/cut, known issues, Persian review list, next-wave recommendation.
+- [x] **Step 6: Update `docs/plans/wave-5/README.md`** statuses and commit ranges.
+- [x] **Step 7: Commit** `docs(F14/F11/F16): close wave 5`.
 
 ### Task 5: Final verification
 
