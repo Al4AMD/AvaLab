@@ -125,8 +125,10 @@ class TransformersEncodecBackend:
 
     def roundtrip(self, samples: np.ndarray, bandwidth_kbps: float) -> np.ndarray:
         torch = cast(Any, import_module("torch"))
+        mono = np.ascontiguousarray(samples, dtype=np.float32)
+        stereo = np.stack([mono, mono])
         inputs = self._processor(
-            raw_audio=np.ascontiguousarray(samples, dtype=np.float32),
+            raw_audio=stereo,
             sampling_rate=self.sample_rate_hz,
             return_tensors="pt",
         )

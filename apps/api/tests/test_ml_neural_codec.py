@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -12,6 +13,7 @@ from avalab_api.ml.neural_codec import (
     MODEL_RATE_HZ,
     NeuralCodecParams,
     NeuralCodecRunner,
+    TransformersEncodecBackend,
     load_encodec,
 )
 
@@ -117,6 +119,42 @@ def test_non_finite_input_is_rejected() -> None:
     samples[10] = np.inf
     with pytest.raises(ValueError, match="non-finite"):
         NeuralCodecRunner(FakeEncodec()).run(samples, 48_000, {}, lambda _: None)
+
+
+def test_backend_feeds_stereo_and_returns_mono() -> None:
+    torch = pytest.importorskip("torch")
+    seen: dict[str, Any] = {}
+
+    class FakeProcessor:
+        feature_extractor = SimpleNamespace(sampling_rate=48_000)
+
+        def __call__(
+            self, raw_audio: np.ndarray, sampling_rate: int, return_tensors: str
+        ) -> dict[str, Any]:
+            seen["shape"] = raw_audio.shape
+            seen["rate"] = sampling_rate
+            mono = torch.from_numpy(np.asarray(raw_audio, dtype=np.float32).mean(axis=0))
+            return {
+                "input_values": mono.repeat(2, 1).unsqueeze(0),
+                "padding_mask": None,
+            }
+
+    class FakeModel:
+        def encode(self, input_values: Any, **kwargs: Any) -> Any:
+            return SimpleNamespace(
+                audio_codes=input_values, audio_scales=None, last_frame_pad_length=0
+            )
+
+        def decode(self, codes: Any, scales: Any, **kwargs: Any) -> Any:
+            return SimpleNamespace(audio_values=codes)
+
+    backend = TransformersEncodecBackend(FakeModel(), FakeProcessor())
+    result = backend.roundtrip(_tone(48_000, 0.1), 6.0)
+
+    assert seen["shape"] == (2, 4_800)
+    assert seen["rate"] == 48_000
+    assert result.ndim == 1
+    assert result.size == 4_800
 
 
 @pytest.mark.ml
