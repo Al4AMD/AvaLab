@@ -15,6 +15,7 @@
     "@avalab/dsp": "workspace:*",
     "clsx": "^2.1.1",
     "i18next": "^26.5.2",
+    "katex": "^0.19.1",
     "openapi-fetch": "^0.17.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
@@ -27,6 +28,7 @@
   "devDependencies": {
     "@playwright/test": "^1.64.1",
     "@tailwindcss/vite": "^4.3.3",
+    "@types/katex": "^0.16.8",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",

@@ -1135,5 +1135,8 @@
       "busy": "Applying…",
       "done": "Applied {{start}} – {{end}} · delay {{delay}} samples"
     }
+  },
+  "theory": {
+    "title": "Theory and what to observe"
   }
 }

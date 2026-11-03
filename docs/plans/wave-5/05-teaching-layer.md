@@ -2,7 +2,7 @@
 
 **Status:** pending.
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** F16 for Wave 5: theory panels for F11/F14, three guided experiments, share-by-URL for bundled demo clips, and WAV/PNG export. Older labs get theory in Wave 6.
 
@@ -45,11 +45,11 @@
 - `Formula` props: `{ tex: string; display?: boolean }`; uses `katex.renderToString` with `throwOnError: true`, `output: "html"`, wrapped in `dir="ltr"`.
 - Accessible `<details>`/`<summary>` or section structure; no raw HTML.
 
-- [ ] **Step 1: Add `katex` + `@types/katex`; run install.**
-- [ ] **Step 2: Write failing tests** for formula rendering, LTR wrapper, section headings, and invalid TeX throwing in test mode.
-- [ ] **Step 3: Implement components and add `theory.*` shell keys.**
-- [ ] **Step 4: Run** `pnpm check` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F16): add theory panel and KaTeX formula`.
+- [x] **Step 1: Add `katex` + `@types/katex`; run install.**
+- [x] **Step 2: Write failing tests** for formula rendering, LTR wrapper, section headings, and invalid TeX throwing in test mode.
+- [x] **Step 3: Implement components and add `theory.*` shell keys.**
+- [x] **Step 4: Run** `pnpm check` — expected PASS.
+- [x] **Step 5: Commit** `feat(F16): add theory panel and KaTeX formula`.
 
 ### Task 2: F11 theory content
 
