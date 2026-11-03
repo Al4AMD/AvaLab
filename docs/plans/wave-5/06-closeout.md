@@ -46,12 +46,12 @@
 
 ### Task 3: Docker CPU smoke
 
-- [ ] **Step 1: Build** `docker compose build api web` — expected: succeeds with the `ml` extra.
-- [ ] **Step 2: Start** `docker compose up -d`; `curl /api/v1/health` — expected: `ffmpeg: true`, codecs list.
-- [ ] **Step 3: `curl /api/v1/models` — expected: five models, cache state honest.**
-- [ ] **Step 4: Open the web app; load a demo; open `/tools/ai` — expected: no console errors.**
-- [ ] **Step 5: Record image size and any CPU-only caveats in `PROGRESS.md`; stop containers.**
-- [ ] **Step 6: Commit** `test(F14): verify docker cpu smoke` if docs changed.
+- [x] **Step 1: Build** `docker compose build api web` — expected: succeeds with the `ml` extra.
+- [x] **Step 2: Start** `docker compose up -d`; `curl /api/v1/health` — expected: `ffmpeg: true`, codecs list.
+- [x] **Step 3: `curl /api/v1/models` — expected: five models, cache state honest.**
+- [x] **Step 4: Open the web app; load a demo; open `/tools/ai` — expected: no console errors.**
+- [x] **Step 5: Record image size and any CPU-only caveats in `PROGRESS.md`; stop containers.**
+- [x] **Step 6: Commit** `test(F14): verify docker cpu smoke` if docs changed.
 
 ### Task 4: Documentation and review list
 

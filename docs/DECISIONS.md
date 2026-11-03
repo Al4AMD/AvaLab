@@ -296,3 +296,11 @@
 - Context: the AI lab needs speech, noisy speech, and music clips that can be committed and redistributed with the public educational repository.
 - Decision: bundle three concatenated Kathleen utterances (CC0 `rhasspy/dataset-voice-kathleen`) as speech, a seeded pink-noise derivative at 5 dB SNR, and a 15 s excerpt of the CC0 “Life Turns to History” as music. Source URLs, revisions, and SHA-256 hashes live in `docs/THIRD_PARTY.md`; `tools/demo_clips/fetch_f14.py` regenerates and verifies them.
 - Consequences: demo experiments work offline and the repository carries no copyrighted music or uncleared voice. The noisy derivative is deterministic from the pinned seed, and asset drift fails the verifier.
+
+## D-037 — Linux/Docker installs CPU-only PyTorch wheels
+
+- Date: 2026-11-04
+- Status: accepted (owner, Wave 5 closeout)
+- Context: the lockfile resolved Linux `torch` from PyPI, whose wheel pulls CUDA runtime packages plus `triton` even though the deployment target is CPU-only. This inflated the API image and made Docker builds fail repeatedly on large wheel downloads.
+- Decision: pin a Linux-only `torch`/`torchaudio` source to the official PyTorch CPU index (`https://download.pytorch.org/whl/cpu`) in `apps/api/pyproject.toml`; macOS keeps its existing PyPI pins. The Docker build also mounts a uv cache so retries reuse downloaded wheels.
+- Consequences: the Linux Docker image installs `torch==2.15.0+cpu`/`torchaudio==2.11.1+cpu` with no `nvidia-*` packages or `triton` (1.12 GB image). A future GPU profile needs its own lock resolution and must not silently reuse this CPU lock.

@@ -471,6 +471,14 @@ Wave 5 plans 01–05 are complete on `feat/wave-5` (ML tools, filter lab, teachi
 - Carries: `filters.*` Persian copy joins the Wave-5 owner-review backlog. FIR roots are omitted above 33 taps (documented in the UI); biquad supports only lowpass/highpass/notch/peaking; whole-file FIR apply returns the same length as the source because preview delay compensation is on. Backend untouched in this plan.
 - **Next step:** execute Wave 5 plan 05.
 
+## 2026-11-04 — Wave 5 Docker close-out fixes
+
+- Fixed `docker/web.Dockerfile`: the web image now copies `packages/dsp` source before `pnpm --filter @avalab/web build`. The package exports `./src/index.ts`, so the stale "not a build dependency" comment was wrong and the image build failed without the source.
+- Fixed `docker/api.Dockerfile`: both `uv sync` layers install the `ml` extra (D-033) and use a uv cache mount. Linux torch/torchaudio now resolve from the PyTorch CPU index (D-037), removing CUDA packages and `triton` from the image.
+- Gates run in this session: `docker compose build api web` succeeds; API image 1.12 GB, web image 109 MB. `docker compose up -d` reports API healthy. `/api/v1/health` → `ffmpeg: true`, codecs `wav, flac, mp3, aac, opus, vorbis`. `/api/v1/models` lists all five pinned models with `state: missing` (clean cache; honest, no network fetch). Web root returns 200 and the Caddy `/api` proxy returns the same health payload. Browser check against the Docker stack loaded the pink-noise demo (`5.000 s` readout) and opened `/tools/ai` with zero console errors.
+- Caveat: host port 8080 is occupied by Homebrew Apache locally; the smoke used a temporary `18080:80` override outside the repo. Models were not cached in the Docker smoke, so `/tools/ai` run controls stay disabled; the model/offline smoke and CPU latency table were already done in `957e54d`. Remaining close-out work is plan Task 4 docs and Task 5 final verification.
+- **Next step:** execute `docs/plans/wave-5/06-closeout.md` Task 4.
+
 ## 2026-11-03 — Wave 5 plan 05 complete (F16 teaching layer)
 
 - Tasks 1–7 complete on `feat/wave-5`: theory framework + KaTeX (`ddde811`), F11 theory (`d827933`), F14 theory (`86bd062`), guided experiments (`32e6f10`), demo share links (`a62dcb9`, docs checkbox fix `3b07dc1`), WAV/PNG export (`e604e77`), and this e2e/docs close-out.
