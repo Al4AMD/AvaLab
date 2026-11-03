@@ -28,6 +28,10 @@ import {
   alawEncode,
   aliasFrequencyHz,
   averagePower,
+  biquadHighpass,
+  biquadLowpass,
+  biquadNotch,
+  biquadPeaking,
   buildHistogram,
   bytesToInt16Pcm,
   classifySignalType,
@@ -37,12 +41,16 @@ import {
   convolveFft,
   decodeLosslessDeltaHuffman,
   decodeMdct,
+  designButterworth,
+  designChebyshev1,
+  designFirWindow,
   editSpectrum,
   encodeLosslessDeltaHuffman,
   encodeMdct,
   entropyBitsPerSymbol,
   fft,
   floatToInt16Pcm,
+  freqz,
   generateChirp,
   generateImpulse,
   generatePinkNoise,
@@ -54,10 +62,13 @@ import {
   generateTriangle,
   generateTwoTone,
   generateWhiteNoise,
+  groupDelaySamples,
   huffmanDecode,
   huffmanEncode,
+  impulseResponse,
   int16PcmToBytes,
   int16PcmToFloat,
+  isStable,
   kaiser,
   magnitudeDb,
   mse,
@@ -65,6 +76,7 @@ import {
   mulawEncode,
   periodicExtend,
   pitchShift,
+  polesZeros,
   psnrDb,
   quantizationError,
   quantizeUniform,
@@ -79,6 +91,7 @@ import {
   segmentalSnrDb,
   signalEnergy,
   snrDb,
+  stepResponse,
   support,
   timeScale,
   timeShift,
@@ -719,6 +732,221 @@ export type SpeedTransformResult = {
   };
   payload?: TransferablePayload;
 };
+
+export type FilterDesignKind = "fir" | "butterworth" | "chebyshev1" | "biquad";
+export type FilterBand = "lowpass" | "highpass" | "bandpass" | "bandstop" | "notch" | "peaking";
+export type FilterWindowKind = "hamming" | "blackman" | "kaiser";
+
+export type FilterDesignParams = {
+  kind: FilterDesignKind;
+  band: FilterBand;
+  cutoffHz: number;
+  cutoff2Hz?: number;
+  order: number;
+  taps: number;
+  window: FilterWindowKind;
+  rippleDb: number;
+  q: number;
+  gainDb: number;
+  sampleRateHz: number;
+};
+
+export type FilterDesignResult = {
+  meta?: { stable: boolean; delaySamples: number };
+  payload?: TransferablePayload;
+  b: number[];
+  a: number[];
+  frequenciesHz: number[];
+  magnitudeDb: number[];
+  phaseRad: number[];
+  groupDelaySamples: number[];
+  impulse: number[];
+  step: number[];
+  poles: { re: number; im: number }[];
+  zeros: { re: number; im: number }[];
+  stable: boolean;
+  delaySamples: number;
+};
+
+const FILTER_DESIGN_POINTS = 512;
+const FILTER_RESPONSE_SAMPLES = 256;
+const FILTER_DB_FLOOR = -160;
+const FILTER_ROOT_MAX_TAPS = 33;
+
+function filterDesignBandValid(kind: FilterDesignKind, band: FilterBand): boolean {
+  if (kind === "biquad") {
+    return band === "lowpass" || band === "highpass" || band === "notch" || band === "peaking";
+  }
+  return band === "lowpass" || band === "highpass" || band === "bandpass" || band === "bandstop";
+}
+
+function filterDesignError(params: FilterDesignParams): string | null {
+  if (!Number.isFinite(params.sampleRateHz) || params.sampleRateHz <= 0) {
+    return "sampleRateHz must be finite and > 0";
+  }
+  if (!filterDesignBandValid(params.kind, params.band)) {
+    return `${params.kind} does not support ${params.band}`;
+  }
+  const nyquistHz = params.sampleRateHz / 2;
+  if (!Number.isFinite(params.cutoffHz) || params.cutoffHz <= 0 || params.cutoffHz >= nyquistHz) {
+    return "cutoffHz must be inside (0, Nyquist)";
+  }
+  const needsSecondCutoff = params.band === "bandpass" || params.band === "bandstop";
+  if (needsSecondCutoff) {
+    if (
+      !Number.isFinite(params.cutoff2Hz) ||
+      (params.cutoff2Hz ?? 0) <= params.cutoffHz ||
+      (params.cutoff2Hz ?? 0) >= nyquistHz
+    ) {
+      return "cutoff2Hz must be finite and greater than cutoffHz inside Nyquist";
+    }
+  }
+  if (params.kind === "fir") {
+    if (!Number.isInteger(params.taps) || params.taps < 3 || params.taps > 257) {
+      return "taps must be an odd integer in [3, 257]";
+    }
+    if (params.taps % 2 === 0) {
+      return "taps must be odd for a linear-phase FIR";
+    }
+    if (params.window !== "hamming" && params.window !== "blackman" && params.window !== "kaiser") {
+      return "unknown FIR window";
+    }
+  } else if (params.kind === "biquad") {
+    if (!Number.isFinite(params.q) || params.q <= 0) {
+      return "q must be finite and > 0";
+    }
+    if (!Number.isFinite(params.gainDb)) {
+      return "gainDb must be finite";
+    }
+  } else {
+    if (!Number.isInteger(params.order) || params.order < 1 || params.order > 8) {
+      return "order must be an integer in [1, 8]";
+    }
+    if (
+      params.kind === "chebyshev1" &&
+      (!Number.isFinite(params.rippleDb) || params.rippleDb <= 0)
+    ) {
+      return "rippleDb must be finite and > 0";
+    }
+  }
+  return null;
+}
+
+/** F11 filter design: one `{b,a}` pair plus the analysis the view plots. */
+export function filterDesign(
+  params: FilterDesignParams,
+  _payload?: TransferablePayload,
+): FilterDesignResult {
+  const error =
+    params === null || params === undefined ? "missing params" : filterDesignError(params);
+  if (error !== null) {
+    throw new DspOpError("badParams", `filterDesign: ${error}`);
+  }
+
+  try {
+    const cutoffHz =
+      params.band === "bandpass" || params.band === "bandstop"
+        ? [params.cutoffHz, params.cutoff2Hz ?? 0]
+        : [params.cutoffHz];
+    let b: Float64Array;
+    let a: Float64Array;
+    if (params.kind === "fir") {
+      b = designFirWindow({
+        band: params.band as "lowpass" | "highpass" | "bandpass" | "bandstop",
+        cutoffHz,
+        taps: params.taps,
+        sampleRateHz: params.sampleRateHz,
+        windowFilter: { kind: params.window },
+      });
+      a = new Float64Array([1]);
+    } else if (params.kind === "butterworth" || params.kind === "chebyshev1") {
+      const options = {
+        band: params.band as "lowpass" | "highpass" | "bandpass" | "bandstop",
+        cutoffHz,
+        order: params.order,
+        sampleRateHz: params.sampleRateHz,
+      };
+      const coefficients =
+        params.kind === "butterworth"
+          ? designButterworth(options)
+          : designChebyshev1({ ...options, rippleDb: params.rippleDb });
+      b = coefficients.b;
+      a = coefficients.a;
+    } else {
+      const options = {
+        frequencyHz: params.cutoffHz,
+        q: params.q,
+        sampleRateHz: params.sampleRateHz,
+      };
+      const coefficients =
+        params.band === "lowpass"
+          ? biquadLowpass(options)
+          : params.band === "highpass"
+            ? biquadHighpass(options)
+            : params.band === "notch"
+              ? biquadNotch(options)
+              : biquadPeaking({ ...options, gainDb: params.gainDb });
+      b = coefficients.b;
+      a = coefficients.a;
+    }
+
+    const response = freqz(b, a, {
+      numPoints: FILTER_DESIGN_POINTS,
+      sampleRateHz: params.sampleRateHz,
+    });
+    const groupDelay = groupDelaySamples(b, a, {
+      numPoints: FILTER_DESIGN_POINTS,
+      sampleRateHz: params.sampleRateHz,
+    });
+    const roots =
+      params.kind === "fir" && params.taps > FILTER_ROOT_MAX_TAPS ? null : polesZeros(b, a);
+    const poles =
+      roots === null
+        ? []
+        : Array.from(roots.poles.re, (re, index) => ({
+            re,
+            im: roots.poles.im[index] ?? 0,
+          }));
+    const zeros =
+      roots === null
+        ? []
+        : Array.from(roots.zeros.re, (re, index) => ({
+            re,
+            im: roots.zeros.im[index] ?? 0,
+          }));
+    const impulse = impulseResponse(b, a, FILTER_RESPONSE_SAMPLES);
+    const step = stepResponse(b, a, FILTER_RESPONSE_SAMPLES);
+    const delaySamples =
+      params.kind === "fir"
+        ? Math.floor(params.taps / 2)
+        : Math.max(0, Math.round(groupDelay[0] ?? 0));
+
+    return {
+      b: Array.from(b),
+      a: Array.from(a),
+      frequenciesHz: Array.from(response.frequencyHz),
+      magnitudeDb: Array.from(magnitudeDb(response.magnitude), (value) =>
+        Number.isFinite(value) ? Math.max(FILTER_DB_FLOOR, value) : FILTER_DB_FLOOR,
+      ),
+      phaseRad: Array.from(unwrapPhase(response.phaseRad)),
+      groupDelaySamples: Array.from(groupDelay),
+      impulse: Array.from(impulse),
+      step: Array.from(step),
+      poles,
+      zeros,
+      stable: roots === null ? true : isStable(roots.poles),
+      delaySamples,
+    };
+  } catch (cause) {
+    if (cause instanceof DspOpError) {
+      throw cause;
+    }
+    throw new DspOpError(
+      "badParams",
+      `filterDesign: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  }
+}
 
 /** F14 sinc super-resolution baseline: band-limited input -> target rate via
  * the same kaiser-sinc path the sampling lab uses. No model, fully offline. */
@@ -2010,6 +2238,24 @@ export const dspOps = {
     },
     result: undefined as unknown as GenerateSynthResult,
     handler: generateSynth,
+  },
+  filterDesign: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: {
+      kind: "fir" as FilterDesignKind,
+      band: "lowpass" as FilterBand,
+      cutoffHz: 0,
+      order: 0,
+      taps: 0,
+      window: "hamming" as FilterWindowKind,
+      rippleDb: 0,
+      q: 0,
+      gainDb: 0,
+      sampleRateHz: 0,
+    } as FilterDesignParams,
+    result: undefined as unknown as FilterDesignResult,
+    handler: filterDesign,
   },
   superresBaseline: {
     // Type lenses only — the table is read for types (DspOpParams/Result);

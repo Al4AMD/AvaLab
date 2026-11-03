@@ -33,6 +33,7 @@ import {
   dspOps,
   extentProcess,
   fftSelection,
+  filterDesign,
   generateSynth,
   reverbProcess,
   samplingProcess,
@@ -69,6 +70,7 @@ const dspHandlers = {
   convolutionSteps,
   extentProcess,
   fftSelection,
+  filterDesign,
   generateSynth,
   reverbProcess,
   samplingProcess,
@@ -177,6 +179,10 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
       }
       case "speedTransform": {
         const result = dspHandlers.speedTransform(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "filterDesign": {
+        const result = dspHandlers.filterDesign(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       case "superresBaseline": {
