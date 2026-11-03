@@ -94,6 +94,7 @@ describe("loadOfflineFile success", () => {
         sourceKind: "offlineBrowser",
       },
     });
+    expect(result.source.demoId).toBeUndefined();
     expect(decode.received).toBeInstanceOf(ArrayBuffer); // the read bytes reached the seam
 
     const state = store.getState();
@@ -191,6 +192,7 @@ describe("loadDemoClip", () => {
 
     expect(requested).toEqual(["/demo/pink-noise-5s.wav"]);
     expect(result.source.sourceKind).toBe("demoClip");
+    expect(result.source.demoId).toBe("pinkNoise");
     expect(result.source.name).toBe("pink-noise-5s.wav");
     expect(result.source.samples).toEqual(new Float32Array([1, -1]));
     expect(store.getState().getDerived(seededKey).status).toBe("miss");

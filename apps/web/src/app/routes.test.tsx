@@ -163,6 +163,9 @@ it("the waveform empty state offers the demo clips with fa/en parity (Task 2)", 
   expect(markup).toContain(
     i18n.t("input.demo.loadAria", { title: i18n.t("input.demo.chirp.title") }),
   );
+  expect(markup).toContain(
+    i18n.t("input.demo.shareAria", { title: i18n.t("input.demo.chirp.title") }),
+  );
 
   // Parity: every demo key resolves under the ENGLISH locale too (a missing
   // translation makes i18next echo the key itself, which would fail here),
@@ -173,6 +176,7 @@ it("the waveform empty state offers the demo clips with fa/en parity (Task 2)", 
     "input.demo.clicks.title",
     "input.demo.pinkNoise.title",
     "input.demo.loadButton",
+    "input.demo.shareButton",
   ]) {
     expect(i18n.t(key, { lng: "en" })).not.toBe(key);
     expect(markup).not.toContain(key);

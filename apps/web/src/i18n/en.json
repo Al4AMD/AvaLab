@@ -45,6 +45,10 @@
       "loadButton": "Load",
       "loadAria": "Load demo clip: {{title}}",
       "loading": "Loading…",
+      "shareButton": "Copy link",
+      "shareAria": "Copy share link for demo clip: {{title}}",
+      "shareCopied": "Share link copied.",
+      "shareFailed": "Could not copy the share link.",
       "chirp": {
         "title": "Logarithmic chirp (100 Hz → 8 kHz)"
       },

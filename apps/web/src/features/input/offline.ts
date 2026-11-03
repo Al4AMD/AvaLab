@@ -97,6 +97,7 @@ async function decodeAndLoad(
   sourceKind: SourceKind,
   decodeWav: DecodeWav,
   store: OfflineStore,
+  demoId?: DemoClipId,
 ): Promise<LoadedSource> {
   let decoded: DecodedAudio;
   try {
@@ -107,7 +108,7 @@ async function decodeAndLoad(
 
   const load = store
     .getState()
-    .loadSource(monoDownmix(decoded), decoded.sampleRate, name, sourceKind);
+    .loadSource(monoDownmix(decoded), decoded.sampleRate, name, sourceKind, demoId);
   if (!load.ok) {
     throw new OfflineError({
       kind: "storeCode",
@@ -222,5 +223,5 @@ export async function loadDemoClip(
   } catch (error) {
     throw demoUnavailableError(error);
   }
-  return decodeAndLoad(bytes, clip.file, "demoClip", decodeWav, store);
+  return decodeAndLoad(bytes, clip.file, "demoClip", decodeWav, store, clip.id);
 }

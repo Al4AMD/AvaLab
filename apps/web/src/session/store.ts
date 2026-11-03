@@ -39,6 +39,7 @@
  */
 import { inputHashFnv1a64 } from "@avalab/dsp";
 import { create, type StoreApi, type UseBoundStore } from "zustand";
+import type { DemoClipId } from "../features/input/offline";
 import type { DspOpName, DspOpParams } from "./ops";
 import type { DspOpOutcome, TransferablePayload } from "./protocol";
 import { canonicalJson } from "./protocol";
@@ -62,6 +63,8 @@ export type SessionSource = {
   readonly sampleRateHz: number;
   readonly name: string;
   readonly sourceKind: SourceKind;
+  /** Bundled clip id when `sourceKind` is "demoClip"; absent otherwise. */
+  readonly demoId?: DemoClipId;
 };
 
 /** Playback lane: the immutable original or the current tool result. */
@@ -170,6 +173,7 @@ export type SessionStore = {
     sampleRateHz: number,
     name: string,
     sourceKind: SourceKind,
+    demoId?: DemoClipId,
   ): LoadSourceResult;
   /** Install a tool result as the processed playback source. Takes ownership
    * (no copy); success switches `playbackMode` to `"processed"`. Rejects
@@ -381,12 +385,13 @@ export function createSessionStore(
       backendProbeSettled: false,
       diagnostics: { pingByteLength: null, pingStatus: "idle" },
 
-      loadSource(samples, sampleRateHz, name, sourceKind) {
+      loadSource(samples, sampleRateHz, name, sourceKind, demoId) {
         if (
           !(samples instanceof Float32Array) ||
           typeof sampleRateHz !== "number" ||
           typeof name !== "string" ||
-          !SOURCE_KINDS.includes(sourceKind)
+          !SOURCE_KINDS.includes(sourceKind) ||
+          (demoId !== undefined && (sourceKind !== "demoClip" || typeof demoId !== "string"))
         ) {
           return { ok: false, code: "invalidType" };
         }
@@ -419,7 +424,13 @@ export function createSessionStore(
         // new Map(): replaces both caches wholesale — and the late-settle
         // hash guard makes any in-flight frames of the OLD source inert.
         set({
-          original: { samples, sampleRateHz, name, sourceKind },
+          original: {
+            samples,
+            sampleRateHz,
+            name,
+            sourceKind,
+            ...(demoId === undefined ? {} : { demoId }),
+          },
           processed: null,
           playbackMode: "original",
           inputHash,
