@@ -65,6 +65,10 @@ it("renders each /tools/* stub page through the data router with its i18n title"
       title: i18n.t("tool.fftview.title"),
       body: i18n.t("input.empty.hint"),
     },
+    "/tools/filters": {
+      title: i18n.t("tool.filters.title"),
+      body: i18n.t("input.empty.hint"),
+    },
     "/tools/generator": {
       title: i18n.t("tool.generator.title"),
       body: i18n.t("generator.load"),

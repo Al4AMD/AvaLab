@@ -28,7 +28,8 @@
     "spectrumEdit": "ویرایشگر طیف (Spectrum Editor)",
     "codecLab": "آزمایشگاه فشرده‌سازی (Compression Lab)",
     "metrics": "سنجه‌های کیفیت",
-    "ai": "آزمایشگاه هوش مصنوعی (AI Lab)"
+    "ai": "آزمایشگاه هوش مصنوعی (AI Lab)",
+    "filters": "طراحی فیلتر (Filter Design)"
   },
   "input": {
     "empty": {
@@ -141,6 +142,9 @@
     },
     "ai": {
       "title": "آزمایشگاه هوش مصنوعی (AI Lab)"
+    },
+    "filters": {
+      "title": "آزمایشگاه طراحی فیلتر (Filter Design)"
     }
   },
   "codecLab": {
@@ -1047,6 +1051,89 @@
     },
     "caption": {
       "approximation": "تقریب تولیدشده با هوش مصنوعی: پیش از نتیجه‌گیری، آن را با صدای اصلی مقایسه کنید."
+    }
+  },
+  "filters": {
+    "controls": {
+      "kind": "نوع طراحی (Design Kind)",
+      "band": "باند (Band)",
+      "cutoff": "فرکانس قطع (Cutoff)",
+      "cutoff2": "فرکانس قطع دوم (Second Cutoff)",
+      "taps": "تعداد ضرایب (Taps)",
+      "window": "پنجره (Window)",
+      "q": "ضریب کیفیت (Q)",
+      "gain": "بهره (Gain)",
+      "order": "مرتبه (Order)",
+      "ripple": "موج‌داری (Ripple)",
+      "sampleRate": "نرخ نمونه‌برداری (Sample Rate)"
+    },
+    "kinds": {
+      "fir": "FIR (روش پنجره)",
+      "butterworth": "باترورث (Butterworth)",
+      "chebyshev1": "چبیشف نوع I (Chebyshev I)",
+      "biquad": "بی‌کواد RBJ (Biquad)"
+    },
+    "bands": {
+      "lowpass": "پایین‌گذر (Low-pass)",
+      "highpass": "بالاگذر (High-pass)",
+      "bandpass": "میان‌گذر (Band-pass)",
+      "bandstop": "میان‌نگه‌دار (Band-stop)",
+      "notch": "نوچ (Notch)",
+      "peaking": "قله‌ساز (Peaking)"
+    },
+    "windows": {
+      "hamming": "همینگ (Hamming)",
+      "blackman": "بلک‌من (Blackman)",
+      "kaiser": "کایزر (Kaiser)"
+    },
+    "result": {
+      "title": "طراحی و تحلیل",
+      "stability": "پایداری",
+      "stable": "پایدار",
+      "unstable": "ناپایدار",
+      "delay": "تأخیر",
+      "coefficients": "ضرایب"
+    },
+    "status": {
+      "designing": "در حال طراحی…"
+    },
+    "error": {
+      "invalid": "فرکانس قطع باید داخل بازهٔ (۰، نصف نرخ نمونه‌برداری) باشد. فرکانس قطع، لبه‌های باند، مرتبه، تعداد ضرایب و موج‌داری را بررسی کنید.",
+      "designFailed": "طراحی فیلتر ناموفق بود. پارامترها را بررسی و دوباره تلاش کنید.",
+      "playback": "نتیجهٔ فیلترشده در سقف پخش جا نمی‌شود.",
+      "applyFailed": "اعمال فیلتر ناموفق بود. بازهٔ کوتاه‌تری را امتحان کنید.",
+      "emptyRange": "بازهٔ انتخاب‌شده خالی است."
+    },
+    "delayNote": "فیلتر FIR با فاز خطی، تأخیر گروهی خود را گزارش و برای هم‌ترازی پیش‌نمایش جبران می‌کند. پاسخ علّی IIR بریده نمی‌شود.",
+    "unstableWarning": "این طراحی ناپایدار است (قطبی بیرون دایرهٔ واحد قرار دارد)؛ اعمال غیرفعال است.",
+    "plots": {
+      "frequencyAxis": "فرکانس (Hz)",
+      "magnitudeAxis": "دامنه (dB)",
+      "phaseAxis": "فاز (rad)",
+      "groupDelayAxis": "تأخیر گروهی (نمونه)",
+      "samplesAxis": "شمارهٔ نمونه",
+      "amplitudeAxis": "دامنه",
+      "empty": "دادهٔ متناهی کافی برای رسم این نمودار نیست.",
+      "magnitudeAria": "پاسخ دامنه بر حسب دسی‌بل",
+      "phaseAria": "پاسخ فاز بازشده بر حسب رادیان",
+      "groupDelayAria": "تأخیر گروهی بر حسب نمونه",
+      "impulseAria": "پاسخ ضربه",
+      "stepAria": "پاسخ پله"
+    },
+    "poleZero": {
+      "title": "صفحهٔ قطب-صفر (Pole-Zero)",
+      "aria": "نمودار قطب-صفر همراه دایرهٔ واحد",
+      "poles": "قطب‌ها",
+      "zeros": "صفرها",
+      "stable": "داخل دایرهٔ واحد — پایدار",
+      "unstable": "بیرون دایرهٔ واحد — ناپایدار",
+      "omitted": "ریشه‌ها برای طراحی FIR با بیش از ۳۳ ضریب محاسبه نشده‌اند."
+    },
+    "apply": {
+      "selection": "اعمال روی انتخاب",
+      "all": "اعمال روی کل فایل",
+      "busy": "در حال اعمال…",
+      "done": "اعمال شد: {{start}} تا {{end}} · تأخیر {{delay}} نمونه"
     }
   }
 }

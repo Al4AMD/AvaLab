@@ -4,6 +4,7 @@ import { AiLabView } from "../features/ai/aiLabView";
 import { CodecLabView } from "../features/codecLab/codecLabView";
 import { ExtentView } from "../features/extent/extentView";
 import { FftView } from "../features/fftview/fftView";
+import { FilterLabView } from "../features/filters/filterLabView";
 import { GeneratorView } from "../features/generator/generatorView";
 import { MetricsView } from "../features/metrics/metricsView";
 import { ReverbView } from "../features/reverb/reverbView";
@@ -19,6 +20,7 @@ export const TOOL_IDS = [
   "waveform",
   "spectrogram",
   "fftview",
+  "filters",
   "generator",
   "speed",
   "sampling",
@@ -84,6 +86,7 @@ export const appRoutes: RouteObject[] = [
       },
       { path: "tools/spectrogram", element: <SpectrogramView /> },
       { path: "tools/fftview", element: <FftView /> },
+      { path: "tools/filters", element: <FilterLabView /> },
       { path: "tools/generator", element: <GeneratorView /> },
       { path: "tools/speed", element: <SpeedView /> },
       { path: "tools/sampling", element: <SamplingView /> },

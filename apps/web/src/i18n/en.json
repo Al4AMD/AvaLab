@@ -28,7 +28,8 @@
     "spectrumEdit": "Spectrum editor",
     "codecLab": "Compression lab",
     "metrics": "Quality metrics",
-    "ai": "AI lab"
+    "ai": "AI lab",
+    "filters": "Filter design"
   },
   "input": {
     "empty": {
@@ -141,6 +142,9 @@
     },
     "ai": {
       "title": "AI lab"
+    },
+    "filters": {
+      "title": "Filter design"
     }
   },
   "codecLab": {
@@ -1047,6 +1051,89 @@
     },
     "caption": {
       "approximation": "AI-generated approximation: compare it with the original before drawing conclusions."
+    }
+  },
+  "filters": {
+    "controls": {
+      "kind": "Design kind",
+      "band": "Band",
+      "cutoff": "Cutoff frequency",
+      "cutoff2": "Second cutoff",
+      "taps": "Taps",
+      "window": "Window",
+      "q": "Quality factor Q",
+      "gain": "Gain (dB)",
+      "order": "Order",
+      "ripple": "Ripple (dB)",
+      "sampleRate": "Sample rate"
+    },
+    "kinds": {
+      "fir": "FIR (window method)",
+      "butterworth": "Butterworth",
+      "chebyshev1": "Chebyshev I",
+      "biquad": "RBJ biquad"
+    },
+    "bands": {
+      "lowpass": "Low-pass",
+      "highpass": "High-pass",
+      "bandpass": "Band-pass",
+      "bandstop": "Band-stop",
+      "notch": "Notch",
+      "peaking": "Peaking"
+    },
+    "windows": {
+      "hamming": "Hamming",
+      "blackman": "Blackman",
+      "kaiser": "Kaiser"
+    },
+    "result": {
+      "title": "Design and analysis",
+      "stability": "Stability",
+      "stable": "Stable",
+      "unstable": "Unstable",
+      "delay": "Delay",
+      "coefficients": "Coefficients"
+    },
+    "status": {
+      "designing": "Designing…"
+    },
+    "error": {
+      "invalid": "The cutoff must lie inside (0, Nyquist). Check the cutoff, band edges, order, taps, and ripple.",
+      "designFailed": "Filter design failed. Check the parameters and try again.",
+      "playback": "The filtered result does not fit the playback caps.",
+      "applyFailed": "Applying the filter failed. Try a shorter excerpt.",
+      "emptyRange": "The selected range is empty."
+    },
+    "delayNote": "A linear-phase FIR reports and compensates its group delay for preview alignment. The causal IIR response is not trimmed.",
+    "unstableWarning": "This design is unstable (a pole lies outside the unit circle); apply is disabled.",
+    "plots": {
+      "frequencyAxis": "Frequency",
+      "magnitudeAxis": "Magnitude (dB)",
+      "phaseAxis": "Phase (rad)",
+      "groupDelayAxis": "Group delay (samples)",
+      "samplesAxis": "Sample index",
+      "amplitudeAxis": "Amplitude",
+      "empty": "Not enough finite data to draw this plot.",
+      "magnitudeAria": "Magnitude response in decibels",
+      "phaseAria": "Unwrapped phase response in radians",
+      "groupDelayAria": "Group delay in samples",
+      "impulseAria": "Impulse response",
+      "stepAria": "Step response"
+    },
+    "poleZero": {
+      "title": "Pole-zero plane",
+      "aria": "Pole-zero plot with the unit circle",
+      "poles": "Poles",
+      "zeros": "Zeros",
+      "stable": "Inside the unit circle — stable",
+      "unstable": "Outside the unit circle — unstable",
+      "omitted": "Roots are omitted for FIR designs above 33 taps."
+    },
+    "apply": {
+      "selection": "Apply to selection",
+      "all": "Apply to whole file",
+      "busy": "Applying…",
+      "done": "Applied {{start}} – {{end}} · delay {{delay}} samples"
     }
   }
 }

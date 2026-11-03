@@ -70,6 +70,24 @@ function clampCutoff(value: number, sampleRateHz: number): number {
   return Math.min(Math.max(1, value), maxHz);
 }
 
+/** Re-anchor a codec-decoded setting to the loaded source rate. The lab has
+ * no rate control: designing at 48 kHz while playing 44.1 kHz audio would
+ * shift every cutoff, so the source rate wins and both cutoffs re-clamp. */
+export function filterSettingsAtRate(
+  settings: FilterSettings,
+  sampleRateHz: number,
+): FilterSettings {
+  const rate = integerIn(
+    sampleRateHz,
+    FILTER_MIN_RATE_HZ,
+    FILTER_MAX_RATE_HZ,
+    settings.sampleRateHz,
+  );
+  const cutoffHz = clampCutoff(settings.cutoffHz, rate);
+  const cutoff2Hz = Math.max(cutoffHz, clampCutoff(settings.cutoff2Hz, rate));
+  return { ...settings, sampleRateHz: rate, cutoffHz, cutoff2Hz };
+}
+
 export function filterSettingsToSearch(settings: FilterSettings): string {
   return encodeParams({
     as: settings.applyScope,
