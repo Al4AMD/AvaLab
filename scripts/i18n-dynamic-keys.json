@@ -8,6 +8,7 @@
   "ai.separation.stems",
   "ai.superres.failed",
   "ai.superres.installFailed",
+  "ai.theory",
   "app.health.loading",
   "app.health.offline",
   "app.health.ok",

@@ -14,8 +14,10 @@ import { useSearchParams } from "react-router";
 import { Button } from "../../components/ui/button";
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
+import { TheoryPanel } from "../theory/TheoryPanel";
 import { AI_MAX_EXCERPT_SECONDS, type AiModelInfo, type AiModelState, aiClient } from "./aiClient";
 import { AI_TASKS, type AiTask, aiTaskFromSearch } from "./aiState";
+import { AI_THEORY } from "./aiTheory";
 import { AsrTab } from "./asrTab";
 import { DenoiseTab } from "./denoiseTab";
 import { NeuralCodecTab } from "./neuralCodecTab";
@@ -270,6 +272,8 @@ export function AiLabView(): React.ReactElement {
           ) : null}
         </div>
       )}
+
+      <TheoryPanel titleKey={AI_THEORY[task].titleKey} sections={AI_THEORY[task].sections} />
 
       <p className="text-xs text-muted">{t("ai.disclaimer")}</p>
     </section>

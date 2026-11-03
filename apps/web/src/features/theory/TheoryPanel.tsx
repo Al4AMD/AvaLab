@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import { Formula } from "./Formula";
 
-type TheorySection = {
+export type TheorySection = {
   readonly headingKey: string;
   readonly bodyKey: string;
   readonly formula?: string;

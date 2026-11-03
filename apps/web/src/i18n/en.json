@@ -1051,6 +1051,128 @@
     },
     "caption": {
       "approximation": "AI-generated approximation: compare it with the original before drawing conclusions."
+    },
+    "theory": {
+      "denoise": {
+        "title": "Denoising: learned spectral suppression",
+        "concept": {
+          "heading": "How the model suppresses noise",
+          "body": "The model estimates a time-frequency mask from noisy speech and multiplies it with the complex spectrum. Unlike a fixed high-pass filter, the suppression follows speech and noise patterns learned from data."
+        },
+        "observe": {
+          "heading": "What to observe",
+          "body": "Compare the enhanced speech with the noisy demo and listen for the same events.",
+          "bullets": {
+            "noise": "Noise between words should drop more than speech onsets.",
+            "artifacts": "Listen for musical noise or smeared consonants; over-suppression removes detail.",
+            "shape": "The waveform and spectrogram should keep the same duration and sample rate."
+          }
+        },
+        "pitfalls": {
+          "heading": "Pitfalls and approximation",
+          "body": "Denoising can improve listening but hurt a downstream recognizer. AI output is an approximation, not a recovered clean recording.",
+          "bullets": {
+            "speechLoss": "A high mask can delete weak speech sounds as well as noise.",
+            "notRecovered": "Artifacts remain; do not present the result as the original clean source."
+          }
+        }
+      },
+      "superres": {
+        "title": "Super-resolution: bandwidth extension",
+        "concept": {
+          "heading": "Extension versus interpolation",
+          "body": "Sinc interpolation can only fill between existing samples, while a learned model predicts plausible content above the old Nyquist frequency from the low band."
+        },
+        "observe": {
+          "heading": "What to observe",
+          "body": "Compare the learned result with the sinc baseline on the same speech clip.",
+          "bullets": {
+            "spectrum": "LavaSR should extend energy above the cutoff; interpolation leaves a hard band edge.",
+            "brightness": "Listen for added brightness against a dull, band-limited copy.",
+            "plausibility": "Decide whether new high-frequency detail sounds plausible or artificial."
+          }
+        },
+        "pitfalls": {
+          "heading": "Pitfalls and approximation",
+          "body": "The model cannot restore information that was never recorded; it invents plausible detail. AI output is an approximation.",
+          "bullets": {
+            "invented": "Treat high-band content as generated, not recovered.",
+            "rates": "Different sample rates must be mapped back explicitly before listening or measuring."
+          }
+        }
+      },
+      "separation": {
+        "title": "Source separation: masks and reconstruction",
+        "concept": {
+          "heading": "Separating by time-frequency masks",
+          "body": "A separator estimates one mask or waveform per stem in the time-frequency domain, then reconstructs each source. The stems add back to an approximation of the mix, not to the exact original tracks."
+        },
+        "observe": {
+          "heading": "What to observe",
+          "body": "Solo each stem and then compare their sum with the mix.",
+          "bullets": {
+            "solo": "Vocals should dominate the vocal stem and drums the drum stem.",
+            "bleed": "Listen for bleed and hollow artifacts where another source was removed.",
+            "sum": "The summed stems should resemble the original mix, with some error."
+          }
+        },
+        "pitfalls": {
+          "heading": "Pitfalls and approximation",
+          "body": "Separation is not unmixing the original studio tracks; overlap and reverb cause errors. AI output is an approximation.",
+          "bullets": {
+            "notTracks": "Do not claim access to the master tracks; the output is estimated.",
+            "excerpt": "CPU runs use a short excerpt, so a full-file result is not implied."
+          }
+        }
+      },
+      "asr": {
+        "title": "Automatic speech recognition and WER",
+        "concept": {
+          "heading": "Acoustic model, language model, and WER",
+          "body": "An acoustic model maps frames to text tokens and a language model resolves ambiguous sounds. WER counts substitutions, deletions, and insertions over the reference word count."
+        },
+        "observe": {
+          "heading": "What to observe",
+          "body": "Keep the reference transcript fixed while you change the codec setting.",
+          "bullets": {
+            "reference": "Compare the transcript with the bundled reference after each codec.",
+            "bitrate": "Lower bitrates usually raise WER, but a denoiser can also hurt recognition.",
+            "normalization": "The checker normalizes case, punctuation, and whitespace before counting."
+          }
+        },
+        "pitfalls": {
+          "heading": "Pitfalls and approximation",
+          "body": "The transcript is an AI approximation, not a guaranteed caption. WER requires an aligned reference and honest normalization.",
+          "bullets": {
+            "alignment": "Do not compare raw strings without the documented normalization.",
+            "persian": "Tiny models are weak for Persian; use the English speech demo for this experiment."
+          }
+        }
+      },
+      "neuralCodec": {
+        "title": "Neural codec: RVQ and rate–distortion",
+        "concept": {
+          "heading": "Residual vector quantization",
+          "body": "A neural codec encodes the signal as indices into learned codebooks. Residual vector quantization refines the waveform in stages; more stages or larger codebooks raise the bitrate and usually lower distortion."
+        },
+        "observe": {
+          "heading": "What to observe",
+          "body": "Move across bitrates and compare decoded audio with the original.",
+          "bullets": {
+            "bitrates": "Compare at least low, medium, and high bitrate settings.",
+            "rateDistortion": "Watch the neural point against the traditional codec points.",
+            "artifacts": "At very low rates the codec keeps structure but loses detail."
+          }
+        },
+        "pitfalls": {
+          "heading": "Pitfalls and approximation",
+          "body": "A neural codec is not bit-exact and its delay must be aligned before metrics. Decoded audio is an AI approximation.",
+          "bullets": {
+            "alignment": "Align codec delay before computing SNR or PSNR.",
+            "stages": "Reported bitrate includes every quantizer stage; do not compare only one."
+          }
+        }
+      }
     }
   },
   "filters": {

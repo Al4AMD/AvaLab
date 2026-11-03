@@ -80,11 +80,11 @@
 - Per-tab theory keys: denoise (spectral masking/learned suppression), super-resolution (bandwidth extension vs interpolation), separation (masking/source reconstruction), ASR (acoustic model + WER), neural codec (RVQ/bitrate/distortion).
 - Each panel: one formula or block diagram description, 1–2 paragraphs, “what to observe”, pitfalls, “AI approximation” caption.
 
-- [ ] **Step 1: Write a data test** for five tabs × fa/en keys and non-empty content.
-- [ ] **Step 2: Run** focused test — expected FAIL.
-- [ ] **Step 3: Implement content and render the panel per tab.**
-- [ ] **Step 4: Run** `pnpm check` — expected PASS.
-- [ ] **Step 5: Commit** `feat(F16): add AI tool theory panels`.
+- [x] **Step 1: Write a data test** for five tabs × fa/en keys and non-empty content.
+- [x] **Step 2: Run** focused test — expected FAIL.
+- [x] **Step 3: Implement content and render the panel per tab.**
+- [x] **Step 4: Run** `pnpm check` — expected PASS.
+- [x] **Step 5: Commit** `feat(F16): add AI tool theory panels`.
 
 ### Task 4: Guided experiments and route
 
