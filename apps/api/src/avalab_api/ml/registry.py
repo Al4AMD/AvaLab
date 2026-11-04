@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from pathlib import Path
+from threading import Lock
 from typing import cast
 
 from avalab_api.errors import ApiError, ErrorCode
@@ -40,6 +41,8 @@ class ModelRegistry:
 
     def __init__(self, cache_dir: Path) -> None:
         self.cache_dir = cache_dir
+        self._runners: dict[MlTask, ModelRunner] = {}
+        self._runner_lock = Lock()
 
     def status(self, task: MlTask) -> ModelStatus:
         spec = MODEL_SPECS[task]
@@ -62,7 +65,12 @@ class ModelRegistry:
                 503,
             )
         factory = _runner_factory(task)
-        return factory(model_dir(self.cache_dir, task))
+        with self._runner_lock:
+            runner = self._runners.get(task)
+            if runner is None:
+                runner = factory(model_dir(self.cache_dir, task))
+                self._runners[task] = runner
+            return runner
 
 
 _BUILTIN_FACTORIES: dict[MlTask, tuple[str, str]] = {

@@ -362,7 +362,7 @@ export function AsrTab({
       startSample: 0,
       endSample,
     };
-    void run("asr", excerpt, { language: "en" });
+    void run("asr", excerpt, { language: null });
   }
 
   function handleLoadDemo(): void {

@@ -1366,8 +1366,8 @@
       }
     },
     "asrCodec": {
-      "title": "Compression and recognition: bitrate versus WER",
-      "goal": "Connect codec bitrate, listening quality, and the transcript quality of a speech recognizer.",
+      "title": "Compression and recognition",
+      "goal": "Connect codec bitrate with listening quality and see how a recognizer behaves on the original speech.",
       "steps": {
         "low": {
           "instruction": "Load the speech demo and encode MDCT at 32 kbps.",
@@ -1382,8 +1382,8 @@
           "observation": "For speech the result is close to transparent."
         },
         "asr": {
-          "instruction": "Run ASR and compare the transcript with the bundled reference.",
-          "observation": "WER usually rises at low bitrates; do not judge from one setting alone."
+          "instruction": "Run ASR on the original speech and note its baseline WER.",
+          "observation": "ASR always reads the original source in this lab, so WER does not change with the codec setting; use listening and the spectrogram for the codec comparison."
         }
       }
     }

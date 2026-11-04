@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from avalab_api.errors import ApiError, ErrorCode
 from avalab_api.main import create_app
+from avalab_api.ml import registry as registry_module
 from avalab_api.ml.models import MODEL_SPECS, ModelSpec
 from avalab_api.ml.registry import ModelRegistry
 
@@ -73,3 +74,37 @@ def test_models_route_lists_every_task() -> None:
         assert item["state"] in {"available", "missing", "loading", "error"}
         assert item["revision"] == MODEL_SPECS[item["task"]].revision
         assert isinstance(item["size_bytes"], int)
+
+
+def test_require_loads_a_runner_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    spec = ModelSpec(
+        task="denoise",
+        model_id="example/test",
+        revision="b" * 40,
+        license="Apache-2.0",
+        size_bytes=1,
+        files=("model.onnx",),
+        loader_name="test",
+    )
+    (tmp_path / "denoise").mkdir()
+    (tmp_path / "denoise" / "model.onnx").write_bytes(b"x")
+    monkeypatch.setitem(MODEL_SPECS, "denoise", spec)
+
+    class DummyRunner:
+        def run(self, samples: object, sample_rate_hz: int, params: dict[str, object], progress: object) -> object:
+            del samples, sample_rate_hz, params, progress
+            return object()
+
+    calls: list[Path] = []
+    sentinel = DummyRunner()
+
+    def factory(directory: Path) -> DummyRunner:
+        calls.append(directory)
+        return sentinel
+
+    monkeypatch.setitem(registry_module._RUNNER_FACTORIES, "denoise", factory)
+    registry = ModelRegistry(tmp_path)
+
+    assert registry.require("denoise") is sentinel
+    assert registry.require("denoise") is sentinel
+    assert calls == [tmp_path / "denoise"]
