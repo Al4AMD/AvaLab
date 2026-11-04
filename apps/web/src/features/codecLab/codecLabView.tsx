@@ -46,6 +46,7 @@ import {
   type ComparisonRow,
   comparisonToCsv,
   handwrittenRow,
+  publishCodecComparisonRows,
   realRow,
   sortComparisonRows,
 } from "./comparison";
@@ -305,7 +306,14 @@ export function CodecLabView(): React.ReactElement {
     return sortComparisonRows(rows);
   }, [result, realResult]);
 
-  const comparisonRows = sortComparisonRows(batchRows ?? singleComparisonRows);
+  const comparisonRows = useMemo(
+    () => sortComparisonRows(batchRows ?? singleComparisonRows),
+    [batchRows, singleComparisonRows],
+  );
+
+  useEffect(() => {
+    publishCodecComparisonRows(original, comparisonRows);
+  }, [original, comparisonRows]);
 
   const realMetrics = useMemo<QualityMetrics | null>(() => {
     if (realResult === null) {

@@ -34,6 +34,9 @@ import {
 import { LaneFailureReadout } from "./failureReadout";
 import { IngestError, ingestFile } from "./ingest";
 
+/** Stable idle snapshot for `useSyncExternalStore` before the machine mounts. */
+const IDLE_RECORDER_STATE: RecorderState = { phase: "idle" };
+
 /**
  * One recording/upload at a time across the WHOLE empty state is the
  * component's rule (the machine itself re-arms for the next take): a take
@@ -61,10 +64,10 @@ function useRecorder(onCompleted: (state: Extract<RecorderState, { phase: "done"
 
   const state = useSyncExternalStore(
     (notify) => recorder?.subscribe(notify) ?? (() => {}),
-    () => recorder?.getState() ?? ({ phase: "idle" } as RecorderState),
+    () => recorder?.getState() ?? IDLE_RECORDER_STATE,
     // Server snapshot = the same live selector (the SSR unit renders have no
     // hydration; routes.test.tsx renderToStaticMarkup must not warn).
-    () => recorder?.getState() ?? ({ phase: "idle" } as RecorderState),
+    () => recorder?.getState() ?? IDLE_RECORDER_STATE,
   );
   return { recorder, state };
 }

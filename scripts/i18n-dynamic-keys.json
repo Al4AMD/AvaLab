@@ -1,8 +1,21 @@
 [
+  "ai.denoise.installFailed",
+  "ai.error",
+  "ai.neuralCodec.installFailed",
+  "ai.neuralCodec.metricsFailed",
+  "ai.neuralCodec.point",
+  "ai.separation.installFailed",
+  "ai.separation.stems",
+  "ai.superres.failed",
+  "ai.superres.installFailed",
+  "ai.theory",
   "app.health.loading",
-  "app.health.ok",
   "app.health.offline",
-  "input.error",
+  "app.health.ok",
+  "experiments",
+  "filters.theory",
   "input.demo",
-  "player.lane"
+  "input.error",
+  "player.lane",
+  "theory.title"
 ]

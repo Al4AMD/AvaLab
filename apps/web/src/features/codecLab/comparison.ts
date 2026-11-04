@@ -7,6 +7,7 @@
  * and the CSV path stays locale-free.
  */
 import type { CodecLabMeta } from "../../session/ops";
+import type { SessionSource } from "../../session/store";
 import { computeQualityMetrics } from "../metrics/metrics";
 import type { RealCodecName, RealCodecRun } from "./backendCodecs";
 
@@ -142,4 +143,24 @@ export function comparisonToCsv(rows: readonly ComparisonRow[]): string {
     ].join(","),
   );
   return [header, ...lines].join("\n");
+}
+
+let latestPublished: {
+  readonly source: SessionSource | null;
+  readonly rows: readonly ComparisonRow[];
+} = { source: null, rows: [] };
+
+/** Keep the last codec-lab table available to the AI neural-codec chart. */
+export function publishCodecComparisonRows(
+  source: SessionSource | null,
+  rows: readonly ComparisonRow[],
+): void {
+  latestPublished = { source, rows };
+}
+
+/** Return rows only for the same immutable source object; stale audio is ignored. */
+export function publishedCodecComparisonRows(
+  source: SessionSource | null,
+): readonly ComparisonRow[] {
+  return source !== null && latestPublished.source === source ? latestPublished.rows : [];
 }

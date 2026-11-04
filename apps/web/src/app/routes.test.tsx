@@ -65,6 +65,10 @@ it("renders each /tools/* stub page through the data router with its i18n title"
       title: i18n.t("tool.fftview.title"),
       body: i18n.t("input.empty.hint"),
     },
+    "/tools/filters": {
+      title: i18n.t("tool.filters.title"),
+      body: i18n.t("input.empty.hint"),
+    },
     "/tools/generator": {
       title: i18n.t("tool.generator.title"),
       body: i18n.t("generator.load"),
@@ -96,6 +100,14 @@ it("renders each /tools/* stub page through the data router with its i18n title"
     "/tools/metrics": {
       title: i18n.t("tool.metrics.title"),
       body: i18n.t("input.empty.hint"),
+    },
+    "/tools/ai": {
+      title: i18n.t("tool.ai.title"),
+      body: i18n.t("input.empty.hint"),
+    },
+    "/experiments": {
+      title: i18n.t("experiments.title"),
+      body: i18n.t("experiments.intro"),
     },
   };
 
@@ -151,6 +163,9 @@ it("the waveform empty state offers the demo clips with fa/en parity (Task 2)", 
   expect(markup).toContain(
     i18n.t("input.demo.loadAria", { title: i18n.t("input.demo.chirp.title") }),
   );
+  expect(markup).toContain(
+    i18n.t("input.demo.shareAria", { title: i18n.t("input.demo.chirp.title") }),
+  );
 
   // Parity: every demo key resolves under the ENGLISH locale too (a missing
   // translation makes i18next echo the key itself, which would fail here),
@@ -161,6 +176,7 @@ it("the waveform empty state offers the demo clips with fa/en parity (Task 2)", 
     "input.demo.clicks.title",
     "input.demo.pinkNoise.title",
     "input.demo.loadButton",
+    "input.demo.shareButton",
   ]) {
     expect(i18n.t(key, { lng: "en" })).not.toBe(key);
     expect(markup).not.toContain(key);

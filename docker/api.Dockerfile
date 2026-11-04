@@ -17,13 +17,15 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 # Dependency layer: manifests only, so source edits do not invalidate it.
 COPY apps/api/pyproject.toml apps/api/uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --extra ml --no-install-project
 
 COPY apps/api/src ./src
 
 # Install the project itself, then create the non-root user and the /data
 # storage volume mount point with matching ownership.
-RUN uv sync --frozen --no-dev \
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --extra ml \
     && groupadd --gid 10001 avalab \
     && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin avalab \
     && mkdir -p /data \

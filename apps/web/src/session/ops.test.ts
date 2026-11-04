@@ -21,16 +21,20 @@ import {
   extentProcess,
   FFT_MAX_LENGTH,
   fftSelection,
+  filterApply,
+  filterDesign,
   generateSynth,
   type ReverbProcessParams,
   reverbProcess,
   type SamplingProcessParams,
   type SpectrumEditParams,
+  type SuperresBaselineParams,
   samplingProcess,
   sessionPing,
   spectrogramTiles,
   spectrumEdit,
   speedTransform,
+  superresBaseline,
   waveformOverview,
   waveformRange,
   windowProfiles,
@@ -1008,6 +1012,9 @@ describe("op table wiring", () => {
     expect(dspOps.windowProfiles.handler).toBe(windowProfiles);
     expect(dspOps.generateSynth.handler).toBe(generateSynth);
     expect(dspOps.speedTransform.handler).toBe(speedTransform);
+    expect(dspOps.filterApply.handler).toBe(filterApply);
+    expect(dspOps.filterDesign.handler).toBe(filterDesign);
+    expect(dspOps.superresBaseline.handler).toBe(superresBaseline);
     expect(dspOps.samplingProcess.handler).toBe(samplingProcess);
     expect(dspOps.aliasDemo.handler).toBe(aliasDemo);
     expect(dspOps.extentProcess.handler).toBe(extentProcess);
@@ -1027,6 +1034,9 @@ describe("op table wiring", () => {
       | "windowProfiles"
       | "generateSynth"
       | "speedTransform"
+      | "filterDesign"
+      | "filterApply"
+      | "superresBaseline"
       | "samplingProcess"
       | "aliasDemo"
       | "extentProcess"
@@ -1046,6 +1056,17 @@ describe("op table wiring", () => {
     }>();
     expectTypeOf<DspOpResult<"waveformOverview">>().toEqualTypeOf<{
       meta: { sampleCount: number; sampleRateHz: number; bucketCount: number };
+      payload?: TransferablePayload;
+    }>();
+    expectTypeOf<DspOpParams<"superresBaseline">>().toEqualTypeOf<SuperresBaselineParams>();
+    expectTypeOf<DspOpResult<"superresBaseline">>().toEqualTypeOf<{
+      meta: {
+        sampleCount: number;
+        sampleRateHz: number;
+        inputSampleRateHz: number;
+        delaySamples: number;
+        elapsedMs: number;
+      };
       payload?: TransferablePayload;
     }>();
     expectTypeOf<DspOpParams<"waveformRange">>().toEqualTypeOf<{

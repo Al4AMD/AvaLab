@@ -22,6 +22,11 @@ class ErrorCode(StrEnum):
     internal_error = "internal_error"
     codec_unavailable = "codec_unavailable"
     encode_failed = "encode_failed"
+    model_unavailable = "model_unavailable"
+    job_not_found = "job_not_found"
+    job_cancelled = "job_cancelled"
+    ml_failed = "ml_failed"
+    ml_busy = "ml_busy"
 
 
 class ApiError(Exception):

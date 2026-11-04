@@ -34,7 +34,7 @@ export type CodecName = CodecEncodeRequest["codec"];
 
 export const DEFAULT_API_BASE_URL = "/api/v1";
 
-function resolveBaseUrl(): string {
+export function resolveBaseUrl(): string {
   // `import.meta.env` is undefined outside a Vite/Node-with-env context
   // (e.g. plain Node importing this module), and an empty string from the
   // build environment must fall back too — hence `?.` plus `||`.

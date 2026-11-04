@@ -88,6 +88,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Cancel Job
+         * @description Cancel a queued or running job; unknown ids are 404.
+         */
+        delete: operations["cancel_job_api_v1_jobs__job_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/jobs/{job_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Job Events
+         * @description Stream one snapshot, progress updates, then a terminal event.
+         */
+        get: operations["job_events_api_v1_jobs__job_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ml/{task}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Job
+         * @description Validate the excerpt/model and queue the task.
+         */
+        post: operations["start_job_api_v1_ml__task__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Models
+         * @description Report local availability without importing any ML backend.
+         */
+        get: operations["list_models_api_v1_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -96,6 +176,14 @@ export interface components {
         Body_ingest_api_v1_ingest_post: {
             /** File */
             file: string;
+        };
+        /**
+         * CancelResponse
+         * @description Cancellation result; false means the job had already finished.
+         */
+        CancelResponse: {
+            /** Cancelled */
+            cancelled: boolean;
         };
         /**
          * CodecEncodeRequest
@@ -206,6 +294,58 @@ export interface components {
             sample_rate_hz: number;
             /** Size Bytes */
             size_bytes: number;
+        };
+        /**
+         * MlJobRequest
+         * @description Reference to stored audio plus task-specific parameters.
+         */
+        MlJobRequest: {
+            /** Audio Id */
+            audio_id: string;
+            /** Params */
+            params?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * MlJobResponse
+         * @description Accepted job reference.
+         */
+        MlJobResponse: {
+            /** Job Id */
+            job_id: string;
+        };
+        /**
+         * ModelInfo
+         * @description One model row rendered by the AI lab model-status banner.
+         */
+        ModelInfo: {
+            /** License */
+            license: string;
+            /** Model Id */
+            model_id: string;
+            /** Revision */
+            revision: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "available" | "missing" | "loading" | "error";
+            /**
+             * Task
+             * @enum {string}
+             */
+            task: "denoise" | "superres" | "separation" | "asr" | "neural_codec";
+        };
+        /**
+         * ModelsResponse
+         * @description All five fixed tasks, in stable order.
+         */
+        ModelsResponse: {
+            /** Models */
+            models: components["schemas"]["ModelInfo"][];
         };
         /** ValidationError */
         ValidationError: {
@@ -454,6 +594,123 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_job_api_v1_jobs__job_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancelResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_events_api_v1_jobs__job_id__events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_job_api_v1_ml__task__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task: "denoise" | "superres" | "separation" | "asr" | "neural_codec";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MlJobRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MlJobResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_models_api_v1_models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelsResponse"];
                 };
             };
         };

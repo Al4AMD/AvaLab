@@ -155,6 +155,12 @@ export type RateDistortionPoints = {
 
 export type RateDistortionQuality = "snrDb" | "psnrDb";
 
+export type RateDistortionExtraPoint = {
+  readonly labelKey: string;
+  readonly bitrateKbps: number;
+  readonly snrDb: number;
+};
+
 export function rateDistortionPoints(
   rows: readonly ComparisonRow[],
   quality: RateDistortionQuality = "snrDb",
@@ -176,6 +182,39 @@ export function rateDistortionPoints(
     snrDb.push(row.snrDb);
     psnrDb.push(row.psnrDb);
     labels.push(row.labelKey);
+  }
+  return { bitrateKbps, snrDb, psnrDb, labels };
+}
+
+/**
+ * Append tool points that are not ComparisonRows (e.g. the neural codec).
+ * Encodec exposes measured SNR only, so extras never invent a PSNR value and
+ * are omitted from a PSNR chart. Invalid extras are filtered like rows.
+ */
+export function appendRateDistortionPoints(
+  points: RateDistortionPoints,
+  extraPoints: readonly RateDistortionExtraPoint[],
+  quality: RateDistortionQuality = "snrDb",
+): RateDistortionPoints {
+  if (quality !== "snrDb" || extraPoints.length === 0) {
+    return points;
+  }
+  const bitrateKbps = [...points.bitrateKbps];
+  const snrDb = [...points.snrDb];
+  const psnrDb = [...points.psnrDb];
+  const labels = [...points.labels];
+  for (const point of extraPoints) {
+    if (
+      !Number.isFinite(point.bitrateKbps) ||
+      point.bitrateKbps <= 0 ||
+      !Number.isFinite(point.snrDb)
+    ) {
+      continue;
+    }
+    bitrateKbps.push(point.bitrateKbps);
+    snrDb.push(point.snrDb);
+    psnrDb.push(Number.NaN);
+    labels.push(point.labelKey);
   }
   return { bitrateKbps, snrDb, psnrDb, labels };
 }

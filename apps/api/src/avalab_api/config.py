@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     ttl_sweep_interval_seconds: int = 60
     storage_dir: Path = Path("storage")
     cors_origins: list[str] = []
+    ml_enabled: bool = True
+    ml_max_concurrency: int = 1
+    ml_max_excerpt_seconds: int = 30
+    ml_model_cache_dir: Path = Path.home() / ".cache" / "avalab" / "models"
+    ml_device: str = "cpu"
 
 
 @lru_cache

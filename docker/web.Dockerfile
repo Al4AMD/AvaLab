@@ -13,8 +13,7 @@ COPY packages/dsp/package.json packages/dsp/
 RUN pnpm install --frozen-lockfile
 
 COPY apps/web apps/web
-# packages/dsp is not a build dependency of @avalab/web yet (Wave 1 adds it);
-# when that changes, copy packages/dsp here.
+COPY packages/dsp packages/dsp
 RUN pnpm --filter @avalab/web build
 
 FROM caddy:2-alpine

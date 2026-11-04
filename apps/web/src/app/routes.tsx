@@ -1,8 +1,11 @@
 import { useEffect } from "react";
 import { createBrowserRouter, type RouteObject, redirect } from "react-router";
+import { AiLabView } from "../features/ai/aiLabView";
 import { CodecLabView } from "../features/codecLab/codecLabView";
+import { ExperimentsView } from "../features/education/experimentsView";
 import { ExtentView } from "../features/extent/extentView";
 import { FftView } from "../features/fftview/fftView";
+import { FilterLabView } from "../features/filters/filterLabView";
 import { GeneratorView } from "../features/generator/generatorView";
 import { MetricsView } from "../features/metrics/metricsView";
 import { ReverbView } from "../features/reverb/reverbView";
@@ -18,6 +21,7 @@ export const TOOL_IDS = [
   "waveform",
   "spectrogram",
   "fftview",
+  "filters",
   "generator",
   "speed",
   "sampling",
@@ -26,6 +30,7 @@ export const TOOL_IDS = [
   "spectrum-edit",
   "codec-lab",
   "metrics",
+  "ai",
 ] as const;
 export type ToolId = (typeof TOOL_IDS)[number];
 
@@ -71,6 +76,7 @@ export const appRoutes: RouteObject[] = [
         // layer — testable without a DOM render and works on first paint.
         loader: () => redirect(toolPath("waveform")),
       },
+      { path: "experiments", element: <ExperimentsView /> },
       {
         path: "tools/waveform",
         element: (
@@ -82,6 +88,7 @@ export const appRoutes: RouteObject[] = [
       },
       { path: "tools/spectrogram", element: <SpectrogramView /> },
       { path: "tools/fftview", element: <FftView /> },
+      { path: "tools/filters", element: <FilterLabView /> },
       { path: "tools/generator", element: <GeneratorView /> },
       { path: "tools/speed", element: <SpeedView /> },
       { path: "tools/sampling", element: <SamplingView /> },
@@ -90,6 +97,7 @@ export const appRoutes: RouteObject[] = [
       { path: "tools/spectrum-edit", element: <SpectrumEditView /> },
       { path: "tools/codec-lab", element: <CodecLabView /> },
       { path: "tools/metrics", element: <MetricsView /> },
+      { path: "tools/ai", element: <AiLabView /> },
     ],
   },
 ];

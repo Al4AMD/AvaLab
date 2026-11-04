@@ -22,6 +22,11 @@ EXPECTED_ERROR_CODES = {
     "internal_error",
     "codec_unavailable",
     "encode_failed",
+    "model_unavailable",
+    "job_not_found",
+    "job_cancelled",
+    "ml_failed",
+    "ml_busy",
 }
 
 

@@ -18,10 +18,14 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from avalab_api.codecs import available_codecs
 from avalab_api.config import get_settings
 from avalab_api.errors import ApiError, ErrorCode
+from avalab_api.ml.jobs import JobManager
+from avalab_api.ml.registry import ModelRegistry
 from avalab_api.openapi_utils import server_relative_schema
 from avalab_api.routes.audio import router as audio_router
 from avalab_api.routes.codec import router as codec_router
 from avalab_api.routes.ingest import router as ingest_router
+from avalab_api.routes.ml import router as ml_router
+from avalab_api.routes.models import router as models_router
 from avalab_api.storage import Storage
 from avalab_api.ttl import SWEEPER_TASK_NAME, sweep_loop
 from avalab_api.upload_limit import UploadLimitMiddleware
@@ -57,6 +61,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         sweeper.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await sweeper
+        app.state.ml_jobs.shutdown()
 
 
 class HealthResponse(BaseModel):
@@ -77,6 +82,13 @@ def create_app() -> FastAPI:
         version=API_VERSION,
         servers=[{"url": API_PREFIX}],
         lifespan=lifespan,
+    )
+    app.state.storage = Storage(settings.storage_dir)
+    app.state.model_registry = ModelRegistry(settings.ml_model_cache_dir)
+    app.state.ml_jobs = JobManager(
+        app.state.storage,
+        max_workers=settings.ml_max_concurrency,
+        ttl_seconds=settings.ttl_minutes * 60,
     )
 
     # Paths are relative to the declared server URL, so the served spec must
@@ -155,6 +167,8 @@ def create_app() -> FastAPI:
     api_router.include_router(ingest_router)
     api_router.include_router(audio_router)
     api_router.include_router(codec_router)
+    api_router.include_router(models_router)
+    api_router.include_router(ml_router)
 
     @api_router.get("/health")
     def health() -> HealthResponse:

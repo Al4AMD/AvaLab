@@ -10,8 +10,15 @@ import { useTranslation } from "react-i18next";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 
+import { Button } from "../../components/ui/button";
+import { downloadChartPng } from "../../lib/download";
 import type { ComparisonRow } from "./comparison";
-import { type RateDistortionQuality, rateDistortionPoints } from "./comparisonRunner";
+import {
+  appendRateDistortionPoints,
+  type RateDistortionExtraPoint,
+  type RateDistortionQuality,
+  rateDistortionPoints,
+} from "./comparisonRunner";
 
 const CHART_HEIGHT_PX = 240;
 const POINT_COLORS = ["#8bd3c7", "#f59e0b", "#93c5fd", "#f472b6", "#a3e635", "#c4b5fd"];
@@ -20,15 +27,23 @@ export function RateDistortionChart({
   rows,
   heightPx = CHART_HEIGHT_PX,
   quality = "snrDb",
+  extraPoints = [],
 }: {
   readonly rows: readonly ComparisonRow[];
   readonly heightPx?: number;
   readonly quality?: RateDistortionQuality;
+  readonly extraPoints?: readonly RateDistortionExtraPoint[];
 }) {
   const { t } = useTranslation();
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const plotRef = useRef<uPlot | null>(null);
+  const [exportFailed, setExportFailed] = useState(false);
   const [widthPx, setWidthPx] = useState(1);
-  const points = rateDistortionPoints(rows, quality);
+  const points = appendRateDistortionPoints(
+    rateDistortionPoints(rows, quality),
+    extraPoints,
+    quality,
+  );
 
   useEffect(() => {
     const host = hostRef.current;
@@ -106,7 +121,11 @@ export function RateDistortionChart({
       ],
     };
     const plot = new uPlot(options, data, host);
+    plotRef.current = plot;
     return () => {
+      if (plotRef.current === plot) {
+        plotRef.current = null;
+      }
       plot.destroy();
     };
   }, [heightPx, points, quality, t, widthPx]);
@@ -116,12 +135,38 @@ export function RateDistortionChart({
       {t("codecLab.comparison.chart.empty")}
     </p>
   ) : (
-    <div
-      ref={hostRef}
-      dir="ltr"
-      role="img"
-      aria-label={t("codecLab.comparison.chart.aria")}
-      data-testid="codecLab.comparison.chart"
-    />
+    <div className="flex flex-col gap-1">
+      <div
+        ref={hostRef}
+        dir="ltr"
+        role="img"
+        aria-label={t("codecLab.comparison.chart.aria")}
+        data-testid="codecLab.comparison.chart"
+      />
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          variant="outline"
+          data-testid="codecLab.comparison.chart.export"
+          onClick={() => {
+            const plot = plotRef.current;
+            if (plot === null) {
+              return;
+            }
+            setExportFailed(false);
+            void downloadChartPng(plot, "avalab-rate-distortion.png").catch(() => {
+              setExportFailed(true);
+            });
+          }}
+        >
+          {t("codecLab.comparison.chart.exportPng")}
+        </Button>
+      </div>
+      {exportFailed ? (
+        <p role="alert" className="text-xs text-danger">
+          {t("codecLab.comparison.chart.exportFailed")}
+        </p>
+      ) : null}
+    </div>
   );
 }

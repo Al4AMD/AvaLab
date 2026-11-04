@@ -39,6 +39,11 @@ export function Sidebar() {
           </NavLink>
         </li>
         <li>
+          <NavLink to="/tools/filters" className={linkClass}>
+            {t("nav.filters")}
+          </NavLink>
+        </li>
+        <li>
           <NavLink to="/tools/generator" className={linkClass}>
             {t("nav.generator")}
           </NavLink>
@@ -76,6 +81,16 @@ export function Sidebar() {
         <li>
           <NavLink to="/tools/metrics" className={linkClass}>
             {t("nav.metrics")}
+          </NavLink>
+        </li>
+        <li>
+          <NavLink to="/tools/ai" className={linkClass}>
+            {t("nav.ai")}
+          </NavLink>
+        </li>
+        <li>
+          <NavLink to="/experiments" className={linkClass}>
+            {t("nav.experiments")}
           </NavLink>
         </li>
       </ul>

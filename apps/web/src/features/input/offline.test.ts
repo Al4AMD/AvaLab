@@ -94,6 +94,7 @@ describe("loadOfflineFile success", () => {
         sourceKind: "offlineBrowser",
       },
     });
+    expect(result.source.demoId).toBeUndefined();
     expect(decode.received).toBeInstanceOf(ArrayBuffer); // the read bytes reached the seam
 
     const state = store.getState();
@@ -191,6 +192,7 @@ describe("loadDemoClip", () => {
 
     expect(requested).toEqual(["/demo/pink-noise-5s.wav"]);
     expect(result.source.sourceKind).toBe("demoClip");
+    expect(result.source.demoId).toBe("pinkNoise");
     expect(result.source.name).toBe("pink-noise-5s.wav");
     expect(result.source.samples).toEqual(new Float32Array([1, -1]));
     expect(store.getState().getDerived(seededKey).status).toBe("miss");
@@ -228,12 +230,13 @@ describe("loadDemoClip", () => {
     await expect(loadDemoClip("nope", { fetch: fetchFn })).rejects.toThrow(TypeError);
   });
 
-  it("pins the bundled demo data (D-016: three 48 kHz / 5 s clips, unique ids)", () => {
-    expect(DEMO_CLIPS).toHaveLength(3);
+  it("pins the bundled demo data (48 kHz clips with unique ids)", () => {
+    expect(DEMO_CLIPS).toHaveLength(6);
     const ids = DEMO_CLIPS.map((clip) => clip.id);
-    expect(new Set(ids).size).toBe(3);
+    expect(new Set(ids).size).toBe(6);
+    const old = DEMO_CLIPS.filter((clip) => ["chirp", "clicks", "pinkNoise"].includes(clip.id));
+    expect(old.map((clip) => clip.seconds)).toEqual([5, 5, 5]);
     for (const clip of DEMO_CLIPS) {
-      expect(clip.seconds).toBe(5);
       expect(clip.rateHz).toBe(48_000);
       expect(clip.file.endsWith(".wav")).toBe(true);
     }
