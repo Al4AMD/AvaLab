@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next";
 import { resolveBaseUrl } from "../../api/client";
 import { Button } from "../../components/ui/button";
 import { isRecordLike } from "../../session/protocol";
-import { useSessionStore } from "../../session/store";
+import { type ProcessedSource, useSessionStore } from "../../session/store";
 import { browserDecodeWav, monoDownmix } from "../input/ingest";
 import { loadDemoClip, OfflineError } from "../input/offline";
 import { UploadEmptyState } from "../input/upload";
@@ -21,6 +21,7 @@ import {
   type AiModelInfo,
   type AiModelState,
 } from "./aiClient";
+import { ProcessedInstallError, processedInstallErrorKey } from "./installResult";
 import { SampleWave } from "./sampleWave";
 import { type AiJobStatus, useAiJob } from "./useAiJob";
 
@@ -94,18 +95,33 @@ export async function installDenoiseAudio(input: {
   readonly audioId: string;
   readonly label: string;
   readonly fetchAudio: FetchDenoiseAudio;
+  readonly sourceHash?: string | null;
+  readonly sourceStartSample?: number;
   readonly setProcessed: (
     samples: Float32Array,
     sampleRateHz: number,
     label: string,
+    options?: { sourceHash?: string; sourceStartSample?: number },
   ) => { ok: true } | { ok: false; code: string };
 }): Promise<{ samples: Float32Array; sampleRateHz: number }> {
   const audio = await input.fetchAudio(input.audioId);
-  const installed = input.setProcessed(audio.samples, audio.sampleRateHz, input.label);
+  const installed = input.setProcessed(audio.samples, audio.sampleRateHz, input.label, {
+    ...(input.sourceHash === null || input.sourceHash === undefined
+      ? {}
+      : { sourceHash: input.sourceHash }),
+    sourceStartSample: input.sourceStartSample ?? 0,
+  });
   if (!installed.ok) {
-    throw new Error(`denoise: store rejected result (${installed.code})`);
+    throw new ProcessedInstallError(installed.code);
   }
   return audio;
+}
+
+/** The denoise A/B lane is this tool's result, not any processed source. */
+export function denoiseLane(
+  processed: Readonly<ProcessedSource> | null,
+): Readonly<ProcessedSource> | null {
+  return processed?.label === "denoise" ? processed : null;
 }
 
 export function denoiseRunDisabled(
@@ -248,9 +264,9 @@ export function DenoiseView(props: DenoiseViewProps): React.ReactElement {
           {t("ai.denoise.ab.original")}
         </Button>
         <Button
-          variant={props.playbackMode === "processed" ? "default" : "outline"}
+          variant={props.hasProcessed && props.playbackMode === "processed" ? "default" : "outline"}
           data-testid="ai.denoise.ab.denoised"
-          aria-pressed={props.playbackMode === "processed"}
+          aria-pressed={props.hasProcessed && props.playbackMode === "processed"}
           disabled={!props.hasProcessed}
           onClick={props.onPlayDenoised}
         >
@@ -277,10 +293,12 @@ export function DenoiseTab({
   const setPlaybackMode = useSessionStore((state) => state.setPlaybackMode);
   const { status, progress, result, errorKey, run, cancel } = useAiJob();
   const installedRef = useRef<string | null>(null);
+  const jobSourceHashRef = useRef<string | null>(null);
   const [demoLoading, setDemoLoading] = useState(false);
   const [demoErrorKey, setDemoErrorKey] = useState<string | null>(null);
   const [installErrorKey, setInstallErrorKey] = useState<string | null>(null);
 
+  const denoised = denoiseLane(processed);
   const info = result === null ? null : readDenoiseResult(result);
   const audioId = info?.audioId ?? null;
 
@@ -296,6 +314,8 @@ export function DenoiseTab({
     void installDenoiseAudio({
       audioId,
       label: "denoise",
+      sourceHash: jobSourceHashRef.current,
+      sourceStartSample: 0,
       fetchAudio: fetchDenoiseAudio,
       setProcessed: useSessionStore.getState().setProcessed,
     }).then(
@@ -304,9 +324,9 @@ export function DenoiseTab({
           installedRef.current = audioId;
         }
       },
-      () => {
+      (error: unknown) => {
         if (!cancelled) {
-          setInstallErrorKey("ai.denoise.installFailed");
+          setInstallErrorKey(processedInstallErrorKey(error, "ai.denoise.installFailed"));
         }
       },
     );
@@ -337,6 +357,7 @@ export function DenoiseTab({
       startSample: 0,
       endSample,
     };
+    jobSourceHashRef.current = useSessionStore.getState().inputHash;
     setInstallErrorKey(null);
     void run("denoise", excerpt);
   }
@@ -358,7 +379,7 @@ export function DenoiseTab({
   }
 
   const waveform =
-    original === null && processed === null ? undefined : (
+    original === null && denoised === null ? undefined : (
       <>
         {original !== null ? (
           <SampleWave
@@ -368,10 +389,10 @@ export function DenoiseTab({
             testId="ai.denoise.wave.original"
           />
         ) : null}
-        {processed !== null ? (
+        {denoised !== null ? (
           <SampleWave
-            samples={processed.samples}
-            sampleRateHz={processed.sampleRateHz}
+            samples={denoised.samples}
+            sampleRateHz={denoised.sampleRateHz}
             label={t("ai.denoise.waveDenoised")}
             testId="ai.denoise.wave.denoised"
           />
@@ -385,7 +406,7 @@ export function DenoiseTab({
       modelState={model?.state}
       modelId={info?.modelId ?? model?.model_id}
       hasSource={original !== null}
-      hasProcessed={processed !== null}
+      hasProcessed={denoised !== null}
       playbackMode={playbackMode}
       status={status}
       progress={progress}

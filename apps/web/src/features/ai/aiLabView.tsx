@@ -44,6 +44,22 @@ function tabLabel(t: TFunction, task: AiTask): string {
   }
 }
 
+export function aiRunDisabled(input: {
+  readonly mlEnabled: boolean;
+  readonly hasSource: boolean;
+  readonly backendOnline: boolean;
+  readonly modelState: AiModelState | undefined;
+  readonly busy: boolean;
+}): boolean {
+  return (
+    !input.mlEnabled ||
+    !input.hasSource ||
+    !input.backendOnline ||
+    input.modelState !== "available" ||
+    input.busy
+  );
+}
+
 function modelStateLabel(t: TFunction, state: AiModelState): string {
   switch (state) {
     case "available":
@@ -59,16 +75,25 @@ function modelStateLabel(t: TFunction, state: AiModelState): string {
 
 function ModelBanner({
   backendOnline,
+  mlEnabled,
   model,
   loading,
   loadFailed,
 }: {
   readonly backendOnline: boolean;
+  readonly mlEnabled: boolean;
   readonly model: AiModelInfo | undefined;
   readonly loading: boolean;
   readonly loadFailed: boolean;
 }) {
   const { t } = useTranslation();
+  if (!mlEnabled) {
+    return (
+      <p data-testid="ai.models.banner" className="text-sm text-muted">
+        {t("ai.models.disabled")}
+      </p>
+    );
+  }
   if (!backendOnline) {
     return (
       <p data-testid="ai.models.banner" className="text-sm text-muted">
@@ -122,6 +147,7 @@ export function AiLabView(): React.ReactElement {
   const { status, progress, result, errorKey, run, cancel } = useAiJob();
 
   const [models, setModels] = useState<readonly AiModelInfo[] | null>(null);
+  const [mlEnabled, setMlEnabled] = useState(true);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsFailed, setModelsFailed] = useState(false);
 
@@ -138,7 +164,8 @@ export function AiLabView(): React.ReactElement {
     void aiClient.getModels().then(
       (response) => {
         if (!cancelled) {
-          setModels(response.models);
+          setMlEnabled(response.ml_enabled);
+          setModels(response.ml_enabled ? response.models : []);
           setModelsLoading(false);
         }
       },
@@ -157,7 +184,13 @@ export function AiLabView(): React.ReactElement {
 
   const model = models?.find((candidate) => candidate.task === task);
   const busy = status === "uploading" || status === "running";
-  const runDisabled = original === null || !backendOnline || model?.state !== "available" || busy;
+  const runDisabled = aiRunDisabled({
+    mlEnabled,
+    hasSource: original !== null,
+    backendOnline,
+    modelState: model?.state,
+    busy,
+  });
 
   function selectTask(next: AiTask): void {
     const params = new URLSearchParams(searchParams);
@@ -166,7 +199,7 @@ export function AiLabView(): React.ReactElement {
   }
 
   function runSelected(): void {
-    if (original === null) {
+    if (original === null || !mlEnabled) {
       return;
     }
     const endSample = Math.min(
@@ -230,6 +263,7 @@ export function AiLabView(): React.ReactElement {
 
       <ModelBanner
         backendOnline={backendOnline}
+        mlEnabled={mlEnabled}
         model={model}
         loading={modelsLoading}
         loadFailed={modelsFailed}

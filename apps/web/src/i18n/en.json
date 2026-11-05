@@ -15,6 +15,11 @@
       "ttlNotice": "Uploaded files are deleted from the server automatically after 60 minutes."
     }
   },
+  "processed": {
+    "error": {
+      "staleSource": "The source changed while the AI job was running; run it again on the current audio."
+    }
+  },
   "nav": {
     "landmark": "Tools",
     "waveform": "Waveform",
@@ -28,6 +33,7 @@
     "spectrumEdit": "Spectrum editor",
     "codecLab": "Compression lab",
     "metrics": "Quality metrics",
+    "psychoacoustics": "Psychoacoustics",
     "ai": "AI lab",
     "filters": "Filter design",
     "experiments": "Guided experiments"
@@ -145,6 +151,9 @@
     "metrics": {
       "title": "Quality metrics"
     },
+    "psychoacoustics": {
+      "title": "Psychoacoustics and masking"
+    },
     "ai": {
       "title": "AI lab"
     },
@@ -217,7 +226,19 @@
       "title": "MDCT details",
       "sparsity": "Coefficient sparsity",
       "frames": "Frame count",
-      "totalBits": "Total bits"
+      "totalBits": "Total bits",
+      "psycho": "Psychoacoustic masking",
+      "psychoOn": "Masking-aware quantization",
+      "legacy": "Legacy uniform quantizer",
+      "referenceSpl": "Reference SPL (dB)",
+      "entropyBits": "Entropy bits",
+      "sideInfoBits": "Side-info bits",
+      "totalBitrate": "Total bitrate",
+      "maskedShare": "Masked share",
+      "bandChartTitle": "Masking threshold and SMR per Bark band",
+      "threshold": "Threshold (dB SPL)",
+      "smr": "Signal-to-mask ratio (dB)",
+      "psychoNote": "Stationary simultaneous-masking model; no temporal masking. Teaching approximation."
     },
     "histogram": {
       "title": "PCM byte histogram (256 bins)",
@@ -861,6 +882,7 @@
     }
   },
   "metrics": {
+    "pending": "Computing quality metrics…",
     "missing": "No processed signal yet. Run a tool that installs a processed lane (for example the compression lab), then compare it here.",
     "mismatch": {
       "length": "The processed signal has a different length. Run a tool that preserves length, or compare codec-lab results against their aligned reference.",
@@ -889,6 +911,56 @@
       "bitrate": "Compare several codec settings and relate the metric change to the bitrate shown in the compression lab."
     }
   },
+  "psychoacoustics": {
+    "description": "Explore absolute hearing threshold, critical bands and simultaneous masking, then see why a perceptual codec can discard masked content.",
+    "noSource": "Load audio to overlay measured band levels and the masking threshold. The curves below work without audio.",
+    "controls": {
+      "referenceSpl": "Reference SPL (dB)",
+      "scale": "Frequency axis",
+      "scaleLog": "Logarithmic",
+      "scaleLinear": "Linear",
+      "showThreshold": "Show threshold"
+    },
+    "chart": {
+      "ath": "Absolute threshold of hearing versus frequency",
+      "spreading": "Bark-band spreading matrix",
+      "bands": "Measured band levels with the masking threshold"
+    },
+    "analysis": {
+      "title": "Loudest-frame analysis",
+      "athTitle": "Absolute threshold",
+      "spreadingTitle": "Spreading function",
+      "frameCount": "{{frames}} MDCT frames analysed"
+    },
+    "status": {
+      "pending": "Analysing the selected audio…",
+      "error": "The psychoacoustic analysis failed. Shorten the selection and try again."
+    },
+    "codecLink": "Open in compression lab",
+    "theory": {
+      "title": "Theory: hearing threshold and masking",
+      "ath": {
+        "heading": "Absolute threshold of hearing",
+        "body": "The Terhardt approximation gives the sound pressure level a pure tone needs to become audible in quiet. Sensitivity peaks near 3–4 kHz and falls sharply at low and very high frequencies; the model is clamped below 20 Hz."
+      },
+      "critical": {
+        "heading": "Critical bands",
+        "body": "The Bark scale warps frequency onto a perceptual axis. The lab uses 25 equal-Bark bands; each band behaves like one auditory filter, so masking spreads mainly between nearby bands."
+      },
+      "masking": {
+        "heading": "Simultaneous masking",
+        "body": "A loud band raises the threshold of neighbouring bands. The model sums masker contributions with a symmetric spreading function and combines the result with the absolute threshold. The strongest masker wins; contributions add on a power basis."
+      },
+      "smr": {
+        "heading": "Signal-to-mask ratio",
+        "body": "SMR is the band level minus its masked threshold. A positive SMR means the band is audible and needs bits; a negative SMR means the band can be quantized coarsely or dropped."
+      },
+      "discard": {
+        "heading": "Why codecs discard masked content",
+        "body": "A perceptual codec derives a per-band quantization step from the masked threshold, never finer than a global rate-control step. Bands under the threshold get coarse steps, so their bits are saved with little audible loss. This model is stationary: it has no temporal masking and no tonal/noise separation, so treat it as a teaching approximation."
+      }
+    }
+  },
   "ai": {
     "tabsLabel": "AI tools",
     "intro": "Run a pinned small model on the current audio. Each job uses a mono excerpt of at most 30 s; model output is an approximation, not an exact DSP operation.",
@@ -904,6 +976,7 @@
       "neuralCodec": "Neural codec"
     },
     "models": {
+      "disabled": "Machine-learning tools are disabled on this server.",
       "offline": "Server unreachable: model tools stay disabled until the server is back.",
       "loading": "Checking model availability…",
       "error": "Model availability could not be checked.",

@@ -336,3 +336,11 @@
 - Context: the lockfile resolved Linux `torch` from PyPI, whose wheel pulls CUDA runtime packages plus `triton` even though the deployment target is CPU-only. This inflated the API image and made Docker builds fail repeatedly on large wheel downloads.
 - Decision: pin a Linux-only `torch`/`torchaudio` source to the official PyTorch CPU index (`https://download.pytorch.org/whl/cpu`) in `apps/api/pyproject.toml`; macOS keeps its existing PyPI pins. The Docker build also mounts a uv cache so retries reuse downloaded wheels.
 - Consequences: the Linux Docker image installs `torch==2.15.0+cpu`/`torchaudio==2.11.1+cpu` with no `nvidia-*` packages or `triton` (1.12 GB image). A future GPU profile needs its own lock resolution and must not silently reuse this CPU lock.
+
+## D-042 — F13 psychoacoustics is a documented symmetric Bark model
+
+- Date: 2026-11-06
+- Status: accepted (owner, Wave 6 brainstorm; implementation detail pinned by Plan 01)
+- Context: F13 must teach masking and feed a toy codec, but a full MPEG psychoacoustic model is proprietary-ish, tempo-dependent, and too heavy to explain. The design asks for one honest, reproducible model that students can verify against textbook curves.
+- Decision: use 25 equal Bark bands on the Zwicker–Terhardt critical-band-rate scale (edges by bisection), the Terhardt absolute threshold with a 20 Hz floor and no upper clamp, and Schroeder spreading evaluated on `abs(dz)` rather than the signed `dz`. The deviation makes the spreading function symmetric and bounded for far maskers, so the 25×25 teaching matrix is stable and reproducible; the signed raw form is noted in `docs/ALGORITHMS.md`. Masking is stationary per MDCT frame with no temporal masking or tonal/noise partition. The reference SPL is user-selectable from 80 to 100 dB (default 94), and `P_ref` is measured through the same MDCT rather than hard-coded. The toy codec applies the masking threshold but never below the global quantization step.
+- Consequences: the curves are deterministic and golden-tested, and the UI can show exactly which bands a codec may discard and at what bit cost. Results are teaching approximations, not an MP3/AAC compliance claim; a future perceptual model can replace the engine behind the same worker ops without touching the view.

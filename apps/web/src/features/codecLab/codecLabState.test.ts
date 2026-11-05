@@ -19,6 +19,8 @@ describe("codec lab state codec", () => {
     const settings: CodecLabSettings = {
       codec: "mdct",
       mdctBitsPerSecond: 320_000,
+      mdctPsychoacoustic: true,
+      mdctReferenceSplDb: 96,
       startSample: 4800,
       endSample: 52_800,
       realCodec: "vorbis",
@@ -36,6 +38,22 @@ describe("codec lab state codec", () => {
     expect(codecLabSettingsFromSearch("?mbr=1", SOURCE, FULL).mdctBitsPerSecond).toBe(32_000);
     expect(codecLabSettingsFromSearch("?mbr=999", SOURCE, FULL).mdctBitsPerSecond).toBe(512_000);
     expect(codecLabSettingsFromSearch("?mbr=100", SOURCE, FULL).mdctBitsPerSecond).toBe(96_000);
+  });
+
+  it("parses and clamps the psychoacoustic mode fields", () => {
+    expect(codecLabSettingsFromSearch("?pm=1", SOURCE, FULL).mdctPsychoacoustic).toBe(true);
+    expect(codecLabSettingsFromSearch("?pm=0", SOURCE, FULL).mdctPsychoacoustic).toBe(false);
+    expect(codecLabSettingsFromSearch("?c=mdct", SOURCE, FULL).mdctPsychoacoustic).toBe(false);
+    expect(codecLabSettingsFromSearch("?rspl=79", SOURCE, FULL).mdctReferenceSplDb).toBe(80);
+    expect(codecLabSettingsFromSearch("?rspl=101", SOURCE, FULL).mdctReferenceSplDb).toBe(100);
+    expect(codecLabSettingsFromSearch("?rspl=wat", SOURCE, FULL).mdctReferenceSplDb).toBe(94);
+    expect(codecLabSettingsFromSearch("?rspl=", SOURCE, FULL).mdctReferenceSplDb).toBe(94);
+  });
+
+  it("marks the MDCT result stale when either mode field changes", () => {
+    const result = { ...CODEC_LAB_DEFAULT_SETTINGS, startSample: 0, endSample: 24_000 };
+    expect(isCodecLabStale(result, { ...result, mdctPsychoacoustic: false })).toBe(true);
+    expect(isCodecLabStale(result, { ...result, mdctReferenceSplDb: 90 })).toBe(true);
   });
 
   it("clamps an explicit excerpt to the source and the 30 s cap", () => {

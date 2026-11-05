@@ -23,18 +23,22 @@
  * lives in the playhead pub-sub and component-local throttled state —
  * writing it into the session store would re-render subscribers per frame.
  */
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import type { PlaybackMode, ProcessedSource, SessionSource } from "../../session/store";
 import { selectPlaybackSource, useSessionStore } from "../../session/store";
 import { appPlayhead } from "./playhead";
 import {
   createTransport,
-  mapPlayheadSeconds,
+  mapAbsolutePlayheadToLane,
   sourceToBufferLike,
   type Transport,
   type TransportState,
 } from "./transport";
+
+function laneStartSample(source: Readonly<SessionSource | ProcessedSource>): number {
+  return "sourceStartSample" in source ? source.sourceStartSample : 0;
+}
 
 /** Stable fallback while the transport's mount effect has not run yet
  * (SSR/static render; StrictMode's null window) — snapshot identity must
@@ -68,6 +72,7 @@ export function usePlayer(): PlayerApi {
   const setStorePlaybackMode = useSessionStore((state) => state.setPlaybackMode);
 
   const [machine, setMachine] = useState<Transport | null>(null);
+  const activeLaneRef = useRef<Readonly<SessionSource | ProcessedSource> | null>(null);
   useEffect(() => {
     const transport = createTransport({
       // End-of-source seam → the playhead boundary (canvases land there).
@@ -105,15 +110,28 @@ export function usePlayer(): PlayerApi {
     // current seconds, attach the new lane, then seek the mapped sample.
     // Playback resumes if it was playing before the swap (Task 3 contract).
     const wasPlaying = machine.getState().phase === "playing";
-    const seconds =
-      machine.sampleRateHz > 0 ? machine.getCurrentSample() / machine.sampleRateHz : 0;
+    const previous = activeLaneRef.current;
+    const previousStart = previous === null ? 0 : laneStartSample(previous);
+    const previousRate = previous?.sampleRateHz ?? machine.sampleRateHz;
+    const absoluteSeconds =
+      previousRate > 0
+        ? previousStart / previousRate + machine.getCurrentSample() / machine.sampleRateHz
+        : 0;
     try {
       machine.setSource(sourceToBufferLike(active), active.sampleRateHz);
     } catch (error) {
       console.warn("avalab player: the platform cannot play this source", error);
       return;
     }
-    machine.seekToSample(mapPlayheadSeconds(seconds, active.sampleRateHz, machine.lengthSamples));
+    activeLaneRef.current = active;
+    machine.seekToSample(
+      mapAbsolutePlayheadToLane(
+        absoluteSeconds,
+        laneStartSample(active),
+        active.sampleRateHz,
+        machine.lengthSamples,
+      ),
+    );
     if (wasPlaying) {
       machine.play();
     }

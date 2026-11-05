@@ -360,8 +360,12 @@
         "type": "object"
       },
       "ModelsResponse": {
-        "description": "All five fixed tasks, in stable order.",
+        "description": "All five fixed tasks, in stable order, plus the global ML switch.",
         "properties": {
+          "ml_enabled": {
+            "title": "Ml Enabled",
+            "type": "boolean"
+          },
           "models": {
             "items": {
               "$ref": "#/components/schemas/ModelInfo"
@@ -371,6 +375,7 @@
           }
         },
         "required": [
+          "ml_enabled",
           "models"
         ],
         "title": "ModelsResponse",

@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   type AudioBufferLike,
   createTransport,
+  mapAbsolutePlayheadToLane,
   mapPlayheadSeconds,
   type Transport,
   type TransportBuffer,
@@ -25,6 +26,7 @@ const LENGTH = 88_200; // 2 s of 44.1 kHz mono
 /** Recording node fake: every transport call lands in the record fields. */
 type FakeNode = TransportNode & {
   readonly id: number;
+  connectedTo: unknown[];
   startedWith: Array<{ when: number | undefined; offset: number | undefined }>;
   stoppedCount: number;
   disconnectedCount: number;
@@ -36,6 +38,7 @@ type FakeNode = TransportNode & {
  * deterministic). */
 type RecordingHarness = {
   readonly clock: { seconds: number };
+  readonly destination: unknown;
   readonly nodes: FakeNode[];
   readonly buffers: Array<{
     readonly source: AudioBufferLike;
@@ -67,6 +70,7 @@ function makeBufferLike(length: number = LENGTH, sampleRate: number = RATE): Aud
 
 function createHarness(harnessOptions?: Partial<TransportOptions>): RecordingHarness {
   const clock = { seconds: 0 };
+  const destination = {};
   const nodes: FakeNode[] = [];
   const buffers: RecordingHarness["buffers"] = [];
   const counts = { contexts: 0, resumed: 0, closed: 0 };
@@ -74,6 +78,7 @@ function createHarness(harnessOptions?: Partial<TransportOptions>): RecordingHar
 
   const harness: Partial<RecordingHarness> = {
     clock,
+    destination,
     nodes,
     buffers,
     counts,
@@ -84,7 +89,7 @@ function createHarness(harnessOptions?: Partial<TransportOptions>): RecordingHar
     counts.contexts += 1;
     const context: TransportContext = {
       currentTime: 0, // stale constant: the transport must use the seam
-      destination: {},
+      destination,
       createBuffer(numberOfChannels, length, sampleRate): TransportBuffer {
         const data = new Float32Array(Math.max(0, length));
         return {
@@ -129,10 +134,14 @@ function createHarness(harnessOptions?: Partial<TransportOptions>): RecordingHar
     const node: FakeNode = {
       id: nodes.length,
       buffer: null,
+      connectedTo: [],
       startedWith: [],
       stoppedCount: 0,
       disconnectedCount: 0,
       onended: null,
+      connect(target) {
+        node.connectedTo.push(target);
+      },
       start(when, offset) {
         void context;
         node.startedWith.push({ when, offset });
@@ -240,6 +249,7 @@ describe("transport: play/pause position semantics (documented + pinned)", () =>
     harness.transport.play(44_100);
     const node = onlyNode(harness);
     expect(harness.transport.getState()).toEqual({ phase: "playing", startedAtSample: 44_100 });
+    expect(node.connectedTo).toEqual([harness.destination]);
     expect(node.startedWith).toEqual([{ when: 0, offset: 1 }]);
     expect(node.onended).toBeTypeOf("function");
     expect(harness.counts.resumed).toBe(1); // suspended-context activation
@@ -251,6 +261,21 @@ describe("transport: play/pause position semantics (documented + pinned)", () =>
     harness.transport.seekToSample(22_050);
     harness.transport.play();
     expect(harness.transport.getState()).toEqual({ phase: "playing", startedAtSample: 22_050 });
+  });
+
+  it("a restarted node connects to the destination exactly once", () => {
+    const harness = createHarness();
+    setTwoSecondSource(harness);
+    harness.transport.play();
+    harness.transport.seekToSample(22_050);
+    harness.transport.pause();
+    harness.transport.play();
+
+    expect(harness.nodes.map((node) => node.connectedTo)).toEqual([
+      [harness.destination],
+      [harness.destination],
+      [harness.destination],
+    ]);
   });
 
   it("play() while playing is a documented no-op (no second node)", () => {
@@ -597,5 +622,24 @@ describe("mapPlayheadSeconds", () => {
   it("treats non-finite input as zero", () => {
     expect(mapPlayheadSeconds(Number.NaN, 48_000, 48_000)).toBe(0);
     expect(mapPlayheadSeconds(Number.POSITIVE_INFINITY, 48_000, 48_000)).toBe(0);
+  });
+});
+
+describe("mapAbsolutePlayheadToLane", () => {
+  it("maps an excerpt-local position back to the original timeline", () => {
+    expect(mapAbsolutePlayheadToLane(10, 240_000, 24_000, 600_000)).toBe(0);
+    expect(mapAbsolutePlayheadToLane(12, 240_000, 24_000, 600_000)).toBe(48_000);
+  });
+
+  it("clamps a position before the excerpt to local zero", () => {
+    expect(mapAbsolutePlayheadToLane(0, 240_000, 24_000, 600_000)).toBe(0);
+  });
+
+  it("clamps at the lane end", () => {
+    expect(mapAbsolutePlayheadToLane(99, 0, 24_000, 24_000)).toBe(23_999);
+  });
+
+  it("treats a non-finite absolute time as zero", () => {
+    expect(mapAbsolutePlayheadToLane(Number.NaN, 0, 24000, 24000)).toBe(0);
   });
 });

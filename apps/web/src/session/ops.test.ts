@@ -1030,6 +1030,8 @@ describe("op table wiring", () => {
       | "spectrogramTiles"
       | "waveformOverview"
       | "waveformRange"
+      | "waveformEnvelope"
+      | "qualityMetrics"
       | "fftSelection"
       | "windowProfiles"
       | "generateSynth"
@@ -1044,6 +1046,8 @@ describe("op table wiring", () => {
       | "convolutionSteps"
       | "spectrumEdit"
       | "codecLabProcess"
+      | "psychoacousticCurves"
+      | "psychoacousticAnalysis"
     >();
     expectTypeOf<DspOpParams<"sessionPing">>().toEqualTypeOf<{ count: number }>();
     expectTypeOf<DspOpResult<"sessionPing">>().toEqualTypeOf<{

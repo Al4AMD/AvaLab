@@ -16,7 +16,7 @@ import { useSessionStore } from "../../session/store";
 import { type ComparisonRow, publishedCodecComparisonRows } from "../codecLab/comparison";
 import { RateDistortionChart } from "../codecLab/rateDistortionChart";
 import { UploadEmptyState } from "../input/upload";
-import { computeQualityMetrics } from "../metrics/metrics";
+import { measureQualityMetrics } from "../metrics/qualityMetricsWorker";
 import {
   AI_MAX_EXCERPT_SECONDS,
   type AiExcerptInput,
@@ -24,6 +24,7 @@ import {
   type AiModelState,
 } from "./aiClient";
 import { fetchDenoiseAudio as fetchResultAudio } from "./denoiseTab";
+import { ProcessedInstallError, processedInstallErrorKey } from "./installResult";
 import { type AiJobStatus, useAiJob } from "./useAiJob";
 
 export const NEURAL_CODEC_BANDWIDTHS = [1.5, 3, 6, 12, 24] as const;
@@ -321,6 +322,7 @@ export function NeuralCodecTab({
   const [point, setPoint] = useState<{ bitrateKbps: number; snrDb: number } | null>(null);
   const [localErrorKey, setLocalErrorKey] = useState<string | null>(null);
   const installedRef = useRef<string | null>(null);
+  const jobSourceHashRef = useRef<string | null>(null);
   const [codecRows, setCodecRows] = useState<readonly ComparisonRow[]>(() =>
     publishedCodecComparisonRows(original),
   );
@@ -355,9 +357,17 @@ export function NeuralCodecTab({
         }
         const installed = useSessionStore
           .getState()
-          .setProcessed(audio.samples.slice(), audio.sampleRateHz, label);
+          .setProcessed(audio.samples.slice(), audio.sampleRateHz, label, {
+            ...(jobSourceHashRef.current === null ? {} : { sourceHash: jobSourceHashRef.current }),
+            sourceStartSample: 0,
+          });
         if (!installed.ok) {
-          setLocalErrorKey("ai.neuralCodec.installFailed");
+          setLocalErrorKey(
+            processedInstallErrorKey(
+              new ProcessedInstallError(installed.code),
+              "ai.neuralCodec.installFailed",
+            ),
+          );
           return;
         }
         const count = Math.min(source.samples.length, audio.samples.length);
@@ -365,22 +375,28 @@ export function NeuralCodecTab({
           setLocalErrorKey("ai.neuralCodec.metricsFailed");
           return;
         }
-        try {
-          const metrics = computeQualityMetrics(
-            source.samples.slice(0, count),
-            audio.samples.slice(0, count),
-            audio.sampleRateHz,
-          );
-          setPoint({
-            bitrateKbps: resultBitrate ?? resultBandwidth ?? 0,
-            snrDb: metrics.snrDb,
-          });
-        } catch {
-          setLocalErrorKey("ai.neuralCodec.metricsFailed");
-          return;
-        }
-        installedRef.current = audioId;
-        setInstalledAudioId(audioId);
+        void measureQualityMetrics(
+          source.samples.slice(0, count),
+          audio.samples.slice(0, count),
+          audio.sampleRateHz,
+        ).then(
+          (metrics) => {
+            if (cancelled) {
+              return;
+            }
+            setPoint({
+              bitrateKbps: resultBitrate ?? resultBandwidth ?? 0,
+              snrDb: metrics.snrDb,
+            });
+            installedRef.current = audioId;
+            setInstalledAudioId(audioId);
+          },
+          () => {
+            if (!cancelled) {
+              setLocalErrorKey("ai.neuralCodec.metricsFailed");
+            }
+          },
+        );
       },
       () => {
         if (!cancelled) {
@@ -425,6 +441,7 @@ export function NeuralCodecTab({
       startSample: 0,
       endSample,
     };
+    jobSourceHashRef.current = useSessionStore.getState().inputHash;
     installedRef.current = null;
     setInstalledAudioId(null);
     setPoint(null);

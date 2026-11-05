@@ -36,6 +36,9 @@ import {
   filterApply,
   filterDesign,
   generateSynth,
+  psychoacousticAnalysis,
+  psychoacousticCurves,
+  qualityMetrics,
   reverbProcess,
   samplingProcess,
   sessionPing,
@@ -43,6 +46,7 @@ import {
   spectrumEdit,
   speedTransform,
   superresBaseline,
+  waveformEnvelope,
   waveformOverview,
   waveformRange,
   windowProfiles,
@@ -74,6 +78,9 @@ const dspHandlers = {
   filterApply,
   filterDesign,
   generateSynth,
+  psychoacousticAnalysis,
+  psychoacousticCurves,
+  qualityMetrics,
   reverbProcess,
   samplingProcess,
   sessionPing,
@@ -81,6 +88,7 @@ const dspHandlers = {
   spectrumEdit,
   superresBaseline,
   spectrogramTiles,
+  waveformEnvelope,
   waveformOverview,
   waveformRange,
   windowProfiles,
@@ -135,7 +143,7 @@ function isCancelFrame(frame: Record<string, unknown>): frame is CancelFrame {
 /** Every op's `DspOpResultBase` payload (optional by constraint) is
  * transferred, never structured-cloned. */
 function transfersOf(response: DspOpResponse): Transferable[] {
-  if (response.ok && !("cancelled" in response)) {
+  if (response.ok && !("cancelled" in response) && "payload" in response.result) {
     const payload = response.result.payload;
     if (payload !== undefined) {
       return [payload.buffer];
@@ -161,6 +169,14 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
       }
       case "waveformRange": {
         const result = dspHandlers.waveformRange(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "waveformEnvelope": {
+        const result = dspHandlers.waveformEnvelope(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "qualityMetrics": {
+        const result = dspHandlers.qualityMetrics(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       case "spectrogramTiles": {
@@ -217,6 +233,14 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
       }
       case "codecLabProcess": {
         const result = dspHandlers.codecLabProcess(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "psychoacousticCurves": {
+        const result = dspHandlers.psychoacousticCurves(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "psychoacousticAnalysis": {
+        const result = dspHandlers.psychoacousticAnalysis(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       case "spectrumEdit": {

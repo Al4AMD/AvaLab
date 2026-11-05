@@ -29,6 +29,9 @@ import {
   aliasFrequencyHz,
   applyFilter,
   averagePower,
+  bandAthDb,
+  bandLevelsDb,
+  barkBandEdgesHz,
   biquadHighpass,
   biquadLowpass,
   biquadNotch,
@@ -42,12 +45,14 @@ import {
   convolveFft,
   decodeLosslessDeltaHuffman,
   decodeMdct,
+  decodeMdctPsycho,
   designButterworth,
   designChebyshev1,
   designFirWindow,
   editSpectrum,
   encodeLosslessDeltaHuffman,
   encodeMdct,
+  encodeMdctPsycho,
   entropyBitsPerSymbol,
   fft,
   floatToInt16Pcm,
@@ -66,15 +71,20 @@ import {
   groupDelaySamples,
   huffmanDecode,
   huffmanEncode,
+  hzToBark,
   impulseResponse,
   int16PcmToBytes,
   int16PcmToFloat,
   isStable,
   kaiser,
   magnitudeDb,
+  maskingThresholdDb,
+  mdct,
+  measureReferencePower,
   mse,
   mulawDecode,
   mulawEncode,
+  PSYCHO_REFERENCE_SPL_DB,
   periodicExtend,
   pitchShift,
   polesZeros,
@@ -91,7 +101,9 @@ import {
   type SyntheticIrKind,
   segmentalSnrDb,
   signalEnergy,
+  signalToMaskRatioDb,
   snrDb,
+  spreadingDb,
   stepResponse,
   support,
   timeScale,
@@ -301,6 +313,108 @@ export function waveformRange(
       endSample: params.endSample,
     },
     payload: { buffer: minMax.buffer, byteOffset: 0, byteLength: minMax.byteLength },
+  };
+}
+
+export type WaveformEnvelopeParams = { bucketCount: number };
+export type WaveformEnvelopeResult = {
+  meta: { bucketCount: number };
+  payload?: TransferablePayload;
+};
+
+/** Display-only min/max envelope for canvases that are not tied to a source
+ * range. Empty input keeps one zero pair so painters never divide by zero. */
+export function waveformEnvelope(
+  params: WaveformEnvelopeParams,
+  payload?: TransferablePayload,
+): WaveformEnvelopeResult {
+  if (
+    params === undefined ||
+    params === null ||
+    !Number.isInteger(params.bucketCount) ||
+    params.bucketCount < 1
+  ) {
+    throw new DspOpError("badParams", `waveformEnvelope: invalid params ${String(params)}`);
+  }
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "waveformEnvelope: a Float32 source payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError(
+      "badPayload",
+      `waveformEnvelope: payload must be Float32-aligned, got byteOffset ${String(payload.byteOffset)}/byteLength ${String(payload.byteLength)}`,
+    );
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  if (samples.length === 0) {
+    const empty = new Float32Array(2);
+    return {
+      meta: { bucketCount: 1 },
+      payload: { buffer: empty.buffer, byteOffset: 0, byteLength: empty.byteLength },
+    };
+  }
+  const minMax = computePeakBuckets(samples, params.bucketCount);
+  return {
+    meta: { bucketCount: minMax.byteLength / 8 },
+    payload: { buffer: minMax.buffer, byteOffset: 0, byteLength: minMax.byteLength },
+  };
+}
+
+export type QualityMetricsParams = { sampleRateHz: number; sampleCount: number };
+export type QualityMetricsResult = {
+  meta: { sampleCount: number; sampleRateHz: number };
+  mse: number;
+  snrDb: number;
+  segmentalSnrDb: number;
+  psnrDb: number;
+};
+
+/** F05 metrics over a combined `reference ++ test` Float32 payload. Keeping
+ * both lanes in one transfer avoids a second protocol shape. */
+export function qualityMetrics(
+  params: QualityMetricsParams,
+  payload?: TransferablePayload,
+): QualityMetricsResult {
+  if (
+    params === undefined ||
+    params === null ||
+    !Number.isFinite(params.sampleRateHz) ||
+    params.sampleRateHz <= 0 ||
+    !Number.isInteger(params.sampleCount) ||
+    params.sampleCount < 1
+  ) {
+    throw new DspOpError("badParams", `qualityMetrics: invalid params ${String(params)}`);
+  }
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "qualityMetrics: a Float32 payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError(
+      "badPayload",
+      `qualityMetrics: payload must be Float32-aligned, got byteOffset ${String(payload.byteOffset)}/byteLength ${String(payload.byteLength)}`,
+    );
+  }
+  const combined = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  if (combined.length !== params.sampleCount * 2) {
+    throw new DspOpError(
+      "badPayload",
+      `qualityMetrics: expected ${String(params.sampleCount * 2)} samples, got ${String(combined.length)}`,
+    );
+  }
+  const reference = combined.subarray(0, params.sampleCount);
+  const test = combined.subarray(params.sampleCount);
+  for (let index = 0; index < combined.length; index += 1) {
+    if (!Number.isFinite(combined[index])) {
+      throw new DspOpError("badPayload", `qualityMetrics: sample ${String(index)} is not finite`);
+    }
+  }
+  const frameLengthSamples = Math.max(1, Math.round(0.02 * params.sampleRateHz));
+  return {
+    meta: { sampleCount: params.sampleCount, sampleRateHz: params.sampleRateHz },
+    mse: mse(reference, test),
+    snrDb: snrDb(reference, test),
+    segmentalSnrDb: segmentalSnrDb(reference, test, { frameLengthSamples }),
+    psnrDb: psnrDb(reference, test, { peak: 1 }),
   };
 }
 
@@ -1792,6 +1906,18 @@ export type CodecLabParams = {
   startSample: number;
   endSample: number;
   mdctBitsPerSecond: number;
+  /** Omitted means legacy uniform quantization (Wave-4 behavior). */
+  mdctPsychoacoustic?: boolean;
+  /** Reference level for a full-scale sine in dB SPL; defaults to 94. */
+  mdctReferenceSplDb?: number;
+};
+
+export type CodecLabMdctBand = {
+  lowHz: number;
+  highHz: number;
+  thresholdDb: number;
+  smrDb: number;
+  step: number;
 };
 
 export type CodecLabMeta = {
@@ -1818,12 +1944,207 @@ export type CodecLabMeta = {
   coefficientSparsity: number | null;
   frameCount: number | null;
   bitsTotal: number | null;
+  psychoacoustic: boolean;
+  mdctEntropyBits: number | null;
+  mdctSideInfoBits: number | null;
+  mdctMaskedFraction: number | null;
+  mdctBands: CodecLabMdctBand[] | null;
 };
 
 export type CodecLabResult = {
   meta: CodecLabMeta;
   payload?: TransferablePayload;
 };
+
+export type PsychoacousticCurvesParams = {
+  sampleRateHz: number;
+  referenceSplDb: number;
+};
+
+export type PsychoacousticCurvesResult = {
+  meta: {
+    bandEdgesHz: Float64Array;
+    bandCentersHz: Float64Array;
+    bandCentersBark: Float64Array;
+    athDb: Float64Array;
+    /** Row-major 25 x 25: row = threshold band, column = masker band. */
+    spreadingDb: Float64Array;
+  };
+};
+
+export type PsychoacousticBand = {
+  lowHz: number;
+  highHz: number;
+  levelDb: number;
+  thresholdDb: number;
+  smrDb: number;
+};
+
+export type PsychoacousticAnalysisParams = {
+  sampleRateHz: number;
+  startSample: number;
+  endSample: number;
+  referenceSplDb: number;
+};
+
+export type PsychoacousticAnalysisResult = {
+  meta: {
+    frameCount: number;
+    bands: PsychoacousticBand[];
+  };
+};
+
+const PSYCHO_MIN_SPL_DB = 80;
+const PSYCHO_MAX_SPL_DB = 100;
+const PSYCHO_MAX_SELECTION_SECONDS = 30;
+
+function isPsychoRate(sampleRateHz: number): boolean {
+  return Number.isFinite(sampleRateHz) && sampleRateHz > 0 && sampleRateHz <= 96_000;
+}
+
+function isPsychoReferenceSpl(referenceSplDb: number): boolean {
+  return (
+    Number.isFinite(referenceSplDb) &&
+    referenceSplDb >= PSYCHO_MIN_SPL_DB &&
+    referenceSplDb <= PSYCHO_MAX_SPL_DB
+  );
+}
+
+function psychoBandCenters(edgesHz: Float64Array): {
+  centersHz: Float64Array;
+  centersBark: Float64Array;
+} {
+  const bandCount = Math.max(0, edgesHz.length - 1);
+  const centersHz = new Float64Array(bandCount);
+  const centersBark = new Float64Array(bandCount);
+  for (let band = 0; band < bandCount; band += 1) {
+    const low = edgesHz[band] ?? 0;
+    const high = edgesHz[band + 1] ?? low;
+    const center = Math.sqrt(low * high);
+    centersHz[band] = center;
+    centersBark[band] = hzToBark(center);
+  }
+  return { centersHz, centersBark };
+}
+
+/** F13 static curves: Bark edges/centers, ATH, and the spreading matrix. */
+export function psychoacousticCurves(
+  params: PsychoacousticCurvesParams,
+  _payload?: TransferablePayload,
+): PsychoacousticCurvesResult {
+  if (
+    params === undefined ||
+    params === null ||
+    !isPsychoRate(params.sampleRateHz) ||
+    !isPsychoReferenceSpl(params.referenceSplDb)
+  ) {
+    throw new DspOpError("badParams", `psychoacousticCurves: invalid params ${String(params)}`);
+  }
+  const bandEdgesHz = barkBandEdgesHz(params.sampleRateHz);
+  const { centersHz, centersBark } = psychoBandCenters(bandEdgesHz);
+  const bandCount = centersBark.length;
+  const spreading = new Float64Array(bandCount * bandCount);
+  for (let row = 0; row < bandCount; row += 1) {
+    const thresholdBark = centersBark[row] ?? 0;
+    for (let column = 0; column < bandCount; column += 1) {
+      spreading[row * bandCount + column] = spreadingDb(thresholdBark - (centersBark[column] ?? 0));
+    }
+  }
+  return {
+    meta: {
+      bandEdgesHz,
+      bandCentersHz: centersHz,
+      bandCentersBark: centersBark,
+      athDb: bandAthDb(bandEdgesHz),
+      spreadingDb: spreading,
+    },
+  };
+}
+
+/**
+ * F13 audio analysis: per-band level, threshold and SMR for the frame with
+ * the largest band-energy sum. The reference SPL is the level assigned to a
+ * full-scale 1 kHz sine measured through the same MDCT.
+ */
+export function psychoacousticAnalysis(
+  params: PsychoacousticAnalysisParams,
+  payload?: TransferablePayload,
+): PsychoacousticAnalysisResult {
+  if (
+    params === undefined ||
+    params === null ||
+    !isPsychoRate(params.sampleRateHz) ||
+    !isPsychoReferenceSpl(params.referenceSplDb) ||
+    !Number.isInteger(params.startSample) ||
+    !Number.isInteger(params.endSample) ||
+    params.startSample < 0 ||
+    params.endSample < params.startSample
+  ) {
+    throw new DspOpError("badParams", `psychoacousticAnalysis: invalid params ${String(params)}`);
+  }
+  if (payload === undefined) {
+    throw new DspOpError(
+      "badPayload",
+      "psychoacousticAnalysis: a Float32 source payload is required",
+    );
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError("badParams", "psychoacousticAnalysis: payload must be Float32-aligned");
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  if (samples.length === 0) {
+    throw new DspOpError("badParams", "psychoacousticAnalysis: the selection is empty");
+  }
+  const maxSamples = PSYCHO_MAX_SELECTION_SECONDS * params.sampleRateHz;
+  if (samples.length > maxSamples || params.endSample - params.startSample > maxSamples) {
+    throw new DspOpError("badParams", "psychoacousticAnalysis: the selection exceeds the 30 s cap");
+  }
+
+  const transform = mdct(Float64Array.from(samples), {
+    frameLengthSamples: CODEC_LAB_MDCT_FRAME_LENGTH,
+  });
+  const bandEdgesHz = barkBandEdgesHz(params.sampleRateHz);
+  const { centersBark } = psychoBandCenters(bandEdgesHz);
+  const athDb = bandAthDb(bandEdgesHz);
+  const referencePower = measureReferencePower(params.sampleRateHz, CODEC_LAB_MDCT_FRAME_LENGTH);
+  let loudestIndex = 0;
+  let loudestEnergy = Number.NEGATIVE_INFINITY;
+  for (let frame = 0; frame < transform.coefficients.length; frame += 1) {
+    const coefficients = transform.coefficients[frame];
+    if (coefficients === undefined) {
+      continue;
+    }
+    let energy = 0;
+    for (const coefficient of coefficients) {
+      energy += coefficient * coefficient;
+    }
+    if (energy > loudestEnergy) {
+      loudestEnergy = energy;
+      loudestIndex = frame;
+    }
+  }
+  const loudest = transform.coefficients[loudestIndex] ?? new Float64Array(0);
+  const { levelsDb } = bandLevelsDb(
+    loudest,
+    bandEdgesHz,
+    params.referenceSplDb,
+    referencePower,
+    params.sampleRateHz,
+  );
+  const thresholdsDb = maskingThresholdDb(levelsDb, centersBark, athDb);
+  const smrDb = signalToMaskRatioDb(levelsDb, thresholdsDb);
+  const bands: PsychoacousticBand[] = [];
+  for (let band = 0; band < centersBark.length; band += 1) {
+    bands.push({
+      lowHz: bandEdgesHz[band] ?? 0,
+      highHz: bandEdgesHz[band + 1] ?? 0,
+      levelDb: levelsDb[band] ?? Number.NEGATIVE_INFINITY,
+      thresholdDb: thresholdsDb[band] ?? Number.NEGATIVE_INFINITY,
+      smrDb: smrDb[band] ?? Number.NEGATIVE_INFINITY,
+    });
+  }
+  return { meta: { frameCount: transform.coefficients.length, bands } };
+}
 
 const CODEC_LAB_CODECS: readonly CodecLabCodec[] = [
   "rle",
@@ -1860,6 +2181,8 @@ export function codecLabProcess(
   params: CodecLabParams,
   payload?: TransferablePayload,
 ): CodecLabResult {
+  const usePsychoacoustic = params?.mdctPsychoacoustic ?? false;
+  const referenceSplDb = params?.mdctReferenceSplDb ?? PSYCHO_REFERENCE_SPL_DB;
   if (
     params === undefined ||
     params === null ||
@@ -1873,10 +2196,13 @@ export function codecLabProcess(
     params.endSample < params.startSample ||
     !Number.isFinite(params.mdctBitsPerSecond) ||
     params.mdctBitsPerSecond < 8_000 ||
-    params.mdctBitsPerSecond > 512_000
+    params.mdctBitsPerSecond > 512_000 ||
+    (params.mdctPsychoacoustic !== undefined && typeof params.mdctPsychoacoustic !== "boolean") ||
+    !isPsychoReferenceSpl(referenceSplDb)
   ) {
     throw new DspOpError("badParams", `codecLabProcess: invalid params ${String(params)}`);
   }
+  const psychoacoustic = usePsychoacoustic && params.codec === "mdct";
   if (payload === undefined) {
     throw new DspOpError("badPayload", "codecLabProcess: a Float32 source payload is required");
   }
@@ -1909,6 +2235,11 @@ export function codecLabProcess(
   let frameCount: number | null = null;
   let encodeMs = 0;
   let decodeMs = 0;
+  let mdctEntropyBits: number | null = null;
+  let mdctSideInfoBits: number | null = null;
+  let mdctMaskedFraction: number | null = null;
+  let mdctBands: CodecLabMdctBand[] | null = null;
+  let bitrateKbpsOverride: number | null = null;
 
   if (params.codec === "rle") {
     const encodeStart = performance.now();
@@ -1960,28 +2291,81 @@ export function codecLabProcess(
     bitsTotal = encoded.length * 8;
     entropy = entropyBitsPerSymbol(encoded);
   } else {
-    const encodeStart = performance.now();
-    const encoded = encodeMdct(Float32Array.from(reference), {
-      sampleRateHz: params.sampleRateHz,
-      frameLengthSamples: CODEC_LAB_MDCT_FRAME_LENGTH,
-      bitsPerSecond: params.mdctBitsPerSecond,
-    });
-    encodeMs = performance.now() - encodeStart;
-    const decodeStart = performance.now();
-    decoded = decodeMdct(encoded, {
-      sampleRateHz: params.sampleRateHz,
-      frameLengthSamples: CODEC_LAB_MDCT_FRAME_LENGTH,
-    }).slice(0, sampleCount);
-    decodeMs = performance.now() - decodeStart;
-    compressedSizeBytes = encoded.stats.compressedSizeBytes + 256 + encoded.steps.length * 8;
-    bitsTotal = encoded.bitsTotal;
-    frameCount = encoded.coefficients.length;
+    let encodedFrames: readonly Float64Array[];
+    if (psychoacoustic) {
+      const encodeStart = performance.now();
+      const encoded = encodeMdctPsycho(Float32Array.from(reference), {
+        sampleRateHz: params.sampleRateHz,
+        frameLengthSamples: CODEC_LAB_MDCT_FRAME_LENGTH,
+        bitsPerSecond: params.mdctBitsPerSecond,
+        referenceSplDb,
+      });
+      encodeMs = performance.now() - encodeStart;
+      const decodeStart = performance.now();
+      decoded = decodeMdctPsycho(encoded, {
+        sampleRateHz: params.sampleRateHz,
+        frameLengthSamples: CODEC_LAB_MDCT_FRAME_LENGTH,
+      }).slice(0, sampleCount);
+      decodeMs = performance.now() - decodeStart;
+      compressedSizeBytes = encoded.stats.compressedSizeBytes;
+      bitsTotal = encoded.bitsTotal;
+      frameCount = encoded.coefficients.length;
+      mdctEntropyBits = encoded.stats.entropyBits;
+      mdctSideInfoBits = encoded.stats.sideInfoBits;
+      mdctMaskedFraction = encoded.stats.maskedFraction;
+      bitrateKbpsOverride = (encoded.stats.totalBits * params.sampleRateHz) / sampleCount / 1000;
+      let loudest = encoded.frameStats[0];
+      let loudestScore = Number.NEGATIVE_INFINITY;
+      for (const frame of encoded.frameStats) {
+        let score = 0;
+        for (const band of frame.bands) {
+          if (Number.isFinite(band.levelDb)) {
+            score += 10 ** (band.levelDb / 10);
+          }
+        }
+        if (score > loudestScore) {
+          loudestScore = score;
+          loudest = frame;
+        }
+      }
+      mdctBands =
+        loudest === undefined
+          ? null
+          : loudest.bands.map((band) => ({
+              lowHz: band.lowHz,
+              highHz: band.highHz,
+              thresholdDb: band.thresholdDb,
+              smrDb: band.smrDb,
+              step: band.step,
+            }));
+      encodedFrames = encoded.coefficients;
+      codeLengths = Array.from(encoded.codebook.codeLengths);
+    } else {
+      const encodeStart = performance.now();
+      const encoded = encodeMdct(Float32Array.from(reference), {
+        sampleRateHz: params.sampleRateHz,
+        frameLengthSamples: CODEC_LAB_MDCT_FRAME_LENGTH,
+        bitsPerSecond: params.mdctBitsPerSecond,
+      });
+      encodeMs = performance.now() - encodeStart;
+      const decodeStart = performance.now();
+      decoded = decodeMdct(encoded, {
+        sampleRateHz: params.sampleRateHz,
+        frameLengthSamples: CODEC_LAB_MDCT_FRAME_LENGTH,
+      }).slice(0, sampleCount);
+      decodeMs = performance.now() - decodeStart;
+      compressedSizeBytes = encoded.stats.compressedSizeBytes + 256 + encoded.steps.length * 8;
+      bitsTotal = encoded.bitsTotal;
+      frameCount = encoded.coefficients.length;
+      encodedFrames = encoded.coefficients;
+      codeLengths = Array.from(encoded.codebook.codeLengths);
+    }
     const hop = CODEC_LAB_MDCT_FRAME_LENGTH / 2;
-    const coefficientCount = frameCount * hop;
+    const coefficientCount = (frameCount ?? 0) * hop;
     const flatCoefficients = new Int32Array(coefficientCount);
     let zeroCount = 0;
     let cursor = 0;
-    for (const frame of encoded.coefficients) {
+    for (const frame of encodedFrames) {
       for (let index = 0; index < hop; index += 1) {
         const coefficient = frame[index] ?? 0;
         flatCoefficients[cursor] = coefficient;
@@ -1993,7 +2377,6 @@ export function codecLabProcess(
     }
     coefficientSparsity = coefficientCount === 0 ? 0 : zeroCount / coefficientCount;
     entropy = entropyBitsPerSymbol(flatCoefficients);
-    codeLengths = Array.from(encoded.codebook.codeLengths);
   }
 
   const bitExact = decodedInt16 === null ? false : int16ArraysEqual(decodedInt16, pcm16);
@@ -2009,7 +2392,7 @@ export function codecLabProcess(
       originalBytes,
       compressedSizeBytes,
       bitsPerSample: (8 * compressedSizeBytes) / sampleCount,
-      bitrateKbps: (8 * compressedSizeBytes) / (durationSeconds * 1000),
+      bitrateKbps: bitrateKbpsOverride ?? (8 * compressedSizeBytes) / (durationSeconds * 1000),
       compressionRatio: originalBytes / compressedSizeBytes,
       entropyBitsPerSymbol: entropy,
       encodeMs,
@@ -2024,6 +2407,11 @@ export function codecLabProcess(
       coefficientSparsity,
       frameCount,
       bitsTotal,
+      psychoacoustic,
+      mdctEntropyBits,
+      mdctSideInfoBits,
+      mdctMaskedFraction,
+      mdctBands,
     },
     payload: {
       buffer: decoded.buffer as ArrayBuffer,
@@ -2292,6 +2680,20 @@ export const dspOps = {
     result: undefined as unknown as WaveformRangeResult,
     handler: waveformRange,
   },
+  waveformEnvelope: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: { bucketCount: 0 },
+    result: undefined as unknown as WaveformEnvelopeResult,
+    handler: waveformEnvelope,
+  },
+  qualityMetrics: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: { sampleRateHz: 0, sampleCount: 0 },
+    result: undefined as unknown as QualityMetricsResult,
+    handler: qualityMetrics,
+  },
   fftSelection: {
     // Type lenses only — the table is read for types (DspOpParams/Result);
     // runtime code dispatches through the worker switch.
@@ -2336,9 +2738,33 @@ export const dspOps = {
       startSample: 0,
       endSample: 0,
       mdctBitsPerSecond: 128_000,
-    },
+      mdctPsychoacoustic: false,
+      mdctReferenceSplDb: PSYCHO_REFERENCE_SPL_DB,
+    } as CodecLabParams,
     result: undefined as unknown as CodecLabResult,
     handler: codecLabProcess,
+  },
+  psychoacousticCurves: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: {
+      sampleRateHz: 0,
+      referenceSplDb: PSYCHO_REFERENCE_SPL_DB,
+    },
+    result: undefined as unknown as PsychoacousticCurvesResult,
+    handler: psychoacousticCurves,
+  },
+  psychoacousticAnalysis: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: {
+      sampleRateHz: 0,
+      startSample: 0,
+      endSample: 0,
+      referenceSplDb: PSYCHO_REFERENCE_SPL_DB,
+    },
+    result: undefined as unknown as PsychoacousticAnalysisResult,
+    handler: psychoacousticAnalysis,
   },
   generateSynth: {
     // Type lenses only — the table is read for types (DspOpParams/Result);

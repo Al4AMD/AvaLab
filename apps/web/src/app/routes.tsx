@@ -8,6 +8,7 @@ import { FftView } from "../features/fftview/fftView";
 import { FilterLabView } from "../features/filters/filterLabView";
 import { GeneratorView } from "../features/generator/generatorView";
 import { MetricsView } from "../features/metrics/metricsView";
+import { PsychoacousticsView } from "../features/psychoacoustics/psychoacousticsView";
 import { ReverbView } from "../features/reverb/reverbView";
 import { SamplingView } from "../features/sampling/samplingView";
 import { SpectrogramView } from "../features/spectrogram/spectrogramView";
@@ -30,6 +31,7 @@ export const TOOL_IDS = [
   "spectrum-edit",
   "codec-lab",
   "metrics",
+  "psychoacoustics",
   "ai",
 ] as const;
 export type ToolId = (typeof TOOL_IDS)[number];
@@ -97,6 +99,7 @@ export const appRoutes: RouteObject[] = [
       { path: "tools/spectrum-edit", element: <SpectrumEditView /> },
       { path: "tools/codec-lab", element: <CodecLabView /> },
       { path: "tools/metrics", element: <MetricsView /> },
+      { path: "tools/psychoacoustics", element: <PsychoacousticsView /> },
       { path: "tools/ai", element: <AiLabView /> },
     ],
   },

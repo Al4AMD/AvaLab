@@ -11,6 +11,7 @@ import { encodeWavPcm16 } from "@avalab/dsp";
 import { resolveBaseUrl } from "../../api/client";
 import { isRecordLike } from "../../session/protocol";
 import { AI_TASKS, type AiTask, aiTaskFromBackend, backendTask } from "./aiState";
+import { appendSseChunk } from "./sseStream";
 
 export const AI_MAX_EXCERPT_SECONDS = 30;
 
@@ -25,7 +26,10 @@ export type AiModelInfo = {
   readonly state: AiModelState;
 };
 
-export type AiModelsResponse = { readonly models: readonly AiModelInfo[] };
+export type AiModelsResponse = {
+  readonly ml_enabled: boolean;
+  readonly models: readonly AiModelInfo[];
+};
 
 export type AiExcerptInput = {
   readonly samples: Float32Array;
@@ -271,7 +275,8 @@ export function createAiClient(options: AiClientOptions = {}): AiClient {
       if (!isPlainRecord(body) || !Array.isArray(body.models)) {
         throw protocolError();
       }
-      return { models: body.models.map(normaliseModel) };
+      const mlEnabled = typeof body.ml_enabled === "boolean" ? body.ml_enabled : true;
+      return { ml_enabled: mlEnabled, models: body.models.map(normaliseModel) };
     },
 
     async uploadExcerpt(input): Promise<string> {
@@ -333,7 +338,7 @@ export function createAiClient(options: AiClientOptions = {}): AiClient {
           if (done) {
             break;
           }
-          buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+          buffer = appendSseChunk(buffer, decoder.decode(value, { stream: true }));
           let separator = buffer.indexOf("\n\n");
           while (separator !== -1) {
             const frame = buffer.slice(0, separator);

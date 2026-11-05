@@ -76,11 +76,27 @@ export type ProcessedSource = {
   readonly samples: Float32Array;
   readonly sampleRateHz: number;
   readonly label: string;
+  /** First source sample this lane covers; 0 for whole-source results. */
+  readonly sourceStartSample: number;
+  /** Input hash captured when an AI job started; null for non-AI tools. */
+  readonly sourceHash: string | null;
+};
+
+/** Optional identity metadata for tool/AI results. */
+export type SetProcessedOptions = {
+  readonly sourceHash?: string;
+  readonly sourceStartSample?: number;
 };
 
 /** Structured rejection codes for `setProcessed` (frontend translates by
  * code; mirrors `SourceErrorCode` plus `empty`). */
-export type ProcessedErrorCode = "invalidType" | "notFinite" | "rateTooHigh" | "tooLong" | "empty";
+export type ProcessedErrorCode =
+  | "invalidType"
+  | "notFinite"
+  | "rateTooHigh"
+  | "tooLong"
+  | "empty"
+  | "staleSource";
 
 /** Pre-flight result of `setProcessed`: structured, never a thrown error. */
 export type SetProcessedResult = { ok: true } | { ok: false; code: ProcessedErrorCode };
@@ -178,7 +194,12 @@ export type SessionStore = {
   /** Install a tool result as the processed playback source. Takes ownership
    * (no copy); success switches `playbackMode` to `"processed"`. Rejects
    * durations above `MAX_PROCESSED_SECONDS` instead of truncating. */
-  setProcessed(samples: Float32Array, sampleRateHz: number, label: string): SetProcessedResult;
+  setProcessed(
+    samples: Float32Array,
+    sampleRateHz: number,
+    label: string,
+    options?: SetProcessedOptions,
+  ): SetProcessedResult;
   /** Drop the processed source and return playback to the original. */
   clearProcessed(): void;
   /** Switch lanes. `"processed"` without a processed source is a no-op. */
@@ -441,11 +462,13 @@ export function createSessionStore(
         return { ok: true };
       },
 
-      setProcessed(samples, sampleRateHz, label) {
+      setProcessed(samples, sampleRateHz, label, options = {}) {
         if (
           !(samples instanceof Float32Array) ||
           typeof sampleRateHz !== "number" ||
-          typeof label !== "string"
+          typeof label !== "string" ||
+          typeof options !== "object" ||
+          options === null
         ) {
           return { ok: false, code: "invalidType" };
         }
@@ -473,8 +496,26 @@ export function createSessionStore(
         if (samples.length / sampleRateHz > MAX_PROCESSED_SECONDS) {
           return { ok: false, code: "tooLong" };
         }
+        const sourceHash = options.sourceHash ?? null;
+        if (sourceHash !== null) {
+          if (typeof sourceHash !== "string") {
+            return { ok: false, code: "invalidType" };
+          }
+          if (sourceHash !== get().inputHash) {
+            return { ok: false, code: "staleSource" };
+          }
+        }
+        const sourceStartSample = options.sourceStartSample ?? 0;
+        const sourceLength = get().original?.samples.length ?? 0;
+        if (
+          !Number.isInteger(sourceStartSample) ||
+          sourceStartSample < 0 ||
+          sourceStartSample > sourceLength
+        ) {
+          return { ok: false, code: "invalidType" };
+        }
         set({
-          processed: { samples, sampleRateHz, label },
+          processed: { samples, sampleRateHz, label, sourceStartSample, sourceHash },
           playbackMode: "processed",
         });
         return { ok: true };
@@ -523,7 +564,13 @@ export function createSessionStore(
         // Same loud-validation rule as `derive` (canonicalJson throws on a
         // typo'd param type before any frame leaves the main thread).
         canonicalJson(params);
-        return { key: "", outcome: rpc.call(opKey, params, payload) };
+        // Standalone calls are not cached: identical params can carry
+        // different payloads (two display waveforms), so they must never
+        // supersede each other.
+        return {
+          key: "",
+          outcome: rpc.call(opKey, params, payload, { supersede: false }),
+        };
       },
 
       /**

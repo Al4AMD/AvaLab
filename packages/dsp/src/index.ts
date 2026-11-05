@@ -36,6 +36,19 @@ export type {
   MdctCodecStats,
 } from "./codecs/mdctCodec.js";
 export { decodeMdct, encodeMdct } from "./codecs/mdctCodec.js";
+export type {
+  MdctPsychoBandStat,
+  MdctPsychoEncoded,
+  MdctPsychoFrameStat,
+  MdctPsychoParams,
+} from "./codecs/mdctPsycho.js";
+export {
+  decodeMdctPsycho,
+  encodeMdctPsycho,
+  measureReferencePower,
+  PSYCHO_REFERENCE_SPL_DB,
+  PSYCHO_SIDE_INFO_BITS_PER_BAND,
+} from "./codecs/mdctPsycho.js";
 export type { WavPcm16Options } from "./codecs/pcmWav.js";
 export {
   bytesToInt16Pcm,
@@ -127,6 +140,20 @@ export {
   quantizeUniform,
   quantizeWithTpdfDither,
 } from "./metrics/quantize.js";
+export {
+  absoluteThresholdDb,
+  bandAthDb,
+  bandLevelsDb,
+  barkBandEdgesHz,
+  barkBandIndexOf,
+  barkToHz,
+  hzToBark,
+  maskingThresholdDb,
+  maskStepForBand,
+  PSYCHO_BAND_COUNT,
+  signalToMaskRatioDb,
+  spreadingDb,
+} from "./psychoacoustics/index.js";
 export type {
   ResampleFilter,
   ResampleRationalOptions,

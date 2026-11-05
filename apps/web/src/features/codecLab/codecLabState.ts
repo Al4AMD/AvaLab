@@ -30,10 +30,15 @@ export const CODEC_LAB_REAL_QUALITY_MIN = 0;
 export const CODEC_LAB_REAL_QUALITY_MAX = 10;
 export const CODEC_LAB_REAL_COMPRESSION_MIN = 0;
 export const CODEC_LAB_REAL_COMPRESSION_MAX = 12;
+export const CODEC_LAB_REFERENCE_SPL_MIN = 80;
+export const CODEC_LAB_REFERENCE_SPL_MAX = 100;
+export const CODEC_LAB_DEFAULT_REFERENCE_SPL = 94;
 
 export type CodecLabSettings = {
   readonly codec: CodecLabCodec;
   readonly mdctBitsPerSecond: number;
+  readonly mdctPsychoacoustic: boolean;
+  readonly mdctReferenceSplDb: number;
   readonly startSample: number;
   readonly endSample: number;
   readonly realCodec: RealCodecName;
@@ -52,6 +57,8 @@ export type CodecLabSourceInfo = {
 export const CODEC_LAB_DEFAULT_SETTINGS: CodecLabSettings = {
   codec: "rle",
   mdctBitsPerSecond: CODEC_LAB_DEFAULT_MDCT_KBPS * 1000,
+  mdctPsychoacoustic: true,
+  mdctReferenceSplDb: CODEC_LAB_DEFAULT_REFERENCE_SPL,
   startSample: 0,
   endSample: 0,
   realCodec: "flac",
@@ -138,15 +145,27 @@ function snapMdctKbps(raw: number): number {
   );
 }
 
+function clampReferenceSpl(raw: number): number {
+  if (!Number.isFinite(raw)) {
+    return CODEC_LAB_DEFAULT_REFERENCE_SPL;
+  }
+  return Math.max(
+    CODEC_LAB_REFERENCE_SPL_MIN,
+    Math.min(CODEC_LAB_REFERENCE_SPL_MAX, Math.round(raw)),
+  );
+}
+
 export function codecLabSettingsToSearch(settings: CodecLabSettings): string {
   return encodeParams({
     c: settings.codec,
     from: settings.startSample,
     mbr: settings.mdctBitsPerSecond / 1000,
+    pm: settings.mdctPsychoacoustic ? 1 : 0,
     rc: settings.realCodec,
     rbr: settings.realBitrateKbps,
     rcl: settings.realCompressionLevel,
     rq: settings.realQuality,
+    rspl: settings.mdctReferenceSplDb,
     to: settings.endSample,
   });
 }
@@ -163,6 +182,8 @@ export function codecLabSettingsFromSearch(
   };
   const codec = scalar("c");
   const realCodec = scalar("rc");
+  const pm = scalar("pm");
+  const rspl = scalar("rspl");
   const kbps = Number(scalar("mbr"));
   const realBitrate = Number(scalar("rbr"));
   const realQuality = Number(scalar("rq"));
@@ -184,6 +205,11 @@ export function codecLabSettingsFromSearch(
       : CODEC_LAB_DEFAULT_SETTINGS.codec,
     mdctBitsPerSecond:
       (Number.isFinite(kbps) ? snapMdctKbps(kbps) : CODEC_LAB_DEFAULT_MDCT_KBPS) * 1000,
+    mdctPsychoacoustic: pm === "1",
+    mdctReferenceSplDb:
+      rspl === undefined || rspl.trim() === ""
+        ? CODEC_LAB_DEFAULT_REFERENCE_SPL
+        : clampReferenceSpl(Number(rspl)),
     startSample: range.startSample,
     endSample: range.endSample,
     realCodec: (REAL_CODEC_NAMES as readonly string[]).includes(realCodec ?? "")
@@ -212,6 +238,8 @@ export function isCodecLabStale(
   return (
     current.codec !== resultSettings.codec ||
     current.mdctBitsPerSecond !== resultSettings.mdctBitsPerSecond ||
+    current.mdctPsychoacoustic !== resultSettings.mdctPsychoacoustic ||
+    current.mdctReferenceSplDb !== resultSettings.mdctReferenceSplDb ||
     current.startSample !== resultSettings.startSample ||
     current.endSample !== resultSettings.endSample
   );

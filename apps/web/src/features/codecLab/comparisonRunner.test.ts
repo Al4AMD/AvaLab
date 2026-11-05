@@ -35,6 +35,11 @@ function meta(patch: Partial<CodecLabMeta> = {}): CodecLabMeta {
     coefficientSparsity: null,
     frameCount: null,
     bitsTotal: null,
+    psychoacoustic: false,
+    mdctEntropyBits: null,
+    mdctSideInfoBits: null,
+    mdctMaskedFraction: null,
+    mdctBands: null,
     ...patch,
   };
 }
@@ -159,6 +164,38 @@ describe("runComparison", () => {
     });
     expect(calls).toBe(0);
     expect(rows).toEqual([]);
+  });
+
+  it("measures real rows in the worker and keeps the row when metrics fail", async () => {
+    const rows = await runComparison(
+      input,
+      [{ kind: "real", codec: "mp3", params: { codec: "mp3", bitrateKbps: 128 } }],
+      {
+        runHandwritten: async () => meta(),
+        runReal: async () => realRun(64),
+        measureQuality: async () => ({
+          mse: 0.0625,
+          snrDb: 6.0206,
+          segmentalSnrDb: 6.0206,
+          psnrDb: 12.0412,
+          sampleCount: 100,
+        }),
+      },
+    );
+    expect(rows[0]?.snrDb).toBeCloseTo(6.0206, 3);
+    const failed = await runComparison(
+      input,
+      [{ kind: "real", codec: "mp3", params: { codec: "mp3", bitrateKbps: 128 } }],
+      {
+        runHandwritten: async () => meta(),
+        runReal: async () => realRun(64),
+        measureQuality: async () => {
+          throw new Error("worker failed");
+        },
+      },
+    );
+    expect(failed[0]?.errorKey).toBeUndefined();
+    expect(failed[0]?.snrDb).toBeNaN();
   });
 
   it("records a failed request as an error row and continues", async () => {

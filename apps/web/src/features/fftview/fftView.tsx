@@ -34,6 +34,7 @@ import {
   type FftViewSettings,
   fftSettingsFromSearch,
   fftSettingsToSearch,
+  phaseMaskBins,
 } from "./fftState";
 
 const PLOT_HEIGHT_PX = 220;
@@ -428,17 +429,19 @@ export function FftView() {
     }
     const frequencies = Array.from(spectrum.frequenciesHz);
     const magnitude = Array.from(spectrum.magnitude);
-    const phase: (number | null)[] = [];
-    for (let bin = 0; bin < magnitude.length; bin += 1) {
-      const linear = magnitude[bin] ?? 0;
-      const db = linear > 0 ? 20 * Math.log10(linear) : Number.NEGATIVE_INFINITY;
-      phase.push(db >= settings.phaseMaskDb ? (spectrum.phase[bin] ?? 0) : null);
-    }
     return {
       magnitude: [frequencies, magnitude],
-      phase: [frequencies, phase],
+      phase: [
+        frequencies,
+        phaseMaskBins(
+          spectrum.magnitude,
+          spectrum.phase,
+          settings.magnitudeMode,
+          settings.phaseMaskDb,
+        ),
+      ],
     };
-  }, [spectrum, settings.phaseMaskDb]);
+  }, [spectrum, settings.phaseMaskDb, settings.magnitudeMode]);
 
   const selectionDurationS =
     original === null

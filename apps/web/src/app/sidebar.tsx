@@ -84,6 +84,11 @@ export function Sidebar() {
           </NavLink>
         </li>
         <li>
+          <NavLink to="/tools/psychoacoustics" className={linkClass}>
+            {t("nav.psychoacoustics")}
+          </NavLink>
+        </li>
+        <li>
           <NavLink to="/tools/ai" className={linkClass}>
             {t("nav.ai")}
           </NavLink>

@@ -8,6 +8,7 @@ import type { AiJobStatus } from "./useAiJob";
 type Modules = {
   readonly DenoiseView: typeof import("./denoiseTab").DenoiseView;
   readonly denoiseRunDisabled: typeof import("./denoiseTab").denoiseRunDisabled;
+  readonly denoiseLane: typeof import("./denoiseTab").denoiseLane;
   readonly installDenoiseAudio: typeof import("./denoiseTab").installDenoiseAudio;
   readonly readDenoiseResult: typeof import("./denoiseTab").readDenoiseResult;
   readonly t: typeof import("../../i18n").default.t;
@@ -81,14 +82,36 @@ describe("denoise tab", () => {
     expect(markup).toContain('aria-pressed="true"');
   });
 
+  it("does not mark a foreign processed lane as the pressed denoised lane", () => {
+    const markup = renderToStaticMarkup(
+      <modules.DenoiseView
+        {...view({
+          hasProcessed: false,
+          playbackMode: "processed",
+          status: "done",
+          progress: 1,
+        })}
+      />,
+    );
+
+    expect(markup).toMatch(/data-testid="ai\.denoise\.ab\.denoised"[^>]*aria-pressed="false"/);
+    expect(markup).toMatch(/data-testid="ai\.denoise\.ab\.denoised"[^>]*disabled/);
+  });
+
   it("installs a decoded result as the processed lane", async () => {
-    const calls: Array<{ samples: Float32Array; rate: number; label: string }> = [];
+    const calls: Array<{
+      samples: Float32Array;
+      rate: number;
+      label: string;
+      options: unknown;
+    }> = [];
     const setProcessed = (
       samples: Float32Array,
       rate: number,
       label: string,
+      options?: { sourceHash?: string; sourceStartSample?: number },
     ): SetProcessedResult => {
-      calls.push({ samples, rate, label });
+      calls.push({ samples, rate, label, options });
       return { ok: true };
     };
     const samples = new Float32Array([0.1, -0.1]);
@@ -96,12 +119,33 @@ describe("denoise tab", () => {
     const installed = await modules.installDenoiseAudio({
       audioId: "result-1",
       label: "denoise",
+      sourceHash: "abc123",
+      sourceStartSample: 0,
       fetchAudio: async () => ({ samples, sampleRateHz: 48_000 }),
       setProcessed,
     });
 
     expect(installed.sampleRateHz).toBe(48_000);
-    expect(calls).toEqual([{ samples, rate: 48_000, label: "denoise" }]);
+    expect(calls).toEqual([
+      {
+        samples,
+        rate: 48_000,
+        label: "denoise",
+        options: { sourceHash: "abc123", sourceStartSample: 0 },
+      },
+    ]);
+  });
+
+  it("only treats the denoise result as the A/B denoised lane", () => {
+    const source = {
+      samples: new Float32Array([0.1]),
+      sampleRateHz: 48_000,
+      sourceStartSample: 0,
+      sourceHash: null,
+    };
+    expect(modules.denoiseLane({ ...source, label: "denoise" })?.label).toBe("denoise");
+    expect(modules.denoiseLane({ ...source, label: "separated-vocals" })).toBeNull();
+    expect(modules.denoiseLane(null)).toBeNull();
   });
 
   it("reads the result id and RMS stats defensively", () => {

@@ -93,6 +93,7 @@ export type TransportContext = {
 /** Narrow source-node seam: exactly the fields the machine drives/observes. */
 export type TransportNode = {
   buffer: TransportBuffer | null;
+  connect(destination: unknown): void;
   start(when?: number, offset?: number): void;
   stop(): void;
   disconnect(): void;
@@ -199,6 +200,26 @@ const clampSample = (sample: number, length: number): number =>
  * position in TIME is preserved, clamped to the last playable sample so an
  * at-end swap does not hit `play()`'s restart-from-zero rule. Non-finite
  * seconds map to 0 (mirrors the store's seek no-op convention). */
+/** Map an absolute timeline position onto a lane that starts at
+ * `laneStartSample` of the source (0 for the original/whole-source lanes). */
+export function mapAbsolutePlayheadToLane(
+  absoluteSeconds: number,
+  laneStartSample: number,
+  targetRateHz: number,
+  targetLengthSamples: number,
+): number {
+  if (
+    !Number.isFinite(absoluteSeconds) ||
+    !Number.isFinite(laneStartSample) ||
+    !Number.isFinite(targetRateHz) ||
+    targetRateHz <= 0
+  ) {
+    return 0;
+  }
+  const localSeconds = absoluteSeconds - laneStartSample / targetRateHz;
+  return mapPlayheadSeconds(Math.max(0, localSeconds), targetRateHz, targetLengthSamples);
+}
+
 export function mapPlayheadSeconds(
   seconds: number,
   targetRateHz: number,
@@ -326,6 +347,9 @@ export function createTransport(options: TransportOptions = {}): Transport {
     liveNode = node;
     startedAtTime = timeSource(context);
     startedAtSample = target;
+    // A source node is silent until connected: start() alone advances only
+    // the state machine, not the speakers.
+    node.connect(context.destination);
     // Buffer-relative offset in seconds (not context-clock arithmetic).
     node.start(0, target / sampleRateHz);
     const resumed = context.resume?.(); // suspended contexts activate here

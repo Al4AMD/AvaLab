@@ -6,11 +6,13 @@
  * hint instead of silently trimming or resampling. PSNR uses peak = 1.0 and
  * the note is always visible (AGENTS F05).
  */
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
-import { computeQualityMetrics, formatMetric, type QualityMetrics } from "./metrics";
+import { formatMetric, type QualityMetrics } from "./metrics";
+import { measureQualityMetrics } from "./qualityMetricsWorker";
 
 function MetricCard({
   label,
@@ -35,6 +37,44 @@ export function MetricsView(): React.ReactElement {
   const { t } = useTranslation();
   const original = useSessionStore((state) => state.original);
   const processed = useSessionStore((state) => state.processed);
+  const [metrics, setMetrics] = useState<QualityMetrics | null>(null);
+  const [pending, setPending] = useState(false);
+
+  const problem: "missing" | "lengthMismatch" | "rateMismatch" | null =
+    processed === null
+      ? "missing"
+      : original !== null && processed.sampleRateHz !== original.sampleRateHz
+        ? "rateMismatch"
+        : original !== null && processed.samples.length !== original.samples.length
+          ? "lengthMismatch"
+          : null;
+
+  useEffect(() => {
+    if (original === null || processed === null || problem !== null) {
+      setMetrics(null);
+      setPending(false);
+      return;
+    }
+    let cancelled = false;
+    setPending(true);
+    void measureQualityMetrics(original.samples, processed.samples, original.sampleRateHz).then(
+      (next) => {
+        if (!cancelled) {
+          setMetrics(next);
+          setPending(false);
+        }
+      },
+      () => {
+        if (!cancelled) {
+          setMetrics(null);
+          setPending(false);
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [original, processed, problem]);
 
   if (original === null) {
     return (
@@ -43,23 +83,6 @@ export function MetricsView(): React.ReactElement {
         <UploadEmptyState />
       </section>
     );
-  }
-
-  let metrics: QualityMetrics | null = null;
-  let problem: "missing" | "lengthMismatch" | "rateMismatch" | null =
-    processed === null ? "missing" : null;
-  if (processed !== null) {
-    if (processed.sampleRateHz !== original.sampleRateHz) {
-      problem = "rateMismatch";
-    } else if (processed.samples.length !== original.samples.length) {
-      problem = "lengthMismatch";
-    } else {
-      try {
-        metrics = computeQualityMetrics(original.samples, processed.samples, original.sampleRateHz);
-      } catch {
-        problem = "lengthMismatch";
-      }
-    }
   }
 
   return (
@@ -79,6 +102,12 @@ export function MetricsView(): React.ReactElement {
       {problem === "rateMismatch" ? (
         <p data-testid="metrics.mismatch.rate" className="text-sm text-muted">
           {t("metrics.mismatch.rate")}
+        </p>
+      ) : null}
+
+      {pending ? (
+        <p data-testid="metrics.pending" className="text-sm text-muted">
+          {t("metrics.pending")}
         </p>
       ) : null}
 

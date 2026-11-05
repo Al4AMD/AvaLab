@@ -341,9 +341,11 @@ export interface components {
         };
         /**
          * ModelsResponse
-         * @description All five fixed tasks, in stable order.
+         * @description All five fixed tasks, in stable order, plus the global ML switch.
          */
         ModelsResponse: {
+            /** Ml Enabled */
+            ml_enabled: boolean;
             /** Models */
             models: components["schemas"]["ModelInfo"][];
         };

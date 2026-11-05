@@ -118,32 +118,6 @@ function useCanvasWidth(): {
   return { hostRef, widthPx };
 }
 
-function peakBuckets(samples: Float32Array, bucketCount: number): Float32Array {
-  const buckets = new Float32Array(Math.max(1, bucketCount) * 2);
-  if (samples.length === 0) {
-    return buckets;
-  }
-  const count = buckets.length / 2;
-  for (let bucket = 0; bucket < count; bucket += 1) {
-    const start = Math.floor((bucket * samples.length) / count);
-    const end = Math.max(start + 1, Math.floor(((bucket + 1) * samples.length) / count));
-    let min = Number.POSITIVE_INFINITY;
-    let max = Number.NEGATIVE_INFINITY;
-    for (let index = start; index < end && index < samples.length; index += 1) {
-      const value = samples[index] ?? 0;
-      if (value < min) {
-        min = value;
-      }
-      if (value > max) {
-        max = value;
-      }
-    }
-    buckets[2 * bucket] = Number.isFinite(min) ? min : 0;
-    buckets[2 * bucket + 1] = Number.isFinite(max) ? max : 0;
-  }
-  return buckets;
-}
-
 function WaveformPanel({
   samples,
   ariaLabel,
@@ -164,17 +138,41 @@ function WaveformPanel({
     if (ctx === null) {
       return;
     }
-    const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), MAX_DEVICE_PIXEL_RATIO);
-    paintWaveform(ctx, peakBuckets(samples, Math.max(1, Math.round(widthPx))), {
-      widthPx,
-      heightPx: WAVEFORM_HEIGHT_PX,
-      dpr,
-      background: "#0b1220",
-      wave: "#8bd3c7",
-      center: "#334155",
-      playhead: "#f59e0b",
-      selection: "rgba(56,189,248,0.18)",
-    });
+    let cancelled = false;
+    const copy = samples.slice();
+    const ticket = useSessionStore
+      .getState()
+      .deriveStandalone(
+        "waveformEnvelope",
+        { bucketCount: Math.max(1, Math.round(widthPx)) },
+        { buffer: copy.buffer, byteOffset: 0, byteLength: copy.byteLength },
+      );
+    ticket.outcome.then(
+      (outcome) => {
+        if (cancelled || "cancelled" in outcome || outcome.payload === undefined) {
+          return;
+        }
+        const payload = outcome.payload;
+        const minMax = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+        const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), MAX_DEVICE_PIXEL_RATIO);
+        paintWaveform(ctx, minMax, {
+          widthPx,
+          heightPx: WAVEFORM_HEIGHT_PX,
+          dpr,
+          background: "#0b1220",
+          wave: "#8bd3c7",
+          center: "#334155",
+          playhead: "#f59e0b",
+          selection: "rgba(56,189,248,0.18)",
+        });
+      },
+      () => {
+        // The envelope is display-only; a failed request leaves the canvas blank.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
   }, [samples, widthPx]);
   return (
     <div ref={hostRef} dir="ltr">
