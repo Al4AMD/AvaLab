@@ -31,6 +31,7 @@
 | openapi-typescript | 7.13.0 | MIT |
 | zustand | 5.0.16 | MIT |
 | uplot | 1.6.32 | MIT |
+| @xyflow/react | 12.12.1 | MIT |
 | katex | 0.19.1 | MIT |
 | vite | 8.3.4 | MIT |
 | @vitejs/plugin-react | 6.1.2 | MIT |
@@ -42,7 +43,7 @@
 | @biomejs/biome | 2.5.15 | MIT |
 | @types/node | 26.6.5 | MIT |
 
-Wave 5 added `katex` 0.19.1 (MIT) for the theory panels; Wave 4 added no new JS dependency. The comparison table and rate–distortion chart reuse the already-listed `uplot` 1.6.32 (MIT); real codecs keep using the separately-invoked `ffmpeg` binary.
+Wave 6 added `@xyflow/react` 12.12.1 (MIT, <https://reactflow.dev>) for the F15 pipeline graph editor. Its transitive `@xyflow/system` 0.0.84 is MIT and its `d3-*` interaction packages are ISC. Wave 5 added `katex` 0.19.1 (MIT) for the theory panels; Wave 4 added no new JS dependency. The comparison table and rate–distortion chart reuse the already-listed `uplot` 1.6.32 (MIT); real codecs keep using the separately-invoked `ffmpeg` binary.
 
 ## Python (apps/api/uv.lock, tools/golden/uv.lock, tools/demo_clips/uv.lock)
 

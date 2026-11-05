@@ -11,6 +11,7 @@
  * Edge cases: n/a; every exported function documents its own.
  */
 
+export type { CodecLabCodec } from "./codecs/codecLabTypes.js";
 export type {
   DeltaHuffmanDecoded,
   DeltaHuffmanEncoded,
@@ -140,6 +141,27 @@ export {
   quantizeUniform,
   quantizeWithTpdfDither,
 } from "./metrics/quantize.js";
+export type {
+  PipelineOutput,
+  PipelineRunResult,
+  PipelineStageSummary,
+} from "./pipeline/runPipeline.js";
+export { PipelineRunError, runPipeline } from "./pipeline/runPipeline.js";
+export type {
+  FilterApplyParams,
+  PipelineEdge,
+  PipelineGraph,
+  PipelineNode,
+  ReverbIrParams,
+  ReverbProcessParams,
+  XY,
+} from "./pipeline/types.js";
+export {
+  PIPELINE_MAX_NODES,
+  PIPELINE_MAX_OUTPUTS,
+} from "./pipeline/types.js";
+export type { PipelineErrorCode, PipelineValidation } from "./pipeline/validate.js";
+export { validatePipeline } from "./pipeline/validate.js";
 export {
   absoluteThresholdDb,
   bandAthDb,

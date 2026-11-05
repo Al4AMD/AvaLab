@@ -34,6 +34,7 @@
     "codecLab": "Compression lab",
     "metrics": "Quality metrics",
     "psychoacoustics": "Psychoacoustics",
+    "pipeline": "Pipeline builder",
     "ai": "AI lab",
     "filters": "Filter design",
     "experiments": "Guided experiments"
@@ -159,6 +160,10 @@
     },
     "filters": {
       "title": "Filter design"
+    },
+    "pipeline": {
+      "title": "Pipeline builder",
+      "description": "Chain processing blocks into a branching graph, run it on the current excerpt, and compare the outputs."
     }
   },
   "codecLab": {
@@ -1388,6 +1393,159 @@
     },
     "export": {
       "wav": "Export WAV"
+    }
+  },
+  "pipeline": {
+    "loading": "Loading the pipeline editor…",
+    "palette": {
+      "title": "Add node"
+    },
+    "nodeKind": {
+      "source": "Source",
+      "resample": "Resample",
+      "filter": "Filter",
+      "quantize": "Quantize",
+      "codec": "Codec",
+      "reverb": "Reverb",
+      "reverse": "Reverse",
+      "timeStretch": "Time-stretch",
+      "output": "Output"
+    },
+    "codec": {
+      "rle": "RLE (run-length)",
+      "huffman": "Canonical Huffman",
+      "deltaHuffman": "Delta + Huffman",
+      "mulaw": "μ-law",
+      "alaw": "A-law",
+      "mdct": "MDCT (lossy)"
+    },
+    "ir": {
+      "room": "Room",
+      "hall": "Hall",
+      "plate": "Plate",
+      "telephone": "Telephone"
+    },
+    "method": {
+      "direct": "Direct convolution"
+    },
+    "properties": {
+      "empty": "Select a node or an edge to edit it.",
+      "edge": "Connection",
+      "source": "The source feeds the current excerpt into the graph.",
+      "reverse": "Time reversal has no parameters."
+    },
+    "property": {
+      "invalid": "This value is out of range; the pipeline cannot run until it is fixed.",
+      "label": "Output label",
+      "targetRate": "Target rate (Hz)",
+      "antiAlias": "Anti-alias filter",
+      "filterB": "Feed-forward coefficients b",
+      "filterA": "Feedback coefficients a",
+      "fir": "FIR (linear phase)",
+      "compensateDelay": "Compensate FIR delay",
+      "bits": "Bit depth",
+      "dither": "TPDF dither",
+      "seed": "Random seed",
+      "codec": "Codec",
+      "mdctKbps": "MDCT bitrate (kbps)",
+      "psychoacoustic": "Psychoacoustic masking",
+      "referenceSpl": "Reference SPL (dB)",
+      "irKind": "Impulse response",
+      "irDuration": "IR duration (s)",
+      "rt60": "RT60 (s)",
+      "preDelay": "Pre-delay (ms)",
+      "wetMix": "Wet mix",
+      "method": "Convolution method",
+      "speed": "Speed factor",
+      "pitch": "Pitch shift (semitones)"
+    },
+    "action": {
+      "deleteEdge": "Delete connection",
+      "deleteNode": "Delete node",
+      "run": "Run pipeline",
+      "cancel": "Cancel",
+      "save": "Save JSON",
+      "load": "Load JSON",
+      "install": "Install output"
+    },
+    "stage": {
+      "duration": "Duration",
+      "rate": "Rate",
+      "peak": "Peak",
+      "rms": "RMS",
+      "elapsed": "Elapsed"
+    },
+    "output": {
+      "select": "Output",
+      "installed": "Output installed in the processed lane."
+    },
+    "result": {
+      "title": "Run result"
+    },
+    "warning": {
+      "invalid": "The shared pipeline link was invalid; the default graph was loaded.",
+      "tooLong": "The pipeline is too large to share in the URL; use Save JSON instead."
+    },
+    "error": {
+      "badVersion": "Unsupported pipeline version.",
+      "duplicateNodeId": "Two nodes share the same ID.",
+      "duplicateEdgeId": "Two connections share the same ID.",
+      "emptyNodeId": "A node has an empty ID.",
+      "emptyEdgeId": "A connection has an empty ID.",
+      "noSource": "The graph needs one source node.",
+      "multipleSources": "The graph can have only one source node.",
+      "noOutput": "The graph needs at least one output node.",
+      "cycle": "This connection would create a cycle.",
+      "merge": "Each node accepts only one incoming connection.",
+      "disconnected": "Every node must be reachable from the source.",
+      "tooManyNodes": "The graph can have at most 24 nodes.",
+      "tooManyOutputs": "At most two output nodes are allowed.",
+      "badPosition": "A node position is not a finite number.",
+      "unknownEndpoint": "A connection points to a missing node.",
+      "selfEdge": "A node cannot connect to itself.",
+      "badParams": "One node has an invalid parameter.",
+      "badPayload": "The worker returned an unexpected payload.",
+      "invalidConnection": "That connection is not allowed: it would create a cycle, a second input, or an invalid route.",
+      "cannotDeleteLast": "Keep at least one source and one output.",
+      "noResult": "Run the pipeline before installing an output.",
+      "missingOutput": "That output is not present in the last run.",
+      "install": "Could not install the output.",
+      "failed": "The pipeline run failed."
+    },
+    "theory": {
+      "title": "Pipeline theory and what to observe",
+      "sampling": {
+        "heading": "Sampling and aliasing",
+        "body": "A resample block changes the sample rate. If the anti-alias filter is off, content above the new Nyquist frequency folds back as an alias; the graph shows the same trade-off as the sampling lab."
+      },
+      "filtering": {
+        "heading": "Filtering",
+        "body": "A filter block applies a difference equation. FIR blocks use only inputs, so they have linear phase and a fixed delay; IIR blocks reuse outputs, so a small order gives a sharp transition but a non-linear phase."
+      },
+      "quantization": {
+        "heading": "Quantization",
+        "body": "A quantize block rounds each sample to N bits. The step is 2A/2^N and the ideal full-scale sine SNR is about 6.02N + 1.76 dB; dither trades a little added noise for removed correlation between the error and the signal."
+      },
+      "codec": {
+        "heading": "Codec branch",
+        "body": "A codec block encodes and immediately decodes the branch. Lossless blocks return bit-exact audio; the MDCT block quantizes spectral coefficients, so its bit budget controls the artifact level."
+      },
+      "reverb": {
+        "heading": "Reverb",
+        "body": "A reverb block convolves the branch with an impulse response. The output keeps the full tail, so it is longer than the input; the wet/dry mix and pre-delay set the balance and the gap before the first reflection."
+      },
+      "timeStretch": {
+        "heading": "Time-stretch",
+        "body": "A time-stretch block changes duration while keeping pitch. The phase vocoder shifts the frame grid, unlike resampling, where speed and pitch move together."
+      },
+      "order": {
+        "heading": "Order effects",
+        "body": "Order matters. Reversing after a filter is not the same as filtering a reversed signal, and a quantizer before a codec removes detail the codec can never recover."
+      },
+      "fanOut": {
+        "heading": "Why fan-out helps",
+        "body": "Fan-out sends the same input into parallel branches. Each output is an independent experiment on the same excerpt, so a filter branch and a codec branch can be compared side by side."
+      }
     }
   },
   "theory": {

@@ -1046,6 +1046,7 @@ describe("op table wiring", () => {
       | "convolutionSteps"
       | "spectrumEdit"
       | "codecLabProcess"
+      | "pipelineRun"
       | "psychoacousticCurves"
       | "psychoacousticAnalysis"
     >();

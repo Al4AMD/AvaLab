@@ -38,6 +38,7 @@ import {
   biquadPeaking,
   buildHistogram,
   bytesToInt16Pcm,
+  type CodecLabCodec,
   classifySignalType,
   computePeakBuckets,
   spectrogramTiles as computeSpectrogramTiles,
@@ -54,6 +55,7 @@ import {
   encodeMdct,
   encodeMdctPsycho,
   entropyBitsPerSymbol,
+  type FilterApplyParams,
   fft,
   floatToInt16Pcm,
   freqz,
@@ -84,6 +86,10 @@ import {
   mse,
   mulawDecode,
   mulawEncode,
+  type PipelineGraph,
+  type PipelineOutput,
+  PipelineRunError,
+  type PipelineStageSummary,
   PSYCHO_REFERENCE_SPL_DB,
   periodicExtend,
   pitchShift,
@@ -92,10 +98,13 @@ import {
   quantizationError,
   quantizeUniform,
   quantizeWithTpdfDither,
+  type ReverbIrParams,
+  type ReverbProcessParams,
   resampleRational,
   reverse,
   rleDecode,
   rleEncode,
+  runPipeline,
   type SpectrogramTilesParams,
   type SpectrumEdit,
   type SyntheticIrKind,
@@ -1063,14 +1072,6 @@ export function filterDesign(
   }
 }
 
-export type FilterApplyParams = {
-  b: number[];
-  a: number[];
-  fir: boolean;
-  sampleRateHz: number;
-  compensateDelay: boolean;
-};
-
 export type FilterApplyResult = {
   samples: Float32Array;
   sampleRateHz: number;
@@ -1382,25 +1383,6 @@ export function extentProcess(
     payload: { buffer: out.buffer, byteOffset: 0, byteLength: out.byteLength },
   };
 }
-
-export type ReverbIrParams = {
-  kind: SyntheticIrKind;
-  durationSeconds: number;
-  rt60Seconds: number;
-  seed: number;
-};
-
-export type ReverbProcessParams = {
-  sampleRateHz: number;
-  startSample: number;
-  endSample: number;
-  ir: ReverbIrParams;
-  uploadedIrSampleCount: number;
-  uploadedIrSampleRateHz?: number;
-  preDelayMs: number;
-  wetMix: number;
-  method: "fft" | "direct";
-};
 
 export type ReverbProcessResult = {
   meta: {
@@ -1898,7 +1880,15 @@ export function samplingProcess(
   };
 }
 
-export type CodecLabCodec = "rle" | "huffman" | "deltaHuffman" | "mulaw" | "alaw" | "mdct";
+export type {
+  CodecLabCodec,
+  FilterApplyParams,
+  PipelineGraph,
+  PipelineOutput,
+  PipelineStageSummary,
+  ReverbIrParams,
+  ReverbProcessParams,
+};
 
 export type CodecLabParams = {
   codec: CodecLabCodec;
@@ -2665,7 +2655,95 @@ export function generateSynth(
   };
 }
 
+const PIPELINE_MAX_EXCERPT_SECONDS = 30;
+
+export type PipelineRunParams = {
+  readonly graph: PipelineGraph;
+  readonly sampleRateHz: number;
+  readonly startSample: number;
+  readonly endSample: number;
+};
+
+export type PipelineRunOpResult = {
+  readonly meta: {
+    readonly stages: readonly PipelineStageSummary[];
+    readonly outputs: readonly PipelineOutput[];
+    readonly totalElapsedMs: number;
+  };
+  readonly payload: TransferablePayload;
+};
+
+export function pipelineRun(
+  params: PipelineRunParams,
+  payload: TransferablePayload | undefined,
+): PipelineRunOpResult {
+  const { sampleRateHz, startSample, endSample } = params;
+  if (
+    !Number.isFinite(sampleRateHz) ||
+    sampleRateHz <= 0 ||
+    sampleRateHz > 96_000 ||
+    !Number.isInteger(startSample) ||
+    !Number.isInteger(endSample) ||
+    startSample < 0 ||
+    endSample <= startSample
+  ) {
+    throw new DspOpError("badParams", "pipelineRun: invalid sample rate or excerpt range");
+  }
+  const maxSamples = PIPELINE_MAX_EXCERPT_SECONDS * sampleRateHz;
+  if (endSample - startSample > maxSamples) {
+    throw new DspOpError(
+      "badParams",
+      `pipelineRun: excerpt must be ${PIPELINE_MAX_EXCERPT_SECONDS} s or shorter`,
+    );
+  }
+  if (payload === undefined || payload.byteLength === 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError("badParams", "pipelineRun: payload must be aligned Float32 samples");
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  if (samples.length !== endSample - startSample || samples.length > maxSamples) {
+    throw new DspOpError("badParams", "pipelineRun: payload length must match the excerpt range");
+  }
+
+  let result: ReturnType<typeof runPipeline>;
+  try {
+    result = runPipeline(samples, sampleRateHz, params.graph);
+  } catch (error) {
+    if (error instanceof PipelineRunError) {
+      throw new DspOpError(error.code, error.message);
+    }
+    throw new DspOpError(
+      "badParams",
+      error instanceof Error ? error.message : "pipelineRun: invalid graph",
+    );
+  }
+
+  return {
+    meta: {
+      stages: result.stages,
+      outputs: result.outputs,
+      totalElapsedMs: result.totalElapsedMs,
+    },
+    payload: {
+      buffer: result.samples.buffer as ArrayBuffer,
+      byteOffset: result.samples.byteOffset,
+      byteLength: result.samples.byteLength,
+    },
+  };
+}
+
 export const dspOps = {
+  pipelineRun: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: {
+      graph: { version: 1, nodes: [], edges: [] },
+      sampleRateHz: 0,
+      startSample: 0,
+      endSample: 0,
+    } as PipelineRunParams,
+    result: undefined as unknown as PipelineRunOpResult,
+    handler: pipelineRun,
+  },
   waveformOverview: {
     // Type lenses only — the table is read for types (DspOpParams/Result);
     // runtime code dispatches through the worker switch.

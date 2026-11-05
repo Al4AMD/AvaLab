@@ -17,6 +17,12 @@
   "input.demo",
   "input.error",
   "player.lane",
+  "pipeline.codec",
+  "pipeline.error",
+  "pipeline.ir",
+  "pipeline.nodeKind",
+  "pipeline.theory",
+  "pipeline.warning",
   "processed.error.staleSource",
   "psychoacoustics.theory",
   "theory.title"

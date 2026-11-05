@@ -36,6 +36,7 @@ import {
   filterApply,
   filterDesign,
   generateSynth,
+  pipelineRun,
   psychoacousticAnalysis,
   psychoacousticCurves,
   qualityMetrics,
@@ -78,6 +79,7 @@ const dspHandlers = {
   filterApply,
   filterDesign,
   generateSynth,
+  pipelineRun,
   psychoacousticAnalysis,
   psychoacousticCurves,
   qualityMetrics,
@@ -241,6 +243,10 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
       }
       case "psychoacousticAnalysis": {
         const result = dspHandlers.psychoacousticAnalysis(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "pipelineRun": {
+        const result = dspHandlers.pipelineRun(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       case "spectrumEdit": {

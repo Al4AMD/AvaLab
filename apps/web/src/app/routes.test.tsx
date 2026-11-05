@@ -105,6 +105,10 @@ it("renders each /tools/* stub page through the data router with its i18n title"
       title: i18n.t("tool.psychoacoustics.title"),
       body: i18n.t("psychoacoustics.noSource"),
     },
+    "/tools/pipeline": {
+      title: i18n.t("tool.pipeline.title"),
+      body: i18n.t("pipeline.loading"),
+    },
     "/tools/ai": {
       title: i18n.t("tool.ai.title"),
       body: i18n.t("input.empty.hint"),

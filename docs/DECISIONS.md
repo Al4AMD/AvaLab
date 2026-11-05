@@ -344,3 +344,11 @@
 - Context: F13 must teach masking and feed a toy codec, but a full MPEG psychoacoustic model is proprietary-ish, tempo-dependent, and too heavy to explain. The design asks for one honest, reproducible model that students can verify against textbook curves.
 - Decision: use 25 equal Bark bands on the Zwicker–Terhardt critical-band-rate scale (edges by bisection), the Terhardt absolute threshold with a 20 Hz floor and no upper clamp, and Schroeder spreading evaluated on `abs(dz)` rather than the signed `dz`. The deviation makes the spreading function symmetric and bounded for far maskers, so the 25×25 teaching matrix is stable and reproducible; the signed raw form is noted in `docs/ALGORITHMS.md`. Masking is stationary per MDCT frame with no temporal masking or tonal/noise partition. The reference SPL is user-selectable from 80 to 100 dB (default 94), and `P_ref` is measured through the same MDCT rather than hard-coded. The toy codec applies the masking threshold but never below the global quantization step.
 - Consequences: the curves are deterministic and golden-tested, and the UI can show exactly which bands a codec may discard and at what bit cost. Results are teaching approximations, not an MP3/AAC compliance claim; a future perceptual model can replace the engine behind the same worker ops without touching the view.
+
+## D-043 — F15 uses React Flow for graph editing
+
+- Date: 2026-11-06
+- Status: accepted (owner, Wave 6 brainstorm; pinned by Plan 02)
+- Context: F15 needs branch/fan-out graph editing with stable node and edge IDs, drag/connect/delete interactions, and a canvas that stays LTR in both locales.
+- Decision: add `@xyflow/react` 12.12.1 (MIT) to `apps/web`. The library is installed into the lazy pipeline route only; its stylesheet is imported by that route, never by the app shell. Rejected alternatives: hand-built SVG (too much interaction work), React Flow v11 (superseded).
+- Consequences: the pipeline view gets editing primitives without hand-maintaining canvas interaction code. The dependency is recorded in `docs/THIRD_PARTY.md`; MIT is compatible with the project's GPL-3.0 license. The graph DSL, validation, and DSP execution remain ours and run outside React Flow.

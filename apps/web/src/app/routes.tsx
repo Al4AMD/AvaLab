@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { createBrowserRouter, type RouteObject, redirect } from "react-router";
 import { AiLabView } from "../features/ai/aiLabView";
 import { CodecLabView } from "../features/codecLab/codecLabView";
@@ -18,6 +19,8 @@ import { WaveformView } from "../features/waveform/waveformView";
 import { useSessionStore } from "../session/store";
 import { AppLayout } from "./layout";
 
+const PipelineView = lazy(() => import("../features/pipeline/pipelineView"));
+
 export const TOOL_IDS = [
   "waveform",
   "spectrogram",
@@ -32,6 +35,7 @@ export const TOOL_IDS = [
   "codec-lab",
   "metrics",
   "psychoacoustics",
+  "pipeline",
   "ai",
 ] as const;
 export type ToolId = (typeof TOOL_IDS)[number];
@@ -64,6 +68,23 @@ function WaveformStubPing() {
     <span data-testid="waveform.stub.ping" dir="ltr" className="text-xs text-muted">
       {pingByteLength}
     </span>
+  );
+}
+
+/** Lazy F15 chunk; the fallback keeps the title visible while the canvas code loads. */
+function PipelineRoute() {
+  const { t } = useTranslation();
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-col gap-1">
+          <h1 className="text-lg font-semibold">{t("tool.pipeline.title")}</h1>
+          <p className="text-sm text-muted">{t("pipeline.loading")}</p>
+        </div>
+      }
+    >
+      <PipelineView />
+    </Suspense>
   );
 }
 
@@ -100,6 +121,7 @@ export const appRoutes: RouteObject[] = [
       { path: "tools/codec-lab", element: <CodecLabView /> },
       { path: "tools/metrics", element: <MetricsView /> },
       { path: "tools/psychoacoustics", element: <PsychoacousticsView /> },
+      { path: "tools/pipeline", element: <PipelineRoute /> },
       { path: "tools/ai", element: <AiLabView /> },
     ],
   },
