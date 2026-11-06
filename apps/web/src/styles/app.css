@@ -74,6 +74,16 @@ body {
   font-family: var(--font-sans);
 }
 
+/* React Flow defaults its minimap to white; keep it on the app tokens. */
+html .react-flow__minimap {
+  background-color: var(--color-surface);
+}
+
+html .react-flow__minimap-mask {
+  fill: var(--color-bg);
+  opacity: 0.75;
+}
+
 /* AGENTS §9 / Plan 05 Task 3: non-essential motion is opt-out. The UI has
  * only color transitions today, but future motion must respect this too. */
 @media (prefers-reduced-motion: reduce) {
