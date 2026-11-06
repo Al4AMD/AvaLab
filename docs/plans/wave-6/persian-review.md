@@ -1,6 +1,6 @@
 # Wave 6 Plan 05 — Persian copy review
 
-Status: **agent review complete; owner sign-off pending**
+Status: **agent review complete; owner chose general terms on 2026-11-07**
 
 Scope: the keys added or changed in the uncommitted Plans 00–04 work
 (`git diff 48f3bae -- apps/web/src/i18n/fa.json`, ~950 added lines), the 13
@@ -41,23 +41,19 @@ pass. `pnpm i18n:check` confirms `fa.json` and
 | quality metrics | سنجه‌های کیفیت | Existing UI term |
 | companding | فشرده‌سازی دامنه | English parenthetical added at first use |
 | noise | نویز | Unified in this review |
-| sparsity | تُنُکی | Needs instructor confirmation |
-| overshoot (Gibbs) | بیش‌جهش | Needs instructor confirmation |
-| correlated (error) | همبسته | Needs instructor confirmation |
-| demo clip | کلیپ نمونه | Understandable; «نمونهٔ صوتی» is an alternative |
+| sparsity | سهم ضرایب صفر | Owner chose the general wording in Plan 07 |
+| overshoot (Gibbs) | فراجهش | Owner chose the general wording in Plan 07 |
+| correlated (error) | وابسته به سیگنال | Owner chose the general wording in Plan 07 |
+| demo clip | نمونهٔ صوتی | Owner chose the general wording in Plan 07 |
 
 ## Owner sign-off list
 
-- [ ] Approve «تُنُکی» for coefficient sparsity, or choose «تنک‌بودن».
-- [ ] Approve «بیش‌جهش» for Gibbs overshoot, or choose «فراجهش».
-- [ ] Approve «همبسته» for correlated quantization error, or choose
-      «وابسته به سیگنال».
-- [ ] Decide whether «کلیپ نمونه» should become «نمونهٔ صوتی» in the player
-      (one e2e assertion would need the same change).
-- [ ] Review the AI/model disclaimer wording: «تقریبی است» is honest but
-      the instructor may prefer a stronger academic caveat.
-- [ ] Confirm the first-use English parentheticals match the instructor’s
-      preferred course terminology.
+- [x] Use «سهم ضرایب صفر» for coefficient sparsity.
+- [x] Use «فراجهش» for Gibbs overshoot.
+- [x] Use «وابسته به سیگنال» for correlated quantization error.
+- [x] Use «نمونهٔ صوتی» in the player (the e2e assertion was updated).
+- [x] Keep the AI/model disclaimer wording at owner direction (general wording).
+- [x] Owner chose general terms; no further parenthetical changes requested.
 
 ## Uncertain or intentionally preserved wording
 
