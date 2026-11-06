@@ -39,6 +39,24 @@ uv run --directory apps/api mypy src
 uv run --directory tools/golden pytest -q
 ```
 
+## Report and slides
+
+The Persian A4 report and 16:9 slides are generated from static HTML/CSS with
+Playwright Chromium:
+
+```sh
+pnpm build:docs
+```
+
+Outputs:
+
+- `docs/deliverables/avalab-report-fa.pdf`
+- `docs/deliverables/avalab-slides-fa.pdf`
+
+The build needs no API or models. Screenshots are captured separately with
+`node docs/capture-report-assets.mjs`; see [`docs/REPORT.md`](docs/REPORT.md)
+for capture, font, verification, and cached-AI-figure notes.
+
 Regenerate artifacts when their sources change:
 
 ```sh

@@ -149,3 +149,15 @@ Model weights are third-party assets tracked with revisions and licenses in `doc
 | `music-life-turns-15s.wav` | CC0-1.0 (source track) | 15 s excerpt from 75 s of “Life Turns to History” by The Oracle / Kaiser, `09_life_turns_to_history.flac` from OpenGameArt (`https://opengameart.org/sites/default/files/09_life_turns_to_history.flac`, SHA-256 `22273ebd073fda1ab5f827d2ae128e5e4ebdf7a9add5c3de9d295232c91be5e0`); mono 48 kHz 16-bit, peak-normalized to -1 dBFS |
 
 All seven clips are dedicated to the public domain (CC0-1.0) or derived from CC0 sources; no copyrighted audio is committed. The self-generated generator and the F14 fetcher are deterministic (fixed seeds/params/offsets) — reruns produce byte-identical outputs for a fixed ffmpeg build.
+
+## Report and slide figures
+
+The report/slide figures are screenshots of AvaLab's own UI captured by
+`docs/capture-report-assets.mjs`; they show the bundled CC0 demo clips listed
+above and contain no third-party artwork, photos, or music. The architecture
+and course-mapping diagrams are original HTML/CSS in `docs/report/index.html`
+and `docs/slides/index.html`. The AI figures under `docs/report/assets/ai/` are
+cached outputs of the pinned models in `docs/MODELS.md` (DPDFNet and LavaSR),
+captured once with the local model cache; they are labelled as approximations
+in the report. The PDFs embed only the self-hosted Vazirmatn files and the
+system Menlo font referenced by the build.

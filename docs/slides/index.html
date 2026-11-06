@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>آوالب — ارائهٔ پروژه</title>
+    <link rel="stylesheet" href="./slides.css" />
+  </head>
+  <body>
+    <main class="deck">
+      <section class="slide cover">
+        <p class="kicker">آزمایشگاه صوتی تعاملی · Wave 6</p>
+        <div class="brand">آوالب</div>
+        <div class="brand-latin">AVALAB</div>
+        <p class="tagline">
+          از شکل‌موج تا فشرده‌سازی، از فرمول تا صدا.
+          <br />
+          آزمایشگاه سیگنال و چندرسانه‌ای برای کلاس و خانه.
+        </p>
+        <div class="meta">
+          <span>سیگنال‌ها و سیستم‌ها</span>
+          <span>·</span>
+          <span>سیستم‌های چندرسانه‌ای</span>
+          <span>·</span>
+          <span class="num">2026</span>
+        </div>
+        <div class="wave" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span>
+        </div>
+      </section>
+
+      <section class="slide">
+        <p class="kicker">مسئله</p>
+        <h2>دانشجو فرمول را می‌بیند؛ اثرش را نمی‌شنود.</h2>
+        <div class="three-col">
+          <div class="card">
+            <h3>شکاف نمایش</h3>
+            <p>
+              نمودارهای کتاب ایستا هستند. دانشجو نمی‌تواند پنجره، نرخ
+              نمونه‌برداری یا بودجهٔ بیت را عوض کند و نتیجه را همان لحظه
+              ببیند.
+            </p>
+          </div>
+          <div class="card">
+            <h3>شکاف شنیدن</h3>
+            <p>
+              تفاوت کوانتیزه‌سازی ۱۶ و ۴ بیت، یا MP3 و FLAC، با تعریف
+              شنیدنی نیست. آزمایش واقعی به فایل و ابزار نیاز دارد.
+            </p>
+          </div>
+          <div class="card">
+            <h3>شکاف تکرار</h3>
+            <p>
+              اجرای آزمایش روی لپ‌تاپ هر دانشجو، محیط متفاوت می‌سازد.
+              نتیجه باید قطعی، آفلاین و قابل اشتراک باشد.
+            </p>
+          </div>
+        </div>
+        <div class="footer-line">
+          هدف: هر پارامتر را عوض کن، اثر را ببین و بشنو، دلیلش را بخوان.
+        </div>
+      </section>
+
+      <section class="slide">
+        <p class="kicker">پوشش</p>
+        <h2>یک آزمایشگاه، دو درس</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>موضوع</th>
+              <th>ابزار</th>
+              <th>مشاهدهٔ کلیدی</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>نمونه‌برداری و دگرسانی</td>
+              <td>F03، F07</td>
+              <td>بسامد تا‌خورده را ببین و بشنو</td>
+            </tr>
+            <tr>
+              <td>تبدیل فوریه و پنجره</td>
+              <td>F08، F12</td>
+              <td>نشت طیفی، لُب اصلی، گبس</td>
+            </tr>
+            <tr>
+              <td>سیستم‌های LTI</td>
+              <td>F10، F11</td>
+              <td>کانولوشن، قطب–صفر، پایداری</td>
+            </tr>
+            <tr>
+              <td>فشرده‌سازی</td>
+              <td>F04، F05، F13</td>
+              <td>آنتروپی، MDCT، نرخ–اعوجاج</td>
+            </tr>
+            <tr>
+              <td>زمان و فرکانس</td>
+              <td>F06، F09</td>
+              <td>فازوکودر در برابر بازنمونه‌برداری</td>
+            </tr>
+            <tr>
+              <td>هوش مصنوعی</td>
+              <td>F14</td>
+              <td>جداسازی، نویززدایی، فوق‌تفکیک</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="slide">
+        <p class="kicker">معماری</p>
+        <h2>محاسبه در جایی که پاسخ زنده ممکن است</h2>
+        <div class="diagram">
+          <div class="box">
+            <strong>React SPA</strong>
+            <small>TypeScript · Zustand · i18next · Canvas</small>
+          </div>
+          <div class="arrow">⇄</div>
+          <div class="box">
+            <strong>DSP Worker</strong>
+            <small>FFT · STFT · filters · codecs · pipeline</small>
+          </div>
+          <div class="arrow">⇄</div>
+          <div class="box">
+            <strong>FastAPI</strong>
+            <small>ffmpeg · PyTorch · SSE jobs</small>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="card">
+            <h3>مرورگر</h3>
+            <p>
+              تحلیل زنده، فیلتر، کانولوشن، کوانتیزه‌سازی، کدک دست‌نویس،
+              خط لوله. هیچ DSP سنگینی روی رشتهٔ اصلی نیست.
+            </p>
+          </div>
+          <div class="card">
+            <h3>سرور</h3>
+            <p>
+              رمزگشایی هر قالب، کدک واقعی، مدل عصبی. فایل موقت با TTL
+              حذف می‌شود؛ مدل‌ها پس از یک‌بار دانلود آفلاین‌اند.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <p class="kicker">مسیر زنده</p>
+        <h2>پنج دقیقه صدا، بدون انجماد رابط</h2>
+        <div class="two-col">
+          <div>
+            <img class="screenshot tall" src="../report/assets/waveform.png" alt="شکل‌موج" />
+            <p class="caption">شکل‌موج، انتخاب بازه و خط پخش هم‌زمان با طیف‌نگاره.</p>
+          </div>
+          <div>
+            <div class="metrics" style="grid-template-columns: 1fr 1fr">
+              <div class="metric">
+                <span class="value">304 ms</span>
+                <span class="label">نمای کلی شکل‌موج</span>
+              </div>
+              <div class="metric">
+                <span class="value">175 ms</span>
+                <span class="label">نمای کلی طیف‌نگاره</span>
+              </div>
+              <div class="metric">
+                <span class="value">173 ms</span>
+                <span class="label">FFT بازهٔ ۳۰ ثانیه</span>
+              </div>
+              <div class="metric">
+                <span class="value">253 ms</span>
+                <span class="label">خط لولهٔ ۳۰ ثانیه</span>
+              </div>
+            </div>
+            <p class="small muted" style="margin-top: 18px">
+              میانهٔ سه اجرا، Chromium Headless، ورودی ۵ دقیقه‌ای
+              <span class="num">44.1 kHz</span>. بودجه‌های §9 رعایت شده‌اند.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <p class="kicker">پایه</p>
+        <h2>نمونه‌برداری، دگرسانی، کوانتیزه‌سازی</h2>
+        <div class="formula">x[n] = x(nT<sub>s</sub>),&nbsp; f<sub>alias</sub> = |f − f<sub>s</sub>·round(f/f<sub>s</sub>)|</div>
+        <div class="formula">SQNR<sub>dB</sub> ≈ 6.02·N + 1.76</div>
+        <div class="two-col">
+          <div class="card">
+            <h3>ضد‌دگرسانی، خاموش و روشن</h3>
+            <p>
+              خاموش‌کردن فیلتر، مؤلفه‌های بالای نایکوئیست را به باند پایین
+              تا می‌دهد. رابط بسامد پیش‌بینی‌شده و اندازه‌گیری‌شده را کنار
+              هم می‌گذارد.
+            </p>
+          </div>
+          <div class="card">
+            <h3>دیتر و خطا</h3>
+            <p>
+              کوانتیزه‌سازی یکنواخت، دیتر TPDF و نمایش خطا. SNR
+              اندازه‌گیری‌شده در کنار مرجع نظری، شکاف واقعی را نشان می‌دهد.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <p class="kicker">فرکانس</p>
+        <h2>FFT، پنجره، و قیمت نشت طیفی</h2>
+        <div class="two-col">
+          <div>
+            <img class="screenshot tall" src="../report/assets/fft.png" alt="نمای FFT" />
+            <p class="caption">دامنه و فاز، مقایسهٔ پنجره، و ماسک آستانهٔ فاز.</p>
+          </div>
+          <div>
+            <ul>
+              <li>
+                <strong>مستطیلی:</strong> لُب اصلی باریک، لُب کناری بلند.
+              </li>
+              <li>
+                <strong>هَن:</strong> نشت کمتر، لُب اصلی پهن‌تر.
+              </li>
+              <li>
+                <strong>بلک‌من و کایزر:</strong> لُب کناری پایین‌تر، هزینهٔ
+                وضوح.
+              </li>
+              <li>
+                DFT ساده برای آموزش، FFT رادیکس-۲ و بلوستین برای طول دلخواه.
+              </li>
+              <li>
+                محک FFT و گام‌به‌گام پروانهٔ کوولی–توکی در همین نما.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <p class="kicker">سیستم‌های LTI</p>
+        <h2>از پاسخ ضربه تا اتاق شنیدنی</h2>
+        <div class="formula">y[n] = (x ∗ h)[n],&nbsp; H(z) = Σ b<sub>k</sub>z<sup>−k</sup> / (1 + Σ a<sub>k</sub>z<sup>−k</sup>)</div>
+        <div class="two-col">
+          <div>
+            <img class="screenshot" src="../report/assets/filters.png" alt="فیلتر" />
+            <p class="caption">پاسخ دامنه، فاز، تأخیر گروه و صفحهٔ قطب–صفر.</p>
+          </div>
+          <div>
+            <h3>پژواک = کانولوشن، نه معکوس</h3>
+            <p>
+              پاسخ ضربهٔ اتاق با overlap-add و FFT اعمال می‌شود. حالت
+              مستقیم برای مقایسه و پاسخ‌های کوتاه است. معکوس زمانی یک
+              عملیات جدا و صریح است.
+            </p>
+            <p class="small muted">
+              فیلتر FIR با پنجره، IIR با باترورث/چبیشف/بی‌کواد RBJ.
+              پایداری با شعاع قطب سنجیده می‌شود.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <p class="kicker">فشرده‌سازی</p>
+        <h2>از آنتروپی تا کدک واقعی، در یک میز</h2>
+        <div class="two-col">
+          <div>
+            <img class="screenshot" src="../report/assets/codec.png" alt="کدک MDCT" />
+            <p class="caption">MDCT، ماسک روان‌آکوستیک و بودجهٔ بیت قابل تنظیم.</p>
+          </div>
+          <div>
+            <table>
+              <thead>
+                <tr><th>کدک</th><th class="num">زمان</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>WAV</td><td class="num">70 ms</td></tr>
+                <tr><td>FLAC</td><td class="num">92 ms</td></tr>
+                <tr><td>MP3</td><td class="num">231 ms</td></tr>
+                <tr><td>AAC</td><td class="num">389 ms</td></tr>
+                <tr><td>Opus</td><td class="num">196 ms</td></tr>
+                <tr><td>Vorbis</td><td class="num">304 ms</td></tr>
+              </tbody>
+            </table>
+            <p class="small muted" style="margin-top: 12px">
+              رمزگذاری ۳۰ ثانیه با <span class="latin">ffmpeg 9.0.2</span>.
+              FLAC بیت‌به‌بیت بازمی‌گردد.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <p class="kicker">کیفیت</p>
+        <h2>نرخ، اعوجاج، و مقایسهٔ منصفانه</h2>
+        <div class="formula">MSE = (1/N)Σ(x−y)²,&nbsp; SNR<sub>dB</sub> = 10·log<sub>10</sub>(Σx²/Σ(x−y)²)</div>
+        <div class="three-col">
+          <div class="card">
+            <h3>هم‌ترازی</h3>
+            <p>
+              کدک تأخیر دارد. مقایسه فقط پس از همبستگی متقابل انجام
+              می‌شود؛ سیگنال ناهم‌تراز هرگز مقایسه نمی‌شود.
+            </p>
+          </div>
+          <div class="card">
+            <h3>سنجه‌ها</h3>
+            <p>
+              MSE، SNR، segmental SNR، PSNR با قلهٔ مستند، نسبت فشرده‌سازی،
+              نرخ بیت و آنتروپی شانون.
+            </p>
+          </div>
+          <div class="card">
+            <h3>نمودار</h3>
+            <p>
+              نرخ–اعوجاج در یک جدول و نمودار، در کنار زمان رمزگذاری.
+              سنجهٔ ادراکی PESQ در این نسخه نیست.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <p class="kicker">هوش مصنوعی</p>
+        <h2>مدل کوچک، آفلاین، با برچسب تقریب</h2>
+        <table>
+          <thead>
+            <tr><th>وظیفه</th><th>مدل</th><th class="num">حجم</th><th>محدودیت</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>نویززدایی</td><td class="latin">DPDFNet</td><td class="num">10.5 MB</td><td>گفتار ۴۸ کیلوهرتز</td></tr>
+            <tr><td>فوق‌تفکیک</td><td class="latin">LavaSR</td><td class="num">57.1 MB</td><td>باند تقریبی</td></tr>
+            <tr><td>جداسازی</td><td class="latin">HTDemucs</td><td class="num">84.0 MB</td><td>CPU کند</td></tr>
+            <tr><td>گفتار به متن</td><td class="latin">Whisper tiny</td><td class="num">155.4 MB</td><td>فارسی ضعیف</td></tr>
+            <tr><td>کدک عصبی</td><td class="latin">EnCodec 48k</td><td class="num">76.3 MB</td><td>حجم تخمینی</td></tr>
+          </tbody>
+        </table>
+        <p class="small" style="margin-top: 18px">
+          جمع مدل‌ها <span class="num">383 MB</span> · یک‌بار دانلود · سپس
+          <span class="latin">HF_HUB_OFFLINE=1</span> · هر کار با پیشرفت و
+          لغو · نمونهٔ ۳۰ ثانیه.
+        </p>
+      </section>
+
+      <section class="slide">
+        <p class="kicker">ترکیب</p>
+        <h2>خط لوله، ماسک، و آنچه کدک حذف می‌کند</h2>
+        <div class="two-col">
+          <div>
+            <img class="screenshot" src="../report/assets/pipeline.png" alt="خط لوله" />
+            <p class="caption">گراف بدون حلقه با گره‌های مستقل و دو خروجی.</p>
+          </div>
+          <div>
+            <img class="screenshot" src="../report/assets/psychoacoustics.png" alt="روان‌آکوستیک" />
+            <p class="caption">آستانهٔ شنوایی، پخش ماسک و سطح باندها.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <p class="kicker">آموزش</p>
+        <h2>نظریه کنار دست، آزمایش در دست</h2>
+        <div class="two-col">
+          <div>
+            <ul>
+              <li>پنل نظریه با فرمول، توضیح و «چه ببینیم».</li>
+              <li>
+                <span class="num">19</span> آزمایش هدایت‌شده با پیشرفت
+                ذخیره‌شده.
+              </li>
+              <li>گزارش خروجی WAV/PNG و اشتراک پارامتر با URL.</li>
+              <li>راهنمای میان‌بر و حالت کاهش حرکت.</li>
+            </ul>
+            <h3 style="margin-top: 24px">یک آزمایش نمونه</h3>
+            <p class="small">
+              chirp را به <span class="num">8 kHz</span> ببر، فیلتر
+              ضد‌دگرسانی را خاموش کن، تا‌خوردگی را بشنو، سپس روشن کن.
+            </p>
+          </div>
+          <div>
+            <img class="screenshot" src="../report/assets/spectrogram.png" alt="طیف‌نگاره" />
+            <p class="caption">پنجره، hop و نقشهٔ رنگ ایمن برای کوررنگی.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <p class="kicker">آمادهٔ کلاس</p>
+        <h2>فارسی، راست‌به‌چپ، آفلاین</h2>
+        <div class="three-col">
+          <div class="card">
+            <h3>دوزبانگی</h3>
+            <p>
+              فارسی پیش‌فرض، انگلیسی کامل. هر رشته از i18n؛ CI کلید
+              گم‌شده را می‌گیرد. نمودارها و فرمول‌ها LTR می‌مانند.
+            </p>
+          </div>
+          <div class="card">
+            <h3>دسترس‌پذیری</h3>
+            <p>
+              اندازه‌های منطقی CSS، کنتراست ۴٫۵:۱، نقشهٔ رنگ ایمن،
+              فوکوس دیدنی، ARIA ترجمه‌شده.
+            </p>
+          </div>
+          <div class="card">
+            <h3>استقرار</h3>
+            <p>
+              Docker Compose، Caddy، دو حجم کش، TTL فایل، SSE بدون
+              بافر. CPU پیش‌فرض؛ GPU اختیاری و آزمون‌نشده.
+            </p>
+          </div>
+        </div>
+        <div class="formula" style="margin-top: 24px">docker compose up -d&nbsp; →&nbsp; /api/v1/health&nbsp; →&nbsp; offline models</div>
+      </section>
+
+      <section class="slide">
+        <p class="kicker">دروازه‌ها</p>
+        <h2>ادعا با آزمون، نه با اسلاید</h2>
+        <div class="metrics">
+          <div class="metric">
+            <span class="value">1111</span>
+            <span class="label">آزمون DSP</span>
+          </div>
+          <div class="metric">
+            <span class="value">648</span>
+            <span class="label">آزمون وب</span>
+          </div>
+          <div class="metric">
+            <span class="value">88/88</span>
+            <span class="label">سرتاسری دوزبانه</span>
+          </div>
+          <div class="metric">
+            <span class="value">230</span>
+            <span class="label">آزمون API</span>
+          </div>
+        </div>
+        <p class="small muted" style="margin-top: 20px">
+          biome 358 · scripts 13 · ruff و mypy پاک · Docker smoke شامل
+          FLAC بیت‌به‌بیت و SSE · Playwright روی ۱۲۸۰، ۷۶۸ و ۳۹۰ پیکسل.
+        </p>
+        <div class="chip warn">GPU آزمون نشده</div>
+        <div class="chip warn">مدل‌های دارای محدودیت مجوز/کارت</div>
+        <div class="chip warn">سنجهٔ ادراکی در نسخهٔ بعد</div>
+      </section>
+
+      <section class="slide closing">
+        <p class="kicker">آوالب</p>
+        <h2 style="font-size: 52px; max-width: 820px">
+          سیگنال را بشنو، فرکانس را ببین، دلیلش را بفهم.
+        </h2>
+        <p class="small muted" style="max-width: 760px">
+          گزارش کامل و اسلایدها با <span class="latin">pnpm build:docs</span>
+          از همین مخزن ساخته می‌شوند. داده‌ها، تصاویر و کلیپ‌ها
+          بازتولیدپذیرند.
+        </p>
+        <div class="links">
+          <span>pnpm dev</span>
+          <span>pnpm check</span>
+          <span>docker compose up</span>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -191,7 +191,12 @@ Wave 6 Plan 04 additions (machine-drafted, agent):
 
 ## Next recommended step
 
-Wave 6 Plans 00–04 are complete on `feat/wave-6`. Next: execute `docs/plans/wave-6/05-polish.md`, then plans 06–07 in order. The audit's owner-decision rows (stereo playback, general F02 comparison, F14 classification, F16 student report) remain open.
+Wave 6 Plans 00–07 are complete on `feat/wave-6`; the report and slides are
+built, verified, and approved for commit by the owner. Remaining release work
+needs a human Persian review, university deployment details, and a release-tag
+decision. Do not push, tag, or deploy without explicit approval. The audit's
+remaining owner-decision rows (stereo playback, general F02 comparison, F14
+classification, F16 student report) are unchanged.
 
 ## Session log
 
@@ -599,3 +604,15 @@ Wave 6 Plans 00–04 are complete on `feat/wave-6`. Next: execute `docs/plans/wa
 - Gates: `pnpm check` exit 0 (biome 346 files; dsp 1058/1058; web 620/620; scripts 13/13; i18n OK); `pnpm --filter @avalab/web e2e` 88/88 in 2.4 min with zero console errors in `fa` and `en`; API `pytest -q` 230 passed / 5 skipped, `ruff` and `mypy` clean (32 files). `bash -n docker/smoke.sh` and `git diff --check` clean.
 - Known issues: GPU path remains untested and needs a CUDA image; smoke requires a prefetched model cache and host Chromium; the pre-existing 48 000-sample naive-DFT timeout flake remains under heavy parallel load; model cache and storage are deleted by `docker compose down -v` by design.
 - **Next step:** execute Wave 6 Plan 07 — `docs/plans/wave-6/07-release.md`.
+
+## 2026-11-06 — Wave 6 Plan 07 complete (Persian report, slides, release gate)
+
+- Status: Plan 07 Tasks 1–6 complete on `feat/wave-6`, no commit/push/tag/deploy. Scope: A4 Persian report, 16:9 slides, deterministic screenshots, PDF verification, docs, final gates.
+- Deliverables: `docs/deliverables/avalab-report-fa.pdf` (31 pages, A4 594.96×841.92 pt, 5,347,148 bytes) and `docs/deliverables/avalab-slides-fa.pdf` (16 pages, 16:9, 3,274,287 bytes). Build: `pnpm build:docs` / `docs/build-pdfs.mjs`, 4,969 ms, no API or models.
+- Report content: 12 sections; course mapping F01–F18; architecture and algorithm formulas; feature walkthrough with figures 2–16 in lab order; three guided experiments; measured performance; pinned AI models and honest limits; references; licenses/provenance. The AI figures are cached files under `docs/report/assets/ai/` and labelled as approximations.
+- Report fixes this plan: corrected `cividis` to `viridisCB`; added spectrum-editor, generator, extent, speed, and reverb subsections with renumbered figures; softened the sampling caption to match the visible crop; fixed the reverb result-spectrogram canvas intrinsic size (`reverbView.tsx`, which never set `canvas.width/height`, leaving a 300×150 backing store) and added an e2e intrinsic-width assertion; recaptured all 13 non-AI assets and rebuilt.
+- PDF verification: PyMuPDF reports 31/16 pages and expected page sizes; Vazirmatn Regular/Bold and Menlo are embedded (slides also embed two Type3 arrow glyphs); extracted text contains 12,833 Persian characters and both locale labels; rendered cover, formula, every lab screenshot page, references, and representative slides with no clipped or overlapping content.
+- F01–F18 close-out: F01 done (mono-only playback is the accepted audit decision), F02 done (general before/after overlay remains an owner decision), F03–F15 done, F16 done except the optional student lab-report export (owner decision), F17 done with human Persian sign-off pending, F18 done. The detailed audit stays in `docs/plans/wave-6/audit.md`; no silent drops.
+- Gates: `pnpm check` exit 0 (biome 352 files, clean; dsp 1,058/1,058, web 620/620 across 76 files, scripts 13/13, i18n OK). The first full e2e run hit one 30 s pipeline delete-edge timeout; the pipeline spec passed 2/2 alone, and the serial full rerun passed 88/88 in 2.2 min with zero console errors in `fa` and `en`. API `pytest -q` 230 passed / 5 skipped; `ruff check .` clean; `mypy .` clean (53 source files). Docker smoke rerun after starting Docker Desktop: passed with health ok, 5 models available offline, FLAC bit-exact (73,627 bytes), 6 incremental SSE events (0.007–3.114 s), zero browser console errors in fa/en, offline denoise done, and model/storage volumes persistent; API image 1,298,499,073 bytes, web 31,799,979 bytes; observed memory 300.9 MiB API / 68.46 MiB web.
+- Known issues: the report is machine-drafted Persian and needs owner review (`docs/plans/wave-6/persian-review.md`); the reverb IR waveform is visually near-flat because `paintWaveform` keeps a fixed ±1 scale for a quiet synthetic IR; the 48,000-sample naive-DFT timeout flake and the two documented performance fallbacks remain.
+- **Next step:** owner decisions only — approve committing `docs/deliverables/*.pdf`, finish the Persian terminology review, provide university proxy/domain details, and decide whether to tag a release. Do not commit, push, tag, or deploy without explicit approval.
