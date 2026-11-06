@@ -19,6 +19,7 @@ from avalab_api.errors import ApiError, ErrorCode
 from avalab_api.ml.audio import resample_to
 from avalab_api.ml.jobs import MlResult, StemResult
 from avalab_api.ml.registry import register_runner
+from avalab_api.ml.runtime import torch_device
 
 MODEL_ID = "adefossez/HTDemucs"
 MODEL_RATE_HZ = 44_100
@@ -146,7 +147,7 @@ class DemucsBackend:
             output = apply.apply_model(
                 self._model,
                 mixture.unsqueeze(0),
-                device="cpu",
+                device=torch_device(),
                 progress=False,
             )[0]
         return np.asarray(output.detach().cpu().numpy(), dtype=np.float32)

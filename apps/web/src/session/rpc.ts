@@ -14,6 +14,8 @@
  * - Supersede: a new call with identical `op + canonicalJson(params)`
  *   supersedes a pending one — the old promise resolves `{cancelled: true}`
  *   (never rejects) and a cancel frame tells the worker to exit early.
+ *   Callers whose payload differs under identical params opt out with
+ *   `{ supersede: false }` (standalone/display ops).
  * - Error frames REJECT with `DspRpcError` (code mirrors the backend's
  *   bilingual-by-code model); cancellations always resolve.
  * - Late frames (id no longer pending) are dropped silently — a superseded
@@ -73,6 +75,7 @@ export interface DspRpc {
     op: K,
     params: DspOpParams<K>,
     payload?: TransferablePayload,
+    options?: { readonly supersede?: boolean },
   ): DspCallPromise<K>;
   /** Cancel a pending call by its frame id (`(await call).callId`). */
   cancel(id: number): void;
@@ -200,12 +203,15 @@ export function createDspRpc(transport: DspRpcTransport): DspRpc {
     op: K,
     params: DspOpParams<K>,
     payload?: TransferablePayload,
+    options?: { readonly supersede?: boolean },
   ): DspCallPromise<K> {
     const id = nextId++;
     const promise = new Promise<DspOpOutcome<K>>((resolve, reject) => {
       try {
         const normalized = normalizeOutgoingPayload(payload);
-        const key = `${op}\u0000${canonicalJson(params)}`;
+        const baseKey = `${op}\u0000${canonicalJson(params)}`;
+        const key =
+          options?.supersede === false ? `${baseKey}\u0000detached:${String(id)}` : baseKey;
         const prior = pendingByKey.get(key);
         if (prior !== undefined) {
           // Supersede: identical op+params ⇒ the previous pending call loses.
@@ -299,6 +305,7 @@ function createUnavailableRpc(error: unknown): DspRpc {
   );
   return {
     call<K extends DspOpName>(): DspCallPromise<K> {
+      // No options to forward: the unavailable stub rejects every call.
       const promise = Promise.reject<DspOpOutcome<K>>(reason) as DspCallPromise<K>;
       promise.callId = 0; // nothing pending: no cancellable id to correlate
       return promise;
@@ -326,7 +333,7 @@ function ensureSharedRpc(): DspRpc {
  * backend). Lazy: the worker spawns on the first call, never at module load.
  */
 export const dspWorkerRpc: DspRpc = {
-  call: (op, params, payload) => ensureSharedRpc().call(op, params, payload),
+  call: (op, params, payload, options) => ensureSharedRpc().call(op, params, payload, options),
   cancel: (id) => sharedRpc?.cancel(id),
   terminate: () => {
     sharedRpc?.terminate();

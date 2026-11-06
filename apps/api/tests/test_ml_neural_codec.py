@@ -1,6 +1,7 @@
 """Encodec neural-codec adapter: bandwidth, estimate and length contracts."""
 
 import os
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -154,6 +155,65 @@ def test_backend_feeds_stereo_and_returns_mono() -> None:
     assert seen["shape"] == (2, 4_800)
     assert seen["rate"] == 48_000
     assert result.ndim == 1
+    assert result.size == 4_800
+
+
+def test_backend_moves_inputs_to_model_device(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, str] = {}
+
+    class FakeTensor:
+        def __init__(self) -> None:
+            self.device = "cpu"
+
+        def to(self, device: str) -> Any:
+            self.device = device
+            return self
+
+    class FakeAudio:
+        def detach(self) -> Any:
+            return self
+
+        def cpu(self) -> Any:
+            return self
+
+        def numpy(self) -> np.ndarray:
+            return np.zeros((1, 4_800), dtype=np.float32)
+
+    class FakeModel:
+        device = "cuda"
+
+        def encode(self, input_values: Any, **kwargs: Any) -> Any:
+            seen["input"] = input_values.device
+            seen["encode_mask"] = kwargs["padding_mask"].device
+            return SimpleNamespace(
+                audio_codes=FakeTensor(), audio_scales=None, last_frame_pad_length=0
+            )
+
+        def decode(self, codes: Any, scales: Any, **kwargs: Any) -> Any:
+            seen["decode_mask"] = kwargs["padding_mask"].device
+            return SimpleNamespace(audio_values=[FakeAudio()])
+
+    class FakeProcessor:
+        feature_extractor = SimpleNamespace(sampling_rate=48_000)
+
+        def __call__(
+            self, raw_audio: np.ndarray, sampling_rate: int, return_tensors: str
+        ) -> dict[str, Any]:
+            del raw_audio, sampling_rate, return_tensors
+            return {"input_values": FakeTensor(), "padding_mask": FakeTensor()}
+
+    class FakeTorch:
+        @staticmethod
+        def no_grad() -> Any:
+            return nullcontext()
+
+    import avalab_api.ml.neural_codec as module
+
+    monkeypatch.setattr(module, "import_module", lambda _name: FakeTorch())
+    backend = TransformersEncodecBackend(FakeModel(), FakeProcessor())
+    result = backend.roundtrip(_tone(48_000, 0.1), 6.0)
+
+    assert seen == {"input": "cuda", "encode_mask": "cuda", "decode_mask": "cuda"}
     assert result.size == 4_800
 
 

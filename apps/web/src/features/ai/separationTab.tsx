@@ -5,7 +5,7 @@
  * so this view only lists them and installs a selected stem as the processed
  * playback lane. No second inference happens in the browser.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "../../components/ui/button";
@@ -15,6 +15,7 @@ import { loadDemoClip, OfflineError } from "../input/offline";
 import { UploadEmptyState } from "../input/upload";
 import type { AiExcerptInput, AiModelInfo, AiModelState } from "./aiClient";
 import { fetchDenoiseAudio as fetchResultAudio } from "./denoiseTab";
+import { ProcessedInstallError, processedInstallErrorKey } from "./installResult";
 import { type AiJobStatus, useAiJob } from "./useAiJob";
 
 export const SEPARATION_MAX_EXCERPT_SECONDS = 15;
@@ -82,10 +83,13 @@ export async function installStemAudio(input: {
   readonly name: SeparationStemName;
   readonly audioId: string;
   readonly fetchAudio: FetchStemAudio;
+  readonly sourceHash?: string | null;
+  readonly sourceStartSample?: number;
   readonly setProcessed: (
     samples: Float32Array,
     sampleRateHz: number,
     label: string,
+    options?: { sourceHash?: string; sourceStartSample?: number },
   ) => { ok: true } | { ok: false; code: string };
 }): Promise<{ samples: Float32Array; sampleRateHz: number }> {
   const audio = await input.fetchAudio(input.audioId);
@@ -93,9 +97,15 @@ export async function installStemAudio(input: {
     audio.samples,
     audio.sampleRateHz,
     `separated-${input.name}`,
+    {
+      ...(input.sourceHash === null || input.sourceHash === undefined
+        ? {}
+        : { sourceHash: input.sourceHash }),
+      sourceStartSample: input.sourceStartSample ?? 0,
+    },
   );
   if (!installed.ok) {
-    throw new Error(`separation: store rejected stem (${installed.code})`);
+    throw new ProcessedInstallError(installed.code);
   }
   return audio;
 }
@@ -275,6 +285,7 @@ export function SeparationTab({
   const [demoErrorKey, setDemoErrorKey] = useState<string | null>(null);
   const [installErrorKey, setInstallErrorKey] = useState<string | null>(null);
   const [selectedStem, setSelectedStem] = useState<SeparationStemName | null>(null);
+  const jobSourceHashRef = useRef<string | null>(null);
 
   useEffect(() => {
     setSelectedStem(null);
@@ -313,6 +324,7 @@ export function SeparationTab({
       startSample: 0,
       endSample,
     };
+    jobSourceHashRef.current = useSessionStore.getState().inputHash;
     setSelectedStem(null);
     setInstallErrorKey(null);
     void run("separation", excerpt);
@@ -340,12 +352,14 @@ export function SeparationTab({
       await installStemAudio({
         name: stem.name,
         audioId: stem.audioId,
+        sourceHash: jobSourceHashRef.current,
+        sourceStartSample: 0,
         fetchAudio: fetchResultAudio,
         setProcessed: useSessionStore.getState().setProcessed,
       });
       setSelectedStem(stem.name);
-    } catch {
-      setInstallErrorKey("ai.separation.installFailed");
+    } catch (error) {
+      setInstallErrorKey(processedInstallErrorKey(error, "ai.separation.installFailed"));
     }
   }
 

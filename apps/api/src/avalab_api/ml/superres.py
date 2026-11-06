@@ -24,6 +24,7 @@ from avalab_api.errors import ApiError, ErrorCode
 from avalab_api.ml.audio import resample_to
 from avalab_api.ml.jobs import MlResult
 from avalab_api.ml.registry import register_runner
+from avalab_api.ml.runtime import onnx_providers
 
 MODEL_ID = "TigreGotico/audiosronnx-lavasr"
 MIN_MODEL_SECONDS = 0.25
@@ -157,7 +158,10 @@ def load_lavasr(model_dir: Path) -> SuperresRunner:
         _denoise: bool = False
 
         def __init__(self, directory: Path) -> None:
-            super().__init__(denoise=False, providers=["CPUExecutionProvider"])
+            super().__init__(
+                denoise=False,
+                providers=onnx_providers(onnxruntime.get_available_providers()),
+            )
             self._directory = directory
 
         def _ensure_models(self) -> None:

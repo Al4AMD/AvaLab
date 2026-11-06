@@ -20,6 +20,7 @@ import shutil
 import sys
 from pathlib import Path
 
+from avalab_api.config import get_settings
 from avalab_api.ml.models import MODEL_SPECS, ModelSpec
 from avalab_api.ml.registry import ModelRegistry, model_dir
 
@@ -31,7 +32,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--cache-dir",
         type=Path,
-        default=Path.home() / ".cache" / "avalab" / "models",
+        default=get_settings().ml_model_cache_dir,
         help="destination cache (default: %(default)s)",
     )
     return parser

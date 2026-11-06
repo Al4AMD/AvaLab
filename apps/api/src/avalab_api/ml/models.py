@@ -12,6 +12,8 @@ from typing import Literal, Protocol
 import numpy as np
 
 MlTask = Literal["denoise", "superres", "separation", "asr", "neural_codec"]
+AnalysisTask = Literal["pitch", "beat"]
+JobTask = MlTask | AnalysisTask
 ModelState = Literal["available", "missing", "loading", "error"]
 
 

@@ -21,6 +21,7 @@ from avalab_api.errors import ApiError, ErrorCode
 from avalab_api.ml.audio import resample_to
 from avalab_api.ml.jobs import MlResult
 from avalab_api.ml.registry import register_runner
+from avalab_api.ml.runtime import torch_device
 
 MODEL_ID = "openai/whisper-tiny"
 MODEL_RATE_HZ = 16_000
@@ -175,7 +176,7 @@ def load_asr(model_dir: Path) -> AsrRunner:
             model=model,
             tokenizer=processor.tokenizer,
             feature_extractor=processor.feature_extractor,
-            device=-1,
+            device=0 if torch_device() == "cuda" else -1,
         )
     except Exception as exc:
         raise ApiError(ErrorCode.model_unavailable, f"Could not load Whisper: {exc}", 503) from exc

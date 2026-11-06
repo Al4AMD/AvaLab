@@ -356,6 +356,29 @@ describe("failures keep the cache clean and reject the ticket", () => {
   });
 });
 
+describe("worker failures preserve earlier results", () => {
+  it("an opFailed frame leaves an existing cached derivation ready", async () => {
+    const { store, transport } = makeStore();
+    expectOk(store.getState().loadSource(fakeAudio(16), 48000, "a.wav", "demoClip"));
+    const good = store.getState().derive("sessionPing", { count: 1 });
+    const goodKey = good?.key ?? "";
+    transport.deliver({ id: 0, ok: true, result: { meta: { empty: true } } });
+    await vi.waitFor(() => expect(store.getState().getDerived(goodKey).status).toBe("ready"));
+
+    const bad = store.getState().derive("sessionPing", { count: 2 });
+    const badKey = bad?.key ?? "";
+    transport.deliver({ id: 1, ok: false, error: { code: "opFailed", message: "boom" } });
+    await expect(bad?.outcome).rejects.toMatchObject({ code: "opFailed" });
+    await vi.waitFor(() => expect(store.getState().jobs.size).toBe(0));
+
+    expect(store.getState().getDerived(badKey)).toEqual({ status: "miss" });
+    expect(store.getState().getDerived(goodKey)).toEqual({
+      status: "ready",
+      entry: { key: goodKey, result: { meta: { empty: true } } },
+    });
+  });
+});
+
 describe("reload invalidates everything", () => {
   it("empties the derived cache and jobs, and changes the input hash", async () => {
     const { store, transport } = makeStore();
@@ -667,9 +690,63 @@ describe("processed playback lane", () => {
     expect(store.getState().setProcessed(processed, 24000, "8 kHz")).toEqual({ ok: true });
 
     const state = store.getState();
-    expect(state.processed).toEqual({ samples: processed, sampleRateHz: 24000, label: "8 kHz" });
+    expect(state.processed).toEqual({
+      samples: processed,
+      sampleRateHz: 24000,
+      label: "8 kHz",
+      sourceStartSample: 0,
+      sourceHash: null,
+    });
     expect(state.playbackMode).toBe("processed");
     expect(selectPlaybackSource(state)?.samples).toBe(processed);
+  });
+
+  it("stores source identity and excerpt offsets for AI results", () => {
+    const { store } = makeStore();
+    expectOk(store.getState().loadSource(fakeAudio(8), 48000, "clip.wav", "demoClip"));
+    const inputHash = store.getState().inputHash;
+    expect(inputHash).not.toBeNull();
+    if (inputHash === null) {
+      throw new Error("loadSource must produce an input hash");
+    }
+    const processed = fakeAudio(4, 2);
+    expect(
+      store
+        .getState()
+        .setProcessed(processed, 24000, "denoise", { sourceHash: inputHash, sourceStartSample: 4 }),
+    ).toEqual({ ok: true });
+    expect(store.getState().processed).toEqual({
+      samples: processed,
+      sampleRateHz: 24000,
+      label: "denoise",
+      sourceHash: inputHash,
+      sourceStartSample: 4,
+    });
+  });
+
+  it("rejects stale AI results without touching the processed lane", () => {
+    const { store } = makeStore();
+    expectOk(store.getState().loadSource(fakeAudio(8), 48000, "clip.wav", "demoClip"));
+    expect(
+      store.getState().setProcessed(fakeAudio(4, 2), 24000, "denoise", {
+        sourceHash: "0000000000000000",
+      }),
+    ).toEqual({ ok: false, code: "staleSource" });
+    expect(store.getState().processed).toBeNull();
+  });
+
+  it("rejects invalid excerpt offsets", () => {
+    const { store } = makeStore();
+    expectOk(store.getState().loadSource(fakeAudio(8), 48000, "clip.wav", "demoClip"));
+    const cases = [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 9];
+    for (const sourceStartSample of cases) {
+      expect(
+        store.getState().setProcessed(fakeAudio(4, 2), 24000, "denoise", { sourceStartSample }),
+      ).toEqual({ ok: false, code: "invalidType" });
+    }
+    expect(
+      store.getState().setProcessed(fakeAudio(4, 2), 24000, "denoise", { sourceStartSample: 8 }),
+    ).toEqual({ ok: true });
   });
 
   it("rejects malformed, non-finite, empty, over-rate and over-duration sources", () => {

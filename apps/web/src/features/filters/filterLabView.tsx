@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
+import { ToolHeader } from "../../components/ToolHeader";
 
 import { Button } from "../../components/ui/button";
 import { downloadWav } from "../../lib/download";
@@ -25,6 +26,7 @@ import type {
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
 import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
 import { FilterLinePlot } from "./filterPlots";
 import {
   FILTER_DESIGN_KINDS,
@@ -36,7 +38,6 @@ import {
   loadFilterSettings,
   saveFilterSettings,
 } from "./filterState";
-import { FILTER_THEORY_SECTIONS, FILTER_THEORY_TITLE_KEY } from "./filterTheory";
 import { PoleZeroPlot } from "./poleZeroPlot";
 
 const CONTROL_FOCUS_CLASSES =
@@ -248,7 +249,7 @@ export function FilterLabPanel({
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold">{t("tool.filters.title")}</h2>
+      <ToolHeader titleKey="tool.filters.title" descriptionKey="tool.filters.description" />
 
       <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-xs">
@@ -646,7 +647,10 @@ export function FilterLabPanel({
           </>
         ) : null}
       </div>
-      <TheoryPanel titleKey={FILTER_THEORY_TITLE_KEY} sections={FILTER_THEORY_SECTIONS} />
+      <TheoryPanel
+        titleKey={TOOL_THEORY.filters.titleKey}
+        sections={TOOL_THEORY.filters.sections}
+      />
     </section>
   );
 }
@@ -777,7 +781,7 @@ export function FilterLabView(): React.ReactElement {
   if (original === null) {
     return (
       <section className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold">{t("tool.filters.title")}</h2>
+        <ToolHeader titleKey="tool.filters.title" descriptionKey="tool.filters.description" />
         <UploadEmptyState />
       </section>
     );

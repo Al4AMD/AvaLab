@@ -21,6 +21,7 @@ import { loadDemoClip, OfflineError } from "../input/offline";
 import { UploadEmptyState } from "../input/upload";
 import type { AiExcerptInput, AiModelInfo, AiModelState } from "./aiClient";
 import { fetchDenoiseAudio as fetchResultAudio } from "./denoiseTab";
+import { ProcessedInstallError, processedInstallErrorKey } from "./installResult";
 import { SampleWave } from "./sampleWave";
 import { type AiJobStatus, useAiJob } from "./useAiJob";
 
@@ -365,6 +366,7 @@ export function SuperresTab({
   const [demoErrorKey, setDemoErrorKey] = useState<string | null>(null);
   const generationRef = useRef(0);
   const installedRef = useRef<string | null>(null);
+  const jobSourceHashRef = useRef<string | null>(null);
   const autoDemoRef = useRef(false);
 
   const info = result === null ? null : readSuperresResult(result);
@@ -436,9 +438,17 @@ export function SuperresTab({
         }
         const installed = useSessionStore
           .getState()
-          .setProcessed(audio.samples.slice(), audio.sampleRateHz, "superres-lavasr");
+          .setProcessed(audio.samples.slice(), audio.sampleRateHz, "superres-lavasr", {
+            ...(jobSourceHashRef.current === null ? {} : { sourceHash: jobSourceHashRef.current }),
+            sourceStartSample: 0,
+          });
         if (!installed.ok) {
-          setLocalErrorKey("ai.superres.installFailed");
+          setLocalErrorKey(
+            processedInstallErrorKey(
+              new ProcessedInstallError(installed.code),
+              "ai.superres.installFailed",
+            ),
+          );
           return;
         }
         installedRef.current = audioId;
@@ -469,9 +479,17 @@ export function SuperresTab({
   function installLane(slice: AudioSlice, label: string): boolean {
     const installed = useSessionStore
       .getState()
-      .setProcessed(slice.samples.slice(), slice.sampleRateHz, label);
+      .setProcessed(slice.samples.slice(), slice.sampleRateHz, label, {
+        ...(jobSourceHashRef.current === null ? {} : { sourceHash: jobSourceHashRef.current }),
+        sourceStartSample: 0,
+      });
     if (!installed.ok) {
-      setLocalErrorKey("ai.superres.installFailed");
+      setLocalErrorKey(
+        processedInstallErrorKey(
+          new ProcessedInstallError(installed.code),
+          "ai.superres.installFailed",
+        ),
+      );
       return false;
     }
     return true;
@@ -492,6 +510,7 @@ export function SuperresTab({
     }
     const generation = generationRef.current + 1;
     generationRef.current = generation;
+    jobSourceHashRef.current = useSessionStore.getState().inputHash;
     const source = original;
     const endSample = Math.min(
       source.samples.length,

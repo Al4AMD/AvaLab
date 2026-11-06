@@ -117,6 +117,60 @@ export const AI_THEORY: Record<AiTask, AiTheoryEntry> = {
       },
     ],
   },
+  pitch: {
+    titleKey: "ai.theory.pitch.title",
+    sections: [
+      {
+        headingKey: "ai.theory.pitch.concept.heading",
+        bodyKey: "ai.theory.pitch.concept.body",
+        formula: "\\hat{f}_0(t)=\\arg\\max_{f}\\,p(\\text{voiced}\\mid x,f,t)",
+      },
+      {
+        headingKey: "ai.theory.pitch.observe.heading",
+        bodyKey: "ai.theory.pitch.observe.body",
+        bulletKeys: [
+          "ai.theory.pitch.observe.bullets.contour",
+          "ai.theory.pitch.observe.bullets.unvoiced",
+          "ai.theory.pitch.observe.bullets.octave",
+        ],
+      },
+      {
+        headingKey: "ai.theory.pitch.pitfalls.heading",
+        bodyKey: "ai.theory.pitch.pitfalls.body",
+        bulletKeys: [
+          "ai.theory.pitch.pitfalls.bullets.range",
+          "ai.theory.pitch.pitfalls.bullets.noise",
+        ],
+      },
+    ],
+  },
+  beat: {
+    titleKey: "ai.theory.beat.title",
+    sections: [
+      {
+        headingKey: "ai.theory.beat.concept.heading",
+        bodyKey: "ai.theory.beat.concept.body",
+        formula: "\\text{tempo}_{\\mathrm{BPM}}=\\frac{60}{\\bar{T}_{\\mathrm{beat}}}",
+      },
+      {
+        headingKey: "ai.theory.beat.observe.heading",
+        bodyKey: "ai.theory.beat.observe.body",
+        bulletKeys: [
+          "ai.theory.beat.observe.bullets.tempo",
+          "ai.theory.beat.observe.bullets.list",
+          "ai.theory.beat.observe.bullets.speech",
+        ],
+      },
+      {
+        headingKey: "ai.theory.beat.pitfalls.heading",
+        bodyKey: "ai.theory.beat.pitfalls.body",
+        bulletKeys: [
+          "ai.theory.beat.pitfalls.bullets.meter",
+          "ai.theory.beat.pitfalls.bullets.cut",
+        ],
+      },
+    ],
+  },
   "neural-codec": {
     titleKey: "ai.theory.neuralCodec.title",
     sections: [

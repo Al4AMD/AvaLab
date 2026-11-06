@@ -11,8 +11,43 @@
       "offline": "Server unavailable",
       "offlineDetail": "Browser-side tools still work; server-side features (codecs and models) are disabled."
     },
+    "theme": {
+      "label": "Theme",
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
+    },
     "privacy": {
       "ttlNotice": "Uploaded files are deleted from the server automatically after 60 minutes."
+    }
+  },
+  "shortcuts": {
+    "open": "Keyboard shortcuts",
+    "title": "Keyboard shortcuts",
+    "hint": "These shortcuts work when focus is not in a text field or a dialog.",
+    "close": "Close",
+    "keyHeader": "Key",
+    "actionHeader": "Action",
+    "keys": {
+      "space": "Space",
+      "left": "←",
+      "right": "→",
+      "shiftLeft": "Shift + ←",
+      "shiftRight": "Shift + →",
+      "question": "?"
+    },
+    "actions": {
+      "playPause": "Play / pause",
+      "back5": "Seek back 5 seconds",
+      "forward5": "Seek forward 5 seconds",
+      "back10": "Seek back 10 seconds",
+      "forward10": "Seek forward 10 seconds",
+      "help": "Open this help"
+    }
+  },
+  "processed": {
+    "error": {
+      "staleSource": "The source changed while the AI job was running; run it again on the current audio."
     }
   },
   "nav": {
@@ -28,6 +63,8 @@
     "spectrumEdit": "Spectrum editor",
     "codecLab": "Compression lab",
     "metrics": "Quality metrics",
+    "psychoacoustics": "Psychoacoustics",
+    "pipeline": "Pipeline builder",
     "ai": "AI lab",
     "filters": "Filter design",
     "experiments": "Guided experiments"
@@ -109,47 +146,78 @@
     "panLeft": "Pan left",
     "panRight": "Pan right",
     "hint": "Drag to select · [ / ] zoom · arrows move selection",
-    "selectionReadout": "Selection {{start}} – {{end}}"
+    "selectionReadout": "Selection {{start}} – {{end}}",
+    "theory": {
+      "title": "Waveform reading and sampling",
+      "sampling": {
+        "heading": "From continuous sound to samples",
+        "body": "A microphone produces a continuous voltage. An ADC samples it at instants spaced by Ts = 1/fs and rounds each value to a finite bit depth. The waveform plot draws those samples against time; zooming changes only the visible sample window, not the data."
+      },
+      "pitfalls": {
+        "heading": "What the picture can hide",
+        "body": "A dense waveform can hide clipping, DC offset, and short dropouts. Zoom to individual samples and check the numeric selection readout before you trust the overview."
+      }
+    }
   },
   "tool": {
     "waveform": {
-      "title": "Waveform"
+      "title": "Waveform",
+      "description": "Inspect the waveform with zoom, range selection and synchronized playback."
     },
     "spectrogram": {
-      "title": "Spectrogram"
+      "title": "Spectrogram",
+      "description": "See frequency energy over time and change the window, hop and frequency axis."
     },
     "fftview": {
-      "title": "FFT View"
+      "title": "FFT View",
+      "description": "Inspect the Fourier spectrum of the selected range in magnitude and phase, and compare windows."
     },
     "generator": {
-      "title": "Signal Generator"
+      "title": "Signal Generator",
+      "description": "Generate a test signal and experiment with Fourier series, AM/FM and ready-made examples."
     },
     "speed": {
-      "title": "Speed and direction"
+      "title": "Speed and direction",
+      "description": "Change playback speed and direction with resampling or time-stretching."
     },
     "sampling": {
-      "title": "Sampling and bit depth"
+      "title": "Sampling and bit depth",
+      "description": "See and hear the effect of sample rate, bit depth and dithering on the audio."
     },
     "extent": {
-      "title": "Signal extent"
+      "title": "Signal extent",
+      "description": "Measure duration, support, energy and power, and see the effect of truncation, zero-padding and time scaling."
     },
     "reverb": {
-      "title": "Reverb"
+      "title": "Reverb",
+      "description": "Convolve the audio with an impulse response and adjust reverb, pre-delay and wet/dry mix."
     },
     "spectrumEdit": {
-      "title": "Spectrum editor"
+      "title": "Spectrum editor",
+      "description": "Edit magnitude, phase, real and imaginary spectrum values and hear the IFFT result."
     },
     "codecLab": {
-      "title": "Compression lab"
+      "title": "Compression lab",
+      "description": "Compare lossless and lossy codecs on an excerpt and measure compression ratio and quality."
     },
     "metrics": {
-      "title": "Quality metrics"
+      "title": "Quality metrics",
+      "description": "Measure MSE, SNR, PSNR, entropy and compression ratio for original and processed audio."
+    },
+    "psychoacoustics": {
+      "title": "Psychoacoustics and masking"
     },
     "ai": {
-      "title": "AI lab"
+      "title": "AI lab",
+      "description": "Run pre-trained models for separation, denoising, super-resolution, neural coding and speech transcription."
     },
     "filters": {
-      "title": "Filter design"
+      "title": "Filter design",
+      "description": "Design FIR and IIR filters, inspect the frequency response and poles/zeros, and apply them to the audio."
+    },
+    "pipeline": {
+      "title": "Pipeline builder",
+      "description": "Chain processing blocks into a branching graph, run it on the current excerpt, and compare the outputs."
     }
   },
   "codecLab": {
@@ -217,7 +285,19 @@
       "title": "MDCT details",
       "sparsity": "Coefficient sparsity",
       "frames": "Frame count",
-      "totalBits": "Total bits"
+      "totalBits": "Total bits",
+      "psycho": "Psychoacoustic masking",
+      "psychoOn": "Masking-aware quantization",
+      "legacy": "Legacy uniform quantizer",
+      "referenceSpl": "Reference SPL (dB)",
+      "entropyBits": "Entropy bits",
+      "sideInfoBits": "Side-info bits",
+      "totalBitrate": "Total bitrate",
+      "maskedShare": "Masked share",
+      "bandChartTitle": "Masking threshold and SMR per Bark band",
+      "threshold": "Threshold (dB SPL)",
+      "smr": "Signal-to-mask ratio (dB)",
+      "psychoNote": "Stationary simultaneous-masking model; no temporal masking. Teaching approximation."
     },
     "histogram": {
       "title": "PCM byte histogram (256 bins)",
@@ -280,7 +360,13 @@
         "lossless": "RLE, Huffman and delta+Huffman must show “bit-exact ✓”; μ-law, A-law and MDCT must not.",
         "entropy": "Compare the lossless size with entropy; the coder approaches the theoretical bound.",
         "bitrate": "In MDCT, sweep the bitrate and watch SNR/PSNR against bitrate.",
-        "sparsity": "MDCT coefficient sparsity shows how much quantization zeroes out."
+        "sparsity": "MDCT coefficient sparsity shows how much quantization zeroes out.",
+        "body": "Read the size, bitrate, and quality numbers together. A lossless result must decode bit-exactly, while a lossy result is judged by the trade between bitrate and measured or heard distortion."
+      },
+      "headings": {
+        "entropy": "Lossless coding and entropy",
+        "companding": "Companding",
+        "mdct": "Transform coding and bitrate"
       }
     },
     "real": {
@@ -347,6 +433,16 @@
       "magnitudeOnly": "Magnitude only",
       "phaseOnly": "Phase only"
     },
+    "curve": {
+      "title": "Freehand curve (applied after band edits)",
+      "target": "Curve component",
+      "hint": "Click to add a point; drag a point to change its value. At least two points are required.",
+      "readout": "Bin {{bin}} · value {{value}}",
+      "points": "{{count}} points",
+      "apply": "Apply curve",
+      "undo": "Undo point",
+      "clear": "Clear curve"
+    },
     "chart": {
       "re": "Real part",
       "im": "Imaginary part",
@@ -387,6 +483,21 @@
       "phase": "Editing phase keeps magnitude; zeroing phase sets it to zero.",
       "hermitian": "With Hermitian symmetry on, the output stays real; turning it off shows why the symmetry is needed.",
       "gibbs": "Zeroing a whole band produces Gibbs ringing in the output; sharp truncation causes it."
+    },
+    "theory": {
+      "title": "Editing the spectrum and returning to time",
+      "inverse": {
+        "heading": "Inverse DFT",
+        "body": "The editor changes selected bins of one frame, then runs the inverse transform. The result is real only when the edited spectrum obeys Hermitian symmetry. Otherwise the IFFT is complex and the player keeps the real part."
+      },
+      "hermitian": {
+        "heading": "Hermitian symmetry",
+        "body": "For a real signal, bin N−k is the conjugate of bin k. Editing magnitude or phase independently can break that rule; the toggle shows the consequence instead of hiding it."
+      },
+      "gibbs": {
+        "heading": "Sharp masks ring",
+        "body": "A brick-wall band edit is a sudden discontinuity in frequency. Its time-domain result has ripples near the edges: the Gibbs phenomenon. Smooth transitions trade sharpness for less ringing."
+      }
     }
   },
   "fftview": {
@@ -433,6 +544,56 @@
     "chart": {
       "magnitudeLabel": "Spectrum magnitude chart",
       "phaseLabel": "Spectrum phase chart"
+    },
+    "benchmark": {
+      "title": "FFT benchmark",
+      "run": "Run FFT benchmark",
+      "stftRun": "Benchmark full STFT",
+      "cancel": "Cancel",
+      "note": "Wall-clock times are machine-dependent; accuracy is the stable comparison. fft.js is used only for this benchmark.",
+      "size": "Size",
+      "ours": "Our FFT",
+      "library": "fft.js",
+      "ratio": "Our / fft.js",
+      "error": "Max abs error",
+      "status": {
+        "idle": "Ready.",
+        "running": "Running…",
+        "done": "Benchmark finished.",
+        "cancelled": "Benchmark cancelled.",
+        "error": "Benchmark failed."
+      }
+    },
+    "butterfly": {
+      "title": "Cooley–Tukey butterfly",
+      "size": "Transform size",
+      "loading": "Computing butterfly steps…",
+      "error": "Butterfly steps could not be computed.",
+      "previous": "Previous step",
+      "next": "Next step",
+      "stage": "Stage",
+      "indices": "Even / odd index",
+      "twiddle": "Twiddle W",
+      "inputEven": "Even input",
+      "inputOdd": "Odd input",
+      "outputEven": "Even output",
+      "outputOdd": "Odd output",
+      "note": "The input is bit-reversed before stage 1; each butterfly adds and subtracts the twiddled odd input."
+    },
+    "theory": {
+      "title": "DFT, windows, and phase",
+      "dft": {
+        "heading": "Discrete Fourier transform",
+        "body": "The DFT compares the frame with complex sinusoids at N equally spaced frequencies. Bin k is the projection on e^{j2πkn/N}; the magnitude says how much, and the phase says where in the cycle."
+      },
+      "window": {
+        "heading": "Windows and leakage",
+        "body": "A rectangular window truncates abruptly and spreads energy into side lobes. Smooth windows lower leakage at the cost of a wider main lobe. Compare the window table to see this trade-off directly."
+      },
+      "phase": {
+        "heading": "Phase is fragile",
+        "body": "Phase under a magnitude threshold is mostly numerical noise. The plot masks those bins; phase differences between nearby bins are more meaningful than absolute wrapped values."
+      }
     }
   },
   "generator": {
@@ -461,7 +622,39 @@
       "whiteNoise": "White noise",
       "pinkNoise": "Pink noise",
       "chirp": "Chirp",
-      "twoTone": "Two-tone"
+      "twoTone": "Two-tone",
+      "am": "Amplitude modulation (AM)",
+      "fm": "Frequency modulation (FM)"
+    },
+    "tab": {
+      "basic": "Basic",
+      "amFm": "AM / FM",
+      "fourier": "Fourier series"
+    },
+    "amFm": {
+      "mode": "Modulation",
+      "carrier": "Carrier frequency (Hz)",
+      "modulation": "Modulation frequency (Hz)",
+      "index": "Modulation index",
+      "deviation": "Frequency deviation (Hz)",
+      "overmodulation": "The modulation index exceeds 1, so the envelope inverts (overmodulation).",
+      "amHint": "AM: x(t) = A (1 + m sin(2πfm t)) sin(2πfc t).",
+      "fmHint": "FM: x(t) = A sin(2πfc t + β sin(2πfm t)), with β = Δf / fm."
+    },
+    "fourier": {
+      "kindLabel": "Target waveform",
+      "kind": {
+        "square": "Square",
+        "sawtooth": "Sawtooth",
+        "triangle": "Triangle"
+      },
+      "harmonics": "Highest harmonic",
+      "partial": "Fourier partial sum",
+      "ideal": "Ideal waveform",
+      "measured": "Measured Gibbs overshoot",
+      "theoretical": "Theoretical overshoot",
+      "hint": "More harmonics sharpen the edges; the Gibbs overshoot stays near 8.95 %.",
+      "error": "The Fourier series could not be built."
     },
     "meta": {
       "samples": "Samples",
@@ -476,7 +669,22 @@
     "load": "Load as source",
     "loadingSource": "Generating…",
     "sourceName": "{{waveform}} (generated)",
-    "error": "The source could not be generated."
+    "error": "The source could not be generated.",
+    "theory": {
+      "title": "Signal generation and Fourier series",
+      "fourier": {
+        "heading": "Building waves from sinusoids",
+        "body": "Any periodic signal can be written as a sum of harmonics at integer multiples of f0. The generator's Fourier tab adds them one by one; the shape approaches the target as the harmonic count grows."
+      },
+      "gibbs": {
+        "heading": "Gibbs ringing",
+        "body": "A truncated Fourier series cannot reproduce a jump exactly. The partial sum overshoots the edge by about 9% of the jump, no matter how many terms you add; only the ripple width shrinks."
+      },
+      "preview": {
+        "heading": "Preview is not the file",
+        "body": "The preview draws a bucket envelope, not every sample. Check the sample count and duration, and remember that the loaded source is capped at 300 s and 96 kHz."
+      }
+    }
   },
   "player": {
     "title": "Player",
@@ -512,6 +720,11 @@
       "aria": "Playback lane",
       "original": "Original",
       "processed": "Processed"
+    },
+    "loudness": {
+      "label": "Loudness match (BS.1770)",
+      "hint": "Changes only playback gain; the audio file is not modified.",
+      "measuring": "Measuring…"
     },
     "reset": "Reset to original"
   },
@@ -562,7 +775,18 @@
     "decimationNotice": "Canvas budget exceeded; columns were decimated ×{{factor}} (the analysis hop is wider).",
     "loading": "Computing the spectrogram…",
     "error": "The spectrogram could not be computed.",
-    "empty": "The source has no samples to analyse."
+    "empty": "The source has no samples to analyse.",
+    "theory": {
+      "title": "Spectrogram: window, hop, and resolution",
+      "stft": {
+        "heading": "Short-time Fourier transform",
+        "body": "The spectrogram splits the signal into overlapping frames, applies a window, and computes a DFT per frame. Each column is a spectrum; colour encodes magnitude in dB. The hop controls how often the spectrum is measured."
+      },
+      "resolution": {
+        "heading": "Time–frequency trade-off",
+        "body": "A longer window gives finer frequency resolution but blurs short events; a shorter window does the opposite. The hop sets time spacing, while zero-padding only interpolates the displayed spectrum."
+      }
+    }
   },
   "compare": {
     "title": "A/B compare",
@@ -610,6 +834,21 @@
       "resample": "Resample mode changes speed and pitch together; watch the spectrogram shift vertically.",
       "timeStretch": "Time-stretch changes duration while the harmonic peaks stay put; the phase vocoder may smear transients.",
       "reverse": "Reverse plays the result backwards; the magnitude spectrum is unchanged, the phase is not."
+    },
+    "theory": {
+      "title": "Speed, resampling, and the phase vocoder",
+      "resample": {
+        "heading": "Tape-style resampling",
+        "body": "Playing the same samples faster multiplies pitch and tempo together. Resampling by r changes the duration by 1/r and every frequency by r; it is the simplest speed control and the easiest to hear."
+      },
+      "vocoder": {
+        "heading": "Pitch-preserving time stretch",
+        "body": "The phase vocoder keeps the frame rate but advances the synthesis grid at a different rate. It accumulates phase from frame to frame so frequency stays put while duration changes; transient smearing is the usual artifact."
+      },
+      "reverse": {
+        "heading": "Reverse is not reverb",
+        "body": "Time reversal flips the sample order. Magnitude stays the same, phase is conjugated, and attacks become decays. Reverb, by contrast, convolves with a room impulse response."
+      }
     }
   },
   "sampling": {
@@ -674,6 +913,21 @@
       "aliasing": "Turn the anti-alias filter off and lower the target rate: a tone above the new Nyquist appears at a different frequency.",
       "dither": "At low bit depth, dither replaces correlated quantization distortion with a steady noise floor.",
       "snr": "Each extra bit adds about 6 dB of SNR; compare the measured value with the theoretical line."
+    },
+    "theory": {
+      "title": "Sampling, aliasing, and quantization",
+      "nyquist": {
+        "heading": "Nyquist condition",
+        "body": "Sampling stores the signal at discrete instants. If the input contains energy above half the sample rate, those components fold back to lower frequencies and become indistinguishable from real content. The anti-alias filter must run before decimation."
+      },
+      "alias": {
+        "heading": "Alias frequency",
+        "body": "A sine at f above Nyquist appears at the folded frequency f_alias. With the filter off you can hear the tone move down as the rate falls; switching the filter on removes the out-of-band energy before it can fold."
+      },
+      "quantization": {
+        "heading": "Quantization and SNR",
+        "body": "Reducing bit depth rounds every sample to a coarser grid. The step size grows, the error power grows, and the signal-to-noise ratio falls. Dither trades a little noise for the removal of correlated quantization distortion."
+      }
     }
   },
   "extent": {
@@ -752,6 +1006,21 @@
       "periodic": "Periodic extension produces spectral lines at multiples of 1/T.",
       "scaleNote": "Time scaling deliberately has no anti-alias filter. For the filtered comparison, use the sampling lab (F03).",
       "units": "Energy and average power are amplitude-squared values; for normalized audio in [−1, 1] the unit is full-scale²."
+    },
+    "theory": {
+      "title": "Signal extent, energy, and resolution",
+      "energy": {
+        "heading": "Energy and average power",
+        "body": "Duration and support describe where a signal exists; energy and power describe how much it carries. A finite-energy pulse has zero average power over infinite time, while a periodic signal is a power signal."
+      },
+      "resolution": {
+        "heading": "Truncation and resolution",
+        "body": "A length-N record has frequency spacing fs/N. Truncating shortens the support and widens the main lobe, so closely spaced components merge. Zero-padding interpolates the spectrum but cannot create resolution."
+      },
+      "timeScale": {
+        "heading": "Time scaling",
+        "body": "Compressing time by a widens the spectrum by a and shifts every frequency upward. This is the Fourier time-scaling property students see when the extent factor changes."
+      }
     }
   },
   "reverb": {
@@ -858,9 +1127,25 @@
       "irInvalid": "The impulse response contains invalid samples.",
       "irDecode": "Could not decode that impulse response file. Try a WAV file.",
       "failed": "The reverb operation failed. Try a shorter range or different parameters."
+    },
+    "theory": {
+      "title": "Convolution reverb and impulse responses",
+      "convolution": {
+        "heading": "Reverb as an LTI system",
+        "body": "An impulse response records how a room answers one click. Convolving the dry signal with that response adds every reflection at its correct delay and level; fast convolution does the same job through the FFT."
+      },
+      "ir": {
+        "heading": "Reading the impulse response",
+        "body": "The direct sound is the first peak; the tail decay sets RT60, the time for the response to fall by 60 dB. Pre-delay separates the direct sound from the first reflection, and wet/dry sets how much dry signal remains."
+      },
+      "direct": {
+        "heading": "Direct versus FFT convolution",
+        "body": "Direct convolution is easy to inspect but costs O(NL). Overlap-add FFT convolution is O(N log N) and is the default for long IRs. Both must produce the same samples apart from rounding."
+      }
     }
   },
   "metrics": {
+    "pending": "Computing quality metrics…",
     "missing": "No processed signal yet. Run a tool that installs a processed lane (for example the compression lab), then compare it here.",
     "mismatch": {
       "length": "The processed signal has a different length. Run a tool that preserves length, or compare codec-lab results against their aligned reference.",
@@ -880,13 +1165,69 @@
       "title": "Definitions and what to observe",
       "energy": "SNR compares signal energy with error energy; MSE averages the squared sample error and is sensitive to outliers.",
       "segmental": "Segmental SNR averages per-frame SNR over 20 ms active frames, so a bad short passage is not hidden by a good average.",
-      "psnr": "PSNR = 10·log10(peak² / MSE) with peak = 1.0 for full-scale float audio."
+      "psnr": "PSNR = 10·log10(peak² / MSE) with peak = 1.0 for full-scale float audio.",
+      "headings": {
+        "snr": "Signal-to-noise ratio",
+        "segmental": "Segmental SNR",
+        "psnr": "PSNR for audio"
+      }
     },
     "observe": {
       "title": "What to observe",
       "lossless": "A lossless codec still differs from the float original by 16-bit PCM quantization error; SNR is finite and PSNR is large.",
       "lossy": "Lower lossy bitrates raise MSE and lower SNR/PSNR; listen to the same result for the perceptual difference.",
-      "bitrate": "Compare several codec settings and relate the metric change to the bitrate shown in the compression lab."
+      "bitrate": "Compare several codec settings and relate the metric change to the bitrate shown in the compression lab.",
+      "body": "Use metrics as evidence, not as a verdict: a high SNR does not guarantee that the result sounds clean, and a low SNR can come from one short but important event."
+    }
+  },
+  "psychoacoustics": {
+    "description": "Explore absolute hearing threshold, critical bands and simultaneous masking, then see why a perceptual codec can discard masked content.",
+    "noSource": "Load audio to overlay measured band levels and the masking threshold. The curves below work without audio.",
+    "controls": {
+      "referenceSpl": "Reference SPL (dB)",
+      "scale": "Frequency axis",
+      "scaleLog": "Logarithmic",
+      "scaleLinear": "Linear",
+      "showThreshold": "Show threshold"
+    },
+    "chart": {
+      "ath": "Absolute threshold of hearing versus frequency",
+      "spreading": "Bark-band spreading matrix",
+      "bands": "Measured band levels with the masking threshold"
+    },
+    "analysis": {
+      "title": "Loudest-frame analysis",
+      "athTitle": "Absolute threshold",
+      "spreadingTitle": "Spreading function",
+      "frameCount": "{{frames}} MDCT frames analysed"
+    },
+    "status": {
+      "pending": "Analysing the selected audio…",
+      "error": "The psychoacoustic analysis failed. Shorten the selection and try again."
+    },
+    "codecLink": "Open in compression lab",
+    "theory": {
+      "title": "Theory: hearing threshold and masking",
+      "ath": {
+        "heading": "Absolute threshold of hearing",
+        "body": "The Terhardt approximation gives the sound pressure level a pure tone needs to become audible in quiet. Sensitivity peaks near 3–4 kHz and falls sharply at low and very high frequencies; the model is clamped below 20 Hz."
+      },
+      "critical": {
+        "heading": "Critical bands",
+        "body": "The Bark scale warps frequency onto a perceptual axis. The lab uses 25 equal-Bark bands; each band behaves like one auditory filter, so masking spreads mainly between nearby bands."
+      },
+      "masking": {
+        "heading": "Simultaneous masking",
+        "body": "A loud band raises the threshold of neighbouring bands. The model sums masker contributions with a symmetric spreading function and combines the result with the absolute threshold. The strongest masker wins; contributions add on a power basis."
+      },
+      "smr": {
+        "heading": "Signal-to-mask ratio",
+        "body": "SMR is the band level minus its masked threshold. A positive SMR means the band is audible and needs bits; a negative SMR means the band can be quantized coarsely or dropped."
+      },
+      "discard": {
+        "heading": "Why codecs discard masked content",
+        "body": "A perceptual codec derives a per-band quantization step from the masked threshold, never finer than a global rate-control step. Bands under the threshold get coarse steps, so their bits are saved with little audible loss. This model is stationary: it has no temporal masking and no tonal/noise separation, so treat it as a teaching approximation."
+      }
     }
   },
   "ai": {
@@ -901,9 +1242,11 @@
       "superres": "Super-resolution",
       "separation": "Source separation",
       "asr": "Speech to text (ASR)",
-      "neuralCodec": "Neural codec"
+      "neuralCodec": "Neural codec",
+      "pitchBeat": "Pitch & beat"
     },
     "models": {
+      "disabled": "Machine-learning tools are disabled on this server.",
       "offline": "Server unreachable: model tools stay disabled until the server is back.",
       "loading": "Checking model availability…",
       "error": "Model availability could not be checked.",
@@ -1056,6 +1399,26 @@
       "compressedHint": "For E3, compress this clip in the codec lab, load the decoded WAV, then run ASR again.",
       "openCodecLab": "Open codec lab"
     },
+    "pitchBeat": {
+      "intro": "Pitch and beat analysis is non-neural: librosa estimates F0 with pYIN and tempo with an onset envelope. No model is downloaded or loaded.",
+      "modeLabel": "Analysis task",
+      "pitch": "Pitch (F0)",
+      "beat": "Beat / tempo",
+      "noSource": "Load audio to analyse pitch or beats.",
+      "pitchResult": "Fundamental frequency over time",
+      "beatResult": "Detected beats",
+      "pitchChartAria": "Estimated fundamental frequency over time",
+      "pitchChartNote": "Unvoiced frames leave gaps; the vertical axis spans the detected F0 range.",
+      "medianF0": "Median F0",
+      "voicedFraction": "Voiced fraction",
+      "tempo": "Tempo",
+      "beatCount": "Beat count",
+      "unvoiced": "No voiced frames",
+      "hzValue": "{{hz}} Hz",
+      "percentValue": "{{percent}}%",
+      "bpmValue": "{{bpm}} BPM",
+      "timeValue": "{{seconds}} s"
+    },
     "caption": {
       "approximation": "AI-generated approximation: compare it with the original before drawing conclusions."
     },
@@ -1177,6 +1540,54 @@
           "bullets": {
             "alignment": "Align codec delay before computing SNR or PSNR.",
             "stages": "Reported bitrate includes every quantizer stage; do not compare only one."
+          }
+        }
+      },
+      "pitch": {
+        "title": "Pitch tracking: F0 over time",
+        "concept": {
+          "heading": "Frame-wise fundamental frequency",
+          "body": "pYIN searches candidate periods in short frames and scores how well each candidate explains the waveform. The result is a fundamental-frequency contour with a voiced probability per frame."
+        },
+        "observe": {
+          "heading": "What to observe",
+          "body": "Compare the F0 curve with the waveform and spectrogram of the same excerpt.",
+          "bullets": {
+            "contour": "A steady vowel or hum should produce a flat F0 segment.",
+            "unvoiced": "Noise and many consonants have no stable F0, so the curve breaks.",
+            "octave": "Sudden jumps by a factor of two are octave errors, not real pitch changes."
+          }
+        },
+        "pitfalls": {
+          "heading": "Pitfalls and limits",
+          "body": "F0 is a physical repetition rate, while perceived pitch also depends on loudness and spectrum. Treat the curve as an estimate.",
+          "bullets": {
+            "range": "The search is limited to 65–1000 Hz; notes outside that range are not tracked.",
+            "noise": "Broadband noise and polyphonic mixtures rarely give one meaningful F0."
+          }
+        }
+      },
+      "beat": {
+        "title": "Beat tracking: tempo and beat times",
+        "concept": {
+          "heading": "Onset envelope and tempo",
+          "body": "The tracker builds an onset-strength envelope, estimates a global tempo, then places beats on strong onsets that fit that tempo. Tempo in BPM is 60 divided by the average beat period."
+        },
+        "observe": {
+          "heading": "What to observe",
+          "body": "Listen to the excerpt while checking where the beat list falls.",
+          "bullets": {
+            "tempo": "A steady pulse near 120 BPM should produce a tempo close to 120.",
+            "list": "Beat times must increase and match audible attacks.",
+            "speech": "Speech has no fixed musical meter, so its tempo estimate can be unstable."
+          }
+        },
+        "pitfalls": {
+          "heading": "Pitfalls and limits",
+          "body": "Beat tracking assumes a roughly periodic pulse. Tempo can double or halve when the meter is ambiguous.",
+          "bullets": {
+            "meter": "A 60 BPM pulse and a 120 BPM pulse can share the same onsets; check the beat count.",
+            "cut": "The 30 s excerpt can cut a phrase, so the first and last beats deserve less trust."
           }
         }
       }
@@ -1317,6 +1728,159 @@
       "wav": "Export WAV"
     }
   },
+  "pipeline": {
+    "loading": "Loading the pipeline editor…",
+    "palette": {
+      "title": "Add node"
+    },
+    "nodeKind": {
+      "source": "Source",
+      "resample": "Resample",
+      "filter": "Filter",
+      "quantize": "Quantize",
+      "codec": "Codec",
+      "reverb": "Reverb",
+      "reverse": "Reverse",
+      "timeStretch": "Time-stretch",
+      "output": "Output"
+    },
+    "codec": {
+      "rle": "RLE (run-length)",
+      "huffman": "Canonical Huffman",
+      "deltaHuffman": "Delta + Huffman",
+      "mulaw": "μ-law",
+      "alaw": "A-law",
+      "mdct": "MDCT (lossy)"
+    },
+    "ir": {
+      "room": "Room",
+      "hall": "Hall",
+      "plate": "Plate",
+      "telephone": "Telephone"
+    },
+    "method": {
+      "direct": "Direct convolution"
+    },
+    "properties": {
+      "empty": "Select a node or an edge to edit it.",
+      "edge": "Connection",
+      "source": "The source feeds the current excerpt into the graph.",
+      "reverse": "Time reversal has no parameters."
+    },
+    "property": {
+      "invalid": "This value is out of range; the pipeline cannot run until it is fixed.",
+      "label": "Output label",
+      "targetRate": "Target rate (Hz)",
+      "antiAlias": "Anti-alias filter",
+      "filterB": "Feed-forward coefficients b",
+      "filterA": "Feedback coefficients a",
+      "fir": "FIR (linear phase)",
+      "compensateDelay": "Compensate FIR delay",
+      "bits": "Bit depth",
+      "dither": "TPDF dither",
+      "seed": "Random seed",
+      "codec": "Codec",
+      "mdctKbps": "MDCT bitrate (kbps)",
+      "psychoacoustic": "Psychoacoustic masking",
+      "referenceSpl": "Reference SPL (dB)",
+      "irKind": "Impulse response",
+      "irDuration": "IR duration (s)",
+      "rt60": "RT60 (s)",
+      "preDelay": "Pre-delay (ms)",
+      "wetMix": "Wet mix",
+      "method": "Convolution method",
+      "speed": "Speed factor",
+      "pitch": "Pitch shift (semitones)"
+    },
+    "action": {
+      "deleteEdge": "Delete connection",
+      "deleteNode": "Delete node",
+      "run": "Run pipeline",
+      "cancel": "Cancel",
+      "save": "Save JSON",
+      "load": "Load JSON",
+      "install": "Install output"
+    },
+    "stage": {
+      "duration": "Duration",
+      "rate": "Rate",
+      "peak": "Peak",
+      "rms": "RMS",
+      "elapsed": "Elapsed"
+    },
+    "output": {
+      "select": "Output",
+      "installed": "Output installed in the processed lane."
+    },
+    "result": {
+      "title": "Run result"
+    },
+    "warning": {
+      "invalid": "The shared pipeline link was invalid; the default graph was loaded.",
+      "tooLong": "The pipeline is too large to share in the URL; use Save JSON instead."
+    },
+    "error": {
+      "badVersion": "Unsupported pipeline version.",
+      "duplicateNodeId": "Two nodes share the same ID.",
+      "duplicateEdgeId": "Two connections share the same ID.",
+      "emptyNodeId": "A node has an empty ID.",
+      "emptyEdgeId": "A connection has an empty ID.",
+      "noSource": "The graph needs one source node.",
+      "multipleSources": "The graph can have only one source node.",
+      "noOutput": "The graph needs at least one output node.",
+      "cycle": "This connection would create a cycle.",
+      "merge": "Each node accepts only one incoming connection.",
+      "disconnected": "Every node must be reachable from the source.",
+      "tooManyNodes": "The graph can have at most 24 nodes.",
+      "tooManyOutputs": "At most two output nodes are allowed.",
+      "badPosition": "A node position is not a finite number.",
+      "unknownEndpoint": "A connection points to a missing node.",
+      "selfEdge": "A node cannot connect to itself.",
+      "badParams": "One node has an invalid parameter.",
+      "badPayload": "The worker returned an unexpected payload.",
+      "invalidConnection": "That connection is not allowed: it would create a cycle, a second input, or an invalid route.",
+      "cannotDeleteLast": "Keep at least one source and one output.",
+      "noResult": "Run the pipeline before installing an output.",
+      "missingOutput": "That output is not present in the last run.",
+      "install": "Could not install the output.",
+      "failed": "The pipeline run failed."
+    },
+    "theory": {
+      "title": "Pipeline theory and what to observe",
+      "sampling": {
+        "heading": "Sampling and aliasing",
+        "body": "A resample block changes the sample rate. If the anti-alias filter is off, content above the new Nyquist frequency folds back as an alias; the graph shows the same trade-off as the sampling lab."
+      },
+      "filtering": {
+        "heading": "Filtering",
+        "body": "A filter block applies a difference equation. FIR blocks use only inputs, so they have linear phase and a fixed delay; IIR blocks reuse outputs, so a small order gives a sharp transition but a non-linear phase."
+      },
+      "quantization": {
+        "heading": "Quantization",
+        "body": "A quantize block rounds each sample to N bits. The step is 2A/2^N and the ideal full-scale sine SNR is about 6.02N + 1.76 dB; dither trades a little added noise for removed correlation between the error and the signal."
+      },
+      "codec": {
+        "heading": "Codec branch",
+        "body": "A codec block encodes and immediately decodes the branch. Lossless blocks return bit-exact audio; the MDCT block quantizes spectral coefficients, so its bit budget controls the artifact level."
+      },
+      "reverb": {
+        "heading": "Reverb",
+        "body": "A reverb block convolves the branch with an impulse response. The output keeps the full tail, so it is longer than the input; the wet/dry mix and pre-delay set the balance and the gap before the first reflection."
+      },
+      "timeStretch": {
+        "heading": "Time-stretch",
+        "body": "A time-stretch block changes duration while keeping pitch. The phase vocoder shifts the frame grid, unlike resampling, where speed and pitch move together."
+      },
+      "order": {
+        "heading": "Order effects",
+        "body": "Order matters. Reversing after a filter is not the same as filtering a reversed signal, and a quantizer before a codec removes detail the codec can never recover."
+      },
+      "fanOut": {
+        "heading": "Why fan-out helps",
+        "body": "Fan-out sends the same input into parallel branches. Each output is an independent experiment on the same excerpt, so a filter branch and a codec branch can be compared side by side."
+      }
+    }
+  },
   "theory": {
     "title": "Theory and what to observe"
   },
@@ -1327,63 +1891,650 @@
     "openLab": "Open the lab",
     "filters": {
       "title": "Filter design: cutoff, order, and group delay",
-      "goal": "See how cutoff and order change the transition band, ringing, and group delay.",
+      "goal": "See how cutoff, order, ripple, and topology change the transition band, ringing, and group delay.",
       "steps": {
-        "taps": {
+        "s1": {
           "instruction": "Load the chirp demo and design an FIR low-pass with 101 taps at 4 kHz using a Hamming window.",
           "observation": "With 101 taps the transition is wide and the magnitude rolls off around 4 kHz."
         },
-        "order": {
+        "s2": {
           "instruction": "Switch to Butterworth with order 8 and keep the same cutoff.",
           "observation": "A higher order narrows the transition but adds ringing near the edge."
         },
-        "ripple": {
+        "s3": {
           "instruction": "Switch to Chebyshev type I with order 8 and 0.5 dB ripple.",
           "observation": "Passband ripple appears, and the group delay peaks near the cutoff."
         },
-        "groupDelay": {
+        "s4": {
           "instruction": "Return to FIR and read the group-delay and impulse-response plots.",
           "observation": "The symmetric FIR has a flat group delay away from the transition."
+        },
+        "s5": {
+          "instruction": "Switch to a high-pass FIR at 2 kHz with 101 taps.",
+          "observation": "Low frequencies fall and the transition width follows the tap count."
+        },
+        "s6": {
+          "instruction": "Design a Butterworth band-pass from 1 to 3 kHz, order 4.",
+          "observation": "Only the middle band survives; the order controls both edges."
+        },
+        "s7": {
+          "instruction": "Change the band-pass to a band-stop with the same edges.",
+          "observation": "The middle band is removed while the low and high sides remain."
+        },
+        "s8": {
+          "instruction": "Design a peaking biquad at 1 kHz with +6 dB gain and Q = 1, then read the pole-zero plot.",
+          "observation": "The poles stay inside the unit circle, so the filter is stable; the peak sits at 1 kHz."
         }
       }
     },
-    "superres": {
-      "title": "Sampling and super-resolution: 8 kHz to full band",
-      "goal": "Separate a sample-rate change from true bandwidth extension on speech.",
+    "category": {
+      "signals": "Signals & Systems",
+      "multimedia": "Multimedia",
+      "ai": "AI",
+      "labs": "Labs"
+    },
+    "completed": "Completed",
+    "waveformSpectrogram": {
+      "title": "Waveform and spectrogram: same sound, two views",
+      "goal": "Connect the time-domain envelope with the time–frequency picture and see how analysis settings change what is visible.",
       "steps": {
-        "load": {
-          "instruction": "Load the clean speech demo in the super-resolution tab.",
-          "observation": "The original spectrum fills the full band of the source rate."
+        "s1": {
+          "instruction": "Load the chirp demo and open the waveform lab.",
+          "observation": "The overview shows a five-second envelope, and the header reports the sample count and rate."
         },
-        "sinc": {
-          "instruction": "Band-limit to 8 kHz and choose the sinc path.",
-          "observation": "Sinc restores the sample rate but leaves a hard edge at 4 kHz; it creates no new high-band energy."
+        "s2": {
+          "instruction": "Zoom into the first 100 ms, then keep zooming until individual samples appear.",
+          "observation": "The envelope becomes discrete points; read exact times from the numeric selection readout, not from pixel position."
         },
-        "lavasr": {
-          "instruction": "Switch the restore path to LavaSR and compare the spectrum above 4 kHz.",
-          "observation": "LavaSR adds energy above 4 kHz; judge whether the detail is plausible or artificial."
+        "s3": {
+          "instruction": "Select about half a second across the rising chirp and open the spectrogram on the same range.",
+          "observation": "The spectrogram shows one rising ridge; the selection is the analysis window."
+        },
+        "s4": {
+          "instruction": "Compare spectrogram windows of 256, 1024, and 4096 samples.",
+          "observation": "The short window localises time but smears frequency; the long window does the opposite."
+        },
+        "s5": {
+          "instruction": "Zero-pad the FFT while keeping the same window length.",
+          "observation": "The ridge looks smoother and the grid finer, but its width does not shrink: zero-padding interpolates, it does not add resolution."
         }
       }
     },
-    "asrCodec": {
-      "title": "Compression and recognition",
-      "goal": "Connect codec bitrate with listening quality and see how a recognizer behaves on the original speech.",
+    "sampling": {
+      "title": "Sampling rate, aliasing, and bit depth",
+      "goal": "Hear and see aliasing, then measure how bit depth and dither change the quantization noise floor.",
       "steps": {
-        "low": {
-          "instruction": "Load the speech demo and encode MDCT at 32 kbps.",
-          "observation": "At 32 kbps the envelope survives but fine detail smears."
+        "s1": {
+          "instruction": "Load the chirp demo and resample from 48 kHz to 8 kHz with the anti-alias filter off.",
+          "observation": "The sweep folds: high tones return as lower tones and the spectrogram shows mirror images."
         },
-        "mid": {
-          "instruction": "Encode the same excerpt at 128 kbps.",
-          "observation": "Artifacts weaken and the waveform and spectrogram move closer to the original."
+        "s2": {
+          "instruction": "Turn the anti-alias filter on and repeat.",
+          "observation": "Energy above 4 kHz disappears before decimation, so no folded ridge remains."
         },
-        "high": {
-          "instruction": "Repeat at 320 kbps.",
-          "observation": "For speech the result is close to transparent."
+        "s3": {
+          "instruction": "Keep 8 kHz and reduce bit depth from 16 to 8 bits without dither.",
+          "observation": "A noise floor rises and SNR falls by roughly the expected 6 dB per bit."
         },
-        "asr": {
-          "instruction": "Run ASR on the original speech and note its baseline WER.",
-          "observation": "ASR always reads the original source in this lab, so WER does not change with the codec setting; use listening and the spectrogram for the codec comparison."
+        "s4": {
+          "instruction": "Keep 8 kHz and reduce to 4 bits with TPDF dither on.",
+          "observation": "The error becomes noise-like instead of correlated with the signal; the sound is noisier but less buzzy."
+        },
+        "s5": {
+          "instruction": "Measure SNR at 16, 12, 8, and 4 bits and compare with 6.02N + 1.76 dB.",
+          "observation": "Each four-bit drop costs about 24 dB; the measured value stays a little below the full-scale-sine bound."
+        }
+      }
+    },
+    "extent": {
+      "title": "Signal extent: duration, energy, and resolution",
+      "goal": "Relate support and duration to energy, power, and the frequency resolution of a finite record.",
+      "steps": {
+        "s1": {
+          "instruction": "Load a short clip and read duration, sample count, support, energy, and average power in the extent lab.",
+          "observation": "The support is the non-zero region and can be shorter than the file."
+        },
+        "s2": {
+          "instruction": "Truncate the signal to 12000 samples (0.25 s at 48 kHz).",
+          "observation": "Energy drops and the spectrum's main lobe widens; the time–bandwidth product resists compression."
+        },
+        "s3": {
+          "instruction": "Keep the first 12000 samples and zero-pad them with another 12000 zeros.",
+          "observation": "The curve is sampled more finely, but no new detail appears between the original bins."
+        },
+        "s4": {
+          "instruction": "Shift the signal by 0.1 s (4800 samples at 48 kHz).",
+          "observation": "The waveform moves in time and the phase changes linearly while the magnitude stays unchanged."
+        },
+        "s5": {
+          "instruction": "Reverse the shifted signal.",
+          "observation": "Time reversal conjugates the phase spectrum but leaves the magnitude spectrum unchanged."
+        },
+        "s6": {
+          "instruction": "Scale time by 0.5 and compare the spectrum with the original.",
+          "observation": "The waveform is compressed and the spectrum stretched by two, demonstrating x(at)."
+        }
+      }
+    },
+    "fft": {
+      "title": "DFT: windows, leakage, phase, and algorithms",
+      "goal": "Read a spectrum carefully, then compare our FFT with a reference library and inspect the butterflies.",
+      "steps": {
+        "s1": {
+          "instruction": "Select a steady tone segment and open the Fourier view with a Hann window of 1024 samples.",
+          "observation": "The peak sits at the tone frequency and the window sets the lobe shape."
+        },
+        "s2": {
+          "instruction": "Switch to a rectangular window and keep the same length.",
+          "observation": "The main lobe narrows but side lobes rise: leakage becomes obvious."
+        },
+        "s3": {
+          "instruction": "Try a Blackman window at 4096 samples.",
+          "observation": "Side lobes fall far below the rectangular case while the main lobe widens."
+        },
+        "s4": {
+          "instruction": "Return to Hann and increase the window length to 8192 samples.",
+          "observation": "The main lobe narrows and close tones resolve better, at the cost of time resolution."
+        },
+        "s5": {
+          "instruction": "Switch phase to unwrapped with a −80 dB mask.",
+          "observation": "Bins below the mask disappear, and the surviving phase is easier to follow."
+        },
+        "s6": {
+          "instruction": "Compare linear and dB magnitude on the same frame.",
+          "observation": "dB exposes low-level components; linear keeps the relative amplitude intuitive."
+        },
+        "s7": {
+          "instruction": "Run the FFT benchmark against the reference library.",
+          "observation": "Both transforms agree within tolerance while the timings show the cost of the educational path."
+        },
+        "s8": {
+          "instruction": "Step through the N = 8 butterfly view.",
+          "observation": "Each stage halves the number of independent transforms, and the replay matches the full FFT."
+        }
+      }
+    },
+    "spectrumEdit": {
+      "title": "Spectrum editing: magnitude, phase, and the return to time",
+      "goal": "Edit one frame in the frequency domain and hear what each representation does and does not preserve.",
+      "steps": {
+        "s1": {
+          "instruction": "Load a tone and inspect Re, Im, magnitude, and phase for one frame.",
+          "observation": "The tone occupies a few bins; phase elsewhere is mostly numerical noise."
+        },
+        "s2": {
+          "instruction": "Zero the imaginary part with Hermitian symmetry on.",
+          "observation": "The inverse stays real and the waveform becomes symmetric in a predictable way."
+        },
+        "s3": {
+          "instruction": "Set every phase to zero while keeping magnitude.",
+          "observation": "The result is a concentrated pulse; phase alignment creates the sharp peak."
+        },
+        "s4": {
+          "instruction": "Keep magnitude only and randomise phase.",
+          "observation": "Energy is preserved but the waveform turns noise-like; magnitude alone does not determine the sound."
+        },
+        "s5": {
+          "instruction": "Keep phase only and set magnitude to one.",
+          "observation": "The reconstruction keeps temporal structure but loses the spectral envelope."
+        },
+        "s6": {
+          "instruction": "Draw a brick-wall zero over a band and apply the IFFT.",
+          "observation": "The edited band disappears and ripples appear around it."
+        },
+        "s7": {
+          "instruction": "Turn Hermitian symmetry off and repeat the band edit.",
+          "observation": "The IFFT becomes complex; the player keeps the real part, which is an explicit approximation."
+        },
+        "s8": {
+          "instruction": "Listen to the brick-wall result and then smooth the mask edges.",
+          "observation": "Sharp edges ring; a gradual transition reduces the Gibbs ripple."
+        }
+      }
+    },
+    "speed": {
+      "title": "Speed: resampling versus phase-vocoder stretching",
+      "goal": "Separate tempo from pitch and see why reverse is not the same operation as reverb.",
+      "steps": {
+        "s1": {
+          "instruction": "Set resampling speed to 2× and play the result.",
+          "observation": "Duration halves and pitch rises by an octave; the spectrogram shifts upward."
+        },
+        "s2": {
+          "instruction": "Switch to time-stretch at 2× with the same excerpt.",
+          "observation": "Duration halves while the spectral ridges stay at the same frequencies."
+        },
+        "s3": {
+          "instruction": "Set resampling to 0.5×.",
+          "observation": "The sound slows and drops an octave; this is the tape effect."
+        },
+        "s4": {
+          "instruction": "Use pitch shift of +12 semitones with duration preserved.",
+          "observation": "Pitch doubles while the timeline stays fixed, the opposite trade from resampling."
+        },
+        "s5": {
+          "instruction": "Enable reverse and inspect phase.",
+          "observation": "The envelope flips in time; magnitude is unchanged while phase is conjugated."
+        }
+      }
+    },
+    "reverb": {
+      "title": "Reverse and reverb: two different operations",
+      "goal": "Treat reverb as convolution with an impulse response and keep time reversal conceptually separate.",
+      "steps": {
+        "s1": {
+          "instruction": "Load the chirp demo and choose the synthetic hall impulse response.",
+          "observation": "The IR shows an early direct peak and a decaying tail; its spectrum colours the result."
+        },
+        "s2": {
+          "instruction": "Raise the hall RT60 from 1.8 s to 3 s.",
+          "observation": "The tail lengthens and the spectrogram shows energy persisting after the dry sound ends."
+        },
+        "s3": {
+          "instruction": "Choose the plate preset and raise the wet mix.",
+          "observation": "The density and brightness change; wet/dry controls how much dry signal survives."
+        },
+        "s4": {
+          "instruction": "Add 80 ms of pre-delay.",
+          "observation": "A silent gap separates the direct sound from the first reflection."
+        },
+        "s5": {
+          "instruction": "Switch from FFT to direct convolution on a short excerpt.",
+          "observation": "The samples match apart from rounding, while the timing shows why overlap-add is the default for long IRs."
+        }
+      }
+    },
+    "generatorFourier": {
+      "title": "Fourier series and Gibbs ringing",
+      "goal": "Build a periodic wave harmonic by harmonic and watch convergence, overshoot, and ripple width.",
+      "steps": {
+        "s1": {
+          "instruction": "Generate a square wave with one harmonic.",
+          "observation": "The result is a pure sine at the fundamental."
+        },
+        "s2": {
+          "instruction": "Raise the harmonic count to three.",
+          "observation": "The edges steepen and the waveform begins to resemble a square."
+        },
+        "s3": {
+          "instruction": "Raise the count to nine and watch the edges.",
+          "observation": "Ripples appear near every jump: the Gibbs overshoot."
+        },
+        "s4": {
+          "instruction": "Raise the count to fifty-one.",
+          "observation": "The ripple width shrinks but the overshoot stays near 9% of the jump."
+        },
+        "s5": {
+          "instruction": "Switch the target to a triangle wave with fifteen harmonics.",
+          "observation": "A triangle converges faster because its coefficients fall as 1/k²."
+        }
+      }
+    },
+    "codecLab": {
+      "title": "Compression: lossless, lossy, and real codecs",
+      "goal": "Compare entropy coding, companding, transform coding, and an ffmpeg codec on the same excerpt.",
+      "steps": {
+        "s1": {
+          "instruction": "Encode the chirp excerpt with RLE.",
+          "observation": "RLE barely compresses ordinary audio because equal-byte runs are rare."
+        },
+        "s2": {
+          "instruction": "Encode with canonical Huffman and compare the size with entropy.",
+          "observation": "The code approaches the entropy bound but cannot beat it."
+        },
+        "s3": {
+          "instruction": "Encode delta plus Huffman.",
+          "observation": "Prediction shrinks the symbol range and the file gets smaller than plain Huffman."
+        },
+        "s4": {
+          "instruction": "Encode with μ-law at 8 bits.",
+          "observation": "The result is not bit-exact; quiet detail is preserved at the cost of coarse large samples."
+        },
+        "s5": {
+          "instruction": "Encode MDCT at 32 kbps.",
+          "observation": "The envelope survives but fine detail smears and SNR drops."
+        },
+        "s6": {
+          "instruction": "Raise MDCT to 128 kbps.",
+          "observation": "Artifacts weaken and the rate–distortion point moves up."
+        },
+        "s7": {
+          "instruction": "Raise MDCT to 320 kbps.",
+          "observation": "Quality approaches transparency while the bitrate cost grows."
+        },
+        "s8": {
+          "instruction": "Encode the same excerpt with MP3 at 128 kbps and compare after alignment.",
+          "observation": "The decoded result is delayed; metrics must align it before comparing."
+        }
+      }
+    },
+    "metrics": {
+      "title": "Quality metrics: SNR, segmental SNR, and PSNR",
+      "goal": "Read metrics as evidence and learn when alignment or framing makes a number meaningless.",
+      "steps": {
+        "s1": {
+          "instruction": "Process a clip with any lab and open the metrics view.",
+          "observation": "Metrics compare the original with the processed lane; unmatched lengths or rates show a hint instead of a number."
+        },
+        "s2": {
+          "instruction": "Apply a lossless Huffman round trip and read the metrics.",
+          "observation": "SNR is finite because the source is float and the codec path stores 16-bit PCM; PSNR is large."
+        },
+        "s3": {
+          "instruction": "Apply MDCT at 32 and 128 kbps.",
+          "observation": "Lower bitrate raises MSE and lowers SNR and PSNR."
+        },
+        "s4": {
+          "instruction": "Compare plain SNR with segmental SNR on a clip with one loud click.",
+          "observation": "Segmental SNR reacts to the short bad frame while the global average dilutes it."
+        },
+        "s5": {
+          "instruction": "Try to compare signals with different sample rates.",
+          "observation": "The view refuses to align them silently; resample or re-encode first."
+        }
+      }
+    },
+    "aiSeparation": {
+      "title": "Source separation: stems and masks",
+      "goal": "Run a four-stem model on a short excerpt, judge bleed and artifacts, and see the CPU cost.",
+      "steps": {
+        "s1": {
+          "instruction": "Load the mixed music demo and open the separation task.",
+          "observation": "The original is mono-downmixed for analysis, but stereo playback remains available."
+        },
+        "s2": {
+          "instruction": "Select the four-stem HT-Demucs model.",
+          "observation": "The model reports the target stems: vocals, drums, bass, and other."
+        },
+        "s3": {
+          "instruction": "Run the default 30-second excerpt and watch progress.",
+          "observation": "The job reports progress and can be cancelled; CPU timing is slower than real time."
+        },
+        "s4": {
+          "instruction": "Solo the vocals stem.",
+          "observation": "The lead voice is emphasised, but bleed from other instruments remains."
+        },
+        "s5": {
+          "instruction": "Solo drums and bass.",
+          "observation": "Transients and low end separate more cleanly than reverberant content."
+        },
+        "s6": {
+          "instruction": "Listen for artifacts at stem boundaries.",
+          "observation": "Neural separation can smear attacks and leave musical noise; it is an approximation."
+        },
+        "s7": {
+          "instruction": "Run the whole file and compare the ETA.",
+          "observation": "Longer input costs proportionally more; the excerpt limit exists for the local demo."
+        },
+        "s8": {
+          "instruction": "Sum the stems and compare with the original mix.",
+          "observation": "The reconstruction is close but not exact; masks are estimated, not inverted exactly."
+        }
+      }
+    },
+    "aiDenoise": {
+      "title": "Denoising: learned suppression",
+      "goal": "Compare a learned mask with a fixed filter and check whether denoising helps or hurts later tasks.",
+      "steps": {
+        "s1": {
+          "instruction": "Load the noisy speech demo and inspect the spectrogram.",
+          "observation": "Noise fills the gaps between words across the whole band."
+        },
+        "s2": {
+          "instruction": "Run DeepFilterNet on a 30-second excerpt.",
+          "observation": "The output duration and rate match the input; only the spectral envelope changes."
+        },
+        "s3": {
+          "instruction": "Listen between words.",
+          "observation": "Stationary noise drops more than speech onsets."
+        },
+        "s4": {
+          "instruction": "Listen to consonants and fricatives.",
+          "observation": "Over-suppression can smear /s/ and /f/; denoising is not free."
+        },
+        "s5": {
+          "instruction": "Try a music clip with the same speech model.",
+          "observation": "Out-of-domain input can be damaged; the model is trained for speech."
+        },
+        "s6": {
+          "instruction": "Compare the enhanced waveform with the noisy one.",
+          "observation": "The noise floor falls while speech peaks stay roughly in place."
+        },
+        "s7": {
+          "instruction": "Run ASR on noisy and denoised speech.",
+          "observation": "Denoising can help or hurt recognition; measure rather than assume."
+        },
+        "s8": {
+          "instruction": "Read the model caption and limitations.",
+          "observation": "The result is an AI approximation, not a mathematically exact filter."
+        }
+      }
+    },
+    "aiSuperres": {
+      "title": "Super-resolution: bandwidth extension",
+      "goal": "Separate restoring a sample rate from inventing high-frequency content on speech.",
+      "steps": {
+        "s1": {
+          "instruction": "Load the speech demo and inspect its spectrum.",
+          "observation": "The original fills the band supported by its sample rate."
+        },
+        "s2": {
+          "instruction": "Band-limit a copy to 8 kHz and inspect the edge at 4 kHz.",
+          "observation": "The low-pass leaves a hard spectral edge and no energy above it."
+        },
+        "s3": {
+          "instruction": "Restore the sample rate with the sinc path.",
+          "observation": "The rate returns but the 4 kHz edge remains; sinc invents no high-band content."
+        },
+        "s4": {
+          "instruction": "Switch the restore path to the neural model.",
+          "observation": "The model adds energy above 4 kHz that the band-limited input did not contain."
+        },
+        "s5": {
+          "instruction": "Compare the neural and sinc spectra above 4 kHz.",
+          "observation": "The neural result looks fuller; decide whether the detail is plausible or artificial."
+        },
+        "s6": {
+          "instruction": "Listen for added artifacts.",
+          "observation": "Extension can brighten speech but may add lisping or unnatural hiss."
+        },
+        "s7": {
+          "instruction": "Change the excerpt and rerun.",
+          "observation": "Results vary with content; speech models are not general audio restorers."
+        },
+        "s8": {
+          "instruction": "Read the honest caption.",
+          "observation": "Super-resolution is an estimate, not recovered ground truth."
+        }
+      }
+    },
+    "aiAsr": {
+      "title": "Automatic speech recognition and WER",
+      "goal": "Measure recognition quality, compute WER, and recognise the limits of a tiny model.",
+      "steps": {
+        "s1": {
+          "instruction": "Load the English speech demo and open the ASR task.",
+          "observation": "The demo is English because tiny models are weak on Persian."
+        },
+        "s2": {
+          "instruction": "Run Whisper Tiny.",
+          "observation": "The job returns text with timestamps and a model label."
+        },
+        "s3": {
+          "instruction": "Read the transcript against the known demo sentence.",
+          "observation": "Substitutions and missing words are visible; compare case-insensitively."
+        },
+        "s4": {
+          "instruction": "Run Whisper Base on the same excerpt.",
+          "observation": "The larger model usually lowers WER but costs more time."
+        },
+        "s5": {
+          "instruction": "Compute WER from substitutions, deletions, and insertions.",
+          "observation": "WER = (S + D + I) / N; one missed word can dominate a short clip."
+        },
+        "s6": {
+          "instruction": "Try the same speech after heavy compression.",
+          "observation": "This lab reads the original source; use the codec lab to hear the compressed version and discuss the mismatch."
+        },
+        "s7": {
+          "instruction": "Note the language limitation.",
+          "observation": "Persian transcription needs a larger model and is outside the default offline budget."
+        },
+        "s8": {
+          "instruction": "Compare two model sizes and record speed.",
+          "observation": "Accuracy and CPU time trade off; choose the smallest model that meets the task."
+        }
+      }
+    },
+    "aiNeuralCodec": {
+      "title": "Neural codec: RVQ and rate–distortion",
+      "goal": "Compare a learned codec with MDCT and read the bitrate–quality trade without hype.",
+      "steps": {
+        "s1": {
+          "instruction": "Load the speech demo and open the neural-codec task.",
+          "observation": "The model expects a fixed sample rate and resamples explicitly."
+        },
+        "s2": {
+          "instruction": "Run EnCodec on a short excerpt.",
+          "observation": "The output is decoded audio plus a reported bitrate."
+        },
+        "s3": {
+          "instruction": "Listen to the reconstruction.",
+          "observation": "Speech remains intelligible even at low bitrate, with characteristic coding artifacts."
+        },
+        "s4": {
+          "instruction": "Read the bitrate and size.",
+          "observation": "The neural codec spends bits on learned features rather than waveform samples."
+        },
+        "s5": {
+          "instruction": "Compare with MDCT at a similar bitrate.",
+          "observation": "The two codecs fail differently; listen and check the metrics."
+        },
+        "s6": {
+          "instruction": "Move along the rate–distortion plane.",
+          "observation": "Lower bitrate trades quality for size, as with classical codecs."
+        },
+        "s7": {
+          "instruction": "Listen for smeared transients.",
+          "observation": "Neural codecs can blur attacks and over-smooth noise."
+        },
+        "s8": {
+          "instruction": "Read the model license and limitations.",
+          "observation": "Weights and code have separate terms; record them before deployment."
+        }
+      }
+    },
+    "aiPitchBeat": {
+      "title": "Pitch and beat tracking",
+      "goal": "Read an F0 curve and a tempo estimate, and learn what these signal-processing trackers assume.",
+      "steps": {
+        "s1": {
+          "instruction": "Load a sustained tone or the click demo and open the pitch task.",
+          "observation": "Analysis jobs run even when the ML service is disabled because they use librosa, not a neural model."
+        },
+        "s2": {
+          "instruction": "Run pitch tracking.",
+          "observation": "The result is an F0 curve in Hz with time stamps."
+        },
+        "s3": {
+          "instruction": "Compare the curve with the generator frequency.",
+          "observation": "A clean sine gives a flat track; silence and noise produce gaps or jumps."
+        },
+        "s4": {
+          "instruction": "Change the selection and rerun.",
+          "observation": "The excerpt limit and the current selection control the analysed range."
+        },
+        "s5": {
+          "instruction": "Switch to the beat task on a click train.",
+          "observation": "The result lists tempo and beat times rather than a pitch curve."
+        },
+        "s6": {
+          "instruction": "Read the reported BPM.",
+          "observation": "A 120 BPM click train should land near 120, within the tracker's tolerance."
+        },
+        "s7": {
+          "instruction": "Change tempo or add syncopation.",
+          "observation": "Beat tracking follows the dominant pulse; ambiguous rhythms can halve or double the tempo."
+        },
+        "s8": {
+          "instruction": "Note the algorithm assumptions.",
+          "observation": "pyin and beat tracking are signal-processing methods with parameters, not trained models."
+        }
+      }
+    },
+    "pipeline": {
+      "title": "Pipeline: composition and order",
+      "goal": "Chain blocks, inspect intermediate results, and see why order and lossy stages matter.",
+      "steps": {
+        "s1": {
+          "instruction": "Open the pipeline lab and add a resample node.",
+          "observation": "Each block is a pure function of its input and parameters."
+        },
+        "s2": {
+          "instruction": "Append a low-pass filter.",
+          "observation": "The chain applies resample then filter; the intermediate signal can be inspected."
+        },
+        "s3": {
+          "instruction": "Append a quantizer and choose 8 bits.",
+          "observation": "Quantization noise appears after filtering, not before."
+        },
+        "s4": {
+          "instruction": "Add an MDCT codec block at a low bitrate.",
+          "observation": "The codec removes detail that later blocks cannot restore."
+        },
+        "s5": {
+          "instruction": "Add a reverb block with a synthetic IR.",
+          "observation": "Convolution runs last in this chain and lengthens the output."
+        },
+        "s6": {
+          "instruction": "Swap the filter and reverse blocks.",
+          "observation": "The result changes because convolution and time reversal do not commute."
+        },
+        "s7": {
+          "instruction": "Fan out the same input into two branches.",
+          "observation": "Each branch is an independent experiment on the same excerpt."
+        },
+        "s8": {
+          "instruction": "Compare per-stage metrics.",
+          "observation": "Metrics show where quality is lost; composition is not associative in practice when blocks are lossy."
+        }
+      }
+    },
+    "psychoacoustics": {
+      "title": "Psychoacoustics: thresholds, Bark bands, and masking",
+      "goal": "Read the absolute threshold and masking curves, then connect them to perceptual coding.",
+      "steps": {
+        "s1": {
+          "instruction": "Open the lab with no audio and read the absolute threshold curve.",
+          "observation": "The threshold is lowest around 2–5 kHz and rises at both extremes."
+        },
+        "s2": {
+          "instruction": "Inspect the critical-band (Bark) scale.",
+          "observation": "Bands are wider at high frequencies; masking spreads differently across the basilar membrane."
+        },
+        "s3": {
+          "instruction": "Change the reference SPL.",
+          "observation": "The whole threshold and masking overlay shifts with the assumed playback level."
+        },
+        "s4": {
+          "instruction": "Load the tone demo and switch to a linear frequency axis.",
+          "observation": "Linear spacing makes low-frequency detail easier to see; log spacing matches hearing better."
+        },
+        "s5": {
+          "instruction": "Read the measured band levels over the masking threshold.",
+          "observation": "Bands below the threshold are candidates for removal by a perceptual codec."
+        },
+        "s6": {
+          "instruction": "Compare a tonal masker with a noise masker.",
+          "observation": "Noise masks a wider range; tonal masking is more local in frequency."
+        },
+        "s7": {
+          "instruction": "Connect the result to the MDCT codec.",
+          "observation": "The toy codec uses a simple masking model; real codecs use finer psychoacoustic models."
+        },
+        "s8": {
+          "instruction": "State the limitation.",
+          "observation": "The model is illustrative, not a certified perceptual standard."
         }
       }
     }

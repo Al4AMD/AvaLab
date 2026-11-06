@@ -129,3 +129,85 @@ test("denoise: noisy demo → job → denoised lane with RMS and A/B", async ({ 
 
   expect(errors).toEqual([]);
 });
+
+test("denoise: cancel leaves the running lane with a terminal status and no spinner", async ({
+  page,
+}) => {
+  const errors = watchForErrors(page);
+  await stubDenoiseBackend(page);
+
+  // Hold the job stream open until the DELETE lands, then answer with the
+  // backend's terminal cancelled event (the unit tests prove the client
+  // drops late frames; this proves the browser lane exits too).
+  let releaseStream: (() => void) | null = null;
+  const streamReleased = new Promise<void>((resolve) => {
+    releaseStream = resolve;
+  });
+  await page.route("**/api/v1/jobs/stub-job/events", async (route) => {
+    await streamReleased;
+    return route.fulfill({
+      status: 200,
+      contentType: "text/event-stream",
+      body: 'data: {"event":"cancelled","progress":null,"result":null,"code":"job_cancelled"}\n\n',
+    });
+  });
+  await page.route("**/api/v1/jobs/stub-job", async (route) => {
+    releaseStream?.();
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ cancelled: true }),
+    });
+  });
+
+  await page.goto("/tools/ai");
+  await page.getByTestId("ai.denoise.loadDemo").click();
+  await expect(page.getByTestId("ai.run")).toBeEnabled();
+  await page.getByTestId("ai.run").click();
+
+  await expect(page.getByTestId("ai.cancel")).toBeVisible();
+  await page.getByTestId("ai.cancel").click();
+
+  await expect(page.getByTestId("ai.status")).toContainText("لغو شد.");
+  await expect(page.getByTestId("ai.denoise.progress")).toHaveCount(0);
+  await expect(page.getByTestId("ai.cancel")).toHaveCount(0);
+  await expect(page.getByTestId("ai.run")).toBeEnabled();
+  expect(errors).toEqual([]);
+});
+
+test("denoise: a missing model disables Run and explains how to download it", async ({ page }) => {
+  const errors = watchForErrors(page);
+  await page.route("**/api/v1/health", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ status: "ok", ffmpeg: false, version: "stub" }),
+    }),
+  );
+  await page.route("**/api/v1/models", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        models: [
+          {
+            task: "denoise",
+            model_id: "Ceva-IP/DPDFNet",
+            revision: "stub",
+            license: "Apache-2.0",
+            size_bytes: 8_000_000,
+            state: "missing",
+          },
+        ],
+      }),
+    }),
+  );
+
+  await page.goto("/tools/ai");
+  await page.getByTestId("ai.denoise.loadDemo").click();
+
+  await expect(page.getByTestId("ai.models.banner")).toContainText("مدل موجود نیست");
+  await expect(page.getByTestId("ai.denoise.modelMissing")).toBeVisible();
+  await expect(page.getByTestId("ai.run")).toBeDisabled();
+  expect(errors).toEqual([]);
+});

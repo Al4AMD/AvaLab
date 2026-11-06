@@ -31,6 +31,8 @@
 | openapi-typescript | 7.13.0 | MIT |
 | zustand | 5.0.16 | MIT |
 | uplot | 1.6.32 | MIT |
+| @xyflow/react | 12.12.1 | MIT |
+| fft.js | 4.0.4 | MIT |
 | katex | 0.19.1 | MIT |
 | vite | 8.3.4 | MIT |
 | @vitejs/plugin-react | 6.1.2 | MIT |
@@ -42,7 +44,7 @@
 | @biomejs/biome | 2.5.15 | MIT |
 | @types/node | 26.6.5 | MIT |
 
-Wave 5 added `katex` 0.19.1 (MIT) for the theory panels; Wave 4 added no new JS dependency. The comparison table and rate–distortion chart reuse the already-listed `uplot` 1.6.32 (MIT); real codecs keep using the separately-invoked `ffmpeg` binary.
+Wave 6 added `@xyflow/react` 12.12.1 (MIT, <https://reactflow.dev>) for the F15 pipeline graph editor. Its transitive `@xyflow/system` 0.0.84 is MIT and its `d3-*` interaction packages are ISC. Wave 6 Plan 04 added `fft.js` 4.0.4 (MIT) as the independent FFT baseline for the F08 benchmark panel; it is never on the audio path. Wave 5 added `katex` 0.19.1 (MIT) for the theory panels; Wave 4 added no new JS dependency. The comparison table and rate–distortion chart reuse the already-listed `uplot` 1.6.32 (MIT); real codecs keep using the separately-invoked `ffmpeg` binary.
 
 ## Python (apps/api/uv.lock, tools/golden/uv.lock, tools/demo_clips/uv.lock)
 
@@ -52,9 +54,12 @@ Wave 5 added `katex` 0.19.1 (MIT) for the theory panels; Wave 4 added no new JS 
 | annotated-types | 0.8.0 | MIT |
 | anyio | 4.15.1 | MIT |
 | ast-serialize | 0.13.1 | MIT |
+| audioread | 3.1.0 | MIT |
 | certifi | 2026.10.18 | MPL-2.0 |
 | click | 8.5.0 | BSD-3-Clause |
+| cloudpickle | 3.1.2 | BSD-3-Clause |
 | colorama | 0.4.6 | BSD-3-Clause |
+| decorator | 5.3.1 | BSD-2-Clause |
 | fastapi | 0.146.0 | MIT |
 | h11 | 0.16.0 | MIT |
 | httpcore | 1.0.9 | BSD-3-Clause |
@@ -62,14 +67,23 @@ Wave 5 added `katex` 0.19.1 (MIT) for the theory panels; Wave 4 added no new JS 
 | httpx | 0.28.1 | BSD-3-Clause |
 | idna | 3.20 | BSD-3-Clause |
 | iniconfig | 2.3.1 | MIT |
+| joblib | 1.6.0 | BSD-3-Clause |
+| lazy-loader | 0.6 | BSD-3-Clause |
+| librosa | 0.11.0 | ISC |
 | librt | 0.16.0 | MIT |
+| llvmlite | 0.44.0 | BSD-2-Clause |
+| msgpack | 1.2.4 | Apache-2.0 |
 | mypy | 2.4.0 | MIT |
 | mypy-extensions | 1.1.0 | MIT |
+| narwhals | 2.28.0 | MIT |
+| numba | 0.61.2 | BSD-2-Clause |
 | numpy | 2.5.4 | BSD-3-Clause (bundled: 0BSD, MIT, Zlib, CC0-1.0) |
 | opentelemetry-api | 1.45.1 | Apache-2.0 |
 | packaging | 26.3 | Apache-2.0 OR BSD-2-Clause |
 | pathspec | 1.1.1 | MPL-2.0 |
+| platformdirs | 4.14.5 | MIT |
 | pluggy | 1.7.0 | MIT |
+| pooch | 1.9.0 | BSD-3-Clause |
 | pydantic | 2.14.1 | MIT |
 | pydantic-core | 2.50.1 | MIT |
 | pydantic-settings | 2.16.0 | MIT |
@@ -79,14 +93,19 @@ Wave 5 added `katex` 0.19.1 (MIT) for the theory panels; Wave 4 added no new JS 
 | python-multipart | 0.0.32 | Apache-2.0 |
 | pyyaml | 6.0.3 | MIT |
 | ruff | 0.17.1 | MIT |
+| scikit-learn | 1.9.1 | BSD-3-Clause |
 | scipy | 1.18.1 | BSD-3-Clause |
+| soxr | 1.1.0 | LGPL-2.1-or-later |
 | starlette | 1.9.0 | BSD-3-Clause |
+| threadpoolctl | 3.8.0 | BSD-3-Clause |
 | typing-extensions | 4.16.0 | PSF-2.0 |
 | typing-inspection | 0.4.4 | MIT |
 | uvicorn | 0.54.0 | BSD-3-Clause |
 | uvloop | 0.23.0 | MIT |
 | watchfiles | 1.3.0 | MIT |
 | websockets | 17.2 | BSD-3-Clause |
+
+Wave 6 added `librosa` 0.11.0 (ISC) to the API base for non-neural F14 pitch/beat analysis. Its `soxr` 1.1.0 dependency is LGPL-2.1-or-later; it is used as a library and remains GPLv3-compatible. `numba` is pinned below 0.62 because later llvmlite releases have no macOS x86_64 wheel (llvmlite 0.50 requires a local LLVM build).
 
 ### ML extra (`apps/api[ml]`, not installed by default or in CI)
 
@@ -130,3 +149,15 @@ Model weights are third-party assets tracked with revisions and licenses in `doc
 | `music-life-turns-15s.wav` | CC0-1.0 (source track) | 15 s excerpt from 75 s of “Life Turns to History” by The Oracle / Kaiser, `09_life_turns_to_history.flac` from OpenGameArt (`https://opengameart.org/sites/default/files/09_life_turns_to_history.flac`, SHA-256 `22273ebd073fda1ab5f827d2ae128e5e4ebdf7a9add5c3de9d295232c91be5e0`); mono 48 kHz 16-bit, peak-normalized to -1 dBFS |
 
 All seven clips are dedicated to the public domain (CC0-1.0) or derived from CC0 sources; no copyrighted audio is committed. The self-generated generator and the F14 fetcher are deterministic (fixed seeds/params/offsets) — reruns produce byte-identical outputs for a fixed ffmpeg build.
+
+## Report and slide figures
+
+The report/slide figures are screenshots of AvaLab's own UI captured by
+`docs/capture-report-assets.mjs`; they show the bundled CC0 demo clips listed
+above and contain no third-party artwork, photos, or music. The architecture
+and course-mapping diagrams are original HTML/CSS in `docs/report/index.html`
+and `docs/slides/index.html`. The AI figures under `docs/report/assets/ai/` are
+cached outputs of the pinned models in `docs/MODELS.md` (DPDFNet and LavaSR),
+captured once with the local model cache; they are labelled as approximations
+in the report. The PDFs embed only the self-hosted Vazirmatn files and the
+system Menlo font referenced by the build.

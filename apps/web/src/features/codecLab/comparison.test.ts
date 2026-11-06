@@ -35,6 +35,11 @@ function meta(patch: Partial<CodecLabMeta> = {}): CodecLabMeta {
     coefficientSparsity: null,
     frameCount: null,
     bitsTotal: null,
+    psychoacoustic: false,
+    mdctEntropyBits: null,
+    mdctSideInfoBits: null,
+    mdctMaskedFraction: null,
+    mdctBands: null,
     ...patch,
   };
 }
@@ -90,7 +95,13 @@ describe("handwrittenRow", () => {
 
 describe("realRow", () => {
   it("uses actual stream bitrate and the aligned reference byte count", () => {
-    const row = realRow(realRun(), "mp3", "codecLab.real.codec.mp3");
+    const row = realRow(realRun(), "mp3", "codecLab.real.codec.mp3", {
+      mse: 0.0625,
+      snrDb: 6.0206,
+      segmentalSnrDb: 6.0206,
+      psnrDb: 12.0412,
+      sampleCount: 1000,
+    });
     expect(row.bitrateKbps).toBe(64);
     expect(row.compressionRatio).toBe(4);
     expect(row.encodeMs).toBe(42);
@@ -98,6 +109,12 @@ describe("realRow", () => {
     expect(row.lossless).toBe(false);
     expect(row.snrDb).toBeCloseTo(6.0206, 3);
     expect(row.psnrDb).toBeCloseTo(12.0412, 3);
+  });
+
+  it("shows NaN when the worker has not produced metrics", () => {
+    const row = realRow(realRun(), "mp3", "codecLab.real.codec.mp3", null);
+    expect(row.snrDb).toBeNaN();
+    expect(row.psnrDb).toBeNaN();
   });
 });
 

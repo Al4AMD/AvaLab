@@ -1,0 +1,1128 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>آوالب — گزارش پروژه</title>
+    <link rel="stylesheet" href="./report.css" />
+  </head>
+  <body>
+    <main class="report">
+      <section class="cover">
+        <div class="wave-mark" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <p class="cover-kicker">گزارش پروژهٔ درسی · نسخهٔ Wave 6</p>
+        <h1>آوالب</h1>
+        <p class="cover-latin">AVALAB</p>
+        <p class="cover-subtitle">
+          آزمایشگاه صوتی تعاملی برای درس‌های
+          <strong>سیگنال‌ها و سیستم‌ها</strong> و
+          <strong>سیستم‌های چندرسانه‌ای</strong>
+        </p>
+        <dl class="cover-meta">
+          <div>
+            <span class="label">پدیدآورنده</span>
+            <strong>علی‌اکبر</strong>
+          </div>
+          <div>
+            <span class="label">تاریخ</span>
+            <strong>۶ نوامبر ۲۰۲۶</strong>
+          </div>
+          <div>
+            <span class="label">نسخه</span>
+            <strong><span class="num">0.0.0 · Wave 6</span></strong>
+          </div>
+          <div>
+            <span class="label">نوع سند</span>
+            <strong>گزارش فنی و آموزشی</strong>
+          </div>
+          <div>
+            <span class="label">پشتهٔ نرم‌افزاری</span>
+            <strong>React + TypeScript · FastAPI · ffmpeg · PyTorch</strong>
+          </div>
+          <div>
+            <span class="label">مجوز</span>
+            <strong>GPL-3.0</strong>
+          </div>
+        </dl>
+        <p class="cover-note">
+          این گزارش از نتایج اندازه‌گیری‌شدهٔ همین مخزن ساخته شده است. هیچ عدد
+          کارایی، شناسهٔ مدل یا نتیجهٔ آزمایشی ابداع نشده است. صداهای نمونه
+          خودتولید و CC0 هستند؛ تصاویر، خروجی مستقیم برنامه‌اند.
+        </p>
+      </section>
+
+      <section>
+        <h2>چکیدهٔ اجرایی</h2>
+        <p class="lead">
+          آوالب یک آزمایشگاه صوتی تحت وب و دوزبانه است که دانشجو را از دیدن
+          شکل‌موج و طیف‌نگاره تا شنیدن اثر الگوریتم‌های پردازش سیگنال و
+          فشرده‌سازی همراه می‌کند. هر ابزار، محاسبهٔ واقعی را در مرورگر یا
+          سرور انجام می‌دهد و در کنار آن، فرمول، توضیح کوتاه، نکات مشاهده و
+          دام‌های رایج را نشان می‌دهد.
+        </p>
+        <div class="cards">
+          <div class="card">
+            <h3>پردازش زنده در مرورگر</h3>
+            <p>
+              تبدیل فوریه، طیف‌نگاره، فیلتر، کانولوشن، بازنمونه‌برداری،
+              کوانتیزه‌سازی، کدگذارهای دست‌نویس و خط لولهٔ پردازش در
+              Web Worker اجرا می‌شوند. رشتهٔ اصلی رابط کاربری هیچ تبدیل
+              سنگینی انجام نمی‌دهد.
+            </p>
+          </div>
+          <div class="card">
+            <h3>کدک و مدل در سرور</h3>
+            <p>
+              کدک‌های واقعی MP3، AAC، Opus، Vorbis و FLAC با
+              <code>ffmpeg</code> و ابزارهای هوش مصنوعی با PyTorch و
+              مدل‌های تثبیت‌شده اجرا می‌شوند. مدل‌ها یک‌بار دانلود و سپس
+              به‌صورت آفلاین استفاده می‌شوند.
+            </p>
+          </div>
+          <div class="card">
+            <h3>پوشش آموزشی</h3>
+            <p>
+              هجده قابلیت اصلی، ۱۴ ابزار با پنل نظریه و ۱۹ آزمایش هدایت‌شده
+              پیاده‌سازی شده‌اند. هر آزمایش گام‌های عملی و observation
+              مورد انتظار دارد.
+            </p>
+          </div>
+          <div class="card">
+            <h3>وضعیت انتشار</h3>
+            <p>
+              مجموعهٔ آزمون‌ها، آزمون‌های سرتاسری دوزبانه، آزمون‌های API،
+              پشتهٔ Docker و اجرای آفلاین مدل‌ها در همین نسخه اجرا و
+              مستند شده‌اند. مسیر GPU اختیاری است و هنوز آزمون نشده است.
+            </p>
+          </div>
+        </div>
+        <div class="note">
+          <p>
+            <strong>مخاطب:</strong> دانشجویان دو درس نام‌برده، استاد درس و
+            بازبین فنی. رابط پیش‌فرض فارسی و راست‌به‌چپ است؛ همهٔ نمودارها،
+            محورها و اعداد فنی چپ‌به‌راست می‌مانند.
+          </p>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>۱. نگاشت درس‌ها</h2>
+        <p>
+          جدول زیر قابلیت‌های اصلی را به موضوع‌های دو درس متصل می‌کند. ستون
+          نخست شناسهٔ قابلیت در <code>AGENTS.md</code> است و ستون دوم،
+          کاربرد کلاسی آن را می‌گوید.
+        </p>
+        <table class="table-compact">
+          <thead>
+            <tr>
+              <th>قابلیت</th>
+              <th>سیگنال‌ها و سیستم‌ها</th>
+              <th>سیستم‌های چندرسانه‌ای</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>F01 ورودی صدا</td>
+              <td>نمونه‌برداری، بازنمونه‌برداری، کانال</td>
+              <td>قالب‌های صوتی، نرمال‌سازی، ffmpeg</td>
+            </tr>
+            <tr>
+              <td>F02 شکل‌موج و طیف‌نگاره</td>
+              <td>نمایش زمان–فرکانس، پنجره، hop</td>
+              <td>تحلیل محتوای صوتی و نمایش طیف</td>
+            </tr>
+            <tr>
+              <td>F03 نرخ نمونه‌برداری و عمق بیت</td>
+              <td>قضیهٔ نایکوئیست، دگرسانی، خطای کوانتیزه‌سازی</td>
+              <td>کیفیت دیجیتال، دیتر، نسبت سیگنال به نویز</td>
+            </tr>
+            <tr>
+              <td>F04 آزمایشگاه فشرده‌سازی</td>
+              <td>آنتروپی، پیش‌بینی، کد هافمن</td>
+              <td>RLE، <code>μ-law/A-law</code>، MDCT، کدک‌های واقعی</td>
+            </tr>
+            <tr>
+              <td>F05 سنجه‌های کیفیت</td>
+              <td>MSE، SNR، PSNR، همبستگی تأخیر</td>
+              <td>نرخ–اعوجاج، ارزیابی کدک</td>
+            </tr>
+            <tr>
+              <td>F06 سرعت و جهت پخش</td>
+              <td>تغییر مقیاس زمانی، تبدیل فوریهٔ کوتاه‌مدت</td>
+              <td>حفظ گام در برابر تغییر سرعت</td>
+            </tr>
+            <tr>
+              <td>F07 گستردگی سیگنال</td>
+              <td>انرژی، توان، تکیه‌گاه، جابه‌جایی و مقیاس زمانی</td>
+              <td>طول قطعه، پنجره‌بندی و تحلیل</td>
+            </tr>
+            <tr>
+              <td>F08 تبدیل فوریه</td>
+              <td>DFT، FFT، پنجره، نشت طیفی</td>
+              <td>تحلیل فرکانسی، نمایش فاز</td>
+            </tr>
+            <tr>
+              <td>F09 ویرایشگر Re/Im</td>
+              <td>تقارن هرمیتی، بازسازی، فاز</td>
+              <td>دستکاری طیف و اثر شنیداری</td>
+            </tr>
+            <tr>
+              <td>F10 معکوس و پژواک</td>
+              <td>کانولوشن، پاسخ ضربه، سیستم LTI</td>
+              <td>افکت اتاق، پاسخ ضربهٔ واقعی</td>
+            </tr>
+            <tr>
+              <td>F11 طراحی فیلتر</td>
+              <td>قطب و صفر، پاسخ فرکانسی، پایداری</td>
+              <td>اکولایزر، حذف نویز باندی</td>
+            </tr>
+            <tr>
+              <td>F12 مولد و سری فوریه</td>
+              <td>سیگنال‌های پایه، گبس، هارمونیک</td>
+              <td>ساخت نمونهٔ آزمایشی، AM/FM</td>
+            </tr>
+            <tr>
+              <td>F13 روان‌آکوستیک</td>
+              <td>پوشش فرکانسی، آستانهٔ شنوایی</td>
+              <td>مدل ماسک، تخصیص بیت</td>
+            </tr>
+            <tr>
+              <td>F14 ابزارهای هوش مصنوعی</td>
+              <td>—</td>
+              <td>جداسازی، نویززدایی، فوق‌تفکیک، ASR، کدک عصبی</td>
+            </tr>
+            <tr>
+              <td>F15 خط لولهٔ پردازش</td>
+              <td>ترکیب سیستم‌ها، ترتیب عملگرها</td>
+              <td>زنجیرهٔ پردازش چندرسانه‌ای</td>
+            </tr>
+            <tr>
+              <td>F16 لایهٔ آموزش</td>
+              <td>نظریه، آزمایش هدایت‌شده، گزارش</td>
+              <td>آزمایشگاه نرم‌افزاری و مستندسازی</td>
+            </tr>
+            <tr>
+              <td>F17 دوزبانگی و RTL</td>
+              <td>—</td>
+              <td>دسترس‌پذیری و ارائهٔ بین‌المللی</td>
+            </tr>
+            <tr>
+              <td>F18 کیفیت زندگی</td>
+              <td>—</td>
+              <td>A/B هم‌بلندی، میان‌بر، تم، ذخیرهٔ تنظیمات</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section">
+        <h2>۲. معماری و مسیر داده</h2>
+        <p>
+          آوالب یک تک‌مخزن با دو زمان‌اجراست: یک برنامهٔ تک‌صفحه‌ای React و
+          یک سرویس FastAPI. تصمیم اصلی این است که هر محاسبه در جایی اجرا شود
+          که پاسخ زنده ممکن باشد.
+        </p>
+        <div class="arch" dir="ltr">
+          <div class="arch-col">
+            <div class="arch-box">
+              <strong>Browser SPA</strong>
+              <small>React 19 · TypeScript · Vite · Zustand · i18next</small>
+            </div>
+            <div class="arch-box">
+              <strong>DSP Worker</strong>
+              <small>FFT · STFT · filters · codecs · pipeline</small>
+            </div>
+            <div class="arch-box">
+              <strong>Canvas / uPlot</strong>
+              <small>waveform · spectrogram · charts</small>
+            </div>
+          </div>
+          <div class="arch-arrow">⇄</div>
+          <div class="arch-col">
+            <div class="arch-box">
+              <strong>FastAPI</strong>
+              <small>ingest · codec · ML jobs · SSE</small>
+            </div>
+            <div class="arch-box">
+              <strong>ffmpeg / PyTorch</strong>
+              <small>real codecs · pinned models</small>
+            </div>
+            <div class="arch-box">
+              <strong>Disk TTL</strong>
+              <small>temporary audio · offline model cache</small>
+            </div>
+          </div>
+        </div>
+        <p class="arch-caption">
+          شکل ۱. مسیر داده: تحلیل‌های تعاملی در مرورگر؛ کدک واقعی و مدل در سرور.
+        </p>
+        <h3>مرزهای مسئولیت</h3>
+        <ul>
+          <li>
+            <strong>مرورگر:</strong> شکل‌موج، طیف‌نگاره، FFT/STFT، ویرایش
+            طیف، فیلتر، کانولوشن، بازنمونه‌برداری، کوانتیزه‌سازی، کدک‌های
+            دست‌نویس، سنجه‌ها، تغییر زمان و خط لوله.
+          </li>
+          <li>
+            <strong>سرور:</strong> رمزگشایی هر قالبی که مرورگر نمی‌شناسد،
+            کدک‌های واقعی، مدل‌های عصبی، تحلیل گام/ضربان و کارهای طولانی
+            با پیشرفت SSE.
+          </li>
+          <li>
+            <strong>حافظه:</strong> فایل صوتی اصلی تغییرناپذیر است؛ نتیجه‌های
+            مشتق با کلید «عملگر + پارامتر + هش ورودی» نگه‌داری می‌شوند.
+            فایل‌های سرور پس از TTL پیش‌فرض ۶۰ دقیقه حذف می‌شوند.
+          </li>
+        </ul>
+        <div class="note">
+          <p>
+            <strong>قاعدهٔ طراحی:</strong> اگر نتیجه باید هم‌زمان با حرکت
+            لغزنده تغییر کند، محاسبه در مرورگر است. اگر کدک واقعی یا شبکهٔ
+            عصبی لازم است، محاسبه در سرور است.
+          </p>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>۳. الگوریتم‌ها و فرمول‌ها</h2>
+        <p>
+          همهٔ الگوریتم‌های دست‌نویس در <code>packages/dsp</code> قرار دارند،
+          خالص و بدون وابستگی به DOM هستند و با بردارهای طلایی
+          (<span class="ltr">NumPy/SciPy/librosa</span>) یا آزمون‌های
+          ویژگی سنجیده می‌شوند. جدول کامل در
+          <code>docs/ALGORITHMS.md</code> است؛ اینجا خلاصهٔ آموزشی می‌آید.
+        </p>
+
+        <div class="algo">
+          <h3>نمونه‌برداری و دگرسانی</h3>
+          <p class="math" dir="ltr">x[n] = x(nT<sub>s</sub>),&nbsp; f<sub>s</sub> = 1/T<sub>s</sub>,&nbsp; f<sub>alias</sub> = |f − f<sub>s</sub>·round(f/f<sub>s</sub>)|</p>
+          <p>
+            اگر بسامد سیگنال از نصف نرخ نمونه‌برداری بیشتر شود، مؤلفه به
+            باند پایین تا می‌خورد. آوالب همان بسامد تا‌خورده را هم پیش‌بینی
+            می‌کند و هم در خروجی اندازه می‌گیرد؛ خاموش‌کردن فیلتر
+            ضد‌دگرسانی، تفاوت را شنیدنی می‌کند.
+          </p>
+        </div>
+
+        <div class="algo">
+          <h3>کوانتیزه‌سازی و نسبت سیگنال به نویز</h3>
+          <p class="math" dir="ltr">SQNR<sub>dB</sub> ≈ 6.02·N + 1.76</p>
+          <p>
+            برای کوانتیزه‌کنندهٔ یکنواخت با <span class="m">N</span> بیت و
+            ورودی سینوسی تمام‌مقیاس، این رابطه مرجع نظری است. آوالب
+            کوانتیزه‌سازی یکنواخت، دیتر TPDF و خطای کوانتیزه‌سازی را نشان
+            می‌دهد و SNR اندازه‌گیری‌شده را با همین مرجع مقایسه می‌کند.
+          </p>
+        </div>
+
+        <div class="algo">
+          <h3>DFT و FFT</h3>
+          <p class="math" dir="ltr">X[k] = Σ<sub>n=0</sub><sup>N−1</sup> x[n]·e<sup>−j2πkn/N</sup></p>
+          <p>
+            DFT ساده برای آموزش <span class="m">O(N²)</span> است؛ FFT
+            رادیکس-۲ کوولی–توکی برای توان‌های دو و بلوستین برای طول
+            دلخواه. خطای نسبی مسیر <span class="ltr">Float64</span> در
+            برابر بردار طلایی تا <span class="num">1e-9</span> و در
+            <span class="ltr">Float32</span> تا <span class="num">1e-5</span>
+            پذیرفته می‌شود.
+          </p>
+        </div>
+
+        <div class="algo">
+          <h3>پنجره و STFT</h3>
+          <p class="math" dir="ltr">X<sub>m</sub>[k] = Σ<sub>n</sub> w[n]·x[n+mH]·e<sup>−j2πkn/L</sup></p>
+          <p>
+            پنجرهٔ مستطیلی، هَن، همینگ، بلک‌من و کایزر در دسترس‌اند.
+            پهنای لُب اصلی و سطح لُب کناری اندازه‌گیری می‌شود تا دانشجو
+            ببیند نشت طیفی چگونه با انتخاب پنجره trade-off می‌شود. دسی‌بل
+            نسبت به سینوس تمام‌مقیاس کالیبره است، نه نسبت به خام FFT.
+          </p>
+        </div>
+
+        <div class="algo">
+          <h3>کانولوشن و پژواک</h3>
+          <p class="math" dir="ltr">y[n] = (x ∗ h)[n] = Σ<sub>m</sub> x[m]·h[n−m]</p>
+          <p>
+            کانولوشن مستقیم برای پاسخ‌های کوتاه و کانولوشن سریع
+            (overlap-add با FFT) برای پاسخ‌های بلند استفاده می‌شود.
+            پژواک، کانولوشن صدا با پاسخ ضربهٔ اتاق است؛ «معکوس زمانی»
+            عملیاتی جدا و مستقل است و در رابط کاربری با آن اشتباه نمی‌شود.
+          </p>
+        </div>
+
+        <div class="algo">
+          <h3>فیلتر FIR و IIR</h3>
+          <p class="math" dir="ltr">H(z) = Σ b<sub>k</sub>z<sup>−k</sup> / (1 + Σ a<sub>k</sub>z<sup>−k</sup>)</p>
+          <p>
+            FIR با روش پنجره و IIR با باترورث، چبیشف I و بی‌کواد RBJ
+            طراحی می‌شود. نمودار قطب–صفر، پایداری، پاسخ دامنه، فاز و
+            تأخیر گروه نمایش داده می‌شود. پایداری IIR با شعاع قطب و یک
+            آزمون فروپاشی پاسخ ضربه بررسی می‌شود؛ ضریب‌ها هرگز برای
+            پنهان‌کردن ناپایداری دست‌کاری نمی‌شوند.
+          </p>
+        </div>
+
+        <div class="algo">
+          <h3>بازنمونه‌برداری</h3>
+          <p class="math" dir="ltr">y[n] = Σ<sub>k</sub> x[k]·sinc((n·L/M) − k)</p>
+          <p>
+            مسیر کایزر-سینک برای جلوگیری از دگرسانی و مسیر بدون فیلتر
+            برای نمایش عمدی دگرسانی. نسبت <span class="ltr">L/M</span>
+            گویاست و نرخ‌های غیرصحیح قبل از محاسبه رد می‌شوند.
+          </p>
+        </div>
+
+        <div class="algo">
+          <h3>MDCT و روان‌آکوستیک</h3>
+          <p class="math" dir="ltr">X[k] = Σ<sub>n=0</sub><sup>2N−1</sup> x[n]·cos(π(2k+1)(2n+1+N)/(4N))</p>
+          <p>
+            کدک آموزشی MDCT با پنجرهٔ سینوسی و TDAC بازسازی کامل می‌دهد.
+            لایهٔ ماسک، ۲۵ باند بارک، آستانهٔ شنوایی Terhardt و پخش
+            شرویدر را روی هم می‌گذارد تا بیت‌های صرف‌شده در باندهای
+            ماسک‌شده دیده شوند. این مدل آموزشی است، نه مدل روان‌آکوستیک
+            استاندارد MPEG.
+          </p>
+        </div>
+
+        <div class="algo">
+          <h3>کدهای بی‌اتلاف</h3>
+          <p>
+            RLE با قالب بایت ثابت، هافمن متعارف مطابق RFC 1951، و
+            پیش‌بینی مرتبهٔ اول + هافمن به سبک FLAC. همهٔ مسیرهای بی‌اتلاف
+            باید روی شبکهٔ PCM صحیح بیت‌به‌بیت بازگردند و وضعیت
+            «bit-exact» در رابط کاربری نمایش داده می‌شود.
+          </p>
+        </div>
+
+        <div class="algo">
+          <h3>سنجه‌های کیفیت</h3>
+          <p class="math" dir="ltr">MSE = (1/N)Σ(x−y)²,&nbsp; SNR<sub>dB</sub> = 10·log<sub>10</sub>(Σx²/Σ(x−y)²)</p>
+          <p>
+            PSNR با قلهٔ ۱٫۰ برای سیگنال نرمال‌شده تعریف می‌شود و همین
+            تعریف در رابط کاربری نوشته شده است. کدک‌ها تأخیر دارند؛
+            بنابراین مقایسه پس از هم‌ترازی همبستگی متقابل انجام می‌شود،
+            نه روی سیگنال ناهم‌تراز.
+          </p>
+        </div>
+
+        <div class="algo">
+          <h3>فازوکودر و تغییر گام</h3>
+          <p>
+            تغییر زمان با STFT، انتشار فاز هر بین و بازسازی
+            <span class="ltr">WOLA</span> انجام می‌شود؛ تغییر گام با
+            تغییر زمان و سپس بازنمونه‌برداری نسبت معکوس. حالت
+            بازنمونه‌برداری، سرعت و گام را با هم تغییر می‌دهد و حالت
+            تغییر زمان فقط سرعت را.
+          </p>
+        </div>
+
+        <div class="algo">
+          <h3>بلندی صدا و خط لوله</h3>
+          <p>
+            بلندی یکپارچهٔ ITU-R BS.1770 با بلوک‌های ۴۰۰ میلی‌ثانیه،
+            هم‌پوشانی ۷۵٪ و دروازه‌های مطلق/نسبی پیاده شده است. خط لوله
+            یک گراف جهت‌دار بدون حلقه با یک منبع، گره‌های پردازش و حداکثر
+            دو خروجی است؛ هر گره همان هستهٔ DSP مستقل را صدا می‌زند.
+          </p>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>۴. گردش کار ابزارها</h2>
+        <p>
+          هر بخش زیر یک تصویر واقعی از برنامه و دو تا چهار مشاهدهٔ آموزشی
+          دارد. تصاویر با نسخهٔ فارسی، تم تیره و کلیپ‌های نمونهٔ CC0 گرفته
+          شده‌اند.
+        </p>
+
+        <figure>
+          <img src="./assets/waveform.png" alt="شکل‌موج و انتخاب بازه" />
+          <figcaption>
+            <span class="fig-label">شکل ۲.</span> شکل‌موج تعاملی با انتخاب
+            بازه، خط پخش و نمای کلی/جزئیات.
+          </figcaption>
+        </figure>
+        <h3>شکل‌موج و طیف‌نگاره (F02)</h3>
+        <ul class="observations">
+          <li>بزرگ‌نمایی، جابه‌جایی و انتخاب بازه با ماوس و صفحه‌کلید.</li>
+          <li>خط پخش بین شکل‌موج و طیف‌نگاره هم‌زمان می‌ماند.</li>
+          <li>نمای کلی برای فایل پنج‌دقیقه‌ای و نمای جزئیات برای ویرایش.</li>
+        </ul>
+
+        <figure>
+          <img src="./assets/spectrogram.png" alt="طیف‌نگاره" />
+          <figcaption>
+            <span class="fig-label">شکل ۳.</span> طیف‌نگاره با پنجره، hop،
+            نقشهٔ رنگ ایمن برای کوررنگی و محورهای دارای واحد.
+          </figcaption>
+        </figure>
+        <ul class="observations">
+          <li>تغییر طول پنجره، پهنای لُب اصلی و وضوح زمان–فرکانس را عوض می‌کند.</li>
+          <li>hop کوچک‌تر، ستون‌های بیشتری می‌سازد و نمایش را نرم‌تر می‌کند.</li>
+          <li>نقشهٔ رنگ <span class="ltr">viridisCB</span> برای خوانایی رنگ‌کوران است.</li>
+        </ul>
+
+        <figure>
+          <img src="./assets/fft.png" alt="نمای FFT" />
+          <figcaption>
+            <span class="fig-label">شکل ۴.</span> دامنه و فاز FFT با
+            ماسک آستانهٔ فاز و مقایسهٔ پنجره‌ها.
+          </figcaption>
+        </figure>
+        <h3>تبدیل فوریه (F08)</h3>
+        <ul class="observations">
+          <li>دامنهٔ خطی و دسی‌بل، فاز پیچیده و بازشده.</li>
+          <li>مقایسهٔ پهنای لُب اصلی و سطح لُب کناری پنجره‌ها.</li>
+          <li>گام‌به‌گام پروانهٔ کوولی–توکی و محک FFT در همین نما.</li>
+        </ul>
+
+        <figure>
+          <img src="./assets/spectrum-edit.png" alt="ویرایشگر طیف" />
+          <figcaption>
+            <span class="fig-label">شکل ۵.</span> ویرایشگر منحنی
+            دامنه/فاز و فهرست ویرایش‌های اعمال‌شده پیش از IFFT.
+          </figcaption>
+        </figure>
+        <h3>ویرایشگر Re/Im (F09)</h3>
+        <ul class="observations">
+          <li>صفرکردن بخش موهومی یا دامنه، اثر آن را در سیگنال بازسازی‌شده نشان می‌دهد.</li>
+          <li>اعمال هم‌تقارنی هرمیتی، خروجی IFFT را حقیقی نگه می‌دارد.</li>
+          <li>پیش‌تنظیم «فقط دامنه» و «فقط فاز» سهم هر یک را مقایسه می‌کند.</li>
+        </ul>
+
+        <figure>
+          <img src="./assets/generator.png" alt="مولد سیگنال و سری فوریه" />
+          <figcaption>
+            <span class="fig-label">شکل ۶.</span> بازسازی سری فوریهٔ
+            موج مربعی با ۹ هارمونیک و نمایش نوسان گیبس.
+          </figcaption>
+        </figure>
+        <h3>مولد سیگنال و سری فوریه (F12)</h3>
+        <ul class="observations">
+          <li>افزودن هارمونیک‌ها لبه را تیزتر می‌کند، ولی نوسان گیبس را حذف نمی‌کند.</li>
+          <li>مقایسهٔ موج ایده‌آل و بازسازی‌شده، پهنای ناحیهٔ گذار را روشن می‌کند.</li>
+          <li>سیگنال تولیدشده به‌عنوان ورودی بقیهٔ آزمایش‌ها قابل استفاده است.</li>
+        </ul>
+
+        <figure>
+          <img src="./assets/sampling.png" alt="آزمایشگاه نمونه‌برداری" />
+          <figcaption>
+            <span class="fig-label">شکل ۷.</span> نمونه‌برداری: باندهای اصلی و
+            بازسازی‌شده و خطای کوانتیزه‌سازی در آزمایشگاه نمونه‌برداری و عمق
+            بیت.
+          </figcaption>
+        </figure>
+        <h3>نمونه‌برداری و عمق بیت (F03)</h3>
+        <ul class="observations">
+          <li>خاموش‌کردن فیلتر ضد‌دگرسانی، بسامد تا‌خورده را می‌سازد.</li>
+          <li>کاهش بیت، خطای کوانتیزه‌سازی و نویز را بلندتر می‌کند.</li>
+          <li>SNR اندازه‌گیری‌شده در کنار مرجع نظری نمایش داده می‌شود.</li>
+        </ul>
+
+        <figure>
+          <img src="./assets/extent.png" alt="آزمایشگاه گستردگی سیگنال" />
+          <figcaption>
+            <span class="fig-label">شکل ۸.</span> صفرافزایی تا ۲۸۸٬۰۰۰
+            نمونه و اثر آن بر محور زمان و طیف.
+          </figcaption>
+        </figure>
+        <h3>گستردگی سیگنال در زمان (F07)</h3>
+        <ul class="observations">
+          <li>صفرافزایی تعداد نمونه‌ها را زیاد می‌کند، ولی اطلاعات جدید نمی‌سازد.</li>
+          <li>کوتاه‌کردن پنجره، پهنای لُب فرکانسی را زیاد می‌کند (عدم‌قطعیت).</li>
+          <li>انرژی، توان میانگین و نوع سیگنال (انرژی/توان) محاسبه می‌شود.</li>
+        </ul>
+
+        <figure>
+          <img src="./assets/speed.png" alt="کنترل سرعت پخش" />
+          <figcaption>
+            <span class="fig-label">شکل ۹.</span> تغییر زمان با
+            فازووکودر در سرعت ۲×؛ گام صدا حفظ می‌شود.
+          </figcaption>
+        </figure>
+        <h3>سرعت و جهت پخش (F06)</h3>
+        <ul class="observations">
+          <li>حالت بازنمونه‌برداری، سرعت و گام را با هم عوض می‌کند.</li>
+          <li>حالت تغییر زمان فقط سرعت را عوض می‌کند و گام را نگه می‌دارد.</li>
+          <li>معکوس‌سازی زمانی و پرش‌های ±۵ و ±۱۰ ثانیه در همین نماست.</li>
+        </ul>
+
+        <figure>
+          <img src="./assets/codec.png" alt="آزمایشگاه فشرده‌سازی" />
+          <figcaption>
+            <span class="fig-label">شکل ۱۰.</span> کدک MDCT با حالت
+            روان‌آکوستیک، نرخ بیت و نمودار آستانه/ماسک.
+          </figcaption>
+        </figure>
+        <h3>فشرده‌سازی (F04) و سنجه‌ها (F05)</h3>
+        <ul class="observations">
+          <li>کدهای بی‌اتلاف وضعیت «بیت‌به‌بیت» را نشان می‌دهند.</li>
+          <li>MDCT با بودجهٔ بیت، بده‌بستان نرخ و کیفیت را می‌سازد.</li>
+          <li>کدک واقعی، اندازه، نرخ بیت و تأخیر هم‌ترازی‌شده را برمی‌گرداند.</li>
+        </ul>
+
+        <figure>
+          <img src="./assets/filters.png" alt="آزمایشگاه فیلتر" />
+          <figcaption>
+            <span class="fig-label">شکل ۱۱.</span> طراحی فیلتر FIR/IIR،
+            پاسخ دامنه، فاز، تأخیر گروه و صفحهٔ قطب–صفر.
+          </figcaption>
+        </figure>
+        <h3>طراحی فیلتر (F11)</h3>
+        <ul class="observations">
+          <li>افزایش مرتبه، گذار را تیزتر و تأخیر گروه را بزرگ‌تر می‌کند.</li>
+          <li>قطب نزدیک دایرهٔ واحد، پایداری را حساس می‌کند.</li>
+          <li>پاسخ ضربه و پله، رفتار زمانی فیلتر را نشان می‌دهند.</li>
+        </ul>
+
+        <figure>
+          <img src="./assets/reverb.png" alt="آزمایشگاه پژواک" />
+          <figcaption>
+            <span class="fig-label">شکل ۱۲.</span> پاسخ ضربهٔ سالن،
+            شکل موج خروجی و طیف‌نگارهٔ نتیجهٔ پیچش.
+          </figcaption>
+        </figure>
+        <h3>پژواک و پیچش (F10)</h3>
+        <ul class="observations">
+          <li>پژواک، پیچش سیگنال با پاسخ ضربهٔ سیستم LTI است.</li>
+          <li>پیچش سریع مبتنی بر FFT برای پاسخ‌های ضربهٔ بلند پیش‌فرض است.</li>
+          <li>«معکوس زمانی» و «پژواک» دو عملیات متفاوت‌اند و نباید یکی گرفته شوند.</li>
+        </ul>
+
+        <figure>
+          <img src="./assets/psychoacoustics.png" alt="آزمایشگاه روان‌آکوستیک" />
+          <figcaption>
+            <span class="fig-label">شکل ۱۳.</span> آستانهٔ شنوایی،
+            پخش ماسک و سطح باندها در برابر آستانه.
+          </figcaption>
+        </figure>
+        <h3>روان‌آکوستیک (F13)</h3>
+        <ul class="observations">
+          <li>ماسک فرکانسی، آستانهٔ شنوایی را در باندهای همسایه بالا می‌برد.</li>
+          <li>باندهای زیر آستانه، نامزد حذف در کدک ماسک‌دار هستند.</li>
+          <li>مدل آموزشی است و ادعای استاندارد MPEG ندارد.</li>
+        </ul>
+
+        <figure>
+          <img src="./assets/pipeline.png" alt="خط لولهٔ پردازش" />
+          <figcaption>
+            <span class="fig-label">شکل ۱۴.</span> خط لولهٔ دوشاخه با
+            گره‌های منبع، فیلتر، کوانتیزه‌سازی و خروجی.
+          </figcaption>
+        </figure>
+        <h3>خط لولهٔ پردازش (F15)</h3>
+        <ul class="observations">
+          <li>گراف بدون حلقه با یک منبع و حداکثر دو خروجی.</li>
+          <li>هر گره در Worker اجرا می‌شود؛ رشتهٔ اصلی فقط گراف را رسم می‌کند.</li>
+          <li>ترتیب گره‌ها، نتیجهٔ شنیداری را عوض می‌کند.</li>
+        </ul>
+
+        <h3>ابزارهای هوش مصنوعی (F14)</h3>
+        <figure>
+          <img src="./assets/ai/denoise.png" alt="نویززدایی" />
+          <figcaption>
+            <span class="fig-label">شکل ۱۵.</span> نویززدایی گفتار با
+            مقایسهٔ اصلی/نویزی/پاک‌شده.
+          </figcaption>
+        </figure>
+        <figure>
+          <img src="./assets/ai/superres.png" alt="فوق‌تفکیک" />
+          <figcaption>
+            <span class="fig-label">شکل ۱۶.</span> باند محدود‌شده در برابر
+            بازسازی عصبی؛ باند بازیابی‌شده تقریبی است.
+          </figcaption>
+        </figure>
+        <p>
+          جداسازی چهار استم، نویززدایی، فوق‌تفکیک، تبدیل گفتار به متن و
+          کدک عصبی، همه به‌صورت کار پس‌زمینه با پیشرفت و لغو اجرا می‌شوند.
+          هر خروجی با برچسب «تقریب هوش مصنوعی» و محدودیت نمونهٔ ۳۰ ثانیه
+          نمایش داده می‌شود.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>۵. آزمایش‌های هدایت‌شده</h2>
+        <p>
+          نوزده آزمایش در چهار دستهٔ سیگنال، چندرسانه، هوش مصنوعی و
+          آزمایشگاه‌ها تعریف شده‌اند. هر آزمایش پنج تا هشت گام دارد و
+          پیشرفت فقط با شناسهٔ آزمایش ذخیره می‌شود. سه نمونهٔ کامل:
+        </p>
+
+        <div class="algo">
+          <h3>آزمایش ۱ — دگرسانی را بشنوید</h3>
+          <ol class="steps">
+            <li>
+              کلیپ <span class="ltr">chirp-log-100to8000hz-5s.wav</span> را
+              بارگذاری کنید.
+              <span class="expect">انتظار: شکل‌موج جاروب بسامد صعودی دیده می‌شود.</span>
+            </li>
+            <li>
+              به ابزار نمونه‌برداری بروید و نرخ هدف را
+              <span class="num">8 kHz</span> بگذارید.
+              <span class="expect">انتظار: نرخ خروجی و مدت تغییر می‌کند.</span>
+            </li>
+            <li>
+              فیلتر ضد‌دگرسانی را خاموش کنید و نتیجه را پخش کنید.
+              <span class="expect">انتظار: مؤلفه‌های بالا به باند پایین تا می‌خورند.</span>
+            </li>
+            <li>
+              فیلتر را روشن کنید و همان بازه را دوباره بشنوید.
+              <span class="expect">انتظار: دگرسانی حذف می‌شود، ولی باند بالا از دست می‌رود.</span>
+            </li>
+            <li>
+              بسامد پیش‌بینی‌شده و اندازه‌گیری‌شده را مقایسه کنید.
+              <span class="expect">انتظار: این دو در چند هرتز اختلاف، هم‌خوان‌اند.</span>
+            </li>
+          </ol>
+        </div>
+
+        <div class="algo">
+          <h3>آزمایش ۲ — پنجره و نشت طیفی</h3>
+          <ol class="steps">
+            <li>
+              یک سینوس <span class="num">440 Hz</span> در مولد بسازید و
+              بارگذاری کنید.
+              <span class="expect">انتظار: طیف یک خط باریک در ۴۴۰ هرتز دارد.</span>
+            </li>
+            <li>
+              در نمای FFT پنجرهٔ مستطیلی را انتخاب کنید.
+              <span class="expect">انتظار: لُب کناری بلند و نشت زیاد است.</span>
+            </li>
+            <li>
+              پنجرهٔ هَن را انتخاب کنید.
+              <span class="expect">انتظار: لُب اصلی پهن‌تر و لُب کناری پایین‌تر می‌شود.</span>
+            </li>
+            <li>
+              طول پنجره را نصف کنید.
+              <span class="expect">انتظار: پهنای لُب اصلی تقریباً دو برابر می‌شود.</span>
+            </li>
+          </ol>
+        </div>
+
+        <div class="algo">
+          <h3>آزمایش ۳ — فیلتر و پایداری</h3>
+          <ol class="steps">
+            <li>
+              به آزمایشگاه فیلتر بروید و نوع «باترورث» را انتخاب کنید.
+              <span class="expect">انتظار: پاسخ دامنهٔ نرم بدون نوسان دیده می‌شود.</span>
+            </li>
+            <li>
+              مرتبه را از ۲ به ۸ ببرید.
+              <span class="expect">انتظار: شیب گذار تیزتر و تأخیر گروه بزرگ‌تر می‌شود.</span>
+            </li>
+            <li>
+              به صفحهٔ قطب–صفر نگاه کنید.
+              <span class="expect">انتظار: همهٔ قطب‌ها داخل دایرهٔ واحد می‌مانند.</span>
+            </li>
+            <li>
+              فیلتر را روی بازهٔ ۳۰ ثانیه‌ای اعمال کنید.
+              <span class="expect">انتظار: نسخهٔ فیلترشده در خط پردازششده پخش می‌شود.</span>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>۶. کارایی اندازه‌گیری‌شده</h2>
+        <p>
+          اندازه‌گیری با Playwright Chromium، ورودی ۵ دقیقه‌ای
+          <span class="num">44.1 kHz</span> مونو، سه اجرای متوالی و میانه
+          گزارش شده است. سخت‌افزار: <span class="ltr">Intel Core i9-8950HK</span>،
+          <span class="ltr">macOS 15.8.2</span>، حافظهٔ گزارش‌شدهٔ مرورگر
+          <span class="num">32 GB</span>. این اعداد روی یک ماشین‌اند و
+          ادعای بنچمارک عمومی نیستند.
+        </p>
+        <table class="bench">
+          <thead>
+            <tr>
+              <th>مسیر</th>
+              <th class="num">بودجهٔ §9</th>
+              <th class="num">میانه</th>
+              <th>وضعیت</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>نمای کلی شکل‌موج پس از رمزگشایی</td>
+              <td class="num">&lt; 1000 ms</td>
+              <td class="num">304 ms</td>
+              <td><span class="pass">در بودجه</span></td>
+            </tr>
+            <tr>
+              <td>نمای کلی طیف‌نگاره</td>
+              <td class="num">&lt; 3000 ms</td>
+              <td class="num">175 ms</td>
+              <td><span class="pass">در بودجه</span></td>
+            </tr>
+            <tr>
+              <td>FFT روی بازهٔ ۳۰ ثانیه</td>
+              <td class="num">&lt; 300 ms</td>
+              <td class="num">173 ms</td>
+              <td><span class="pass">در بودجه</span></td>
+            </tr>
+            <tr>
+              <td>فیلتر FIR روی بازهٔ ۳۰ ثانیه</td>
+              <td class="num">&lt; 300 ms</td>
+              <td class="num">141 ms</td>
+              <td><span class="pass">در بودجه</span></td>
+            </tr>
+            <tr>
+              <td>خط لوله روی بازهٔ ۳۰ ثانیه</td>
+              <td class="num">&lt; 300 ms</td>
+              <td class="num">253 ms</td>
+              <td><span class="pass">در بودجه</span></td>
+            </tr>
+            <tr>
+              <td>بلندی صدا (اصلی ۵ دقیقه + پردازش ۳۰ ثانیه)</td>
+              <td class="num">—</td>
+              <td class="num">368 ms</td>
+              <td><span class="pass">ثبت‌شده</span></td>
+            </tr>
+            <tr>
+              <td>MDCT آموزشی ۱۰ ثانیه</td>
+              <td class="num">300 ms ناممکن</td>
+              <td class="num">1380 ms</td>
+              <td><span class="fallback">استثنای مستند</span></td>
+            </tr>
+            <tr>
+              <td>پژواک ۳۰ ثانیه</td>
+              <td class="num">300 ms ناممکن</td>
+              <td class="num">1404 ms</td>
+              <td><span class="fallback">استثنای مستند</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="note">
+          <p>
+            <strong>چرا دو استثنا؟</strong> MDCT آموزشی عمداً
+            <span class="ltr">O(frames·N²)</span> است تا ماتریس پایه را
+            قابل مشاهده کند؛ جایگزینی آن با FFT، ماهیت آموزشی را عوض
+            می‌کند. پژواک ۳۰ ثانیه‌ای هم یک عمل صریح است، نه مسیر
+            لغزنده؛ ۴۱ بلوک overlap-add و ۲۵۰ میلی‌ثانیه debounce دارد.
+            هر دو با دروازهٔ آزمون پایدار مهار شده‌اند.
+          </p>
+        </div>
+        <h3>زمان رمزگذاری کدک‌های واقعی</h3>
+        <p>
+          روی مک توسعه با <span class="ltr">ffmpeg 9.0.2</span>، یک اجرا
+          برای هر کدک، بازهٔ ۳۰ ثانیه‌ای <span class="num">44.1 kHz</span>:
+          WAV <span class="num">70 ms</span>، FLAC <span class="num">92 ms</span>،
+          MP3 <span class="num">231 ms</span>، AAC <span class="num">389 ms</span>،
+          Opus <span class="num">196 ms</span> و Vorbis <span class="num">304 ms</span>.
+          این‌ها مشاهدهٔ تک‌اجرایی‌اند، نه مجموعهٔ بنچمارک.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>۷. ابزارهای هوش مصنوعی و مدل‌ها</h2>
+        <p>
+          هیچ مدلی آموزش داده نمی‌شود. همهٔ مدل‌ها با commit تثبیت شده‌اند،
+          یک‌بار دانلود می‌شوند و سپس با
+          <code>HF_HUB_OFFLINE=1</code> کار می‌کنند. مجموع حافظهٔ مدل‌ها
+          حدود <span class="num">383 MB</span> است.
+        </p>
+        <table class="table-compact">
+          <thead>
+            <tr>
+              <th>وظیفه</th>
+              <th>مدل</th>
+              <th class="num">حجم</th>
+              <th>مجوز</th>
+              <th>محدودیت</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>نویززدایی</td>
+              <td><span class="ltr">Ceva-IP/DPDFNet</span></td>
+              <td class="num">10.5 MB</td>
+              <td>Apache-2.0</td>
+              <td>گفتار ۴۸ کیلوهرتز، CPU</td>
+            </tr>
+            <tr>
+              <td>فوق‌تفکیک</td>
+              <td><span class="ltr">TigreGotico/audiosronnx-lavasr</span></td>
+              <td class="num">57.1 MB</td>
+              <td>Apache-2.0 upstream؛ کارت ONNX بدون فیلد مجوز</td>
+              <td>گفتار، باند بازیابی‌شده تقریبی</td>
+            </tr>
+            <tr>
+              <td>جداسازی</td>
+              <td><span class="ltr">adefossez/HTDemucs</span></td>
+              <td class="num">84.0 MB</td>
+              <td>MIT upstream؛ کارت مدل بدون فیلد مجوز</td>
+              <td>استریو ۴۴٫۱ کیلوهرتز، CPU کند</td>
+            </tr>
+            <tr>
+              <td>تبدیل گفتار به متن</td>
+              <td><span class="ltr">openai/whisper-tiny</span></td>
+              <td class="num">155.4 MB</td>
+              <td>Apache-2.0</td>
+              <td>۱۶ کیلوهرتز، فارسی ضعیف</td>
+            </tr>
+            <tr>
+              <td>کدک عصبی</td>
+              <td><span class="ltr">facebook/encodec_48khz</span></td>
+              <td class="num">76.3 MB</td>
+              <td>MIT</td>
+              <td>بیت‌استریم واقعی نمی‌دهد؛ حجم تخمینی</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="warn">
+          <p>
+            <strong>صداقت خروجی:</strong> فوق‌تفکیک باند حذف‌شده را «بازیابی»
+            نمی‌کند؛ آن را محتمل می‌سازد. نویززدایی می‌تواند دقت ASR را
+            کاهش دهد. جداسازی روی CPU کند است و به بازهٔ ۱۵–۳۰ ثانیه
+            محدود می‌شود. هیچ‌کدام جای عملیات ریاضی دقیق را نمی‌گیرند.
+          </p>
+        </div>
+        <h3>تحلیل غیرعصبی</h3>
+        <p>
+          ردیابی گام و ضربان با <code>librosa.pyin</code> و
+          <code>librosa.beat.beat_track</code> انجام می‌شود؛ بدون وزن
+          اضافی و با همان سقف ۳۰ ثانیه. این کارها «تحلیل» برچسب می‌گیرند،
+          نه «هوش مصنوعی» یا خروجی مدل.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>۸. استقرار و اجرای آفلاین</h2>
+        <p>
+          پشتهٔ پیش‌فرض دو سرویس دارد: Caddy که SPA ساخته‌شده را سرو
+          می‌کند و <code>/api/*</code> را به FastAPI می‌فرستد، و API که
+          با کاربر غیرروت اجرا می‌شود. هیچ پایگاه داده‌ای وجود ندارد؛
+          فایل‌های موقت با TTL حذف می‌شوند.
+        </p>
+        <ul>
+          <li>
+            <strong>حجم‌ها:</strong> <code>avalab-storage</code> برای صدای
+            موقت و <code>avalab-models</code> برای کش مدل‌ها.
+          </li>
+          <li>
+            <strong>آفلاین:</strong> پیش‌بارگذاری یک‌بارهٔ مدل‌ها، سپس
+            اجرا با محیط آفلاین؛ کش اندازه‌گیری‌شده
+            <span class="num">365.7 MiB</span> و هر پنج وظیفه
+            <span class="ltr">available</span>.
+          </li>
+          <li>
+            <strong>SSE:</strong> مسیر <code>/api/v1/jobs/*</code> در Caddy
+            با <code>flush_interval -1</code> تنظیم شده است تا پیشرفت
+            کار به‌صورت افزایشی برسد. در آزمون دود، شش رویداد با فاصلهٔ
+            <span class="num">0.008–3.491 s</span> دریافت شد.
+          </li>
+          <li>
+            <strong>اندازهٔ تصاویر:</strong> API حدود
+            <span class="num">1.3 GB</span> (PyTorch CPU و ffmpeg) و وب
+            حدود <span class="num">31.8 MB</span>.
+          </li>
+        </ul>
+        <pre dir="ltr">cp .env.example .env
+docker compose build
+AVALAB_HTTP_PORT=8080 docker compose up -d
+curl -fsS http://127.0.0.1:8080/api/v1/health</pre>
+        <div class="note">
+          <p>
+            <strong>پروکسی دانشگاه:</strong> باید buffering را برای
+            <code>/api/v1/jobs/*</code> خاموش کند و زمان خواندن را
+            دست‌کم ۱۰ دقیقه بگذارد. مسیر GPU اختیاری است، تصویر CUDA
+            جداگانه می‌خواهد و هنوز آزمون نشده است؛ CPU پیش‌فرض الزامی است.
+          </p>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>۹. دوزبانگی، دسترس‌پذیری و کیفیت</h2>
+        <p>
+          فارسی پیش‌فرض و راست‌به‌چپ است؛ انگلیسی چپ‌به‌راست. همهٔ رشته‌های
+          دیدنی از <code>fa.json</code> و <code>en.json</code> می‌آیند و
+          اسکریپت CI برای کلیدهای گم‌شده و بلااستفاده خطا می‌دهد. نمودارها،
+          فرمول‌ها و خوانش‌های عددی در هر دو زبان چپ‌به‌راست می‌مانند.
+        </p>
+        <ul>
+          <li>اندازه‌های منطقی CSS برای آینه‌شدن خودکار چیدمان.</li>
+          <li>فونت Vazirmatn خودمیزبان با مجوز OFL.</li>
+          <li>نقشهٔ رنگ ایمن برای کوررنگی و کنتراست ۴٫۵:۱ در هر دو تم.</li>
+          <li>پنجرهٔ راهنمای میان‌بر با تلهٔ فوکوس و بستن با Escape.</li>
+          <li>احترام به <code>prefers-reduced-motion</code>.</li>
+          <li>آزمون‌های RTL در عرض‌های ۱۲۸۰، ۷۶۸ و ۳۹۰ پیکسل.</li>
+        </ul>
+        <h3>وضعیت دروازه‌ها در آخرین اجرا</h3>
+        <table class="table-compact">
+          <thead>
+            <tr>
+              <th>دروازه</th>
+              <th class="num">نتیجه</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>pnpm check</code></td><td class="num">موفق (dsp 1111، web 648، scripts 13)</td></tr>
+            <tr><td>Playwright سرتاسری</td><td class="num">88/88 در fa و en</td></tr>
+            <tr><td>آزمون‌های API</td><td class="num">230 passed / 5 skipped</td></tr>
+            <tr><td>ruff و mypy</td><td class="num">پاک (51 فایل منبع)</td></tr>
+            <tr><td>Docker smoke</td><td class="num">سلامت، FLAC بیت‌به‌بیت، SSE، آفلاین</td></tr>
+          </tbody>
+        </table>
+        <p class="small muted">
+          اعداد بالا از اجرای ثبت‌شدهٔ Wave 6 می‌آیند. این گزارش خودش
+          آزمون‌ها را دوباره اجرا نمی‌کند؛ گزارش PDF فقط از منابع ثابت
+          ساخته می‌شود.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>۱۰. محدودیت‌ها و کارهای باز</h2>
+        <ul>
+          <li>
+            <strong>پخش مونو:</strong> تحلیل و پخش فعلی روی میکس مونو
+            است؛ خط استریوی مستقل تصمیم مالک است.
+          </li>
+          <li>
+            <strong>MDCT تُنال:</strong> مدل نرخ بیت با میانگین هندسی
+            گام، ورودی تُنال را در نرخ‌های بالا به فروپاشی می‌برد. این
+            محدودیت در <code>ALGORITHMS.md</code> مستند است.
+          </li>
+          <li>
+            <strong>مدل‌ها:</strong> Whisper tiny برای فارسی ضعیف است،
+            LavaSR و HTDemucs کارت مجوز کامل ندارند و مجوز upstream
+            مبناست. GPU آزمون نشده است.
+          </li>
+          <li>
+            <strong>سنجهٔ ادراکی:</strong> PESQ/ViSQOL اضافه نشده است
+            (D-005). نمودار نرخ–اعوجاج بر SNR/PSNR است.
+          </li>
+          <li>
+            <strong>مقایسهٔ کلی F02:</strong> نمای «قبل/بعد» عمومی برای
+            هر مرحله ساخته نشده؛ هر ابزار نتیجهٔ خودش را نشان می‌دهد.
+          </li>
+          <li>
+            <strong>خطای زمان‌بندی آزمون:</strong> آزمون طلایی DFT با
+            ۴۸۰۰۰ نمونه زیر بار موازی سنگین می‌تواند از مهلت ۲۴ ثانیه
+            بگذرد؛ اجرای جداگانه و سریال موفق است.
+          </li>
+          <li>
+            <strong>گزارش دانشجو:</strong> خروجی WAV و PNG موجود است،
+            ولی گزارش PDF/HTML آزمایش دانشجو در دامنهٔ این نسخه نیست.
+          </li>
+          <li>
+            <strong>دسترسی مالک:</strong> امضای نهایی فارسی و تصمیم
+            دربارهٔ انتشار PDF باقی مانده است.
+          </li>
+        </ul>
+        <div class="warn">
+          <p>
+            <strong>محدودیت روش:</strong> همهٔ اعداد کارایی روی یک لپ‌تاپ
+            توسعه و در حالت Headless گرفته شده‌اند. مقایسهٔ بین دستگاه‌ها
+            باید با اجرای دوبارهٔ همان هارنس انجام شود، نه با نقل این جدول.
+          </p>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>۱۱. منابع</h2>
+        <ol class="refs">
+          <li>
+            A. V. Oppenheim and R. W. Schafer,
+            <em>Discrete-Time Signal Processing</em>, 3rd ed.,
+            Pearson, 2010.
+          </li>
+          <li>
+            J. G. Proakis and D. G. Manolakis,
+            <em>Digital Signal Processing: Principles, Algorithms, and Applications</em>,
+            4th ed., Pearson, 2007.
+          </li>
+          <li>
+            F. J. Harris, “On the use of windows for harmonic analysis with
+            the discrete Fourier transform,”
+            <em>Proceedings of the IEEE</em>, vol. 66, no. 1, 1978.
+          </li>
+          <li>
+            E. Zwicker and H. Fastl,
+            <em>Psychoacoustics: Facts and Models</em>, 3rd ed., Springer, 2007.
+          </li>
+          <li>
+            E. Terhardt, “Calculating virtual pitch,”
+            <em>Hearing Research</em>, vol. 1, 1979.
+          </li>
+          <li>
+            ITU-R Recommendation BS.1770, “Algorithms to measure audio
+            programme loudness and true-peak audio level.”
+          </li>
+          <li>
+            ITU-T Recommendation G.711, “Pulse code modulation (PCM) of voice
+            frequencies,” 1988.
+          </li>
+          <li>
+            J. P. Princen and A. B. Bradley, “Analysis/synthesis filter bank
+            design based on time domain aliasing cancellation,”
+            <em>IEEE Trans. ASSP</em>, 1986.
+          </li>
+          <li>
+            M. Dolson, “The phase vocoder: a tutorial,”
+            <em>Computer Music Journal</em>, 1986.
+          </li>
+          <li>
+            L. Bluestein, “A linear filtering approach to the computation of
+            the discrete Fourier transform,”
+            <em>IEEE Trans. Audio Electroacoustics</em>, 1970.
+          </li>
+          <li>
+            L. R. Rabiner, R. W. Schafer, and C. M. Rader, “The chirp z-transform
+            algorithm,” <em>Bell System Technical Journal</em>, 1969.
+          </li>
+          <li>
+            RFC 1951, “DEFLATE Compressed Data Format Specification,” IETF, 1996.
+          </li>
+        </ol>
+      </section>
+
+      <section class="section">
+        <h2>۱۲. مجوزها و منشأ داده</h2>
+        <p>
+          خود پروژه با <strong>GPL-3.0</strong> منتشر می‌شود. کتابخانه‌های
+          همراه با مجوزهای سازگار (MIT، Apache-2.0، BSD) در
+          <code>docs/THIRD_PARTY.md</code> ثبت شده‌اند.
+          <code>ffmpeg</code> به‌صورت فرایند جداگانه فراخوانی می‌شود و به
+          کد پروژه پیوند نمی‌خورد.
+        </p>
+        <ul class="link-list">
+          <li>فونت Vazirmatn — OFL-1.1، خودمیزبان در پروژه.</li>
+          <li>
+            کلیپ‌های نمونهٔ
+            <span class="ltr">pink-noise-5s.wav</span>،
+            <span class="ltr">chirp-log-100to8000hz-5s.wav</span>،
+            <span class="ltr">music-life-turns-15s.wav</span>،
+            <span class="ltr">speech-kathleen-19s.wav</span> و
+            <span class="ltr">clicks-2hz-5s.wav</span> — CC0/خودتولید با
+            مولد قطعی و seed ثابت. منشأ در
+            <code>docs/THIRD_PARTY.md</code>.
+          </li>
+          <li>
+            مدل‌ها — DPDFNet (Apache-2.0)، LavaSR (Apache-2.0 upstream)،
+            HTDemucs (MIT upstream)، Whisper tiny (Apache-2.0)،
+            EnCodec 48 kHz (MIT). جزئیات و revision در
+            <code>docs/MODELS.md</code>.
+          </li>
+          <li>
+            React، Zustand، i18next، uPlot، KaTeX، React Flow، fft.js — MIT.
+            Vite/TypeScript — MIT/Apache-2.0.
+          </li>
+          <li>
+            تصاویر این گزارش — خروجی مستقیم رابط کاربری با کلیپ‌های بالا؛
+            هیچ تصویر دارای حق نشر شخص ثالث استفاده نشده است.
+          </li>
+        </ul>
+        <p class="page-note">
+          این گزارش در <span class="num">2026-11-06</span> از منابع همین
+          مخزن ساخته شده است. برای بازتولید:
+          <code class="ltr">pnpm build:docs</code>. تصاویر با
+          <code class="ltr">node docs/capture-report-assets.mjs</code>
+          بازتولید می‌شوند.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

@@ -6,6 +6,7 @@
  * One excerpt and one request in flight at a time; cancel stops the queue.
  */
 import type { CodecLabCodec, CodecLabMeta } from "../../session/ops";
+import type { QualityMetrics } from "../metrics/metrics";
 import {
   RealCodecError,
   type RealCodecName,
@@ -102,6 +103,7 @@ export type ComparisonRunners = {
   readonly runReal: (
     request: Extract<ComparisonRequest, { kind: "real" }>,
   ) => Promise<RealCodecRun>;
+  readonly measureQuality?: (run: RealCodecRun) => Promise<QualityMetrics | null>;
   readonly signal?: AbortSignal;
   readonly onProgress?: (completed: number, total: number, row: ComparisonRow) => void;
 };
@@ -132,7 +134,15 @@ export async function runComparison(
         row = handwrittenRow(meta, labelKeyFor(request));
       } else {
         const run = await options.runReal(request);
-        row = realRow(run, request.codec, labelKeyFor(request));
+        let metrics: QualityMetrics | null = null;
+        if (options.measureQuality !== undefined) {
+          try {
+            metrics = await options.measureQuality(run);
+          } catch {
+            // Keep the codec row; the chart shows NaN for missing metrics.
+          }
+        }
+        row = realRow(run, request.codec, labelKeyFor(request), metrics);
       }
     } catch (error) {
       if (options.signal?.aborted) {

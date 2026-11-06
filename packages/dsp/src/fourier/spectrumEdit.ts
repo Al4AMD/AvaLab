@@ -33,6 +33,7 @@
 import { mulberry32 } from "../signals/noise.js";
 import { nextPowerOfTwo } from "../systems/convolution.js";
 import { fftRadix2, ifftRadix2 } from "./fft.js";
+import { applySpectrumCurves, type SpectrumCurveEdit } from "./spectrumCurves.js";
 
 export type SpectrumEditTarget = "re" | "im" | "mag" | "phase";
 export type SpectrumEditMode = "zero" | "scale" | "set";
@@ -57,6 +58,8 @@ export type SpectrumPreset =
 export interface EditSpectrumParams {
   fftLengthSamples?: number;
   edits: readonly SpectrumEdit[];
+  /** Freehand curves applied after every band edit. */
+  curves?: readonly SpectrumCurveEdit[];
   hermitian: boolean;
 }
 
@@ -186,6 +189,9 @@ export function editSpectrum(
   if (typeof params.hermitian !== "boolean") {
     throw new RangeError("editSpectrum: params.hermitian must be a boolean");
   }
+  if (params.curves !== undefined && !Array.isArray(params.curves)) {
+    throw new RangeError("editSpectrum: params.curves must be an array");
+  }
   const sampleCount = samples.length;
   const fftLengthSamples = params.fftLengthSamples ?? nextPowerOfTwo(sampleCount);
   if (!isPowerOfTwo(fftLengthSamples) || fftLengthSamples < sampleCount) {
@@ -206,6 +212,8 @@ export function editSpectrum(
     assertEdit(edit, index, fftLengthSamples);
     applyEdit(spectrum.re, spectrum.im, edit, fftLengthSamples);
   }
+
+  applySpectrumCurves(spectrum, params.curves ?? [], spectrum.re.length);
 
   if (params.hermitian) {
     const half = fftLengthSamples / 2;

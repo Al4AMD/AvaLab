@@ -26,18 +26,18 @@
  *   this keeps the e2e contract (`waveform.stub.ping`) alive through the
  *   store instead of a direct rpc call from the component tree.
  *
- * Money-size note: inputHash is an O(bytes) byte loop executed on the main
- * thread exactly ONCE per successful load — ruled a load-time cost in the
- * wave pre-flight (115.2 MB worst case at 5 min/96 kHz mono Float32), alongside the
- * per-sample finiteness scan that loadSource performs anyway. No other DSP
- * runs on the main thread (AGENTS §9); audio math lives in the worker.
+ * Money-size note: inputHash is an O(N) word loop executed on the main
+ * thread exactly ONCE per successful load (115.2 MB worst case at 5 min/
+ * 96 kHz mono Float32), alongside the per-sample finiteness scan that
+ * loadSource performs anyway. No other DSP runs on the main thread
+ * (AGENTS §9); audio math lives in the worker.
  *
  * Immutability: `original` is owned by the store and MUST NOT be mutated by
  * consumers; `derive`'s optional payload is transferable and NEUTERED for the
  * caller per session/protocol.ts ownership rules — views that hand out
  * sample-buffer ranges transfer ownership that way on purpose.
  */
-import { inputHashFnv1a64 } from "@avalab/dsp";
+import { inputHash64 } from "@avalab/dsp";
 import { create, type StoreApi, type UseBoundStore } from "zustand";
 import type { DemoClipId } from "../features/input/offline";
 import type { DspOpName, DspOpParams } from "./ops";
@@ -76,11 +76,27 @@ export type ProcessedSource = {
   readonly samples: Float32Array;
   readonly sampleRateHz: number;
   readonly label: string;
+  /** First source sample this lane covers; 0 for whole-source results. */
+  readonly sourceStartSample: number;
+  /** Input hash captured when an AI job started; null for non-AI tools. */
+  readonly sourceHash: string | null;
+};
+
+/** Optional identity metadata for tool/AI results. */
+export type SetProcessedOptions = {
+  readonly sourceHash?: string;
+  readonly sourceStartSample?: number;
 };
 
 /** Structured rejection codes for `setProcessed` (frontend translates by
  * code; mirrors `SourceErrorCode` plus `empty`). */
-export type ProcessedErrorCode = "invalidType" | "notFinite" | "rateTooHigh" | "tooLong" | "empty";
+export type ProcessedErrorCode =
+  | "invalidType"
+  | "notFinite"
+  | "rateTooHigh"
+  | "tooLong"
+  | "empty"
+  | "staleSource";
 
 /** Pre-flight result of `setProcessed`: structured, never a thrown error. */
 export type SetProcessedResult = { ok: true } | { ok: false; code: ProcessedErrorCode };
@@ -178,7 +194,12 @@ export type SessionStore = {
   /** Install a tool result as the processed playback source. Takes ownership
    * (no copy); success switches `playbackMode` to `"processed"`. Rejects
    * durations above `MAX_PROCESSED_SECONDS` instead of truncating. */
-  setProcessed(samples: Float32Array, sampleRateHz: number, label: string): SetProcessedResult;
+  setProcessed(
+    samples: Float32Array,
+    sampleRateHz: number,
+    label: string,
+    options?: SetProcessedOptions,
+  ): SetProcessedResult;
   /** Drop the processed source and return playback to the original. */
   clearProcessed(): void;
   /** Switch lanes. `"processed"` without a processed source is a no-op. */
@@ -420,7 +441,7 @@ export function createSessionStore(
           return { ok: false, code: "tooLong" };
         }
 
-        const inputHash = inputHashFnv1a64(samples);
+        const inputHash = inputHash64(samples);
         // new Map(): replaces both caches wholesale — and the late-settle
         // hash guard makes any in-flight frames of the OLD source inert.
         set({
@@ -441,11 +462,13 @@ export function createSessionStore(
         return { ok: true };
       },
 
-      setProcessed(samples, sampleRateHz, label) {
+      setProcessed(samples, sampleRateHz, label, options = {}) {
         if (
           !(samples instanceof Float32Array) ||
           typeof sampleRateHz !== "number" ||
-          typeof label !== "string"
+          typeof label !== "string" ||
+          typeof options !== "object" ||
+          options === null
         ) {
           return { ok: false, code: "invalidType" };
         }
@@ -473,8 +496,26 @@ export function createSessionStore(
         if (samples.length / sampleRateHz > MAX_PROCESSED_SECONDS) {
           return { ok: false, code: "tooLong" };
         }
+        const sourceHash = options.sourceHash ?? null;
+        if (sourceHash !== null) {
+          if (typeof sourceHash !== "string") {
+            return { ok: false, code: "invalidType" };
+          }
+          if (sourceHash !== get().inputHash) {
+            return { ok: false, code: "staleSource" };
+          }
+        }
+        const sourceStartSample = options.sourceStartSample ?? 0;
+        const sourceLength = get().original?.samples.length ?? 0;
+        if (
+          !Number.isInteger(sourceStartSample) ||
+          sourceStartSample < 0 ||
+          sourceStartSample > sourceLength
+        ) {
+          return { ok: false, code: "invalidType" };
+        }
         set({
-          processed: { samples, sampleRateHz, label },
+          processed: { samples, sampleRateHz, label, sourceStartSample, sourceHash },
           playbackMode: "processed",
         });
         return { ok: true };
@@ -523,7 +564,13 @@ export function createSessionStore(
         // Same loud-validation rule as `derive` (canonicalJson throws on a
         // typo'd param type before any frame leaves the main thread).
         canonicalJson(params);
-        return { key: "", outcome: rpc.call(opKey, params, payload) };
+        // Standalone calls are not cached: identical params can carry
+        // different payloads (two display waveforms), so they must never
+        // supersede each other.
+        return {
+          key: "",
+          outcome: rpc.call(opKey, params, payload, { supersede: false }),
+        };
       },
 
       /**

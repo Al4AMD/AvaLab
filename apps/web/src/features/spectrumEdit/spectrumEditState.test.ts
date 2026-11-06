@@ -16,12 +16,21 @@ import {
 } from "./spectrumEditState";
 
 describe("spectrum edit URL codec", () => {
-  it("round-trips edits, Hermitian flag and range", () => {
+  it("round-trips edits, curves, Hermitian flag and range", () => {
     const settings = {
       hermitian: false,
       edits: [
         { startBin: 3, endBin: 9, target: "mag" as const, mode: "scale" as const, value: 0.5 },
         { startBin: 0, endBin: 1, target: "phase" as const, mode: "set" as const, value: 1.2 },
+      ],
+      curves: [
+        {
+          target: "mag" as const,
+          points: [
+            { bin: 0, value: 0.25 },
+            { bin: 100, value: 1 },
+          ],
+        },
       ],
       startSample: 100,
       endSample: 2000,
@@ -33,6 +42,16 @@ describe("spectrum edit URL codec", () => {
         { startSample: 0, endSample: 0 },
       ),
     ).toEqual(settings);
+  });
+
+  it("keeps legacy edit links working when no cv key exists", () => {
+    const settings = spectrumEditSettingsFromSearch(
+      "?ed=%5B%7B%22startBin%22%3A0%2C%22endBin%22%3A2%2C%22target%22%3A%22im%22%2C%22mode%22%3A%22zero%22%2C%22value%22%3A0%7D%5D",
+      { sampleCount: 100, sampleRateHz: 8000 },
+      { startSample: 0, endSample: 0 },
+    );
+    expect(settings.curves).toEqual([]);
+    expect(settings.edits).toHaveLength(1);
   });
 
   it("falls back per field and drops malformed edits", () => {

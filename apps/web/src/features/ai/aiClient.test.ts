@@ -70,6 +70,7 @@ describe("AI client models", () => {
     const fetchFn = vi.fn(async (url: string) => {
       expect(url).toBe(`${BASE_URL}/models`);
       return jsonResponse({
+        ml_enabled: true,
         models: [
           {
             task: "neural_codec",
@@ -85,6 +86,7 @@ describe("AI client models", () => {
     const client = createAiClient({ baseUrl: BASE_URL, fetch: fetchFn });
 
     await expect(client.getModels()).resolves.toEqual({
+      ml_enabled: true,
       models: [
         {
           task: "neural-codec",

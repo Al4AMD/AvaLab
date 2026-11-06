@@ -7,12 +7,25 @@ services:
       dockerfile: docker/api.Dockerfile
     environment:
       AVALAB_STORAGE_DIR: /data
-      AVALAB_TTL_MINUTES: "60"
-      AVALAB_TTL_SWEEP_INTERVAL_SECONDS: "60"
-      AVALAB_MAX_UPLOAD_BYTES: "104857600"
-      AVALAB_MAX_DURATION_SECONDS: "300"
+      AVALAB_TTL_MINUTES: "${AVALAB_TTL_MINUTES:-60}"
+      AVALAB_TTL_SWEEP_INTERVAL_SECONDS: "${AVALAB_TTL_SWEEP_INTERVAL_SECONDS:-60}"
+      AVALAB_MAX_UPLOAD_BYTES: "${AVALAB_MAX_UPLOAD_BYTES:-104857600}"
+      AVALAB_MAX_DURATION_SECONDS: "${AVALAB_MAX_DURATION_SECONDS:-300}"
+      AVALAB_MAX_SAMPLE_RATE_HZ: "${AVALAB_MAX_SAMPLE_RATE_HZ:-96000}"
+      AVALAB_MAX_CHANNELS: "${AVALAB_MAX_CHANNELS:-2}"
+      AVALAB_ML_ENABLED: "${AVALAB_ML_ENABLED:-true}"
+      AVALAB_ML_MAX_CONCURRENCY: "${AVALAB_ML_MAX_CONCURRENCY:-1}"
+      AVALAB_ML_MAX_EXCERPT_SECONDS: "${AVALAB_ML_MAX_EXCERPT_SECONDS:-30}"
+      AVALAB_ML_DEVICE: "${AVALAB_ML_DEVICE:-cpu}"
+      AVALAB_ML_MODEL_CACHE_DIR: /models
+      AVALAB_CORS_ORIGINS: "${AVALAB_CORS_ORIGINS:-[]}"
+      AVALAB_PUBLIC_ORIGIN: "${AVALAB_PUBLIC_ORIGIN:-}"
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      HF_HOME: /tmp/huggingface
     volumes:
       - avalab-storage:/data
+      - avalab-models:/models
     healthcheck:
       test:
         - CMD
@@ -30,7 +43,7 @@ services:
       context: .
       dockerfile: docker/web.Dockerfile
     ports:
-      - "8080:80"
+      - "${AVALAB_HTTP_PORT:-8080}:80"
     depends_on:
       api:
         condition: service_healthy
@@ -38,3 +51,4 @@ services:
 
 volumes:
   avalab-storage:
+  avalab-models:

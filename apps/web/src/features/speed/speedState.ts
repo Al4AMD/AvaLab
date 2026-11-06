@@ -5,6 +5,8 @@
  * 30 s (AGENTS §9 live-preview budget); "apply to whole file" writes the
  * full source range into the URL.
  */
+
+import { type LastUsedStorage, readLastUsed } from "../../lib/lastUsed";
 import { decodeParams, encodeParams } from "../../lib/url-state";
 
 export type SpeedMode = "resample" | "timeStretch";
@@ -28,6 +30,8 @@ export const SPEED_MAX = 4;
 export const SPEED_SEMITONE_MIN = -12;
 export const SPEED_SEMITONE_MAX = 12;
 export const SPEED_PREVIEW_SECONDS = 30;
+
+export const SPEED_STORAGE_KEY = "avalab.speed.last";
 
 export const SPEED_DEFAULT_SETTINGS: SpeedSettings = {
   mode: "resample",
@@ -113,4 +117,14 @@ export function speedSettingsFromSearch(
     startSample: range.startSample,
     endSample: range.endSample,
   };
+}
+
+/** Last-used panel; missing/invalid storage decodes to the same defaults. */
+export function loadSpeedSettings(
+  source: SpeedSourceInfo,
+  selection: SpeedRange,
+  storage?: LastUsedStorage | null,
+): SpeedSettings {
+  const stored = readLastUsed(SPEED_STORAGE_KEY, storage);
+  return speedSettingsFromSearch(stored === null ? "" : stored, source, selection);
 }

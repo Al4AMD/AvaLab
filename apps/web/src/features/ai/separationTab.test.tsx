@@ -81,13 +81,19 @@ describe("separation tab", () => {
   });
 
   it("installs a selected stem as the processed playback source", async () => {
-    const calls: Array<{ samples: Float32Array; rate: number; label: string }> = [];
+    const calls: Array<{
+      samples: Float32Array;
+      rate: number;
+      label: string;
+      options: unknown;
+    }> = [];
     const setProcessed = (
       samples: Float32Array,
       rate: number,
       label: string,
+      options?: { sourceHash?: string; sourceStartSample?: number },
     ): SetProcessedResult => {
-      calls.push({ samples, rate, label });
+      calls.push({ samples, rate, label, options });
       return { ok: true };
     };
     const samples = new Float32Array([0.25, -0.25]);
@@ -95,11 +101,20 @@ describe("separation tab", () => {
     await modules.installStemAudio({
       name: "vocals",
       audioId: "a-4",
+      sourceHash: "abc123",
+      sourceStartSample: 0,
       fetchAudio: async () => ({ samples, sampleRateHz: 48_000 }),
       setProcessed,
     });
 
-    expect(calls).toEqual([{ samples, rate: 48_000, label: "separated-vocals" }]);
+    expect(calls).toEqual([
+      {
+        samples,
+        rate: 48_000,
+        label: "separated-vocals",
+        options: { sourceHash: "abc123", sourceStartSample: 0 },
+      },
+    ]);
   });
 
   it("disables Run when the model is missing and explains why", () => {

@@ -26,6 +26,8 @@ const THEORY_NAMESPACE: Record<AiTask, string> = {
   separation: "separation",
   asr: "asr",
   "neural-codec": "neuralCodec",
+  pitch: "pitch",
+  beat: "beat",
 };
 
 describe("AI theory data", () => {
@@ -75,6 +77,14 @@ describe("AI theory data", () => {
 
   it("keeps the task ids aligned with the record type", () => {
     const tasks: AiTask[] = [...AI_TASKS];
-    expect(tasks).toEqual(["denoise", "superres", "separation", "asr", "neural-codec"]);
+    expect(tasks).toEqual([
+      "denoise",
+      "superres",
+      "separation",
+      "asr",
+      "neural-codec",
+      "pitch",
+      "beat",
+    ]);
   });
 });

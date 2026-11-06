@@ -1,0 +1,23 @@
+# Optional GPU override — UNTESTED on the owner's hardware.
+#
+# CPU remains the supported deployment. This override does not turn the CPU
+# image into a CUDA image: build and provide your own API image containing a
+# CUDA-enabled PyTorch/torchaudio stack, then name it in AVALAB_GPU_API_IMAGE.
+#
+#   AVALAB_GPU_API_IMAGE=registry.example/avalab-api:cuda \
+#     docker compose -f compose.yaml -f compose.gpu.yaml up -d
+#
+# Requires an NVIDIA GPU, driver, and NVIDIA Container Toolkit on the host.
+services:
+  api:
+    image: ${AVALAB_GPU_API_IMAGE:?set AVALAB_GPU_API_IMAGE to a CUDA-enabled API image}
+    build: !reset null
+    environment:
+      AVALAB_ML_DEVICE: cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

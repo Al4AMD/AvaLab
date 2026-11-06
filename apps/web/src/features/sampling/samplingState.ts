@@ -5,6 +5,8 @@
  * 30 s (AGENTS §9 live-preview budget); "apply to whole file" writes the
  * full source range into the URL.
  */
+
+import { type LastUsedStorage, readLastUsed } from "../../lib/lastUsed";
 import { decodeParams, encodeParams } from "../../lib/url-state";
 
 export type SamplingSettings = {
@@ -27,6 +29,8 @@ export const SAMPLING_MAX_RATE_HZ = 96_000;
 export const SAMPLING_MIN_BITS = 1;
 export const SAMPLING_MAX_BITS = 16;
 export const SAMPLING_PREVIEW_SECONDS = 30;
+
+export const SAMPLING_STORAGE_KEY = "avalab.sampling.last";
 
 export const SAMPLING_DEFAULT_SETTINGS: SamplingSettings = {
   targetRateHz: 48_000,
@@ -122,4 +126,14 @@ export function samplingSettingsFromSearch(
     startSample: range.startSample,
     endSample: range.endSample,
   };
+}
+
+/** Last-used panel; missing/invalid storage decodes to the same defaults. */
+export function loadSamplingSettings(
+  source: SamplingSourceInfo,
+  selection: SamplingRange,
+  storage?: LastUsedStorage | null,
+): SamplingSettings {
+  const stored = readLastUsed(SAMPLING_STORAGE_KEY, storage);
+  return samplingSettingsFromSearch(stored === null ? "" : stored, source, selection);
 }

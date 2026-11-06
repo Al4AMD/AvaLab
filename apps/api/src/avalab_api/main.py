@@ -109,9 +109,12 @@ def create_app() -> FastAPI:
     # upload cap is registered first to keep CORSMiddleware outermost — its
     # headers must appear on the middleware's own 413 responses.
     app.add_middleware(UploadLimitMiddleware, max_upload_bytes=settings.max_upload_bytes)
+    cors_origins = list(settings.cors_origins)
+    if settings.public_origin and settings.public_origin not in cors_origins:
+        cors_origins.append(settings.public_origin)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=cors_origins,
         allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Range"],
     )

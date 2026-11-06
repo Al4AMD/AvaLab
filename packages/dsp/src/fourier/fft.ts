@@ -42,7 +42,7 @@ import type { Complex } from "./complex.js";
 
 const TAU = 2 * Math.PI;
 
-interface FftPlan {
+export interface FftPlan {
   readonly size: number;
   readonly bitReversed: Uint32Array;
   readonly twiddleRe: Float64Array;
@@ -102,16 +102,18 @@ function butterfliesInPlace(re: Float64Array, im: Float64Array, plan: FftPlan): 
     for (let blockStart = 0; blockStart < size; blockStart += stageSize) {
       for (let j = 0; j < half; j += 1) {
         const twiddleIndex = j * twiddleStride;
-        const wRe = valueAt(twiddleRe, twiddleIndex, "fftRadix2: twiddleRe");
-        const wIm = valueAt(twiddleIm, twiddleIndex, "fftRadix2: twiddleIm");
+        // Every index is in range by loop construction; non-null assertions
+        // keep the innermost butterfly free of per-sample helper calls.
+        const wRe = twiddleRe[twiddleIndex] as number;
+        const wIm = twiddleIm[twiddleIndex] as number;
         const evenIndex = blockStart + j;
         const oddIndex = evenIndex + half;
-        const oddRe = valueAt(re, oddIndex, "fftRadix2: re");
-        const oddIm = valueAt(im, oddIndex, "fftRadix2: im");
+        const oddRe = re[oddIndex] as number;
+        const oddIm = im[oddIndex] as number;
         const productRe = oddRe * wRe - oddIm * wIm;
         const productIm = oddRe * wIm + oddIm * wRe;
-        const evenRe = valueAt(re, evenIndex, "fftRadix2: re");
-        const evenIm = valueAt(im, evenIndex, "fftRadix2: im");
+        const evenRe = re[evenIndex] as number;
+        const evenIm = im[evenIndex] as number;
         re[evenIndex] = evenRe + productRe;
         im[evenIndex] = evenIm + productIm;
         re[oddIndex] = evenRe - productRe;
@@ -119,6 +121,68 @@ function butterfliesInPlace(re: Float64Array, im: Float64Array, plan: FftPlan): 
       }
     }
   }
+}
+
+/**
+ * Builds a reusable radix-2 plan (bit-reversal table + twiddles). Callers that
+ * run many transforms of the same length (overlap-add) build it once instead
+ * of paying the O(N) table and trigonometry cost per transform.
+ */
+export function createFftPlan(size: number): FftPlan {
+  assertPowerOfTwo(size, "createFftPlan");
+  return planFor(size);
+}
+
+/** Forward transform using a prebuilt plan; `samples.length` must equal plan.size. */
+export function fftRadix2WithPlan(samples: Float64Array, plan: FftPlan): Complex {
+  const size = plan.size;
+  if (samples.length !== size) {
+    throw new TypeError(`fftRadix2WithPlan: samples length ${samples.length} != plan size ${size}`);
+  }
+  for (let index = 0; index < size; index += 1) {
+    valueAt(samples, index, "fftRadix2WithPlan: samples");
+  }
+  const re = new Float64Array(size);
+  const im = new Float64Array(size);
+  for (let index = 0; index < size; index += 1) {
+    const reversed = plan.bitReversed[index];
+    if (reversed === undefined) {
+      throw new TypeError(`fftRadix2WithPlan: bitReversed[${index}] read out of bounds`);
+    }
+    re[reversed] = valueAt(samples, index, "fftRadix2WithPlan: samples");
+  }
+  butterfliesInPlace(re, im, plan);
+  return { re, im };
+}
+
+/** Inverse transform using a prebuilt plan; returns the real part. */
+export function ifftRadix2WithPlan(spectrum: Complex, plan: FftPlan): Float64Array {
+  const size = plan.size;
+  if (spectrum.re.length !== size || spectrum.im.length !== size) {
+    throw new TypeError(
+      `ifftRadix2WithPlan: spectrum lengths ${spectrum.re.length}/${spectrum.im.length} != plan size ${size}`,
+    );
+  }
+  for (let index = 0; index < size; index += 1) {
+    valueAt(spectrum.re, index, "ifftRadix2WithPlan: re");
+    valueAt(spectrum.im, index, "ifftRadix2WithPlan: im");
+  }
+  const re = new Float64Array(size);
+  const im = new Float64Array(size);
+  for (let index = 0; index < size; index += 1) {
+    const reversed = plan.bitReversed[index];
+    if (reversed === undefined) {
+      throw new TypeError(`ifftRadix2WithPlan: bitReversed[${index}] read out of bounds`);
+    }
+    re[reversed] = valueAt(spectrum.re, index, "ifftRadix2WithPlan: re");
+    im[reversed] = -valueAt(spectrum.im, index, "ifftRadix2WithPlan: im");
+  }
+  butterfliesInPlace(re, im, plan);
+  const samples = new Float64Array(size);
+  for (let index = 0; index < size; index += 1) {
+    samples[index] = valueAt(re, index, "ifftRadix2WithPlan: result") / size;
+  }
+  return samples;
 }
 
 export function fftRadix2(samples: Float64Array): Complex {
@@ -132,19 +196,7 @@ export function fftRadix2(samples: Float64Array): Complex {
     valueAt(samples, index, "fftRadix2: samples");
   }
   assertPowerOfTwo(size, "fftRadix2");
-
-  const plan = planFor(size);
-  const re = new Float64Array(size);
-  const im = new Float64Array(size);
-  for (let index = 0; index < size; index += 1) {
-    const reversed = plan.bitReversed[index];
-    if (reversed === undefined) {
-      throw new TypeError(`fftRadix2: bitReversed[${index}] read out of bounds`);
-    }
-    re[reversed] = valueAt(samples, index, "fftRadix2: samples");
-  }
-  butterfliesInPlace(re, im, plan);
-  return { re, im };
+  return fftRadix2WithPlan(samples, planFor(size));
 }
 
 export function ifftRadix2(spectrum: Complex): Float64Array {
@@ -166,24 +218,5 @@ export function ifftRadix2(spectrum: Complex): Float64Array {
   // Conjugate trick: ifft(X) = conj(fft(conj(X))) / N. The forward butterfly
   // stages run unchanged on the conjugated spectrum, then the real part is
   // scaled by 1/N (the conjugate's real part equals the original re).
-  const plan = planFor(size);
-  const re = new Float64Array(size);
-  const im = new Float64Array(size);
-  for (let index = 0; index < size; index += 1) {
-    const reversed = plan.bitReversed[index];
-    if (reversed === undefined) {
-      throw new TypeError(`ifftRadix2: bitReversed[${index}] read out of bounds`);
-    }
-    const reValue = valueAt(spectrum.re, index, "ifftRadix2: re");
-    const imValue = valueAt(spectrum.im, index, "ifftRadix2: im");
-    re[reversed] = reValue;
-    im[reversed] = -imValue;
-  }
-  butterfliesInPlace(re, im, plan);
-
-  const samples = new Float64Array(size);
-  for (let index = 0; index < size; index += 1) {
-    samples[index] = valueAt(re, index, "ifftRadix2: result") / size;
-  }
-  return samples;
+  return ifftRadix2WithPlan(spectrum, planFor(size));
 }

@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from avalab_api.config import get_settings
 from avalab_api.errors import ApiError, ErrorCode
 from avalab_api.main import create_app
 from avalab_api.ml import registry as registry_module
@@ -69,6 +70,7 @@ def test_models_route_lists_every_task() -> None:
 
     assert response.status_code == 200
     body = response.json()
+    assert body["ml_enabled"] is True
     assert [item["task"] for item in body["models"]] == list(MODEL_SPECS)
     for item in body["models"]:
         assert item["state"] in {"available", "missing", "loading", "error"}
@@ -108,3 +110,15 @@ def test_require_loads_a_runner_once(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert registry.require("denoise") is sentinel
     assert registry.require("denoise") is sentinel
     assert calls == [tmp_path / "denoise"]
+
+
+def test_models_route_reports_disabled_ml(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AVALAB_ML_ENABLED", "false")
+    get_settings.cache_clear()
+    try:
+        with TestClient(create_app()) as client:
+            response = client.get("/api/v1/models")
+        assert response.status_code == 200
+        assert response.json()["ml_enabled"] is False
+    finally:
+        get_settings.cache_clear()

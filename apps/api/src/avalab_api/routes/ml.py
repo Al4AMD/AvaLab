@@ -2,19 +2,23 @@
 
 import json
 from collections.abc import Iterator
+from importlib import import_module
 from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from avalab_api.analysis import FunctionRunner, RunFunction
 from avalab_api.config import Settings, get_settings
 from avalab_api.errors import ApiError, ErrorCode
 from avalab_api.ml.jobs import JobManager, MlJobRequest
-from avalab_api.ml.models import MlTask, ModelRunner
+from avalab_api.ml.models import AnalysisTask, JobTask, ModelRunner
 from avalab_api.storage import Storage
 
 router = APIRouter()
+
+ANALYSIS_TASKS: frozenset[AnalysisTask] = frozenset({"pitch", "beat"})
 
 
 class MlJobResponse(BaseModel):
@@ -35,21 +39,26 @@ def _jobs(request: Request) -> JobManager:
 
 @router.post("/ml/{task}", status_code=202)
 def start_job(
-    task: MlTask,
+    task: JobTask,
     body: MlJobRequest,
     request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> MlJobResponse:
     """Validate the excerpt/model and queue the task."""
-    if not settings.ml_enabled:
-        raise ApiError(ErrorCode.model_unavailable, "ML tools are disabled", 503)
     _check_excerpt(settings, body.audio_id)
-    factory = getattr(request.app.state, "ml_runner_factory", None)
-    runner = (
-        cast(ModelRunner, factory(task))
-        if factory is not None
-        else cast(ModelRunner, request.app.state.model_registry.require(task))
-    )
+    runner: ModelRunner
+    if task in ANALYSIS_TASKS:
+        module = import_module(f"avalab_api.analysis.{task}")
+        runner = FunctionRunner(cast(RunFunction, module.run))
+    else:
+        if not settings.ml_enabled:
+            raise ApiError(ErrorCode.model_unavailable, "ML tools are disabled", 503)
+        factory = getattr(request.app.state, "ml_runner_factory", None)
+        runner = (
+            cast(ModelRunner, factory(task))
+            if factory is not None
+            else cast(ModelRunner, request.app.state.model_registry.require(task))
+        )
     job_id = _jobs(request).submit(task, body, runner)
     return MlJobResponse(job_id=job_id)
 

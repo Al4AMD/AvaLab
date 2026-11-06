@@ -13,9 +13,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
+import { ToolHeader } from "../../components/ToolHeader";
 
 import { Button } from "../../components/ui/button";
 import { formatS } from "../../lib/format";
+import { writeLastUsed } from "../../lib/lastUsed";
 import type { SpectrogramTilesParams } from "../../session/ops";
 import { DspRpcError } from "../../session/rpc";
 import { useSessionStore } from "../../session/store";
@@ -25,13 +27,17 @@ import {
   type SpectrogramColormapName,
 } from "../spectrogram/paintSpectrogram";
 import { spectrogramGeometry } from "../spectrogram/workerJob";
+import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
 import {
   defaultSpeedRange,
+  loadSpeedSettings,
   SPEED_MAX,
   SPEED_MIN,
   SPEED_PRESETS,
   SPEED_SEMITONE_MAX,
   SPEED_SEMITONE_MIN,
+  SPEED_STORAGE_KEY,
   type SpeedMode,
   type SpeedSettings,
   speedSettingsFromSearch,
@@ -253,18 +259,20 @@ export function SpeedView(): React.ReactElement {
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
   const [searchParams, setSearchParams] = useSearchParams();
-  const settings = useMemo(
-    () =>
-      speedSettingsFromSearch(
-        `?${searchParams.toString()}`,
-        {
-          sampleCount: original?.samples.length ?? 0,
-          sampleRateHz: original?.sampleRateHz ?? 1,
-        },
-        selection,
-      ),
-    [searchParams, original, selection],
-  );
+  const settings = useMemo(() => {
+    const source = {
+      sampleCount: original?.samples.length ?? 0,
+      sampleRateHz: original?.sampleRateHz ?? 1,
+    };
+    if (searchParams.toString() === "") {
+      return loadSpeedSettings(source, selection);
+    }
+    return speedSettingsFromSearch(`?${searchParams.toString()}`, source, selection);
+  }, [searchParams, original, selection]);
+
+  useEffect(() => {
+    writeLastUsed(SPEED_STORAGE_KEY, speedSettingsToSearch(settings));
+  }, [settings]);
   const [result, setResult] = useState<SpeedResultView | null>(null);
   const [spectrogram, setSpectrogram] = useState<SpectrogramView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -410,7 +418,7 @@ export function SpeedView(): React.ReactElement {
   if (original === null) {
     return (
       <section className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold">{t("tool.speed.title")}</h2>
+        <ToolHeader titleKey="tool.speed.title" descriptionKey="tool.speed.description" />
         <UploadEmptyState />
       </section>
     );
@@ -422,7 +430,7 @@ export function SpeedView(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold">{t("tool.speed.title")}</h2>
+      <ToolHeader titleKey="tool.speed.title" descriptionKey="tool.speed.description" />
 
       <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-xs">
@@ -603,6 +611,8 @@ export function SpeedView(): React.ReactElement {
           <li>{t("speed.observe.reverse")}</li>
         </ul>
       </aside>
+
+      <TheoryPanel titleKey={TOOL_THEORY.speed.titleKey} sections={TOOL_THEORY.speed.sections} />
     </section>
   );
 }

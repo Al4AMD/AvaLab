@@ -181,9 +181,22 @@ Wave 5 plan 05 additions (machine-drafted, agent):
 - `input.demo.shareButton/shareAria/shareCopied/shareFailed`
 - `filters.export.wav`, `ai.export.wav`, `codecLab.comparison.chart.exportPng/exportFailed`
 
+Wave 6 Plan 04 additions (machine-drafted, agent):
+
+- `fftview.benchmark.*`, `fftview.butterfly.*` (F08 benchmark and butterfly teaching view)
+- `spectrumEdit.curve.*` (F09 freehand spectrum curves)
+- `generator.amFm.*`, `generator.fourier.*` (F12 AM/FM and Fourier-series preview)
+- `ai.pitchBeat.*` (F14 pitch/beat analysis)
+- Expanded `experiments.*` copy for all 19 guided experiments, plus per-tool `*.theory.*` content added in Wave 6 Plan 04
+
 ## Next recommended step
 
-Wave 5 is complete on `feat/wave-5` (ML tools, filter lab, teaching layer, close-out). Next: open the PR to `main`, then plan Wave 6 (psychoacoustics F13, quality-of-life F18, performance/accessibility pass, Persian review, deployment, report/slides). Do not begin Wave 6 while any check is failing.
+Wave 6 Plans 00–07 are complete on `feat/wave-6`; the report and slides are
+built, verified, and approved for commit by the owner. Remaining release work
+needs a human Persian review, university deployment details, and a release-tag
+decision. Do not push, tag, or deploy without explicit approval. The audit's
+remaining owner-decision rows (stereo playback, general F02 comparison, F14
+classification, F16 student report) are unchanged.
 
 ## Session log
 
@@ -505,3 +518,101 @@ Wave 5 is complete on `feat/wave-5` (ML tools, filter lab, teaching layer, close
 - Persian review list (machine-drafted, needs the owner): `input.*` (including upload/record/demo/share), `player.*`, `speed.*`, `sampling.*`, `extent.*`, `reverb.*`, `spectrumEdit.*`, `codecLab.*` (including `real.*` and `comparison.*`), `metrics.*`, `filters.*`, `filters.theory.*`, `ai.*` (including `superres.*`, `asr.*`, `neuralCodec.*`, `theory.*`), `theory.*`, `experiments.*`, `nav.experiments`, `tool.experiments.title`, and export copy (`filters.export.wav`, `ai.export.wav`, `codecLab.comparison.chart.exportPng/exportFailed`). Persian copy is honest machine-draft quality; RTL and LTR technical content were exercised by e2e, but wording still needs a human pass.
 - Docker/host caveat: host port 8080 is occupied by Homebrew Apache, so the local smoke used a temporary `18080:80` override outside the repo; the compose defaults are unchanged.
 - **Next step:** open the PR (`feat/wave-5` → `main`), then plan Wave 6 around the owner's priorities: Persian review, the FFT phase-mask bug, performance/accessibility, F13 psychoacoustics, F15 pipeline builder (last), deployment, and the report/slides. Do not start Wave 6 while any gate is failing.
+
+## 2026-11-05 — Wave 6 Plan 00 complete (baseline)
+
+- Status: Plan 00 Tasks 1–10 complete on `feat/wave-5`, no commit. Scope: FFT phase-mask units, AI source identity/excerpt offset, ASR demo identity, honest `ml_enabled`, denoise A/B lane guard, SSE CRLF handling, worker ops for envelopes/metrics, feature audit, missing playback `connect`, baseline gates.
+- Worker boundary: `waveformEnvelope` and `qualityMetrics` are worker ops; extent/reverb mini-waveforms and metrics/codec-lab/neural-codec measurement no longer compute DSP on the main thread. Comparison `realRow` takes precomputed metrics; `comparison.ts` no longer imports `@avalab/dsp`.
+- Playback fix: `TransportNode.connect(destination)` is called before `start`; the source node is no longer silent. The existing player e2e proves the demo load/play/advance flow in fa + en.
+- Audit: `docs/plans/wave-6/audit.md` has 59 rows covering every F01–F18 bullet, evidence, status and gap ownership. No silent drops: each partial/missing row maps to plans 01–04, plan 07 Persian review, or an owner decision (stereo playback, general F02 before/after, F14 classification, F16 student lab report).
+- Regression caught by full e2e: two standalone `waveformEnvelope` calls with identical params shared the rpc supersede key, so the first (reverb IR) resolved cancelled and left its canvas blank. Root fix: `deriveStandalone` uses `{ supersede: false }`; rpc test pins detached sibling calls. Reverb spec and full e2e pass.
+- Gates: `pnpm check` exit 0 (biome 264 files, dsp 966/966, web 468/468 across 56 files, scripts 13/13, i18n OK); `pnpm e2e` 52/52 (1.9 min, zero console errors in fa + en); API `pytest -q` 200 passed / 5 skipped; `ruff check .` clean; `mypy .` clean (47 files); web build succeeded inside e2e.
+- Residual risks: The Node/Homebrew dylib breakage is fixed outside the repo and can return after a Homebrew upgrade; `metricsView` still shows no metrics (and no error) if the metrics worker rejects; a few audit rows require owner decisions before release.
+- **Next step:** execute Wave 6 Plan 01 — `docs/plans/wave-6/01-psychoacoustics.md`.
+
+## 2026-11-06 — Wave 6 Plan 01 complete (F13 psychoacoustics + masking MDCT)
+
+- Status: Plan 01 Tasks 1–7 complete on `feat/wave-5`, no commit. Scope: F13 Bark/ATH/masking engine, masking-aware MDCT toy codec, codec-lab integration, standalone `/tools/psychoacoustics` lab, bilingual copy, docs, e2e.
+- Shipped DSP: Zwicker–Terhardt Bark conversion, 25 equal Bark bands, Terhardt ATH (20 Hz floor), Schroeder spreading on `abs(dz)` (D-042), band levels, thresholds, SMR, mask steps, and a measured `P_ref` through the same MDCT. Golden vectors generated by `tools/golden`; legacy MDCT encode/decode paths remain byte-identical.
+- Shipped codec lab: `pm`/`rspl` URL flags (absent `pm` = legacy), SPL control, mode label, entropy vs side-info vs total bitrate vs masked-share readouts, and a threshold/SMR band chart. Psycho bitrate includes 16 bits/band side info; payload size stays entropy bytes.
+- Shipped F13 lab: static ATH, spreading heatmap, controls for SPL/scale/threshold, measured band level vs threshold from the worker, and a link that opens the masking-aware MDCT. Analysis follows the current selection or the first 30 s; the view holds no DSP.
+- Docs: `docs/ALGORITHMS.md` rows added for every new algorithm/op; D-042 records the symmetric spreading deviation and the model's teaching-only limits. No backend code changed.
+- Gates: `pnpm check` exit 0 (biome 281 files, dsp 992/992 across 40 files, web 490/490 across 60 files, scripts 13/13, i18n OK); `pnpm e2e` 54/54 in 1.3 min with zero console errors in fa + en; perf gates still pass inside e2e. `pnpm gen:golden` regenerated every golden deterministically; the new F13 fixture is stable. The build keeps the existing >500 kB chunk warning.
+- Carries: `psychoacoustics.*` and `codecLab.mdct.*` Persian copy joins the owner-review backlog. `mdctPsycho.test.ts` still lacks a fixture with active masking; current coverage pins the bookkeeping and round-trip, not a hand-checked masked-band vector. No commit or push.
+- **Next step:** execute Wave 6 Plan 02 — `docs/plans/wave-6/02-pipeline.md`.
+
+## 2026-11-06 — Wave 6 Plan 02 complete (F15 pipeline builder)
+
+- Status: Plan 02 Tasks 1–6 complete on `feat/wave-6` at `4f053e4`, no commit. Scope: versioned DAG DSL, pure execution engine, worker op, React Flow builder, URL sharing, theory panel, route/i18n, docs, e2e.
+- Shipped DSL/engine: exactly one source, fan-out allowed, merges rejected; 24-node / 2-output caps; validation returns stable typed codes; stable topological execution; each node reuses the matching DSP kernel; outputs concatenate in node-array order; final PCM and summaries return from the worker only.
+- Shipped UI: palette, draggable nodes, delete/connect guards, properties panel, per-stage summaries, output switching, save/load JSON, URL persistence with over-cap fallback, 30 s excerpt run/cancel/install, fit-view controls, and a translated theory panel (sampling, filtering, quantization, codec, reverb, time-stretch, order effects, fan-out).
+- Worker boundary: the graph never executes on the main thread. `pipelineRun` validates params/range/payload and maps `PipelineRunError` codes to `DspOpError`; codec and reverb branches are pinned byte-equivalent to the standalone codec-lab/reverb ops.
+- Route/bundle: `/tools/pipeline` is `React.lazy` with a translated Suspense fallback; `pipelineView` builds to a separate 217.48 kB chunk (68.10 kB gzip). The main index chunk warning (>500 kB) is unchanged.
+- Layout fix during e2e: new nodes now scan for a free grid cell instead of stacking on the next index; `output-2` now lands at `{x:740,y:80}`. Known minor: a newly added node can still land outside the current viewport; the user (and the e2e) presses Fit View. Auto-fit after add is deferred.
+- E2E deviation: the UI guard prevents creating cycles and the JSON loader rejects invalid graphs before `pipeline.validationError` renders. The e2e therefore attempts a self-connection and asserts the translated `pipeline.actionError` containing «حلقه», with the edge count unchanged and run still enabled; no worker call. The rest of the planned flow (palette build, connect, run, URL reload, `fa`/`en`, zero console errors) is covered.
+- Gates: `pnpm check` exit 0 (biome 296 files; dsp 1018/1018 across 42 files; web 516/516 across 63 files; scripts 13/13; i18n OK); `pnpm e2e` 56/56 in 1.9 min with zero console errors in fa + en; perf gates 443 ms and 518 ms; `pnpm --filter @avalab/web build` succeeded. Backend untouched.
+- Carries: `pipeline.*`, `nav.pipeline`, and `tool.pipeline` Persian copy join the owner-review backlog. No commit or push.
+- **Next step:** execute Wave 6 Plan 03 — `docs/plans/wave-6/03-quality-of-life.md`.
+
+## 2026-11-06 — Wave 6 Plan 03 complete (F18 quality of life)
+
+- Status: Plan 03 Tasks 1–8 complete on `feat/wave-6`, no commit. Scope: BS.1770 A/B loudness matching, player gain seam, theme, global shortcuts/help, last-used persistence, docs.
+- Shipped: worker-side ITU-R BS.1770 integrated loudness (400 ms blocks, 750verlap, absolute/relative gates, 44.1/48/96 kHz golden + `ffmpeg ebur128` cross-check); playback-only gain clamped to ±24 dB with the original lane reset on lane changes; `system/light/dark` theme with live `prefers-color-scheme` fallback; Space/arrow/Shift-arrow/`?` global map guarded against editable targets and dialogs; accessible focus-trapped help dialog; namespaced `avalab.<tool>.last` persistence for generator, speed, sampling, extent, reverb, spectrum edit, codec lab, AI, filters, pipeline and psychoacoustics.
+- Persistence detail: the stored value is the tool’s existing URL query string; a non-empty URL wins, invalid storage falls back to defaults, and only serializable parameters are stored (never audio, names, uploaded IRs or AI results).
+- Gates: `pnpm check` exit 0 (biome clean; dsp 1035/1035; web 552/552 across 70 files; scripts 13/13; i18n OK); `pnpm e2e` 64/64 in 1.5 min with zero console errors in fa + en; `pnpm --filter @avalab/web build` succeeded (existing >500 kB chunk warning remains). Backend untouched.
+- Carries: `app.theme.*`, `player.loudness.*` and `shortcuts.*` Persian copy join the owner-review backlog. Metrics has no settings, so persistence is intentionally a no-op there. No commit or push.
+- **Next step:** execute Wave 6 Plan 04 — feature gaps.
+
+## 2026-11-06 — Wave 6 Plan 04 complete (feature gaps)
+
+- Status: Plan 04 Tasks 1–8 complete on `feat/wave-6`, no commit. Scope: F08 butterfly/benchmark, F09 freehand spectrum curves, F12 AM/FM + Fourier-series preview, F14 pitch/beat analysis, F16 theory panels and 19 guided experiments, docs and gates.
+- Shipped F08: `fftButterflySteps` for N = 8/16 with worker replay, and `benchmarkFft`/`stftBenchmarkChunk` against pinned `fft.js` 4.0.4; benchmark reports medians, relative speed and max coefficient error, with no wall-clock CI threshold (D-048). New benchmark/butterfly panels.
+- Shipped F09: `applySpectrumCurves` with sorted/deduplicated linear-bin curves, held endpoints, `re`/`im`/`mag`/`phase` targets and an 8192-bin `cv` URL codec; curves run after band edits and before Hermitian enforcement (D-049).
+- Shipped F12: `am`/`fm` generator presets, `fourierPreview` worker op, basic/AM-FM/Fourier tabs, overmodulation warning and 2 s/200-harmonic preview caps (D-052).
+- Shipped F14: backend `librosa.pyin` pitch and `librosa.beat.beat_track` beat analysis as non-neural 30 s excerpt jobs that bypass the model registry, plus the pitch/beat AI tab, F0 curve, tempo and beat list (D-051).
+- Shipped F16: shared theory content for all 14 non-AI tools; 19 guided experiments in `signals`/`multimedia`/`ai`/`labs` with 5–8 steps each, validated deep links, and IDs-only persistent progress (D-050).
+- Docs: `ALGORITHMS.md` has the Wave-6 algorithm rows and theory/experiment notes; `THIRD_PARTY.md` records `fft.js` 4.0.4 (MIT) and `librosa` 0.11.0 (ISC); `DECISIONS.md` records D-048–D-052.
+- Gates: `pnpm check` exit 0 (biome 341 files; dsp 1060/1060; web 618/618; scripts 13/13; i18n OK); `pnpm --filter @avalab/web e2e` 74/74 in 3.3 min with zero console errors in `fa` and `en`; API `pytest -q` 206 passed / 5 skipped, `ruff` and `mypy` clean (51 source files); production build succeeded inside e2e.
+- First `pnpm check` run overlapped with the API suite and hit the pre-existing 24 s timeout in the 48 000-sample naive-DFT golden test; the file passed alone (5.07 s) and a clean serial `pnpm check` passed. The test remains sensitive to heavy parallel load.
+- Carries: Wave 6 Persian copy joins the owner-review backlog; FFT benchmark timings are machine-dependent by design; pitch/beat and full-file analysis remain excerpt-limited; no commit or push.
+- **Next step:** execute Wave 6 Plan 05 — `docs/plans/wave-6/05-polish.md`.
+
+## 2026-11-06 — Wave 6 Plan 05 complete (polish, performance, accessibility, Persian review)
+
+- Status: Plan 05 Tasks 1–7 complete on `feat/wave-6`, no commit. Scope: measured performance, main-thread DSP audit, accessibility, RTL/Persian review, robustness cases, shared tool headers, docs hygiene.
+- Performance: the deterministic 5-minute 44.1 kHz harness (`apps/web/e2e/performance.spec.ts`) passes with 3-run medians in `docs/plans/wave-6/performance.md`: waveform after decode 304 ms (< 2 000 gate; 1 s budget), spectrogram 175 ms (< 6 000; 3 s), FFT 173 ms (< 600; 300 ms), FIR 141 ms (< 600), pipeline 253 ms (< 600), MDCT 1 380 ms, reverb 1 404 ms, loudness 368 ms. The final full-e2e run measured waveform 387 ms, spectrogram 316 ms, FFT 217 ms, MDCT 1 905 ms, FIR 193 ms, reverb 1 924 ms (under the 2 000 ms fallback gate), pipeline 261 ms, loudness 880 ms.
+- Optimizations: word-wise two-lane session hash, sequential spectrogram chunk scheduling, power-of-two `ifft` delegation, reusable FFT plans, a 4096-sample overlap-add minimum, and direct convolution for ≤ 8 taps. Both non-viable 300 ms paths are explicit and gated: the teaching O(frames·N²) MDCT (6 s gate) and 30 s reverb apply (2 s gate); D-053 records them. No WASM added.
+- Main-thread audit: `apps/web/src/session/mainThreadDsp.test.ts` blocks DSP imports in `features/**` outside canvas painters. Remaining O(n) loops are load-boundary validation/hash and `monoDownmix`, run once per source and recorded as exceptions in D-053, not hidden as DSP purity.
+- Accessibility: `apps/web/e2e/accessibility.spec.ts` 5/5 in `fa` and `en`: named visible controls, labelled canvases (uPlot descendants inherit their labelled `role="img"` host), keyboard focus, focus-trapped shortcut dialog, reduced motion, colorblind-safe `viridisCB`, and 4.5:1 dark/light tokens. Fixes: light accent contrast, pitch canvas role, reverb IR upload label.
+- RTL/Persian: `apps/web/e2e/rtl.spec.ts` 4/4 covers sidebar mirroring, LTR plots/readouts, no overflow at 1280/768/390 px, and the mobile player dock. Static scan is clean. `docs/plans/wave-6/persian-review.md` records the full pass, fixes (noise unified to «نویز», companding parenthetical, ezafe, reverb header wording); the owner approved general terms on 2026-11-07: «سهم ضرایب صفر»، «فراجهش»، «وابسته به سیگنال»، and «نمونهٔ صوتی».
+- Robustness: e2e now covers a corrupted upload (translated decode error, app usable), a 300.5 s file (rejected, never truncated), denoise job cancel (terminal «لغو شد.», no spinner, Run re-enabled), and a missing denoise model (Run disabled, banner explains the download). A new store test pins that an `opFailed` frame keeps an earlier cached derivation ready.
+- Consistency: shared `apps/web/src/components/ToolHeader.tsx` gives every tool the same `h2` + short description; 13 descriptions added in both locales (pipeline already had one). The pipeline `h1` outlier and the route Suspense fallback are aligned. Dynamic header keys are covered by the exact `tool`/`psychoacoustics.description` entries in `scripts/i18n-dynamic-keys.json`, keeping `i18n:check` strict for other namespaces.
+- Hygiene: no `TODO`/`FIXME` in source, no unjustified `@ts-expect-error`, no empty catches, no commented-out code; `console.warn` calls are developer diagnostics only.
+- Gates: `pnpm check` exit 0 (biome 346 files; dsp 1 058/1 058; web 620/620 across 76 files; scripts 13/13; i18n OK); `pnpm --filter @avalab/web e2e` 88/88 in 2.5 min with zero console errors in `fa` and `en`; API `pytest -q` 206 passed / 5 skipped, `ruff` and `mypy` clean (51 source files). Production build succeeds inside e2e with the existing >500 kB chunk warning.
+- Known issues: the pre-existing 48 000-sample naive-DFT golden test can still exceed its 24 s timeout under heavy parallel load (isolated and serial runs pass); the two documented performance fallbacks remain; worker-failure UI preservation is unit-covered rather than e2e because the UI has no test hook to force a worker rejection; the load-boundary loops in D-053 remain on the main thread by decision.
+- **Next step:** execute Wave 6 Plan 06 — deployment.
+
+## 2026-11-06 — Wave 6 Plan 06 complete (deployment)
+
+- Status: Plan 06 Tasks 1–6 complete on `feat/wave-6` (owner-approved commit at wave close). Scope: Compose topology, offline model cache, Caddy/SSE, optional GPU override, acceptance smoke, deployment docs.
+- Compose: non-root API (`10001`) + Caddy web, named `avalab-storage` and `avalab-models` volumes, all AVALAB env vars with defaults, `AVALAB_HTTP_PORT` for the published host port, normalized `AVALAB_PUBLIC_ORIGIN` appended to CORS, TTL limits unchanged. `docker compose config` and the GPU override merge both validate.
+- Offline models: API image now includes `scripts/download_models.py`, creates `/models`, and the script defaults to `Settings.ml_model_cache_dir` instead of an unwritable home path. Prefetch mode temporarily re-enables HF Hub; runtime uses `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`, and ephemeral `HF_HOME=/tmp/huggingface`. Cache volume is 365.7 MiB and all five tasks report `available` with the API network disconnected.
+- Caddy: `/api/v1/jobs/*` has `flush_interval -1`; generic `/api/*` follows; only SPA static responses are compressed, so SSE stays incremental. University proxy runbook covers buffering, 10-minute read timeout, forwarded headers, and TLS termination.
+- GPU: `compose.gpu.yaml` requests NVIDIA devices and sets `AVALAB_ML_DEVICE=cuda`; ASR, separation and Encodec select CUDA, LavaSR uses CUDA only if the ONNX runtime exposes it, and DPDFNet remains CPU. The GPU path is untested and not a gate.
+- Dependency fix: the unmarked `numba<0.62` pin selected numba 0.53/llvmlite 0.36 on Linux/Python 3.12 and broke the Docker build. The pin is now Intel-macOS-only; `uv.lock` uses numba 0.61.2 there and 0.68.1 elsewhere.
+- Acceptance (`docker/smoke.sh`, host port 18080, rerun after the device/origin fixes): health ok, ffmpeg true, five models available, FLAC `bit_exact=true` (73 627 bytes), 6 incremental SSE events (0.008–3.491 s), fa RTL/en LTR with zero console errors, offline denoise done, volumes survived `down`/`up`. API image 1 298 499 073 bytes, web image 31 799 710 bytes; observed API 135.4 MiB, web 19.12 MiB (first run: 208.3 / 69.15 MiB).
+- Gates: `pnpm check` exit 0 (biome 346 files; dsp 1058/1058; web 620/620; scripts 13/13; i18n OK); `pnpm --filter @avalab/web e2e` 88/88 in 2.4 min with zero console errors in `fa` and `en`; API `pytest -q` 230 passed / 5 skipped, `ruff` and `mypy` clean (32 files). `bash -n docker/smoke.sh` and `git diff --check` clean.
+- Known issues: GPU path remains untested and needs a CUDA image; smoke requires a prefetched model cache and host Chromium; the pre-existing 48 000-sample naive-DFT timeout flake remains under heavy parallel load; model cache and storage are deleted by `docker compose down -v` by design.
+- **Next step:** execute Wave 6 Plan 07 — `docs/plans/wave-6/07-release.md`.
+
+## 2026-11-06 — Wave 6 Plan 07 complete (Persian report, slides, release gate)
+
+- Status: Plan 07 Tasks 1–6 complete on `feat/wave-6`, no commit/push/tag/deploy. Scope: A4 Persian report, 16:9 slides, deterministic screenshots, PDF verification, docs, final gates.
+- Deliverables: `docs/deliverables/avalab-report-fa.pdf` (31 pages, A4 594.96×841.92 pt, 5,347,148 bytes) and `docs/deliverables/avalab-slides-fa.pdf` (16 pages, 16:9, 3,274,287 bytes). Build: `pnpm build:docs` / `docs/build-pdfs.mjs`, 4,969 ms, no API or models.
+- Report content: 12 sections; course mapping F01–F18; architecture and algorithm formulas; feature walkthrough with figures 2–16 in lab order; three guided experiments; measured performance; pinned AI models and honest limits; references; licenses/provenance. The AI figures are cached files under `docs/report/assets/ai/` and labelled as approximations.
+- Report fixes this plan: corrected `cividis` to `viridisCB`; added spectrum-editor, generator, extent, speed, and reverb subsections with renumbered figures; softened the sampling caption to match the visible crop; fixed the reverb result-spectrogram canvas intrinsic size (`reverbView.tsx`, which never set `canvas.width/height`, leaving a 300×150 backing store) and added an e2e intrinsic-width assertion; recaptured all 13 non-AI assets and rebuilt.
+- PDF verification: PyMuPDF reports 31/16 pages and expected page sizes; Vazirmatn Regular/Bold and Menlo are embedded (slides also embed two Type3 arrow glyphs); extracted text contains 12,833 Persian characters and both locale labels; rendered cover, formula, every lab screenshot page, references, and representative slides with no clipped or overlapping content.
+- F01–F18 close-out for v0.1.0: F01/F02/F16 ship their current implementations; stereo playback, the general F02 before/after overlay, and the F16 student lab-report export are scheduled for post-0.1.0. F14 classification remains out of scope for v0.1.0. F03–F15 and F18 are done, and F17 has its terminology sign-off. The detailed audit stays in `docs/plans/wave-6/audit.md`; no silent drops.
+- Gates: `pnpm check` exit 0 (biome 352 files, clean; dsp 1,058/1,058, web 620/620 across 76 files, scripts 13/13, i18n OK). The first full e2e run hit one 30 s pipeline delete-edge timeout; the pipeline spec passed 2/2 alone, and the serial full rerun passed 88/88 in 2.2 min with zero console errors in `fa` and `en`. API `pytest -q` 230 passed / 5 skipped; `ruff check .` clean; `mypy .` clean (53 source files). Docker smoke rerun after starting Docker Desktop: passed with health ok, 5 models available offline, FLAC bit-exact (73,627 bytes), 6 incremental SSE events (0.007–3.114 s), zero browser console errors in fa/en, offline denoise done, and model/storage volumes persistent; API image 1,298,499,073 bytes, web 31,799,979 bytes; observed memory 300.9 MiB API / 68.46 MiB web.
+- Known issues: the report is machine-drafted Persian; the owner approved the pending terminology on 2026-11-07, but a final full-copy proofread is still advisable (`docs/plans/wave-6/persian-review.md`); the reverb IR waveform is visually near-flat because `paintWaveform` keeps a fixed ±1 scale for a quiet synthetic IR; the 48,000-sample naive-DFT timeout flake and the two documented performance fallbacks remain.
+- Release decisions (2026-11-07): PDFs approved for commit; general Persian terms chosen; CPU-only university server remains the target while the same Compose stack stays runnable on the owner laptop; no public domain yet; tag `v0.1.0`; push branch and open a PR. Post-0.1.0 backlog: stereo playback, general F02 comparison, F14 classification, F16 student lab report.

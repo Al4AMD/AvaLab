@@ -5,6 +5,8 @@
  * (AGENTS §9 live-preview budget); "apply to whole file" writes the full
  * source range into the URL.
  */
+
+import { type LastUsedStorage, readLastUsed } from "../../lib/lastUsed";
 import { decodeParams, encodeParams } from "../../lib/url-state";
 
 export const EXTENT_OPERATIONS = [
@@ -42,6 +44,8 @@ export const EXTENT_MAX_FACTOR = 4;
 export const EXTENT_MIN_REPETITIONS = 1;
 export const EXTENT_MAX_REPETITIONS = 16;
 export const EXTENT_TRUNCATE_DEFAULT_SECONDS = 1;
+
+export const EXTENT_STORAGE_KEY = "avalab.extent.last";
 
 export const EXTENT_DEFAULT_SETTINGS: ExtentSettings = {
   operation: "identity",
@@ -158,4 +162,14 @@ export function extentSettingsFromSearch(
     startSample: range.startSample,
     endSample: range.endSample,
   };
+}
+
+/** Last-used panel; missing/invalid storage decodes to the same defaults. */
+export function loadExtentSettings(
+  source: ExtentSourceInfo,
+  selection: ExtentRange,
+  storage?: LastUsedStorage | null,
+): ExtentSettings {
+  const stored = readLastUsed(EXTENT_STORAGE_KEY, storage);
+  return extentSettingsFromSearch(stored === null ? "" : stored, source, selection);
 }

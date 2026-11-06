@@ -15,10 +15,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 import uPlot from "uplot";
+import { ToolHeader } from "../../components/ToolHeader";
 import "uplot/dist/uPlot.min.css";
 
 import { Button } from "../../components/ui/button";
 import { formatHz, formatS } from "../../lib/format";
+import { writeLastUsed } from "../../lib/lastUsed";
 import {
   type ExtentProcessParams,
   type ExtentProcessResult,
@@ -28,6 +30,8 @@ import {
 import { DspRpcError } from "../../session/rpc";
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
+import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
 import { paintWaveform } from "../waveform/paintWaveform";
 import {
   defaultExtentRange,
@@ -35,10 +39,12 @@ import {
   EXTENT_MAX_REPETITIONS,
   EXTENT_MIN_FACTOR,
   EXTENT_MIN_REPETITIONS,
+  EXTENT_STORAGE_KEY,
   type ExtentOperationName,
   type ExtentSettings,
   extentSettingsFromSearch,
   extentSettingsToSearch,
+  loadExtentSettings,
 } from "./extentState";
 
 const CONTROL_FOCUS_CLASSES =
@@ -88,33 +94,6 @@ function useCanvasWidth(): {
   return { hostRef, widthPx };
 }
 
-/** Display-only min/max envelope; the DSP transforms stay in the worker. */
-function peakBuckets(samples: Float32Array, bucketCount: number): Float32Array {
-  const buckets = new Float32Array(Math.max(1, bucketCount) * 2);
-  if (samples.length === 0) {
-    return buckets;
-  }
-  const count = buckets.length / 2;
-  for (let bucket = 0; bucket < count; bucket += 1) {
-    const start = Math.floor((bucket * samples.length) / count);
-    const end = Math.max(start + 1, Math.floor(((bucket + 1) * samples.length) / count));
-    let min = Number.POSITIVE_INFINITY;
-    let max = Number.NEGATIVE_INFINITY;
-    for (let index = start; index < end && index < samples.length; index += 1) {
-      const value = samples[index] ?? 0;
-      if (value < min) {
-        min = value;
-      }
-      if (value > max) {
-        max = value;
-      }
-    }
-    buckets[2 * bucket] = Number.isFinite(min) ? min : 0;
-    buckets[2 * bucket + 1] = Number.isFinite(max) ? max : 0;
-  }
-  return buckets;
-}
-
 function ExtentWaveform({
   samples,
   supportStartSample,
@@ -139,25 +118,49 @@ function ExtentWaveform({
     if (ctx === null) {
       return;
     }
-    const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), MAX_DEVICE_PIXEL_RATIO);
-    const sampleRange =
-      samples.length === 0 ? undefined : { startSample: 0, endSample: samples.length - 1 };
-    const selectionRange =
-      sampleRange !== undefined && supportEndSample >= supportStartSample
-        ? { startSample: supportStartSample, endSample: supportEndSample }
-        : undefined;
-    paintWaveform(ctx, peakBuckets(samples, Math.max(1, Math.round(widthPx))), {
-      widthPx,
-      heightPx: WAVEFORM_HEIGHT_PX,
-      dpr,
-      background: "#0b1220",
-      wave: "#8bd3c7",
-      center: "#334155",
-      playhead: "#f59e0b",
-      selection: "rgba(56,189,248,0.18)",
-      sampleRange,
-      selectionRange,
-    });
+    let cancelled = false;
+    const copy = samples.slice();
+    const ticket = useSessionStore
+      .getState()
+      .deriveStandalone(
+        "waveformEnvelope",
+        { bucketCount: Math.max(1, Math.round(widthPx)) },
+        { buffer: copy.buffer, byteOffset: 0, byteLength: copy.byteLength },
+      );
+    ticket.outcome.then(
+      (outcome) => {
+        if (cancelled || "cancelled" in outcome || outcome.payload === undefined) {
+          return;
+        }
+        const payload = outcome.payload;
+        const minMax = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+        const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), MAX_DEVICE_PIXEL_RATIO);
+        const sampleRange =
+          samples.length === 0 ? undefined : { startSample: 0, endSample: samples.length - 1 };
+        const selectionRange =
+          sampleRange !== undefined && supportEndSample >= supportStartSample
+            ? { startSample: supportStartSample, endSample: supportEndSample }
+            : undefined;
+        paintWaveform(ctx, minMax, {
+          widthPx,
+          heightPx: WAVEFORM_HEIGHT_PX,
+          dpr,
+          background: "#0b1220",
+          wave: "#8bd3c7",
+          center: "#334155",
+          playhead: "#f59e0b",
+          selection: "rgba(56,189,248,0.18)",
+          sampleRange,
+          selectionRange,
+        });
+      },
+      () => {
+        // The envelope is display-only; a failed request leaves the canvas blank.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
   }, [samples, widthPx, supportStartSample, supportEndSample]);
   return (
     <div ref={hostRef} dir="ltr">
@@ -315,18 +318,20 @@ export function ExtentView(): React.ReactElement {
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
   const [searchParams, setSearchParams] = useSearchParams();
-  const settings = useMemo(
-    () =>
-      extentSettingsFromSearch(
-        `?${searchParams.toString()}`,
-        {
-          sampleCount: original?.samples.length ?? 0,
-          sampleRateHz: original?.sampleRateHz ?? 1,
-        },
-        selection,
-      ),
-    [searchParams, original, selection],
-  );
+  const settings = useMemo(() => {
+    const source = {
+      sampleCount: original?.samples.length ?? 0,
+      sampleRateHz: original?.sampleRateHz ?? 1,
+    };
+    if (searchParams.toString() === "") {
+      return loadExtentSettings(source, selection);
+    }
+    return extentSettingsFromSearch(`?${searchParams.toString()}`, source, selection);
+  }, [searchParams, original, selection]);
+
+  useEffect(() => {
+    writeLastUsed(EXTENT_STORAGE_KEY, extentSettingsToSearch(settings));
+  }, [settings]);
   const [beforeSamples, setBeforeSamples] = useState<Float32Array | null>(null);
   const [result, setResult] = useState<ExtentResult | null>(null);
   const [beforeSpectrum, setBeforeSpectrum] = useState<Spectrum | null>(null);
@@ -477,7 +482,7 @@ export function ExtentView(): React.ReactElement {
   if (original === null) {
     return (
       <section className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold">{t("tool.extent.title")}</h2>
+        <ToolHeader titleKey="tool.extent.title" descriptionKey="tool.extent.description" />
         <UploadEmptyState />
       </section>
     );
@@ -492,7 +497,7 @@ export function ExtentView(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold">{t("tool.extent.title")}</h2>
+      <ToolHeader titleKey="tool.extent.title" descriptionKey="tool.extent.description" />
 
       <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-xs">
@@ -840,6 +845,8 @@ export function ExtentView(): React.ReactElement {
         <p className="text-xs text-muted">{t("extent.observe.scaleNote")}</p>
         <p className="text-xs text-muted">{t("extent.observe.units")}</p>
       </div>
+
+      <TheoryPanel titleKey={TOOL_THEORY.extent.titleKey} sections={TOOL_THEORY.extent.sections} />
     </section>
   );
 }

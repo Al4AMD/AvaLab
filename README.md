@@ -39,6 +39,24 @@ uv run --directory apps/api mypy src
 uv run --directory tools/golden pytest -q
 ```
 
+## Report and slides
+
+The Persian A4 report and 16:9 slides are generated from static HTML/CSS with
+Playwright Chromium:
+
+```sh
+pnpm build:docs
+```
+
+Outputs:
+
+- `docs/deliverables/avalab-report-fa.pdf`
+- `docs/deliverables/avalab-slides-fa.pdf`
+
+The build needs no API or models. Screenshots are captured separately with
+`node docs/capture-report-assets.mjs`; see [`docs/REPORT.md`](docs/REPORT.md)
+for capture, font, verification, and cached-AI-figure notes.
+
 Regenerate artifacts when their sources change:
 
 ```sh
@@ -50,10 +68,15 @@ uv run --directory tools/demo_clips python generate.py   # bundled demo WAVs (de
 ## Docker
 
 ```sh
-docker compose up --build
+cp .env.example .env
+docker compose build
+docker compose run --rm --no-deps \
+  -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 \
+  api python scripts/download_models.py --all
+docker compose up -d
 ```
 
-Web is served on **http://localhost:8080** (Caddy serves the static build and proxies `/api/*` to the API container). API: <http://localhost:8080/api/v1/health>.
+Web is served on **http://localhost:8080** by default (`AVALAB_HTTP_PORT` changes the host port). Caddy serves the static build and proxies `/api/*` to the API container. API health: <http://localhost:8080/api/v1/health>. Models run offline after the one-time prefetch. Full runbook, offline verification, reverse-proxy/SSE notes, and the smoke test are in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ## Layout
 

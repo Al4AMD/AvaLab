@@ -141,9 +141,20 @@ export function useSpectrogramJob(
       return;
     }
     let cancelled = false;
+    let nextChunkIndex = 0;
     const keys: string[] = [];
     const store = useSessionStore.getState();
-    for (let chunkIndex = 0; chunkIndex < geometry.chunkCount; chunkIndex += 1) {
+    // One chunk in flight at a time. The worker is a single synchronous
+    // event loop: posting every chunk up front queues minutes of STFT work
+    // that a later tool's request (or a tool switch) must wait behind. The
+    // sequential fan-out keeps at most one stale chunk running after unmount
+    // while the first chunk still paints as soon as it settles.
+    const requestNextChunk = (): void => {
+      if (cancelled || nextChunkIndex >= geometry.chunkCount) {
+        return;
+      }
+      const chunkIndex = nextChunkIndex;
+      nextChunkIndex += 1;
       const request = spectrogramChunkRequest(geometry, params, chunkIndex);
       const ticket = store.deriveWithSourceSlice(
         "spectrogramTiles",
@@ -152,35 +163,44 @@ export function useSpectrogramJob(
         request.endSample,
       );
       keys.push(ticket.key);
-      ticket.outcome.then(
-        (outcome) => {
-          if (cancelled) {
-            return;
-          }
-          if ("cancelled" in outcome) {
-            return;
-          }
-          if (outcome.payload === undefined) {
-            setError(true);
-            return;
-          }
-          const payload = outcome.payload;
-          const rows = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
-          chunksRef.current.set(chunkIndex, {
-            rowStart: outcome.meta.rowStart,
-            frameCount: outcome.meta.rowCount,
-            rows,
-          });
-          setCompletedChunks(chunksRef.current.size);
-          setPaintVersion((version) => version + 1);
-        },
-        () => {
-          if (!cancelled) {
-            setError(true);
-          }
-        },
-      );
-    }
+      ticket.outcome
+        .then(
+          (outcome) => {
+            if (cancelled) {
+              return;
+            }
+            if ("cancelled" in outcome) {
+              return;
+            }
+            if (outcome.payload === undefined) {
+              setError(true);
+              return;
+            }
+            const payload = outcome.payload;
+            const rows = new Float32Array(
+              payload.buffer,
+              payload.byteOffset,
+              payload.byteLength / 4,
+            );
+            chunksRef.current.set(chunkIndex, {
+              rowStart: outcome.meta.rowStart,
+              frameCount: outcome.meta.rowCount,
+              rows,
+            });
+            setCompletedChunks(chunksRef.current.size);
+            setPaintVersion((version) => version + 1);
+          },
+          () => {
+            if (!cancelled) {
+              setError(true);
+            }
+          },
+        )
+        .finally(() => {
+          requestNextChunk();
+        });
+    };
+    requestNextChunk();
     return () => {
       cancelled = true;
       const live = useSessionStore.getState();

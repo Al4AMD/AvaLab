@@ -8,23 +8,42 @@
  * stay LTR (AGENTS §6). The 200 ms debounce matches the other Wave-3 labs.
  */
 
-import type { SpectrumEdit, SpectrumEditMode, SpectrumEditTarget } from "@avalab/dsp";
+import type {
+  SpectrumCurvePoint,
+  SpectrumCurveTarget,
+  SpectrumEdit,
+  SpectrumEditMode,
+  SpectrumEditTarget,
+} from "@avalab/dsp";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 import uPlot from "uplot";
+import { ToolHeader } from "../../components/ToolHeader";
 import "uplot/dist/uPlot.min.css";
 
 import { Button } from "../../components/ui/button";
 import { formatHz, formatS } from "../../lib/format";
+import { writeLastUsed } from "../../lib/lastUsed";
 import { FFT_MAX_LENGTH, type SpectrumEditResult } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
+import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
+import { CurveCanvas } from "./curveCanvas";
+import {
+  CURVE_URL_KEY,
+  isCurveTarget,
+  MAX_CURVE_POINTS,
+  SPECTRUM_CURVE_TARGETS,
+} from "./curveState";
 import {
   binsFromHz,
+  loadSpectrumEditSettings,
   presetEdits,
   SPECTRUM_EDIT_MODES,
   SPECTRUM_EDIT_PRESETS,
+  SPECTRUM_EDIT_STORAGE_KEY,
   SPECTRUM_EDIT_TARGETS,
   type SpectrumEditPreset,
   type SpectrumEditSettings,
@@ -187,18 +206,20 @@ export function SpectrumEditView(): React.ReactElement {
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
   const [searchParams, setSearchParams] = useSearchParams();
-  const settings = useMemo(
-    () =>
-      spectrumEditSettingsFromSearch(
-        `?${searchParams.toString()}`,
-        {
-          sampleCount: original?.samples.length ?? 0,
-          sampleRateHz: original?.sampleRateHz ?? 1,
-        },
-        selection,
-      ),
-    [searchParams, original, selection],
-  );
+  const settings = useMemo(() => {
+    const source = {
+      sampleCount: original?.samples.length ?? 0,
+      sampleRateHz: original?.sampleRateHz ?? 1,
+    };
+    if (searchParams.toString() === "") {
+      return loadSpectrumEditSettings(source, selection);
+    }
+    return spectrumEditSettingsFromSearch(`?${searchParams.toString()}`, source, selection);
+  }, [searchParams, original, selection]);
+
+  useEffect(() => {
+    writeLastUsed(SPECTRUM_EDIT_STORAGE_KEY, spectrumEditSettingsToSearch(settings));
+  }, [settings]);
   const [result, setResult] = useState<SpectrumEditViewResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -207,11 +228,14 @@ export function SpectrumEditView(): React.ReactElement {
   const [target, setTarget] = useState<SpectrumEditTarget>("mag");
   const [mode, setMode] = useState<SpectrumEditMode>("zero");
   const [value, setValue] = useState(0);
+  const [curveTarget, setCurveTarget] = useState<SpectrumCurveTarget>("mag");
+  const [curveDraft, setCurveDraft] = useState<readonly SpectrumCurvePoint[]>([]);
   const generationRef = useRef(0);
 
   function updateSettings(patch: Partial<SpectrumEditSettings>): void {
     const next = { ...settings, ...patch };
     const params = new URLSearchParams(searchParams);
+    params.delete(CURVE_URL_KEY);
     for (const [key, entry] of new URLSearchParams(spectrumEditSettingsToSearch(next))) {
       params.set(key, entry);
     }
@@ -232,9 +256,10 @@ export function SpectrumEditView(): React.ReactElement {
       startSample: rangeStart,
       endSample: rangeEnd,
       edits: settings.edits,
+      curves: settings.curves,
       hermitian: settings.hermitian,
     }),
-    [original, rangeStart, rangeEnd, settings.edits, settings.hermitian],
+    [original, rangeStart, rangeEnd, settings.edits, settings.curves, settings.hermitian],
   );
 
   useEffect(() => {
@@ -316,6 +341,19 @@ export function SpectrumEditView(): React.ReactElement {
     });
   }, [settings.edits]);
 
+  const curveValues = useMemo(() => {
+    if (result === null) {
+      return new Float64Array(0);
+    }
+    if (curveTarget === "mag") {
+      return result.magnitude;
+    }
+    if (curveTarget === "phase") {
+      return result.phase;
+    }
+    return curveTarget === "re" ? result.re : result.im;
+  }, [result, curveTarget]);
+
   const frequencies = useMemo(() => {
     if (result === null) {
       return new Float64Array(0);
@@ -345,6 +383,26 @@ export function SpectrumEditView(): React.ReactElement {
     });
   }
 
+  function applyCurve(): void {
+    if (curveDraft.length < 2) {
+      return;
+    }
+    updateSettings({
+      curves: [
+        ...settings.curves.filter((curve) => curve.target !== curveTarget),
+        { target: curveTarget, points: curveDraft },
+      ],
+    });
+    setCurveDraft([]);
+  }
+
+  function clearCurve(): void {
+    updateSettings({
+      curves: settings.curves.filter((curve) => curve.target !== curveTarget),
+    });
+    setCurveDraft([]);
+  }
+
   function playResult(): void {
     if (result === null) {
       return;
@@ -358,7 +416,10 @@ export function SpectrumEditView(): React.ReactElement {
   if (original === null) {
     return (
       <section className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold">{t("tool.spectrumEdit.title")}</h2>
+        <ToolHeader
+          titleKey="tool.spectrumEdit.title"
+          descriptionKey="tool.spectrumEdit.description"
+        />
         <UploadEmptyState />
       </section>
     );
@@ -369,7 +430,10 @@ export function SpectrumEditView(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold">{t("tool.spectrumEdit.title")}</h2>
+      <ToolHeader
+        titleKey="tool.spectrumEdit.title"
+        descriptionKey="tool.spectrumEdit.description"
+      />
 
       <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-3">
         <label className="flex flex-col gap-1 text-xs">
@@ -516,6 +580,78 @@ export function SpectrumEditView(): React.ReactElement {
             {presetLabels[preset]}
           </Button>
         ))}
+      </div>
+
+      <div className="flex flex-col gap-3 rounded border border-surface p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold">{t("spectrumEdit.curve.title")}</h3>
+          <label className="flex items-center gap-2 text-xs">
+            <span>{t("spectrumEdit.curve.target")}</span>
+            <select
+              value={curveTarget}
+              data-testid="spectrumEdit.curve.target"
+              onChange={(event) => {
+                const next = event.currentTarget.value;
+                if (isCurveTarget(next)) {
+                  setCurveTarget(next);
+                  setCurveDraft([]);
+                }
+              }}
+              className={INPUT_CLASSES}
+            >
+              {SPECTRUM_CURVE_TARGETS.map((entry) => (
+                <option key={entry} value={entry}>
+                  {targetLabels[entry]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <CurveCanvas
+          binCount={result?.meta.binCount ?? 1}
+          values={curveValues}
+          target={curveTarget}
+          points={curveDraft.slice(0, MAX_CURVE_POINTS)}
+          committed={settings.curves
+            .filter((curve) => curve.target === curveTarget)
+            .flatMap((curve) => curve.points)}
+          onChange={(points) => {
+            setCurveDraft(points);
+          }}
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            disabled={curveDraft.length < 2}
+            data-testid="spectrumEdit.curve.apply"
+            onClick={applyCurve}
+          >
+            {t("spectrumEdit.curve.apply")}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={curveDraft.length === 0}
+            data-testid="spectrumEdit.curve.undo"
+            onClick={() => {
+              setCurveDraft((points) => points.slice(0, -1));
+            }}
+          >
+            {t("spectrumEdit.curve.undo")}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={curveDraft.length === 0 && settings.curves.length === 0}
+            data-testid="spectrumEdit.curve.clear"
+            onClick={clearCurve}
+          >
+            {t("spectrumEdit.curve.clear")}
+          </Button>
+          <span className="text-xs text-muted" data-testid="spectrumEdit.curve.count">
+            {t("spectrumEdit.curve.points", { count: curveDraft.length })}
+          </span>
+        </div>
       </div>
 
       <div className="rounded border border-surface p-3 text-xs text-muted">
@@ -666,6 +802,11 @@ export function SpectrumEditView(): React.ReactElement {
           <li>{t("spectrumEdit.observe.gibbs")}</li>
         </ul>
       </div>
+
+      <TheoryPanel
+        titleKey={TOOL_THEORY["spectrum-edit"].titleKey}
+        sections={TOOL_THEORY["spectrum-edit"].sections}
+      />
     </section>
   );
 }

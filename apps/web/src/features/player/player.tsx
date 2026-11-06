@@ -21,9 +21,11 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useGlobalShortcuts } from "../../app/useGlobalShortcuts";
 import { Button } from "../../components/ui/button";
 import { useSessionStore } from "../../session/store";
 import { appPlayhead, type PlayheadListener } from "./playhead";
+import { useLoudnessMatch } from "./useLoudnessMatch";
 import { type PlayerApi, usePlayer } from "./usePlayer";
 
 /** Keyboard seek steps (AGENTS §10: units in the name, no magic numbers). */
@@ -36,6 +38,12 @@ function formatMmss(sample: number, sampleRateHz: number): string {
   const seconds = Math.max(0, Math.trunc(sample / sampleRateHz));
   const minutes = Math.trunc(seconds / 60);
   return `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+/** Signed one-decimal playback gain, locale-neutral (Latin digits). */
+function formatGainDb(gainDb: number): string {
+  const normalized = Math.abs(gainDb) < 0.05 ? 0 : gainDb;
+  return `${normalized > 0 ? "+" : ""}${normalized.toFixed(1)} dB`;
 }
 
 /**
@@ -69,9 +77,15 @@ function useDisplayedSample(player: PlayerApi): number {
 }
 
 /** The docked player panel — the layout renders exactly one, per page. */
-export function PlayerDock(): React.ReactElement {
+export function PlayerDock({
+  onShowHelp,
+}: {
+  readonly onShowHelp: () => void;
+}): React.ReactElement {
   const { t } = useTranslation();
   const player = usePlayer();
+  useGlobalShortcuts({ player, onShowHelp });
+  const loudness = useLoudnessMatch(player);
   const selection = useSessionStore((state) => state.selection);
   const original = useSessionStore((state) => state.original);
   const clearProcessed = useSessionStore((state) => state.clearProcessed);
@@ -170,6 +184,32 @@ export function PlayerDock(): React.ReactElement {
         >
           {t("player.ab.processed")}
         </Button>
+        <Button
+          size="sm"
+          variant={loudness.enabled ? "default" : "outline"}
+          aria-pressed={loudness.enabled}
+          aria-label={`${t("player.loudness.label")} — ${t("player.loudness.hint")}`}
+          title={t("player.loudness.hint")}
+          data-testid="player.loudnessMatch"
+          disabled={!hasSource}
+          onClick={() => {
+            loudness.toggle();
+          }}
+        >
+          {t("player.loudness.label")}
+        </Button>
+        <span
+          dir="ltr"
+          data-testid="player.loudnessGain"
+          title={t("player.loudness.hint")}
+          className="text-xs tabular-nums text-muted"
+        >
+          {loudness.status === "measuring"
+            ? t("player.loudness.measuring")
+            : loudness.enabled && player.hasProcessed
+              ? formatGainDb(loudness.gainDb)
+              : "—"}
+        </span>
         <Button
           size="sm"
           variant="outline"

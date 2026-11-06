@@ -15,10 +15,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 import uPlot from "uplot";
+import { ToolHeader } from "../../components/ToolHeader";
 import "uplot/dist/uPlot.min.css";
 
 import { Button } from "../../components/ui/button";
 import { formatHz, formatS } from "../../lib/format";
+import { writeLastUsed } from "../../lib/lastUsed";
 import {
   type ConvolutionStepsResult,
   FFT_MAX_LENGTH,
@@ -32,9 +34,12 @@ import { useSessionStore } from "../../session/store";
 import { browserDecodeWav, monoDownmix } from "../input/ingest";
 import { UploadEmptyState } from "../input/upload";
 import { paintSpectrogramChunk } from "../spectrogram/paintSpectrogram";
+import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
 import { paintWaveform } from "../waveform/paintWaveform";
 import {
   defaultReverbRange,
+  loadReverbSettings,
   REVERB_MAX_IR_SECONDS,
   REVERB_MAX_PRE_DELAY_MS,
   REVERB_MAX_RT60_SECONDS,
@@ -42,6 +47,7 @@ import {
   REVERB_MAX_UPLOADED_IR_SECONDS,
   REVERB_MIN_IR_SECONDS,
   REVERB_MIN_RT60_SECONDS,
+  REVERB_STORAGE_KEY,
   type ReverbIrPreset,
   type ReverbSettings,
   reverbPresetDefaults,
@@ -118,32 +124,6 @@ function useCanvasWidth(): {
   return { hostRef, widthPx };
 }
 
-function peakBuckets(samples: Float32Array, bucketCount: number): Float32Array {
-  const buckets = new Float32Array(Math.max(1, bucketCount) * 2);
-  if (samples.length === 0) {
-    return buckets;
-  }
-  const count = buckets.length / 2;
-  for (let bucket = 0; bucket < count; bucket += 1) {
-    const start = Math.floor((bucket * samples.length) / count);
-    const end = Math.max(start + 1, Math.floor(((bucket + 1) * samples.length) / count));
-    let min = Number.POSITIVE_INFINITY;
-    let max = Number.NEGATIVE_INFINITY;
-    for (let index = start; index < end && index < samples.length; index += 1) {
-      const value = samples[index] ?? 0;
-      if (value < min) {
-        min = value;
-      }
-      if (value > max) {
-        max = value;
-      }
-    }
-    buckets[2 * bucket] = Number.isFinite(min) ? min : 0;
-    buckets[2 * bucket + 1] = Number.isFinite(max) ? max : 0;
-  }
-  return buckets;
-}
-
 function WaveformPanel({
   samples,
   ariaLabel,
@@ -164,17 +144,41 @@ function WaveformPanel({
     if (ctx === null) {
       return;
     }
-    const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), MAX_DEVICE_PIXEL_RATIO);
-    paintWaveform(ctx, peakBuckets(samples, Math.max(1, Math.round(widthPx))), {
-      widthPx,
-      heightPx: WAVEFORM_HEIGHT_PX,
-      dpr,
-      background: "#0b1220",
-      wave: "#8bd3c7",
-      center: "#334155",
-      playhead: "#f59e0b",
-      selection: "rgba(56,189,248,0.18)",
-    });
+    let cancelled = false;
+    const copy = samples.slice();
+    const ticket = useSessionStore
+      .getState()
+      .deriveStandalone(
+        "waveformEnvelope",
+        { bucketCount: Math.max(1, Math.round(widthPx)) },
+        { buffer: copy.buffer, byteOffset: 0, byteLength: copy.byteLength },
+      );
+    ticket.outcome.then(
+      (outcome) => {
+        if (cancelled || "cancelled" in outcome || outcome.payload === undefined) {
+          return;
+        }
+        const payload = outcome.payload;
+        const minMax = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+        const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), MAX_DEVICE_PIXEL_RATIO);
+        paintWaveform(ctx, minMax, {
+          widthPx,
+          heightPx: WAVEFORM_HEIGHT_PX,
+          dpr,
+          background: "#0b1220",
+          wave: "#8bd3c7",
+          center: "#334155",
+          playhead: "#f59e0b",
+          selection: "rgba(56,189,248,0.18)",
+        });
+      },
+      () => {
+        // The envelope is display-only; a failed request leaves the canvas blank.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
   }, [samples, widthPx]);
   return (
     <div ref={hostRef} dir="ltr">
@@ -348,6 +352,14 @@ function SpectrogramPanel({
       return;
     }
     const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), MAX_DEVICE_PIXEL_RATIO);
+    const widthDevicePx = Math.max(1, Math.round(widthPx * dpr));
+    const heightDevicePx = Math.max(1, Math.round(SPECTROGRAM_HEIGHT_PX * dpr));
+    if (canvas.width !== widthDevicePx) {
+      canvas.width = widthDevicePx;
+    }
+    if (canvas.height !== heightDevicePx) {
+      canvas.height = heightDevicePx;
+    }
     paintSpectrogramChunk(ctx, tile.rows, {
       widthPx,
       heightPx: SPECTROGRAM_HEIGHT_PX,
@@ -456,18 +468,20 @@ export function ReverbView(): React.ReactElement {
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
   const [searchParams, setSearchParams] = useSearchParams();
-  const settings = useMemo(
-    () =>
-      reverbSettingsFromSearch(
-        `?${searchParams.toString()}`,
-        {
-          sampleCount: original?.samples.length ?? 0,
-          sampleRateHz: original?.sampleRateHz ?? 1,
-        },
-        selection,
-      ),
-    [searchParams, original, selection],
-  );
+  const settings = useMemo(() => {
+    const source = {
+      sampleCount: original?.samples.length ?? 0,
+      sampleRateHz: original?.sampleRateHz ?? 1,
+    };
+    if (searchParams.toString() === "") {
+      return loadReverbSettings(source, selection);
+    }
+    return reverbSettingsFromSearch(`?${searchParams.toString()}`, source, selection);
+  }, [searchParams, original, selection]);
+
+  useEffect(() => {
+    writeLastUsed(REVERB_STORAGE_KEY, reverbSettingsToSearch(settings));
+  }, [settings]);
   const [uploadedIr, setUploadedIr] = useState<UploadedIr | null>(null);
   const [decodingIr, setDecodingIr] = useState(false);
   const [result, setResult] = useState<ReverbResult | null>(null);
@@ -905,7 +919,7 @@ export function ReverbView(): React.ReactElement {
   if (original === null) {
     return (
       <section className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold">{t("tool.reverb.title")}</h2>
+        <ToolHeader titleKey="tool.reverb.title" descriptionKey="tool.reverb.description" />
         <UploadEmptyState />
       </section>
     );
@@ -922,7 +936,7 @@ export function ReverbView(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold">{t("tool.reverb.title")}</h2>
+      <ToolHeader titleKey="tool.reverb.title" descriptionKey="tool.reverb.description" />
 
       <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-xs">
@@ -1060,6 +1074,7 @@ export function ReverbView(): React.ReactElement {
           <input
             type="file"
             accept="audio/*"
+            aria-label={t("reverb.controls.upload")}
             data-testid="reverb.upload"
             onChange={(event) => {
               const file = event.currentTarget.files?.[0];
@@ -1394,6 +1409,8 @@ export function ReverbView(): React.ReactElement {
           <li>{t("reverb.observe.ir")}</li>
         </ul>
       </div>
+
+      <TheoryPanel titleKey={TOOL_THEORY.reverb.titleKey} sections={TOOL_THEORY.reverb.sections} />
     </section>
   );
 }

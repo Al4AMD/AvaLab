@@ -10,10 +10,12 @@ import { describe, expect, it } from "vitest";
 import {
   type AudioBufferLike,
   createTransport,
+  mapAbsolutePlayheadToLane,
   mapPlayheadSeconds,
   type Transport,
   type TransportBuffer,
   type TransportContext,
+  type TransportGain,
   type TransportNode,
   type TransportOptions,
   type TransportState,
@@ -25,6 +27,7 @@ const LENGTH = 88_200; // 2 s of 44.1 kHz mono
 /** Recording node fake: every transport call lands in the record fields. */
 type FakeNode = TransportNode & {
   readonly id: number;
+  connectedTo: unknown[];
   startedWith: Array<{ when: number | undefined; offset: number | undefined }>;
   stoppedCount: number;
   disconnectedCount: number;
@@ -34,9 +37,16 @@ type FakeNode = TransportNode & {
  * outside the injected time source (the transport never reads currentTime
  * directly — the seam promise that node tests keep the interpolation
  * deterministic). */
+type FakeGain = TransportGain & {
+  connectedTo: unknown[];
+  disconnectedCount: number;
+};
+
 type RecordingHarness = {
   readonly clock: { seconds: number };
+  readonly destination: unknown;
   readonly nodes: FakeNode[];
+  readonly gains: FakeGain[];
   readonly buffers: Array<{
     readonly source: AudioBufferLike;
     readonly sampleRateHz: number;
@@ -65,16 +75,23 @@ function makeBufferLike(length: number = LENGTH, sampleRate: number = RATE): Aud
   };
 }
 
-function createHarness(harnessOptions?: Partial<TransportOptions>): RecordingHarness {
+function createHarness(
+  harnessOptions?: Partial<TransportOptions>,
+  options: { withGain?: boolean } = {},
+): RecordingHarness {
   const clock = { seconds: 0 };
+  const destination = {};
   const nodes: FakeNode[] = [];
+  const gains: FakeGain[] = [];
   const buffers: RecordingHarness["buffers"] = [];
   const counts = { contexts: 0, resumed: 0, closed: 0 };
   const onEndedSamples: number[] = [];
 
   const harness: Partial<RecordingHarness> = {
     clock,
+    destination,
     nodes,
+    gains,
     buffers,
     counts,
     onEndedSamples,
@@ -84,7 +101,7 @@ function createHarness(harnessOptions?: Partial<TransportOptions>): RecordingHar
     counts.contexts += 1;
     const context: TransportContext = {
       currentTime: 0, // stale constant: the transport must use the seam
-      destination: {},
+      destination,
       createBuffer(numberOfChannels, length, sampleRate): TransportBuffer {
         const data = new Float32Array(Math.max(0, length));
         return {
@@ -104,6 +121,25 @@ function createHarness(harnessOptions?: Partial<TransportOptions>): RecordingHar
       close: () => {
         counts.closed += 1;
       },
+      ...(options.withGain
+        ? {
+            createGain(): TransportGain {
+              const gain: FakeGain = {
+                gain: { value: 1 },
+                connectedTo: [],
+                disconnectedCount: 0,
+                connect(target) {
+                  gain.connectedTo.push(target);
+                },
+                disconnect() {
+                  gain.disconnectedCount += 1;
+                },
+              };
+              gains.push(gain);
+              return gain;
+            },
+          }
+        : {}),
     };
     return context;
   };
@@ -129,10 +165,14 @@ function createHarness(harnessOptions?: Partial<TransportOptions>): RecordingHar
     const node: FakeNode = {
       id: nodes.length,
       buffer: null,
+      connectedTo: [],
       startedWith: [],
       stoppedCount: 0,
       disconnectedCount: 0,
       onended: null,
+      connect(target) {
+        node.connectedTo.push(target);
+      },
       start(when, offset) {
         void context;
         node.startedWith.push({ when, offset });
@@ -240,6 +280,7 @@ describe("transport: play/pause position semantics (documented + pinned)", () =>
     harness.transport.play(44_100);
     const node = onlyNode(harness);
     expect(harness.transport.getState()).toEqual({ phase: "playing", startedAtSample: 44_100 });
+    expect(node.connectedTo).toEqual([harness.destination]);
     expect(node.startedWith).toEqual([{ when: 0, offset: 1 }]);
     expect(node.onended).toBeTypeOf("function");
     expect(harness.counts.resumed).toBe(1); // suspended-context activation
@@ -251,6 +292,21 @@ describe("transport: play/pause position semantics (documented + pinned)", () =>
     harness.transport.seekToSample(22_050);
     harness.transport.play();
     expect(harness.transport.getState()).toEqual({ phase: "playing", startedAtSample: 22_050 });
+  });
+
+  it("a restarted node connects to the destination exactly once", () => {
+    const harness = createHarness();
+    setTwoSecondSource(harness);
+    harness.transport.play();
+    harness.transport.seekToSample(22_050);
+    harness.transport.pause();
+    harness.transport.play();
+
+    expect(harness.nodes.map((node) => node.connectedTo)).toEqual([
+      [harness.destination],
+      [harness.destination],
+      [harness.destination],
+    ]);
   });
 
   it("play() while playing is a documented no-op (no second node)", () => {
@@ -597,5 +653,104 @@ describe("mapPlayheadSeconds", () => {
   it("treats non-finite input as zero", () => {
     expect(mapPlayheadSeconds(Number.NaN, 48_000, 48_000)).toBe(0);
     expect(mapPlayheadSeconds(Number.POSITIVE_INFINITY, 48_000, 48_000)).toBe(0);
+  });
+});
+
+describe("mapAbsolutePlayheadToLane", () => {
+  it("maps an excerpt-local position back to the original timeline", () => {
+    expect(mapAbsolutePlayheadToLane(10, 240_000, 24_000, 600_000)).toBe(0);
+    expect(mapAbsolutePlayheadToLane(12, 240_000, 24_000, 600_000)).toBe(48_000);
+  });
+
+  it("clamps a position before the excerpt to local zero", () => {
+    expect(mapAbsolutePlayheadToLane(0, 240_000, 24_000, 600_000)).toBe(0);
+  });
+
+  it("clamps at the lane end", () => {
+    expect(mapAbsolutePlayheadToLane(99, 0, 24_000, 24_000)).toBe(23_999);
+  });
+
+  it("treats a non-finite absolute time as zero", () => {
+    expect(mapAbsolutePlayheadToLane(Number.NaN, 0, 24000, 24000)).toBe(0);
+  });
+});
+
+describe("transport: gain seam", () => {
+  it("routes the source through one gain node connected to the destination", () => {
+    const harness = createHarness(undefined, { withGain: true });
+    setTwoSecondSource(harness);
+
+    expect(harness.gains).toHaveLength(1);
+    expect(harness.gains[0]?.connectedTo).toEqual([harness.destination]);
+
+    harness.transport.play();
+    expect(onlyNode(harness).connectedTo).toEqual([harness.gains[0]]);
+  });
+
+  it("keeps the direct connection when the context has no gain node", () => {
+    const harness = createHarness();
+    setTwoSecondSource(harness);
+    harness.transport.play();
+
+    expect(harness.gains).toHaveLength(0);
+    expect(onlyNode(harness).connectedTo).toEqual([harness.destination]);
+  });
+
+  it("sets linear gain from dB, clamps, ignores non-finite values, and resets exactly", () => {
+    const harness = createHarness(undefined, { withGain: true });
+    setTwoSecondSource(harness);
+    const gain = harness.gains[0];
+    expect(gain).toBeDefined();
+    if (gain === undefined) {
+      return;
+    }
+
+    expect(harness.transport.gainDb).toBe(0);
+    expect(gain.gain.value).toBe(1);
+
+    harness.transport.setGainDb(-6);
+    expect(harness.transport.gainDb).toBe(-6);
+    expect(gain.gain.value).toBeCloseTo(10 ** (-6 / 20), 12);
+
+    harness.transport.setGainDb(Number.NaN);
+    expect(harness.transport.gainDb).toBe(-6);
+    expect(gain.gain.value).toBeCloseTo(10 ** (-6 / 20), 12);
+
+    harness.transport.setGainDb(100);
+    expect(harness.transport.gainDb).toBe(24);
+    harness.transport.setGainDb(-100);
+    expect(harness.transport.gainDb).toBe(-24);
+
+    harness.transport.setGainDb(0);
+    expect(harness.transport.gainDb).toBe(0);
+    expect(gain.gain.value).toBe(1);
+  });
+
+  it("resetting the original lane does not change playback state or replace the node", () => {
+    const harness = createHarness(undefined, { withGain: true });
+    setTwoSecondSource(harness);
+    harness.transport.play();
+    const before = harness.transport.getState();
+
+    harness.transport.setGainDb(-6);
+    harness.transport.setGainDb(0);
+
+    expect(harness.transport.getState()).toEqual(before);
+    expect(harness.nodes).toHaveLength(1);
+    expect(harness.gains).toHaveLength(1);
+  });
+
+  it("disposes the gain node with the transport", () => {
+    const harness = createHarness(undefined, { withGain: true });
+    setTwoSecondSource(harness);
+    const gain = harness.gains[0];
+    expect(gain).toBeDefined();
+    if (gain === undefined) {
+      return;
+    }
+
+    harness.transport.dispose();
+    expect(gain.disconnectedCount).toBe(1);
+    expect(harness.transport.gainDb).toBe(0);
   });
 });

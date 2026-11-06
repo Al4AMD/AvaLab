@@ -156,6 +156,24 @@ describe("supersede and cancel semantics", () => {
     await expect(second).resolves.toEqual({ meta: { received: true } });
   });
 
+  it("does NOT supersede detached calls with identical params and different payloads", async () => {
+    const { rpc, transport } = makeRpc("silent");
+    const first = rpc.call("sessionPing", { count: 1 }, float32PayloadOf([1]), {
+      supersede: false,
+    });
+    const second = rpc.call("sessionPing", { count: 1 }, float32PayloadOf([2]), {
+      supersede: false,
+    });
+
+    expect(cancelFramesOf(transport)).toEqual([]);
+    expect(requestsOf(transport)).toHaveLength(2);
+
+    transport.deliver({ id: 0, ok: true, result: { meta: { received: true } } });
+    await expect(first).resolves.toEqual({ meta: { received: true } });
+    transport.deliver({ id: 1, ok: true, result: { meta: { received: true } } });
+    await expect(second).resolves.toEqual({ meta: { received: true } });
+  });
+
   it("does NOT supersede different params: both pending calls settle independently", async () => {
     const { rpc, transport } = makeRpc("silent");
     const first = rpc.call("sessionPing", { count: 1 });

@@ -50,7 +50,7 @@ test("Persian (default): dock arms after a demo load, play advances the readout,
   // Now armed: hint gone, play available, readout at the start, the lane
   // badge names the loaded lane (the T2 carry that Task 4 owns).
   await expect(page.getByTestId("player.empty")).toHaveCount(0);
-  await expect(page.getByTestId("player.lane")).toContainText("کلیپ نمونه");
+  await expect(page.getByTestId("player.lane")).toContainText("نمونهٔ صوتی");
   const toggle = page.getByTestId("player.playToggle");
   await expect(toggle).toBeEnabled();
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
