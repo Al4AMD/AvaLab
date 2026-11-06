@@ -19,6 +19,7 @@ import "uplot/dist/uPlot.min.css";
 
 import { Button } from "../../components/ui/button";
 import { formatHz, formatS } from "../../lib/format";
+import { writeLastUsed } from "../../lib/lastUsed";
 import {
   type ExtentProcessParams,
   type ExtentProcessResult,
@@ -35,10 +36,12 @@ import {
   EXTENT_MAX_REPETITIONS,
   EXTENT_MIN_FACTOR,
   EXTENT_MIN_REPETITIONS,
+  EXTENT_STORAGE_KEY,
   type ExtentOperationName,
   type ExtentSettings,
   extentSettingsFromSearch,
   extentSettingsToSearch,
+  loadExtentSettings,
 } from "./extentState";
 
 const CONTROL_FOCUS_CLASSES =
@@ -312,18 +315,20 @@ export function ExtentView(): React.ReactElement {
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
   const [searchParams, setSearchParams] = useSearchParams();
-  const settings = useMemo(
-    () =>
-      extentSettingsFromSearch(
-        `?${searchParams.toString()}`,
-        {
-          sampleCount: original?.samples.length ?? 0,
-          sampleRateHz: original?.sampleRateHz ?? 1,
-        },
-        selection,
-      ),
-    [searchParams, original, selection],
-  );
+  const settings = useMemo(() => {
+    const source = {
+      sampleCount: original?.samples.length ?? 0,
+      sampleRateHz: original?.sampleRateHz ?? 1,
+    };
+    if (searchParams.toString() === "") {
+      return loadExtentSettings(source, selection);
+    }
+    return extentSettingsFromSearch(`?${searchParams.toString()}`, source, selection);
+  }, [searchParams, original, selection]);
+
+  useEffect(() => {
+    writeLastUsed(EXTENT_STORAGE_KEY, extentSettingsToSearch(settings));
+  }, [settings]);
   const [beforeSamples, setBeforeSamples] = useState<Float32Array | null>(null);
   const [result, setResult] = useState<ExtentResult | null>(null);
   const [beforeSpectrum, setBeforeSpectrum] = useState<Spectrum | null>(null);

@@ -20,6 +20,7 @@ import { useSearchParams } from "react-router";
 
 import { Button } from "../../components/ui/button";
 import { formatHz, formatS } from "../../lib/format";
+import { writeLastUsed } from "../../lib/lastUsed";
 import type { PipelineOutput, PipelineStageSummary } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
@@ -31,8 +32,10 @@ import {
   deletePipelineEdge,
   deletePipelineNode,
   encodePipelineState,
+  loadPipelineState,
   PIPELINE_MAX_NODES,
   PIPELINE_MAX_OUTPUTS,
+  PIPELINE_STORAGE_KEY,
   type PipelineEdge,
   type PipelineGraph,
   type PipelineNode,
@@ -782,9 +785,13 @@ export function PipelineView(): React.ReactElement {
   const original = useSessionStore((session) => session.original);
   const selection = useSessionStore((session) => session.selection);
   const [searchParams, setSearchParams] = useSearchParams();
-  const initial = useRef(pipelineStateFromSearch(`?${searchParams.toString()}`));
-  const [state, setState] = useState<PipelineState>(initial.current.state);
-  const [urlWarning, setUrlWarning] = useState(initial.current.warning);
+  const [initial] = useState(() =>
+    searchParams.toString() === ""
+      ? loadPipelineState()
+      : pipelineStateFromSearch(`?${searchParams.toString()}`),
+  );
+  const [state, setState] = useState<PipelineState>(initial.state);
+  const [urlWarning, setUrlWarning] = useState(initial.warning);
   const [actionError, setActionError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [installed, setInstalled] = useState<string | null>(null);
@@ -808,6 +815,7 @@ export function PipelineView(): React.ReactElement {
       setUrlWarning(encoded.warning);
       return;
     }
+    writeLastUsed(PIPELINE_STORAGE_KEY, encoded.search);
     if (encoded.search === lastEncodedRef.current) {
       return;
     }

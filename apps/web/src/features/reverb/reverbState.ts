@@ -5,6 +5,8 @@
  * view asks for the file again after a reload. The preview range defaults to
  * the current sub-selection, else the first 30 s (AGENTS §9).
  */
+
+import { type LastUsedStorage, readLastUsed } from "../../lib/lastUsed";
 import { decodeParams, encodeParams } from "../../lib/url-state";
 
 export const REVERB_IR_PRESETS = ["room", "hall", "plate", "telephone", "upload"] as const;
@@ -35,6 +37,8 @@ export const REVERB_MAX_IR_SECONDS = 10;
 export const REVERB_MAX_PRE_DELAY_MS = 500;
 export const REVERB_MAX_UPLOADED_IR_SECONDS = 10;
 export const REVERB_MAX_SEED = 4_294_967_295;
+
+export const REVERB_STORAGE_KEY = "avalab.reverb.last";
 
 export const REVERB_DEFAULT_SETTINGS: ReverbSettings = {
   irKind: "hall",
@@ -160,4 +164,14 @@ export function reverbSettingsFromSearch(
     startSample: range.startSample,
     endSample: range.endSample,
   };
+}
+
+/** Last-used panel; missing/invalid storage decodes to the same defaults. */
+export function loadReverbSettings(
+  source: ReverbSourceInfo,
+  selection: ReverbRange,
+  storage?: LastUsedStorage | null,
+): ReverbSettings {
+  const stored = readLastUsed(REVERB_STORAGE_KEY, storage);
+  return reverbSettingsFromSearch(stored === null ? "" : stored, source, selection);
 }

@@ -51,6 +51,9 @@ export type PlayerApi = {
   readonly state: TransportState;
   readonly lengthSamples: number;
   readonly sampleRateHz: number;
+  /** Playback gain in dB; reset to 0 whenever the active lane changes. */
+  readonly gainDb: number;
+  readonly setGainDb: (gainDb: number) => void;
   /** Play/pause toggle by phase (the button is the only caller). */
   readonly togglePlay: () => void;
   readonly seekBySeconds: (deltaSeconds: number) => void;
@@ -72,6 +75,7 @@ export function usePlayer(): PlayerApi {
   const setStorePlaybackMode = useSessionStore((state) => state.setPlaybackMode);
 
   const [machine, setMachine] = useState<Transport | null>(null);
+  const [gainDb, setGainDbState] = useState(0);
   const activeLaneRef = useRef<Readonly<SessionSource | ProcessedSource> | null>(null);
   useEffect(() => {
     const transport = createTransport({
@@ -106,6 +110,11 @@ export function usePlayer(): PlayerApi {
     if (machine === null || active === null) {
       return;
     }
+    // Loudness matching belongs to the lane that produced it: every active
+    // source change starts from unity until the measurement hook applies a
+    // fresh match (Task 4), so the original lane can never inherit gain.
+    machine.setGainDb(0);
+    setGainDbState(0);
     // A/B swap keeps the position in TIME (not sample index): capture the
     // current seconds, attach the new lane, then seek the mapped sample.
     // Playback resumes if it was playing before the swap (Task 3 contract).
@@ -160,6 +169,14 @@ export function usePlayer(): PlayerApi {
     state,
     lengthSamples: machine?.lengthSamples ?? 0,
     sampleRateHz: machine?.sampleRateHz ?? 0,
+    gainDb,
+    setGainDb: (nextGainDb) => {
+      if (machine === null) {
+        return;
+      }
+      machine.setGainDb(nextGainDb);
+      setGainDbState(machine.gainDb);
+    },
     togglePlay: () => {
       if (machine === null) {
         return;

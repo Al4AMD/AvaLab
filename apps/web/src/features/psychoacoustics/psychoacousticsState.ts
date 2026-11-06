@@ -4,7 +4,10 @@
  * The analysis window is not part of the URL: it follows the current
  * sub-selection, else the first 30 s (AGENTS §9 live-preview budget).
  */
+import { type LastUsedStorage, readLastUsed } from "../../lib/lastUsed";
 import { decodeParams, encodeParams } from "../../lib/url-state";
+
+export const PSYCHOACOUSTICS_STORAGE_KEY = "avalab.psychoacoustics.last";
 
 export const PSYCHOACOUSTICS_REFERENCE_MIN = 80;
 export const PSYCHOACOUSTICS_REFERENCE_MAX = 100;
@@ -84,4 +87,12 @@ export function psychoacousticsAnalysisRange(
     startSample: 0,
     endSample: Math.min(sampleCount, Math.round(PSYCHOACOUSTICS_PREVIEW_SECONDS * sampleRateHz)),
   };
+}
+
+/** Last-used panel; missing/invalid storage decodes to the defaults. */
+export function loadPsychoacousticsSettings(
+  storage?: LastUsedStorage | null,
+): PsychoacousticsSettings {
+  const stored = readLastUsed(PSYCHOACOUSTICS_STORAGE_KEY, storage);
+  return psychoacousticsSettingsFromSearch(stored === null ? "" : stored);
 }

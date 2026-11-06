@@ -11,8 +11,38 @@
       "offline": "Server unavailable",
       "offlineDetail": "Browser-side tools still work; server-side features (codecs and models) are disabled."
     },
+    "theme": {
+      "label": "Theme",
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
+    },
     "privacy": {
       "ttlNotice": "Uploaded files are deleted from the server automatically after 60 minutes."
+    }
+  },
+  "shortcuts": {
+    "open": "Keyboard shortcuts",
+    "title": "Keyboard shortcuts",
+    "hint": "These shortcuts work when focus is not in a text field or a dialog.",
+    "close": "Close",
+    "keyHeader": "Key",
+    "actionHeader": "Action",
+    "keys": {
+      "space": "Space",
+      "left": "←",
+      "right": "→",
+      "shiftLeft": "Shift + ←",
+      "shiftRight": "Shift + →",
+      "question": "?"
+    },
+    "actions": {
+      "playPause": "Play / pause",
+      "back5": "Seek back 5 seconds",
+      "forward5": "Seek forward 5 seconds",
+      "back10": "Seek back 10 seconds",
+      "forward10": "Seek forward 10 seconds",
+      "help": "Open this help"
     }
   },
   "processed": {
@@ -538,6 +568,11 @@
       "aria": "Playback lane",
       "original": "Original",
       "processed": "Processed"
+    },
+    "loudness": {
+      "label": "Loudness match (BS.1770)",
+      "hint": "Changes only playback gain; the audio file is not modified.",
+      "measuring": "Measuring…"
     },
     "reset": "Reset to original"
   },

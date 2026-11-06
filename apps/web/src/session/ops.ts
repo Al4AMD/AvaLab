@@ -79,9 +79,11 @@ import {
   int16PcmToFloat,
   isStable,
   kaiser,
+  type LoudnessResult,
   magnitudeDb,
   maskingThresholdDb,
   mdct,
+  measureLoudness,
   measureReferencePower,
   mse,
   mulawDecode,
@@ -424,6 +426,90 @@ export function qualityMetrics(
     snrDb: snrDb(reference, test),
     segmentalSnrDb: segmentalSnrDb(reference, test, { frameLengthSamples }),
     psnrDb: psnrDb(reference, test, { peak: 1 }),
+  };
+}
+
+export type LoudnessMeasureParams = { sampleRateHz: number };
+export type LoudnessMeasureBlock = {
+  startSample: number;
+  loudnessLufs: number;
+  absoluteGated: boolean;
+  relativeGated: boolean;
+};
+export type LoudnessMeasureResult = {
+  meta: {
+    sampleCount: number;
+    sampleRateHz: number;
+    blockCount: number;
+  };
+  integratedLufs: number;
+  blockCount: number;
+  blockDurationSeconds: number;
+  blockHopSeconds: number;
+  blocks: LoudnessMeasureBlock[];
+};
+
+/** BS.1770 loudness over one mono Float32 lane. Results are small structured
+ * data; the UI formats them and applies the returned gain at playback. */
+export function loudnessMeasure(
+  params: LoudnessMeasureParams,
+  payload?: TransferablePayload,
+): LoudnessMeasureResult {
+  if (
+    params === undefined ||
+    params === null ||
+    !Number.isFinite(params.sampleRateHz) ||
+    params.sampleRateHz <= 0 ||
+    params.sampleRateHz > 96_000
+  ) {
+    throw new DspOpError("badParams", `loudnessMeasure: invalid params ${String(params)}`);
+  }
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "loudnessMeasure: a Float32 source payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError(
+      "badPayload",
+      `loudnessMeasure: payload must be Float32-aligned, got byteOffset ${String(payload.byteOffset)}/byteLength ${String(payload.byteLength)}`,
+    );
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  if (samples.length === 0) {
+    throw new DspOpError("badPayload", "loudnessMeasure: payload must not be empty");
+  }
+  if (samples.length / params.sampleRateHz > 300) {
+    throw new DspOpError("badParams", "loudnessMeasure: payload exceeds the 300 s cap");
+  }
+  for (let index = 0; index < samples.length; index += 1) {
+    if (!Number.isFinite(samples[index])) {
+      throw new DspOpError("badPayload", `loudnessMeasure: sample ${String(index)} is not finite`);
+    }
+  }
+
+  let measured: LoudnessResult;
+  try {
+    measured = measureLoudness(samples, { sampleRateHz: params.sampleRateHz });
+  } catch (error) {
+    const code = error instanceof TypeError ? "badPayload" : "badParams";
+    throw new DspOpError(code, error instanceof Error ? error.message : "loudnessMeasure failed");
+  }
+
+  return {
+    meta: {
+      sampleCount: samples.length,
+      sampleRateHz: params.sampleRateHz,
+      blockCount: measured.blocks.length,
+    },
+    integratedLufs: measured.integratedLufs,
+    blockCount: measured.blocks.length,
+    blockDurationSeconds: measured.blockDurationSeconds,
+    blockHopSeconds: measured.blockHopSeconds,
+    blocks: measured.blocks.map((block) => ({
+      startSample: block.startSample,
+      loudnessLufs: block.loudnessLufs,
+      absoluteGated: block.absoluteGated,
+      relativeGated: block.relativeGated,
+    })),
   };
 }
 
@@ -2990,6 +3076,13 @@ export const dspOps = {
     } as SpectrogramTilesParams,
     result: undefined as unknown as SpectrogramTilesResult,
     handler: spectrogramTiles,
+  },
+  loudnessMeasure: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: { sampleRateHz: 0 },
+    result: undefined as unknown as LoudnessMeasureResult,
+    handler: loudnessMeasure,
   },
   sessionPing: {
     // Type lenses only — the table is read for types (DspOpParams/Result);

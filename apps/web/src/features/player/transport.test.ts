@@ -15,6 +15,7 @@ import {
   type Transport,
   type TransportBuffer,
   type TransportContext,
+  type TransportGain,
   type TransportNode,
   type TransportOptions,
   type TransportState,
@@ -36,10 +37,16 @@ type FakeNode = TransportNode & {
  * outside the injected time source (the transport never reads currentTime
  * directly — the seam promise that node tests keep the interpolation
  * deterministic). */
+type FakeGain = TransportGain & {
+  connectedTo: unknown[];
+  disconnectedCount: number;
+};
+
 type RecordingHarness = {
   readonly clock: { seconds: number };
   readonly destination: unknown;
   readonly nodes: FakeNode[];
+  readonly gains: FakeGain[];
   readonly buffers: Array<{
     readonly source: AudioBufferLike;
     readonly sampleRateHz: number;
@@ -68,10 +75,14 @@ function makeBufferLike(length: number = LENGTH, sampleRate: number = RATE): Aud
   };
 }
 
-function createHarness(harnessOptions?: Partial<TransportOptions>): RecordingHarness {
+function createHarness(
+  harnessOptions?: Partial<TransportOptions>,
+  options: { withGain?: boolean } = {},
+): RecordingHarness {
   const clock = { seconds: 0 };
   const destination = {};
   const nodes: FakeNode[] = [];
+  const gains: FakeGain[] = [];
   const buffers: RecordingHarness["buffers"] = [];
   const counts = { contexts: 0, resumed: 0, closed: 0 };
   const onEndedSamples: number[] = [];
@@ -80,6 +91,7 @@ function createHarness(harnessOptions?: Partial<TransportOptions>): RecordingHar
     clock,
     destination,
     nodes,
+    gains,
     buffers,
     counts,
     onEndedSamples,
@@ -109,6 +121,25 @@ function createHarness(harnessOptions?: Partial<TransportOptions>): RecordingHar
       close: () => {
         counts.closed += 1;
       },
+      ...(options.withGain
+        ? {
+            createGain(): TransportGain {
+              const gain: FakeGain = {
+                gain: { value: 1 },
+                connectedTo: [],
+                disconnectedCount: 0,
+                connect(target) {
+                  gain.connectedTo.push(target);
+                },
+                disconnect() {
+                  gain.disconnectedCount += 1;
+                },
+              };
+              gains.push(gain);
+              return gain;
+            },
+          }
+        : {}),
     };
     return context;
   };
@@ -641,5 +672,85 @@ describe("mapAbsolutePlayheadToLane", () => {
 
   it("treats a non-finite absolute time as zero", () => {
     expect(mapAbsolutePlayheadToLane(Number.NaN, 0, 24000, 24000)).toBe(0);
+  });
+});
+
+describe("transport: gain seam", () => {
+  it("routes the source through one gain node connected to the destination", () => {
+    const harness = createHarness(undefined, { withGain: true });
+    setTwoSecondSource(harness);
+
+    expect(harness.gains).toHaveLength(1);
+    expect(harness.gains[0]?.connectedTo).toEqual([harness.destination]);
+
+    harness.transport.play();
+    expect(onlyNode(harness).connectedTo).toEqual([harness.gains[0]]);
+  });
+
+  it("keeps the direct connection when the context has no gain node", () => {
+    const harness = createHarness();
+    setTwoSecondSource(harness);
+    harness.transport.play();
+
+    expect(harness.gains).toHaveLength(0);
+    expect(onlyNode(harness).connectedTo).toEqual([harness.destination]);
+  });
+
+  it("sets linear gain from dB, clamps, ignores non-finite values, and resets exactly", () => {
+    const harness = createHarness(undefined, { withGain: true });
+    setTwoSecondSource(harness);
+    const gain = harness.gains[0];
+    expect(gain).toBeDefined();
+    if (gain === undefined) {
+      return;
+    }
+
+    expect(harness.transport.gainDb).toBe(0);
+    expect(gain.gain.value).toBe(1);
+
+    harness.transport.setGainDb(-6);
+    expect(harness.transport.gainDb).toBe(-6);
+    expect(gain.gain.value).toBeCloseTo(10 ** (-6 / 20), 12);
+
+    harness.transport.setGainDb(Number.NaN);
+    expect(harness.transport.gainDb).toBe(-6);
+    expect(gain.gain.value).toBeCloseTo(10 ** (-6 / 20), 12);
+
+    harness.transport.setGainDb(100);
+    expect(harness.transport.gainDb).toBe(24);
+    harness.transport.setGainDb(-100);
+    expect(harness.transport.gainDb).toBe(-24);
+
+    harness.transport.setGainDb(0);
+    expect(harness.transport.gainDb).toBe(0);
+    expect(gain.gain.value).toBe(1);
+  });
+
+  it("resetting the original lane does not change playback state or replace the node", () => {
+    const harness = createHarness(undefined, { withGain: true });
+    setTwoSecondSource(harness);
+    harness.transport.play();
+    const before = harness.transport.getState();
+
+    harness.transport.setGainDb(-6);
+    harness.transport.setGainDb(0);
+
+    expect(harness.transport.getState()).toEqual(before);
+    expect(harness.nodes).toHaveLength(1);
+    expect(harness.gains).toHaveLength(1);
+  });
+
+  it("disposes the gain node with the transport", () => {
+    const harness = createHarness(undefined, { withGain: true });
+    setTwoSecondSource(harness);
+    const gain = harness.gains[0];
+    expect(gain).toBeDefined();
+    if (gain === undefined) {
+      return;
+    }
+
+    harness.transport.dispose();
+    expect(gain.disconnectedCount).toBe(1);
+    expect(harness.transport.gainDb).toBe(0);
   });
 });

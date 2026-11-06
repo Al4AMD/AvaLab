@@ -5,7 +5,10 @@
  * use hyphens, while the backend route and model registry use underscores
  * (`neural_codec`); the mapping lives here so callers never guess.
  */
+import { type LastUsedStorage, readLastUsed } from "../../lib/lastUsed";
 import { decodeParams, encodeParams } from "../../lib/url-state";
+
+export const AI_STORAGE_KEY = "avalab.ai.last";
 
 export const AI_TASKS = ["denoise", "superres", "separation", "asr", "neural-codec"] as const;
 export type AiTask = (typeof AI_TASKS)[number];
@@ -42,4 +45,10 @@ export function aiTaskFromSearch(search: string): AiTask {
 /** Encode the task as a bare query string (no leading "?"). */
 export function aiTaskToSearch(task: AiTask): string {
   return encodeParams({ task });
+}
+
+/** Last-used task; missing/invalid storage falls back to denoise. */
+export function loadAiTask(storage?: LastUsedStorage | null): AiTask {
+  const stored = readLastUsed(AI_STORAGE_KEY, storage);
+  return stored === null ? "denoise" : aiTaskFromSearch(stored);
 }

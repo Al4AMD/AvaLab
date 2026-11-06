@@ -19,6 +19,7 @@ import "uplot/dist/uPlot.min.css";
 
 import { Button } from "../../components/ui/button";
 import { formatHz, formatS } from "../../lib/format";
+import { writeLastUsed } from "../../lib/lastUsed";
 import {
   type ConvolutionStepsResult,
   FFT_MAX_LENGTH,
@@ -35,6 +36,7 @@ import { paintSpectrogramChunk } from "../spectrogram/paintSpectrogram";
 import { paintWaveform } from "../waveform/paintWaveform";
 import {
   defaultReverbRange,
+  loadReverbSettings,
   REVERB_MAX_IR_SECONDS,
   REVERB_MAX_PRE_DELAY_MS,
   REVERB_MAX_RT60_SECONDS,
@@ -42,6 +44,7 @@ import {
   REVERB_MAX_UPLOADED_IR_SECONDS,
   REVERB_MIN_IR_SECONDS,
   REVERB_MIN_RT60_SECONDS,
+  REVERB_STORAGE_KEY,
   type ReverbIrPreset,
   type ReverbSettings,
   reverbPresetDefaults,
@@ -454,18 +457,20 @@ export function ReverbView(): React.ReactElement {
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
   const [searchParams, setSearchParams] = useSearchParams();
-  const settings = useMemo(
-    () =>
-      reverbSettingsFromSearch(
-        `?${searchParams.toString()}`,
-        {
-          sampleCount: original?.samples.length ?? 0,
-          sampleRateHz: original?.sampleRateHz ?? 1,
-        },
-        selection,
-      ),
-    [searchParams, original, selection],
-  );
+  const settings = useMemo(() => {
+    const source = {
+      sampleCount: original?.samples.length ?? 0,
+      sampleRateHz: original?.sampleRateHz ?? 1,
+    };
+    if (searchParams.toString() === "") {
+      return loadReverbSettings(source, selection);
+    }
+    return reverbSettingsFromSearch(`?${searchParams.toString()}`, source, selection);
+  }, [searchParams, original, selection]);
+
+  useEffect(() => {
+    writeLastUsed(REVERB_STORAGE_KEY, reverbSettingsToSearch(settings));
+  }, [settings]);
   const [uploadedIr, setUploadedIr] = useState<UploadedIr | null>(null);
   const [decodingIr, setDecodingIr] = useState(false);
   const [result, setResult] = useState<ReverbResult | null>(null);

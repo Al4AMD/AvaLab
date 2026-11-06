@@ -36,6 +36,7 @@ import {
   filterApply,
   filterDesign,
   generateSynth,
+  loudnessMeasure,
   pipelineRun,
   psychoacousticAnalysis,
   psychoacousticCurves,
@@ -79,6 +80,7 @@ const dspHandlers = {
   filterApply,
   filterDesign,
   generateSynth,
+  loudnessMeasure,
   pipelineRun,
   psychoacousticAnalysis,
   psychoacousticCurves,
@@ -243,6 +245,10 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
       }
       case "psychoacousticAnalysis": {
         const result = dspHandlers.psychoacousticAnalysis(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "loudnessMeasure": {
+        const result = dspHandlers.loudnessMeasure(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       case "pipelineRun": {

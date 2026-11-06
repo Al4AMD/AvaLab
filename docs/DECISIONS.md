@@ -352,3 +352,35 @@
 - Context: F15 needs branch/fan-out graph editing with stable node and edge IDs, drag/connect/delete interactions, and a canvas that stays LTR in both locales.
 - Decision: add `@xyflow/react` 12.12.1 (MIT) to `apps/web`. The library is installed into the lazy pipeline route only; its stylesheet is imported by that route, never by the app shell. Rejected alternatives: hand-built SVG (too much interaction work), React Flow v11 (superseded).
 - Consequences: the pipeline view gets editing primitives without hand-maintaining canvas interaction code. The dependency is recorded in `docs/THIRD_PARTY.md`; MIT is compatible with the project's GPL-3.0 license. The graph DSL, validation, and DSP execution remain ours and run outside React Flow.
+
+## D-044 — F18 loudness matching is playback-only and clamped
+
+- Date: 2026-11-06
+- Status: accepted (owner, Wave 6 Plan 03)
+- Context: A/B comparison is misleading when a codec changes level, but normalizing stored/exported audio would hide a real effect and mutate the student's result.
+- Decision: measure both playback lanes with ITU-R BS.1770 integrated loudness in the worker, apply only the difference as a transport gain, clamp it to ±24 dB, and reset the original lane to 0 dB whenever the active lane changes. Exported WAVs and processed buffers are never normalized.
+- Consequences: the listener compares timbre and artifacts at matched loudness while the measured/exported signals stay honest; a silent or unmeasurable lane reads `—` and contributes 0 dB rather than inventing a gain.
+
+## D-045 — F18 theme is a per-browser preference with a system default
+
+- Date: 2026-11-06
+- Status: accepted (owner, Wave 6 Plan 03)
+- Context: the product defaults to the dark scientific-instrument look, but users may need a light theme for projectors or accessibility.
+- Decision: store `system | light | dark` in `localStorage["avalab.theme"]`; missing or invalid values resolve to `system`, which follows `prefers-color-scheme` live. Apply the resolved theme as `data-theme` on `<html>`; keep plots and technical axes LTR in both themes and leave spectrogram colormaps unchanged.
+- Consequences: no account or server is needed, first visit respects the OS, and switching themes never changes tool state or audio.
+
+## D-046 — F18 shortcuts are global but never fire in text fields or dialogs
+
+- Date: 2026-11-06
+- Status: accepted (owner, Wave 6 Plan 03)
+- Context: transport keys should work anywhere on a tool page, but must not steal typing or break native form behavior.
+- Decision: Space toggles play/pause, ArrowLeft/ArrowRight seek ∓5 s, Shift+ArrowLeft/Right seek ∓10 s, and `?` opens the shortcut help dialog. Ignore key repeats, Ctrl/Meta/Alt combinations, editable targets (`input`, `textarea`, `select`, `contenteditable`) and any target inside an open dialog. Provide a header button as the non-keyboard entry point; the dialog traps focus and closes on Escape.
+- Consequences: one keyboard map works across all tools without per-view handlers; help remains discoverable and keyboard-accessible, and form controls keep their native arrows/space behavior.
+
+## D-047 — F18 last-used settings reuse URL codecs in namespaced localStorage
+
+- Date: 2026-11-06
+- Status: accepted (owner, Wave 6 Plan 03)
+- Context: many tools already encode shareable parameters in the URL; duplicating a second serialization format for persistence would drift.
+- Decision: store the same stable query string under `avalab.<tool>.last` and reuse each tool's total decoder; a non-empty URL wins over storage, and a missing/invalid stored value falls back to defaults. A shared best-effort storage helper is used by the nine tools that need identical safe handling. Never store source audio, file names, uploaded IRs, or AI results.
+- Consequences: share links stay authoritative, reloads reopen the last panel state, private/quota-blocked storage is non-fatal, and old or hand-edited values cannot crash a view.

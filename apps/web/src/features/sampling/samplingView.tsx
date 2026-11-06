@@ -18,16 +18,19 @@ import "uplot/dist/uPlot.min.css";
 
 import { Button } from "../../components/ui/button";
 import { formatDb, formatHz, formatS } from "../../lib/format";
+import { writeLastUsed } from "../../lib/lastUsed";
 import type { AliasDemoResult, SamplingProcessResult } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
 import {
   defaultSamplingRange,
+  loadSamplingSettings,
   SAMPLING_MAX_BITS,
   SAMPLING_MAX_RATE_HZ,
   SAMPLING_MIN_BITS,
   SAMPLING_MIN_RATE_HZ,
   SAMPLING_RATE_PRESETS,
+  SAMPLING_STORAGE_KEY,
   type SamplingSettings,
   samplingSettingsFromSearch,
   samplingSettingsToSearch,
@@ -411,18 +414,20 @@ export function SamplingView(): React.ReactElement {
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
   const [searchParams, setSearchParams] = useSearchParams();
-  const settings = useMemo(
-    () =>
-      samplingSettingsFromSearch(
-        `?${searchParams.toString()}`,
-        {
-          sampleCount: original?.samples.length ?? 0,
-          sampleRateHz: original?.sampleRateHz ?? 1,
-        },
-        selection,
-      ),
-    [searchParams, original, selection],
-  );
+  const settings = useMemo(() => {
+    const source = {
+      sampleCount: original?.samples.length ?? 0,
+      sampleRateHz: original?.sampleRateHz ?? 1,
+    };
+    if (searchParams.toString() === "") {
+      return loadSamplingSettings(source, selection);
+    }
+    return samplingSettingsFromSearch(`?${searchParams.toString()}`, source, selection);
+  }, [searchParams, original, selection]);
+
+  useEffect(() => {
+    writeLastUsed(SAMPLING_STORAGE_KEY, samplingSettingsToSearch(settings));
+  }, [settings]);
   const [result, setResult] = useState<SamplingResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);

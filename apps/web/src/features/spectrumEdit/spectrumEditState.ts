@@ -6,7 +6,7 @@
  * worker throw.
  */
 import { buildSpectrumPreset, type SpectrumEdit } from "@avalab/dsp";
-
+import { type LastUsedStorage, readLastUsed } from "../../lib/lastUsed";
 import { decodeParams, encodeParams } from "../../lib/url-state";
 import { FFT_MAX_LENGTH } from "../../session/ops";
 
@@ -37,6 +37,8 @@ export type SpectrumEditSourceInfo = {
   readonly sampleCount: number;
   readonly sampleRateHz: number;
 };
+
+export const SPECTRUM_EDIT_STORAGE_KEY = "avalab.spectrum-edit.last";
 
 export const SPECTRUM_EDIT_DEFAULT_SETTINGS: SpectrumEditSettings = {
   hermitian: true,
@@ -169,4 +171,14 @@ export function spectrumEditSettingsFromSearch(
     startSample: range.startSample,
     endSample: range.endSample,
   };
+}
+
+/** Last-used panel; missing/invalid storage decodes to the same defaults. */
+export function loadSpectrumEditSettings(
+  source: SpectrumEditSourceInfo,
+  selection: SpectrumEditRange,
+  storage?: LastUsedStorage | null,
+): SpectrumEditSettings {
+  const stored = readLastUsed(SPECTRUM_EDIT_STORAGE_KEY, storage);
+  return spectrumEditSettingsFromSearch(stored === null ? "" : stored, source, selection);
 }

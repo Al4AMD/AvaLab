@@ -6,6 +6,7 @@
  * worker op rejects longer payloads.
  */
 
+import { type LastUsedStorage, readLastUsed } from "../../lib/lastUsed";
 import { decodeParams, encodeParams } from "../../lib/url-state";
 import type { CodecLabCodec } from "../../session/ops";
 import { REAL_CODEC_NAMES, type RealCodecName } from "./backendCodecs";
@@ -53,6 +54,8 @@ export type CodecLabSourceInfo = {
   readonly sampleCount: number;
   readonly sampleRateHz: number;
 };
+
+export const CODEC_LAB_STORAGE_KEY = "avalab.codec-lab.last";
 
 export const CODEC_LAB_DEFAULT_SETTINGS: CodecLabSettings = {
   codec: "rle",
@@ -257,4 +260,14 @@ export function isRealCodecStale(
     current.startSample !== resultSettings.startSample ||
     current.endSample !== resultSettings.endSample
   );
+}
+
+/** Last-used panel; missing/invalid storage decodes to the same defaults. */
+export function loadCodecLabSettings(
+  source: CodecLabSourceInfo,
+  selection: CodecLabRange,
+  storage?: LastUsedStorage | null,
+): CodecLabSettings {
+  const stored = readLastUsed(CODEC_LAB_STORAGE_KEY, storage);
+  return codecLabSettingsFromSearch(stored === null ? "" : stored, source, selection);
 }

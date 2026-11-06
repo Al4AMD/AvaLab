@@ -19,6 +19,7 @@ import {
   type XY,
 } from "@avalab/dsp";
 
+import { type LastUsedStorage, readLastUsed } from "../../lib/lastUsed";
 import { decodeParams, encodeParams } from "../../lib/url-state";
 import type { CodecLabCodec } from "../../session/ops";
 
@@ -26,6 +27,7 @@ export type { PipelineEdge, PipelineGraph, PipelineNode, PipelineValidation };
 export { PIPELINE_MAX_NODES, PIPELINE_MAX_OUTPUTS };
 
 export const PIPELINE_URL_KEY = "pg";
+export const PIPELINE_STORAGE_KEY = "avalab.pipeline.last";
 export const PIPELINE_URL_MAX_CHARS = 8192;
 export const PIPELINE_PREVIEW_SECONDS = 30;
 export const PIPELINE_GRID_COLUMNS = 5;
@@ -748,4 +750,10 @@ export function pipelineStateFromSearch(search: string): PipelineDecodeResult {
   } catch {
     return { state: defaultPipelineState(), warning: "invalid" };
   }
+}
+
+/** Last-used graph; missing/invalid storage returns the validated default. */
+export function loadPipelineState(storage?: LastUsedStorage | null): PipelineDecodeResult {
+  const stored = readLastUsed(PIPELINE_STORAGE_KEY, storage);
+  return stored === null ? pipelineStateFromSearch("") : pipelineStateFromSearch(stored);
 }

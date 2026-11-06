@@ -135,6 +135,16 @@ export {
 export type { CompandingOptions } from "./metrics/companding.js";
 export { alawDecode, alawEncode, mulawDecode, mulawEncode } from "./metrics/companding.js";
 export { entropyBitsPerSymbol } from "./metrics/entropy.js";
+export type {
+  LoudnessBlock,
+  LoudnessParams,
+  LoudnessResult,
+} from "./metrics/loudness.js";
+export {
+  kWeightingCoefficients,
+  loudnessGainDb,
+  measureLoudness,
+} from "./metrics/loudness.js";
 export type { TpdfDitherOptions, UniformQuantizeOptions } from "./metrics/quantize.js";
 export {
   quantizationError,

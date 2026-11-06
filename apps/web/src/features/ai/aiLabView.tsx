@@ -7,17 +7,25 @@
  * or a missing model disables the run button instead of failing a request.
  */
 import type { TFunction } from "i18next";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 
 import { Button } from "../../components/ui/button";
 import { downloadWav } from "../../lib/download";
+import { writeLastUsed } from "../../lib/lastUsed";
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
 import { TheoryPanel } from "../theory/TheoryPanel";
 import { AI_MAX_EXCERPT_SECONDS, type AiModelInfo, type AiModelState, aiClient } from "./aiClient";
-import { AI_TASKS, type AiTask, aiTaskFromSearch } from "./aiState";
+import {
+  AI_STORAGE_KEY,
+  AI_TASKS,
+  type AiTask,
+  aiTaskFromSearch,
+  aiTaskToSearch,
+  loadAiTask,
+} from "./aiState";
 import { AI_THEORY } from "./aiTheory";
 import { AsrTab } from "./asrTab";
 import { DenoiseTab } from "./denoiseTab";
@@ -143,7 +151,16 @@ export function AiLabView(): React.ReactElement {
   const processed = useSessionStore((state) => state.processed);
   const backendOnline = useSessionStore((state) => state.backendOnline);
   const [searchParams, setSearchParams] = useSearchParams();
-  const task = aiTaskFromSearch(`?${searchParams.toString()}`);
+  const task = useMemo(() => {
+    const fromUrl = aiTaskFromSearch(`?${searchParams.toString()}`);
+    if (searchParams.toString() === "") {
+      return loadAiTask();
+    }
+    return fromUrl;
+  }, [searchParams]);
+  useEffect(() => {
+    writeLastUsed(AI_STORAGE_KEY, aiTaskToSearch(task));
+  }, [task]);
   const { status, progress, result, errorKey, run, cancel } = useAiJob();
 
   const [models, setModels] = useState<readonly AiModelInfo[] | null>(null);

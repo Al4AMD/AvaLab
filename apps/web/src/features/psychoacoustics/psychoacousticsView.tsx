@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router";
 
 import { formatDb, formatHz } from "../../lib/format";
+import { writeLastUsed } from "../../lib/lastUsed";
 import type {
   PsychoacousticAnalysisResult,
   PsychoacousticBand,
@@ -18,8 +19,10 @@ import { useSessionStore } from "../../session/store";
 import { TheoryPanel } from "../theory/TheoryPanel";
 import {
   clampPsychoacousticsReferenceSpl,
+  loadPsychoacousticsSettings,
   PSYCHOACOUSTICS_REFERENCE_MAX,
   PSYCHOACOUSTICS_REFERENCE_MIN,
+  PSYCHOACOUSTICS_STORAGE_KEY,
   type PsychoacousticsFrequencyScale,
   type PsychoacousticsSettings,
   psychoacousticsAnalysisRange,
@@ -405,10 +408,15 @@ export function PsychoacousticsView(): React.ReactElement {
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
   const [searchParams, setSearchParams] = useSearchParams();
-  const settings = useMemo(
-    () => psychoacousticsSettingsFromSearch(`?${searchParams.toString()}`),
-    [searchParams],
-  );
+  const settings = useMemo(() => {
+    if (searchParams.toString() === "") {
+      return loadPsychoacousticsSettings();
+    }
+    return psychoacousticsSettingsFromSearch(`?${searchParams.toString()}`);
+  }, [searchParams]);
+  useEffect(() => {
+    writeLastUsed(PSYCHOACOUSTICS_STORAGE_KEY, psychoacousticsSettingsToSearch(settings));
+  }, [settings]);
   const [curves, setCurves] = useState<CurvesMeta | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisMeta | null>(null);
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>("idle");

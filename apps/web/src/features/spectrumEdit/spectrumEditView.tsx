@@ -17,14 +17,17 @@ import "uplot/dist/uPlot.min.css";
 
 import { Button } from "../../components/ui/button";
 import { formatHz, formatS } from "../../lib/format";
+import { writeLastUsed } from "../../lib/lastUsed";
 import { FFT_MAX_LENGTH, type SpectrumEditResult } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
 import {
   binsFromHz,
+  loadSpectrumEditSettings,
   presetEdits,
   SPECTRUM_EDIT_MODES,
   SPECTRUM_EDIT_PRESETS,
+  SPECTRUM_EDIT_STORAGE_KEY,
   SPECTRUM_EDIT_TARGETS,
   type SpectrumEditPreset,
   type SpectrumEditSettings,
@@ -187,18 +190,20 @@ export function SpectrumEditView(): React.ReactElement {
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
   const [searchParams, setSearchParams] = useSearchParams();
-  const settings = useMemo(
-    () =>
-      spectrumEditSettingsFromSearch(
-        `?${searchParams.toString()}`,
-        {
-          sampleCount: original?.samples.length ?? 0,
-          sampleRateHz: original?.sampleRateHz ?? 1,
-        },
-        selection,
-      ),
-    [searchParams, original, selection],
-  );
+  const settings = useMemo(() => {
+    const source = {
+      sampleCount: original?.samples.length ?? 0,
+      sampleRateHz: original?.sampleRateHz ?? 1,
+    };
+    if (searchParams.toString() === "") {
+      return loadSpectrumEditSettings(source, selection);
+    }
+    return spectrumEditSettingsFromSearch(`?${searchParams.toString()}`, source, selection);
+  }, [searchParams, original, selection]);
+
+  useEffect(() => {
+    writeLastUsed(SPECTRUM_EDIT_STORAGE_KEY, spectrumEditSettingsToSearch(settings));
+  }, [settings]);
   const [result, setResult] = useState<SpectrumEditViewResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);

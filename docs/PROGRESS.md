@@ -540,3 +540,12 @@ Wave 6 Plan 00 is complete on `feat/wave-5`. Next: execute `docs/plans/wave-6/01
 - Gates: `pnpm check` exit 0 (biome 296 files; dsp 1018/1018 across 42 files; web 516/516 across 63 files; scripts 13/13; i18n OK); `pnpm e2e` 56/56 in 1.9 min with zero console errors in fa + en; perf gates 443 ms and 518 ms; `pnpm --filter @avalab/web build` succeeded. Backend untouched.
 - Carries: `pipeline.*`, `nav.pipeline`, and `tool.pipeline` Persian copy join the owner-review backlog. No commit or push.
 - **Next step:** execute Wave 6 Plan 03 — `docs/plans/wave-6/03-quality-of-life.md`.
+
+## 2026-11-06 — Wave 6 Plan 03 complete (F18 quality of life)
+
+- Status: Plan 03 Tasks 1–8 complete on `feat/wave-6`, no commit. Scope: BS.1770 A/B loudness matching, player gain seam, theme, global shortcuts/help, last-used persistence, docs.
+- Shipped: worker-side ITU-R BS.1770 integrated loudness (400 ms blocks, 750verlap, absolute/relative gates, 44.1/48/96 kHz golden + `ffmpeg ebur128` cross-check); playback-only gain clamped to ±24 dB with the original lane reset on lane changes; `system/light/dark` theme with live `prefers-color-scheme` fallback; Space/arrow/Shift-arrow/`?` global map guarded against editable targets and dialogs; accessible focus-trapped help dialog; namespaced `avalab.<tool>.last` persistence for generator, speed, sampling, extent, reverb, spectrum edit, codec lab, AI, filters, pipeline and psychoacoustics.
+- Persistence detail: the stored value is the tool’s existing URL query string; a non-empty URL wins, invalid storage falls back to defaults, and only serializable parameters are stored (never audio, names, uploaded IRs or AI results).
+- Gates: `pnpm check` exit 0 (biome clean; dsp 1035/1035; web 552/552 across 70 files; scripts 13/13; i18n OK); `pnpm e2e` 64/64 in 1.5 min with zero console errors in fa + en; `pnpm --filter @avalab/web build` succeeded (existing >500 kB chunk warning remains). Backend untouched.
+- Carries: `app.theme.*`, `player.loudness.*` and `shortcuts.*` Persian copy join the owner-review backlog. Metrics has no settings, so persistence is intentionally a no-op there. No commit or push.
+- **Next step:** execute Wave 6 Plan 04 — feature gaps.

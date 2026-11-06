@@ -15,6 +15,7 @@ import type { HealthResponse } from "../../api/client";
 import { api } from "../../api/client";
 import { Button } from "../../components/ui/button";
 import { formatS } from "../../lib/format";
+import { writeLastUsed } from "../../lib/lastUsed";
 import type {
   CodecLabCodec,
   CodecLabMdctBand,
@@ -43,12 +44,14 @@ import {
   CODEC_LAB_REAL_QUALITY_MIN,
   CODEC_LAB_REFERENCE_SPL_MAX,
   CODEC_LAB_REFERENCE_SPL_MIN,
+  CODEC_LAB_STORAGE_KEY,
   type CodecLabSettings,
   codecLabRangeFromSelection,
   codecLabSettingsFromSearch,
   codecLabSettingsToSearch,
   isCodecLabStale,
   isRealCodecStale,
+  loadCodecLabSettings,
 } from "./codecLabState";
 import {
   type ComparisonRow,
@@ -369,18 +372,20 @@ export function CodecLabView(): React.ReactElement {
   const selection = useSessionStore((state) => state.selection);
   const backendOnline = useSessionStore((state) => state.backendOnline);
   const [searchParams, setSearchParams] = useSearchParams();
-  const settings = useMemo(
-    () =>
-      codecLabSettingsFromSearch(
-        `?${searchParams.toString()}`,
-        {
-          sampleCount: original?.samples.length ?? 0,
-          sampleRateHz: original?.sampleRateHz ?? 1,
-        },
-        selection,
-      ),
-    [searchParams, original, selection],
-  );
+  const settings = useMemo(() => {
+    const source = {
+      sampleCount: original?.samples.length ?? 0,
+      sampleRateHz: original?.sampleRateHz ?? 1,
+    };
+    if (searchParams.toString() === "") {
+      return loadCodecLabSettings(source, selection);
+    }
+    return codecLabSettingsFromSearch(`?${searchParams.toString()}`, source, selection);
+  }, [searchParams, original, selection]);
+
+  useEffect(() => {
+    writeLastUsed(CODEC_LAB_STORAGE_KEY, codecLabSettingsToSearch(settings));
+  }, [settings]);
   const [status, setStatus] = useState<CodecLabStatus>("idle");
   const [result, setResult] = useState<CodecLabViewResult | null>(null);
   const [errorKey, setErrorKey] = useState<CodecLabErrorKey | null>(null);

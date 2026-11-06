@@ -24,6 +24,7 @@ import {
   filterApply,
   filterDesign,
   generateSynth,
+  loudnessMeasure,
   type ReverbProcessParams,
   reverbProcess,
   type SamplingProcessParams,
@@ -1022,6 +1023,7 @@ describe("op table wiring", () => {
     expect(dspOps.convolutionSteps.handler).toBe(convolutionSteps);
     expect(dspOps.spectrumEdit.handler).toBe(spectrumEdit);
     expect(dspOps.codecLabProcess.handler).toBe(codecLabProcess);
+    expect(dspOps.loudnessMeasure.handler).toBe(loudnessMeasure);
   });
 
   it("derives typed params/results from the table (the add-one-entry lens)", () => {
@@ -1046,6 +1048,7 @@ describe("op table wiring", () => {
       | "convolutionSteps"
       | "spectrumEdit"
       | "codecLabProcess"
+      | "loudnessMeasure"
       | "pipelineRun"
       | "psychoacousticCurves"
       | "psychoacousticAnalysis"
