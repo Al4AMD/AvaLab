@@ -1,14 +1,22 @@
 # AvaLab web: API traffic goes to the api service, everything else is the SPA.
 # `handle` blocks are mutually exclusive and evaluated in written order, so the
-# /api/* matcher never falls through to the SPA fallback.
+# job-event matcher must come before the generic /api/* matcher.
 :80 {
-	encode zstd gzip
+	# SSE job events. flush_interval -1 disables Caddy's response buffering so
+	# progress events reach the browser as each one is produced.
+	handle /api/v1/jobs/* {
+		reverse_proxy api:8000 {
+			flush_interval -1
+		}
+	}
 
 	handle /api/* {
 		reverse_proxy api:8000
 	}
 
+	# Compress only the static SPA assets; SSE must never be compressed.
 	handle {
+		encode zstd gzip
 		root * /srv
 		try_files {path} /index.html
 		file_server
