@@ -352,6 +352,14 @@ function SpectrogramPanel({
       return;
     }
     const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), MAX_DEVICE_PIXEL_RATIO);
+    const widthDevicePx = Math.max(1, Math.round(widthPx * dpr));
+    const heightDevicePx = Math.max(1, Math.round(SPECTROGRAM_HEIGHT_PX * dpr));
+    if (canvas.width !== widthDevicePx) {
+      canvas.width = widthDevicePx;
+    }
+    if (canvas.height !== heightDevicePx) {
+      canvas.height = heightDevicePx;
+    }
     paintSpectrogramChunk(ctx, tile.rows, {
       widthPx,
       heightPx: SPECTROGRAM_HEIGHT_PX,
