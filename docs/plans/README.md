@@ -12,6 +12,7 @@ Statuses: `planned` → `executing` → `done`.
 | 4 | `wave-4/` | `01-browser-codec-lab.md`, `02-backend-real-codecs.md`, `03-real-codec-ui-and-metrics.md`, `04-comparison-rate-distortion-closeout.md` (F04/F05/F06) | done (2026-11-02; plans 01–04 done) |
 | 5 | `wave-5/` | `01-ml-platform.md`, `02-denoise-superres.md`, `03-separation-asr-codec.md`, `04-filter-lab.md`, `05-teaching-layer.md`, `06-closeout.md` (F14/F11/F16) | done (2026-11-04; plans 01–06) |
 | 6 | `wave-6/` | `00-baseline.md`, `01-psychoacoustics.md`, `02-pipeline.md`, `03-quality-of-life.md`, `04-feature-gaps.md`, `05-polish.md`, `06-deployment.md`, `07-release.md` (F13/F15/F18, polish, deployment, report/slides) | done (2026-11-06; plans 00–07; PDFs committed 2026-11-07) |
+| 7 | `wave-7/` | `README.md` (post-0.1.0 backlog: stereo playback, general F02 comparison, F16 student report, F14 classification) | planned (2026-11-07) |
 
 Authority order when plans conflict: `AGENTS.md` (spec) → `docs/DECISIONS.md` → the wave plan.
 Ledgers live in `.superpowers/sdd/<plan-basename>/progress.md` (git-ignored scratch, not committed).

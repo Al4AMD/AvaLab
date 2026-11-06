@@ -4,6 +4,14 @@ AvaLab deploys as two containers: Caddy serves the built SPA and proxies
 `/api/*` to the FastAPI container. The default path is CPU-only and works
 offline after a one-time model prefetch.
 
+Owner decision (2026-11-07): the primary target is a CPU-only university
+server, but the same Compose stack must stay runnable on the owner's laptop
+for local presentations. No public domain is assigned yet; use
+`http://127.0.0.1:<port>` for now. When a domain is assigned, either let Caddy
+terminate TLS or put the stack behind the university proxy as described under
+[Reverse proxy and SSE](#reverse-proxy-and-sse). Do not commit a real domain
+or certificate.
+
 ## Prerequisites
 
 - Docker Engine with Compose v2 (this session used Docker 29.7 and Compose 5.3).
