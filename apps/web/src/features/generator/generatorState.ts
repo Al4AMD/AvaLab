@@ -21,7 +21,14 @@ export type GeneratorSettings = {
   readonly chirpLog: boolean;
   readonly tone2Hz: number;
   readonly seed: number;
+  readonly modulationHz: number;
+  readonly modulationIndex: number;
+  readonly frequencyDeviationHz: number;
+  readonly fourierKind: FourierKind;
+  readonly fourierHarmonics: number;
 };
+
+export type FourierKind = "square" | "sawtooth" | "triangle";
 
 export const GENERATOR_WAVEFORMS: readonly SynthWaveform[] = [
   "sine",
@@ -34,7 +41,26 @@ export const GENERATOR_WAVEFORMS: readonly SynthWaveform[] = [
   "pinkNoise",
   "chirp",
   "twoTone",
+  "am",
+  "fm",
 ];
+
+export const GENERATOR_BASIC_WAVEFORMS: readonly SynthWaveform[] = [
+  "sine",
+  "square",
+  "sawtooth",
+  "triangle",
+  "impulse",
+  "step",
+  "whiteNoise",
+  "pinkNoise",
+  "chirp",
+  "twoTone",
+];
+
+export const FOURIER_KINDS: readonly FourierKind[] = ["square", "sawtooth", "triangle"];
+export const FOURIER_MIN_HARMONICS = 1;
+export const FOURIER_MAX_HARMONICS = 200;
 export const GENERATOR_SAMPLE_RATES = [8000, 16000, 22050, 32000, 44100, 48000, 96000] as const;
 export const GENERATOR_MAX_DURATION_S = 300;
 export const GENERATOR_STORAGE_KEY = "avalab.generator.last";
@@ -52,6 +78,11 @@ export const GENERATOR_DEFAULT_SETTINGS: GeneratorSettings = {
   chirpLog: true,
   tone2Hz: 880,
   seed: 1,
+  modulationHz: 5,
+  modulationIndex: 0.5,
+  frequencyDeviationHz: 1000,
+  fourierKind: "square",
+  fourierHarmonics: 10,
 };
 
 function finiteIn(value: number, min: number, max: number, fallback: number): number {
@@ -69,10 +100,15 @@ export function generatorSettingsToSearch(settings: GeneratorSettings): string {
     cl: settings.chirpLog ? 1 : 0,
     ct: settings.chirpToHz,
     d: settings.durationSeconds,
+    dev: settings.frequencyDeviationHz,
     duty: settings.dutyCycle,
     f: settings.frequencyHz,
     f2: settings.tone2Hz,
+    fh: settings.fourierHarmonics,
+    fk: settings.fourierKind,
     imp: settings.impulseIndex,
+    mh: settings.modulationHz,
+    mi: settings.modulationIndex,
     seed: settings.seed,
     sr: settings.sampleRateHz,
     step: settings.stepIndex,
@@ -88,6 +124,7 @@ export function generatorSettingsFromSearch(search: string): GeneratorSettings {
   };
   const defaults = GENERATOR_DEFAULT_SETTINGS;
   const waveform = scalar("w");
+  const fourierKind = scalar("fk");
   const sampleRate = Number(scalar("sr"));
   return {
     waveform:
@@ -113,5 +150,18 @@ export function generatorSettingsFromSearch(search: string): GeneratorSettings {
     chirpLog: scalar("cl") !== "0",
     tone2Hz: finiteIn(Number(scalar("f2")), 1, 48000, defaults.tone2Hz),
     seed: integerIn(Number(scalar("seed")), 0, 2 ** 31 - 1, defaults.seed),
+    modulationHz: finiteIn(Number(scalar("mh")), 0.1, 20_000, defaults.modulationHz),
+    modulationIndex: finiteIn(Number(scalar("mi")), 0, 10, defaults.modulationIndex),
+    frequencyDeviationHz: finiteIn(Number(scalar("dev")), 0, 20_000, defaults.frequencyDeviationHz),
+    fourierKind:
+      fourierKind !== undefined && (FOURIER_KINDS as readonly string[]).includes(fourierKind)
+        ? (fourierKind as FourierKind)
+        : defaults.fourierKind,
+    fourierHarmonics: integerIn(
+      Number(scalar("fh")),
+      FOURIER_MIN_HARMONICS,
+      FOURIER_MAX_HARMONICS,
+      defaults.fourierHarmonics,
+    ),
   };
 }

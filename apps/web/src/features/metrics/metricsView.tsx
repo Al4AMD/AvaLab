@@ -8,9 +8,12 @@
  */
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ToolHeader } from "../../components/ToolHeader";
 
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
+import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
 import { formatMetric, type QualityMetrics } from "./metrics";
 import { measureQualityMetrics } from "./qualityMetricsWorker";
 
@@ -79,7 +82,7 @@ export function MetricsView(): React.ReactElement {
   if (original === null) {
     return (
       <section className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold">{t("tool.metrics.title")}</h2>
+        <ToolHeader titleKey="tool.metrics.title" descriptionKey="tool.metrics.description" />
         <UploadEmptyState />
       </section>
     );
@@ -87,7 +90,7 @@ export function MetricsView(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold">{t("tool.metrics.title")}</h2>
+      <ToolHeader titleKey="tool.metrics.title" descriptionKey="tool.metrics.description" />
 
       {problem === "missing" ? (
         <p data-testid="metrics.missing" className="text-sm text-muted">
@@ -152,22 +155,10 @@ export function MetricsView(): React.ReactElement {
         </>
       ) : null}
 
-      <details className="rounded border border-surface p-3 text-sm">
-        <summary className="cursor-pointer font-semibold">{t("metrics.theory.title")}</summary>
-        <div className="mt-2 flex flex-col gap-2 text-xs text-muted">
-          <p>{t("metrics.theory.energy")}</p>
-          <p>{t("metrics.theory.segmental")}</p>
-          <p>{t("metrics.theory.psnr")}</p>
-          <div>
-            <h4 className="font-semibold text-text">{t("metrics.observe.title")}</h4>
-            <ul className="ms-4 list-disc">
-              <li>{t("metrics.observe.lossless")}</li>
-              <li>{t("metrics.observe.lossy")}</li>
-              <li>{t("metrics.observe.bitrate")}</li>
-            </ul>
-          </div>
-        </div>
-      </details>
+      <TheoryPanel
+        titleKey={TOOL_THEORY.metrics.titleKey}
+        sections={TOOL_THEORY.metrics.sections}
+      />
     </section>
   );
 }

@@ -11,6 +11,11 @@
  * Edge cases: n/a; every exported function documents its own.
  */
 
+export type {
+  BeatAnalysis,
+  PitchAnalysis,
+  PitchBeatAnalysis,
+} from "./analysis/pitchBeat.js";
 export type { CodecLabCodec } from "./codecs/codecLabTypes.js";
 export type {
   DeltaHuffmanDecoded,
@@ -99,9 +104,21 @@ export type {
 } from "./filters/iir.js";
 export { applyFilter, designButterworth, designChebyshev1 } from "./filters/iir.js";
 export { fftBluestein } from "./fourier/bluestein.js";
+export type { ButterflyStep } from "./fourier/butterfly.js";
+export { fftButterflySteps } from "./fourier/butterfly.js";
 export type { Complex } from "./fourier/complex.js";
 export { dftNaive, idftNaive } from "./fourier/dft.js";
 export { fftRadix2, ifftRadix2 } from "./fourier/fft.js";
+export type {
+  FftBenchmarkResult,
+  StftBenchmarkChunkParams,
+  StftBenchmarkChunkResult,
+} from "./fourier/fftBenchmark.js";
+export {
+  benchmarkFft,
+  FFT_BENCHMARK_SIZES,
+  stftBenchmarkChunk,
+} from "./fourier/fftBenchmark.js";
 export { irfft, rfft } from "./fourier/rfft.js";
 export type {
   SpectrogramTilesParams,
@@ -109,6 +126,12 @@ export type {
   SpectrogramWindowFamily,
 } from "./fourier/spectrogramTiles.js";
 export { spectrogramTiles } from "./fourier/spectrogramTiles.js";
+export type {
+  SpectrumCurveEdit,
+  SpectrumCurvePoint,
+  SpectrumCurveTarget,
+} from "./fourier/spectrumCurves.js";
+export { applySpectrumCurves } from "./fourier/spectrumCurves.js";
 export type {
   EditSpectrumParams,
   EditSpectrumResult,
@@ -237,6 +260,6 @@ export { imdct, mdct } from "./timestretch/mdct.js";
 export type { PitchShiftParams, TimeStretchParams } from "./timestretch/phaseVocoder.js";
 export { pitchShift, timeStretch } from "./timestretch/phaseVocoder.js";
 export { averagePowerOf, energyOf } from "./utils/energy.js";
-export { inputHashFnv1a64 } from "./utils/hash.js";
+export { inputHash64 } from "./utils/hash.js";
 export { computePeakBuckets } from "./utils/peaks.js";
 export { samplesToSeconds, secondsToSamples } from "./utils/time.js";

@@ -39,14 +39,14 @@ test("Persian: experiments, filter theory, demo share boot, and WAV export", asy
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await expect(page.getByRole("heading", { name: /آزمایش‌های هدایت‌شده/ })).toBeVisible();
 
-  for (const id of ["filters", "superres", "asr-codec"]) {
+  for (const id of ["filters", "ai-superres", "ai-asr"]) {
     const card = page.getByTestId(`experiments.card.${id}`);
     await expect(card).toBeVisible();
     await expect(card.getByRole("link").first()).toHaveAttribute("href", /\/tools\//);
   }
-  await expect(page.getByTestId("experiments.card.filters").getByRole("link")).toHaveCount(4);
-  await expect(page.getByTestId("experiments.card.superres").getByRole("link")).toHaveCount(3);
-  await expect(page.getByTestId("experiments.card.asr-codec").getByRole("link")).toHaveCount(4);
+  await expect(page.getByTestId("experiments.card.filters").getByRole("link")).toHaveCount(8);
+  await expect(page.getByTestId("experiments.card.ai-superres").getByRole("link")).toHaveCount(1);
+  await expect(page.getByTestId("experiments.card.ai-asr").getByRole("link")).toHaveCount(1);
 
   await page
     .getByTestId("experiments.card.filters")
@@ -136,7 +136,7 @@ test("Persian: rate-distortion chart PNG export is a real PNG", async ({ page })
   expect(errors).toEqual([]);
 });
 
-test("English: experiments, LTR theory, and all five AI theory panels", async ({ page }) => {
+test("English: experiments, LTR theory, and all six AI theory panels", async ({ page }) => {
   const errors = watchForErrors(page);
   await page.addInitScript(() => {
     localStorage.setItem("avalab.language", "en");
@@ -144,7 +144,7 @@ test("English: experiments, LTR theory, and all five AI theory panels", async ({
   await page.goto("/experiments");
   await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
   await expect(page.getByRole("heading", { name: "Guided experiments" })).toBeVisible();
-  await expect(page.getByTestId("experiments.card.asr-codec")).toBeVisible();
+  await expect(page.getByTestId("experiments.card.ai-asr")).toBeVisible();
 
   await page
     .getByTestId("experiments.card.filters")
@@ -165,6 +165,7 @@ test("English: experiments, LTR theory, and all five AI theory panels", async ({
     separation: /Source separation: masks and reconstruction/,
     asr: /Automatic speech recognition and WER/,
     "neural-codec": /Neural codec: RVQ and rate–distortion/,
+    pitchBeat: /Pitch tracking: F0 over time/,
   };
   for (const [task, title] of Object.entries(expected)) {
     await page.getByTestId(`ai.tab.${task}`).click();

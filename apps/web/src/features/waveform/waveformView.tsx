@@ -6,10 +6,13 @@
 import { type KeyboardEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
+import { ToolHeader } from "../../components/ToolHeader";
 import { formatS } from "../../lib/format";
 import type { WaveformOverviewResult, WaveformRangeResult } from "../../session/ops";
 import { type SessionSource, useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
+import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
 import { WaveformCanvas } from "./canvasWaveform";
 import { CompareSlot } from "./compareSlot";
 import {
@@ -192,7 +195,7 @@ export function WaveformView() {
   if (original === null) {
     return (
       <section className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold">{t("tool.waveform.title")}</h2>
+        <ToolHeader titleKey="tool.waveform.title" descriptionKey="tool.waveform.description" />
         <UploadEmptyState />
       </section>
     );
@@ -208,16 +211,19 @@ export function WaveformView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-2xl font-semibold">{t("tool.waveform.title")}</h2>
-        <p dir="ltr" data-testid="waveform.readout" className="font-mono text-xs text-muted">
-          {t("waveform.readout", {
-            duration: formatS(durationSeconds),
-            rateHz: original.sampleRateHz,
-            peak: peak.toFixed(3),
-          })}
-        </p>
-      </div>
+      <ToolHeader
+        titleKey="tool.waveform.title"
+        descriptionKey="tool.waveform.description"
+        trailing={
+          <p dir="ltr" data-testid="waveform.readout" className="font-mono text-xs text-muted">
+            {t("waveform.readout", {
+              duration: formatS(durationSeconds),
+              rateHz: original.sampleRateHz,
+              peak: peak.toFixed(3),
+            })}
+          </p>
+        }
+      />
 
       <figure className="flex flex-col gap-1">
         <figcaption className="flex items-baseline justify-between gap-2 text-sm text-muted">
@@ -322,6 +328,11 @@ export function WaveformView() {
           end: formatS(selectionEndSeconds),
         })}
       </p>
+
+      <TheoryPanel
+        titleKey={TOOL_THEORY.waveform.titleKey}
+        sections={TOOL_THEORY.waveform.sections}
+      />
     </section>
   );
 }

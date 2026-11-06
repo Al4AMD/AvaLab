@@ -1,7 +1,7 @@
 /**
  * AI lab shell (F14, Wave-5 Plan 01 Task 5).
  *
- * One route, five tabs. Model-specific controls and result views arrive in
+ * One route, six tabs. Model-specific controls and result views live in
  * Plans 02–03; this shell already owns the shared tab URL state, model
  * availability banner, 30 s excerpt run path and job status. Backend absent
  * or a missing model disables the run button instead of failing a request.
@@ -10,6 +10,7 @@ import type { TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
+import { ToolHeader } from "../../components/ToolHeader";
 
 import { Button } from "../../components/ui/button";
 import { downloadWav } from "../../lib/download";
@@ -20,16 +21,20 @@ import { TheoryPanel } from "../theory/TheoryPanel";
 import { AI_MAX_EXCERPT_SECONDS, type AiModelInfo, type AiModelState, aiClient } from "./aiClient";
 import {
   AI_STORAGE_KEY,
-  AI_TASKS,
-  type AiTask,
+  AI_TABS,
+  type AiTab,
+  type AnalysisTask,
+  aiTabForTask,
   aiTaskFromSearch,
   aiTaskToSearch,
+  isAnalysisTask,
   loadAiTask,
 } from "./aiState";
 import { AI_THEORY } from "./aiTheory";
 import { AsrTab } from "./asrTab";
 import { DenoiseTab } from "./denoiseTab";
 import { NeuralCodecTab } from "./neuralCodecTab";
+import { PitchBeatTab } from "./pitchBeatTab";
 import { SeparationTab } from "./separationTab";
 import { SuperresTab } from "./superresTab";
 import { useAiJob } from "./useAiJob";
@@ -37,8 +42,8 @@ import { useAiJob } from "./useAiJob";
 const CONTROL_FOCUS_CLASSES =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
-function tabLabel(t: TFunction, task: AiTask): string {
-  switch (task) {
+function tabLabel(t: TFunction, tab: AiTab): string {
+  switch (tab) {
     case "denoise":
       return t("ai.tab.denoise");
     case "superres":
@@ -49,6 +54,8 @@ function tabLabel(t: TFunction, task: AiTask): string {
       return t("ai.tab.asr");
     case "neural-codec":
       return t("ai.tab.neuralCodec");
+    case "pitchBeat":
+      return t("ai.tab.pitchBeat");
   }
 }
 
@@ -58,7 +65,11 @@ export function aiRunDisabled(input: {
   readonly backendOnline: boolean;
   readonly modelState: AiModelState | undefined;
   readonly busy: boolean;
+  readonly analysis?: boolean;
 }): boolean {
+  if (input.analysis === true) {
+    return !input.hasSource || !input.backendOnline || input.busy;
+  }
   return (
     !input.mlEnabled ||
     !input.hasSource ||
@@ -199,7 +210,9 @@ export function AiLabView(): React.ReactElement {
     };
   }, [backendOnline]);
 
-  const model = models?.find((candidate) => candidate.task === task);
+  const tab = aiTabForTask(task);
+  const analysis = isAnalysisTask(task);
+  const model = analysis ? undefined : models?.find((candidate) => candidate.task === task);
   const busy = status === "uploading" || status === "running";
   const runDisabled = aiRunDisabled({
     mlEnabled,
@@ -207,9 +220,19 @@ export function AiLabView(): React.ReactElement {
     backendOnline,
     modelState: model?.state,
     busy,
+    analysis,
   });
 
-  function selectTask(next: AiTask): void {
+  function selectTab(next: AiTab): void {
+    if (next === tab) {
+      return;
+    }
+    const params = new URLSearchParams(searchParams);
+    params.set("task", next === "pitchBeat" ? "pitch" : next);
+    setSearchParams(params);
+  }
+
+  function selectAnalysisTask(next: AnalysisTask): void {
     const params = new URLSearchParams(searchParams);
     params.set("task", next);
     setSearchParams(params);
@@ -238,39 +261,42 @@ export function AiLabView(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-2xl font-semibold">{t("tool.ai.title")}</h2>
-        {processed !== null ? (
-          <Button
-            variant="outline"
-            data-testid="ai.export.wav"
-            onClick={() => {
-              downloadWav(
-                processed.samples,
-                processed.sampleRateHz,
-                `avalab-ai-${processed.label}.wav`,
-              );
-            }}
-          >
-            {t("ai.export.wav")}
-          </Button>
-        ) : null}
-      </div>
+      <ToolHeader
+        titleKey="tool.ai.title"
+        descriptionKey="tool.ai.description"
+        trailing={
+          processed !== null ? (
+            <Button
+              variant="outline"
+              data-testid="ai.export.wav"
+              onClick={() => {
+                downloadWav(
+                  processed.samples,
+                  processed.sampleRateHz,
+                  `avalab-ai-${processed.label}.wav`,
+                );
+              }}
+            >
+              {t("ai.export.wav")}
+            </Button>
+          ) : null
+        }
+      />
       <p className="text-sm text-muted">{t("ai.intro")}</p>
 
       <div role="tablist" aria-label={t("ai.tabsLabel")} className="flex flex-wrap gap-2">
-        {AI_TASKS.map((candidate) => (
+        {AI_TABS.map((candidate) => (
           <button
             key={candidate}
             type="button"
             role="tab"
-            aria-selected={candidate === task}
+            aria-selected={candidate === tab}
             data-testid={`ai.tab.${candidate}`}
             className={`rounded-md border border-surface px-3 py-1.5 text-sm ${CONTROL_FOCUS_CLASSES} ${
-              candidate === task ? "bg-surface text-text" : "text-muted hover:bg-surface"
+              candidate === tab ? "bg-surface text-text" : "text-muted hover:bg-surface"
             }`}
             onClick={() => {
-              selectTask(candidate);
+              selectTab(candidate);
             }}
           >
             {tabLabel(t, candidate)}
@@ -278,15 +304,19 @@ export function AiLabView(): React.ReactElement {
         ))}
       </div>
 
-      <ModelBanner
-        backendOnline={backendOnline}
-        mlEnabled={mlEnabled}
-        model={model}
-        loading={modelsLoading}
-        loadFailed={modelsFailed}
-      />
+      {analysis ? null : (
+        <ModelBanner
+          backendOnline={backendOnline}
+          mlEnabled={mlEnabled}
+          model={model}
+          loading={modelsLoading}
+          loadFailed={modelsFailed}
+        />
+      )}
 
-      {task === "denoise" ? (
+      {isAnalysisTask(task) ? (
+        <PitchBeatTab backendOnline={backendOnline} task={task} onTaskChange={selectAnalysisTask} />
+      ) : task === "denoise" ? (
         <DenoiseTab backendOnline={backendOnline} model={model} />
       ) : task === "superres" ? (
         <SuperresTab backendOnline={backendOnline} model={model} />

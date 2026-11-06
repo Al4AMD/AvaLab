@@ -11,12 +11,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router";
+import { ToolHeader } from "../../components/ToolHeader";
 
 import { Button } from "../../components/ui/button";
 import { formatS } from "../../lib/format";
 import type { GenerateSynthParams, SynthWaveform } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
+import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
+import { AmFmPanel } from "./amFmPanel";
+import { FourierPanel } from "./fourierPanel";
+import { GeneratorPreview } from "./generatorPreview";
 import {
+  GENERATOR_BASIC_WAVEFORMS,
   GENERATOR_MAX_DURATION_S,
   GENERATOR_SAMPLE_RATES,
   GENERATOR_STORAGE_KEY,
@@ -25,10 +32,10 @@ import {
   generatorSettingsFromSearch,
   generatorSettingsToSearch,
 } from "./generatorState";
-import { paintGeneratorPreview } from "./genPreviewCanvas";
 
 const PREVIEW_BUCKETS = 512;
-const PREVIEW_HEIGHT_PX = 140;
+
+type GeneratorTab = "basic" | "amFm" | "fourier";
 const CONTROL_FOCUS_CLASSES =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const INPUT_CLASSES = `rounded border border-surface bg-bg px-2 py-1 text-sm ${CONTROL_FOCUS_CLASSES}`;
@@ -65,58 +72,11 @@ function synthParams(settings: GeneratorSettings, previewBucketCount: number): G
     chirpLog: settings.chirpLog,
     tone2Hz: settings.tone2Hz,
     seed: settings.seed,
+    modulationHz: settings.modulationHz,
+    modulationIndex: settings.modulationIndex,
+    frequencyDeviationHz: settings.frequencyDeviationHz,
     previewBucketCount,
   };
-}
-
-function GeneratorPreview({
-  minMax,
-  ariaLabel,
-}: {
-  readonly minMax: Float32Array | null;
-  readonly ariaLabel: string;
-}) {
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [widthPx, setWidthPx] = useState(640);
-
-  useEffect(() => {
-    const host = hostRef.current;
-    if (host === null) {
-      return;
-    }
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry !== undefined) {
-        setWidthPx(Math.max(1, Math.round(entry.contentRect.width)));
-      }
-    });
-    observer.observe(host);
-    setWidthPx(Math.max(1, Math.round(host.getBoundingClientRect().width)));
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas !== null && minMax !== null) {
-      paintGeneratorPreview(canvas, minMax, widthPx, PREVIEW_HEIGHT_PX);
-    }
-  }, [minMax, widthPx]);
-
-  return (
-    <div ref={hostRef} dir="ltr">
-      <canvas
-        ref={canvasRef}
-        role="img"
-        aria-label={ariaLabel}
-        data-testid="generator.preview.canvas"
-        style={{ height: `${PREVIEW_HEIGHT_PX}px` }}
-        className="block w-full rounded bg-bg ring-1 ring-surface"
-      />
-    </div>
-  );
 }
 
 export function GeneratorView() {
@@ -138,6 +98,7 @@ export function GeneratorView() {
   const [previewError, setPreviewError] = useState(false);
   const [loadingSource, setLoadingSource] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [tab, setTab] = useState<GeneratorTab>("basic");
   const previewGenerationRef = useRef(0);
 
   function updateSettings(patch: Partial<GeneratorSettings>): void {
@@ -227,6 +188,8 @@ export function GeneratorView() {
     pinkNoise: t("generator.waveform.pinkNoise"),
     chirp: t("generator.waveform.chirp"),
     twoTone: t("generator.waveform.twoTone"),
+    am: t("generator.waveform.am"),
+    fm: t("generator.waveform.fm"),
   };
   const sampleCount = Math.round(settings.sampleRateHz * settings.durationSeconds);
   const isTonal =
@@ -234,243 +197,279 @@ export function GeneratorView() {
     settings.waveform === "square" ||
     settings.waveform === "sawtooth" ||
     settings.waveform === "triangle" ||
-    settings.waveform === "twoTone";
+    settings.waveform === "twoTone" ||
+    settings.waveform === "am" ||
+    settings.waveform === "fm";
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold">{t("tool.generator.title")}</h2>
+      <ToolHeader titleKey="tool.generator.title" descriptionKey="tool.generator.description" />
 
-      <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="flex flex-col gap-1 text-xs">
-          <span className="font-medium">{t("generator.controls.waveform")}</span>
-          <select
-            value={settings.waveform}
-            data-testid="generator.control.waveform"
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              if ((GENERATOR_WAVEFORMS as readonly string[]).includes(value)) {
-                updateSettings({ waveform: value as SynthWaveform });
+      <div role="tablist" className="flex flex-wrap gap-2">
+        {(["basic", "amFm", "fourier"] as const).map((entry) => (
+          <Button
+            key={entry}
+            size="sm"
+            variant={tab === entry ? "default" : "outline"}
+            role="tab"
+            aria-selected={tab === entry}
+            data-testid={`generator.tab.${entry}`}
+            onClick={() => {
+              setTab(entry);
+              if (entry === "basic" && !GENERATOR_BASIC_WAVEFORMS.includes(settings.waveform)) {
+                updateSettings({ waveform: "sine" });
+              }
+              if (entry === "amFm" && settings.waveform !== "am" && settings.waveform !== "fm") {
+                updateSettings({ waveform: "am" });
               }
             }}
-            className={INPUT_CLASSES}
           >
-            {GENERATOR_WAVEFORMS.map((waveform) => (
-              <option key={waveform} value={waveform}>
-                {waveformLabels[waveform]}
-              </option>
-            ))}
-          </select>
-        </label>
+            {t(`generator.tab.${entry}`)}
+          </Button>
+        ))}
+      </div>
 
-        <label className="flex flex-col gap-1 text-xs">
-          <span className="font-medium">{t("generator.controls.sampleRate")}</span>
-          <select
-            value={settings.sampleRateHz}
-            data-testid="generator.control.sampleRate"
-            onChange={(event) =>
-              updateSettings({ sampleRateHz: Number(event.currentTarget.value) })
-            }
-            className={INPUT_CLASSES}
-          >
-            {GENERATOR_SAMPLE_RATES.map((rate) => (
-              <option key={rate} value={rate}>
-                {rate} Hz
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1 text-xs">
-          <span className="font-medium">{t("generator.controls.duration")}</span>
-          <input
-            type="number"
-            min={0.05}
-            max={GENERATOR_MAX_DURATION_S}
-            step={0.05}
-            value={settings.durationSeconds}
-            data-testid="generator.control.duration"
-            onChange={(event) => {
-              const value = Number(event.currentTarget.value);
-              if (Number.isFinite(value) && value > 0 && value <= GENERATOR_MAX_DURATION_S) {
-                updateSettings({ durationSeconds: value });
-              }
-            }}
-            className={`${INPUT_CLASSES} tabular-nums`}
-          />
-        </label>
-
-        <label className="flex flex-col gap-1 text-xs">
-          <span className="flex items-center justify-between gap-2 font-medium">
-            <span>{t("generator.controls.amplitude")}</span>
-            <span dir="ltr" className="tabular-nums">
-              {settings.amplitude.toFixed(2)}
-            </span>
-          </span>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={settings.amplitude}
-            data-testid="generator.control.amplitude"
-            onChange={(event) => updateSettings({ amplitude: Number(event.currentTarget.value) })}
-            className={`w-full ${CONTROL_FOCUS_CLASSES}`}
-          />
-        </label>
-
-        {isTonal ? (
+      {tab === "amFm" ? (
+        <AmFmPanel settings={settings} update={updateSettings} />
+      ) : tab === "fourier" ? (
+        <FourierPanel settings={settings} update={updateSettings} />
+      ) : (
+        <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="flex flex-col gap-1 text-xs">
-            <span className="font-medium">{t("generator.controls.frequency")}</span>
+            <span className="font-medium">{t("generator.controls.waveform")}</span>
+            <select
+              value={settings.waveform}
+              data-testid="generator.control.waveform"
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                if ((GENERATOR_WAVEFORMS as readonly string[]).includes(value)) {
+                  updateSettings({ waveform: value as SynthWaveform });
+                }
+              }}
+              className={INPUT_CLASSES}
+            >
+              {GENERATOR_BASIC_WAVEFORMS.map((waveform) => (
+                <option key={waveform} value={waveform}>
+                  {waveformLabels[waveform]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1 text-xs">
+            <span className="font-medium">{t("generator.controls.sampleRate")}</span>
+            <select
+              value={settings.sampleRateHz}
+              data-testid="generator.control.sampleRate"
+              onChange={(event) =>
+                updateSettings({ sampleRateHz: Number(event.currentTarget.value) })
+              }
+              className={INPUT_CLASSES}
+            >
+              {GENERATOR_SAMPLE_RATES.map((rate) => (
+                <option key={rate} value={rate}>
+                  {rate} Hz
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1 text-xs">
+            <span className="font-medium">{t("generator.controls.duration")}</span>
             <input
               type="number"
-              min={1}
-              max={48000}
-              step={1}
-              value={settings.frequencyHz}
-              data-testid="generator.control.frequency"
+              min={0.05}
+              max={GENERATOR_MAX_DURATION_S}
+              step={0.05}
+              value={settings.durationSeconds}
+              data-testid="generator.control.duration"
               onChange={(event) => {
                 const value = Number(event.currentTarget.value);
-                if (Number.isFinite(value) && value > 0 && value <= 48000) {
-                  updateSettings({ frequencyHz: value });
+                if (Number.isFinite(value) && value > 0 && value <= GENERATOR_MAX_DURATION_S) {
+                  updateSettings({ durationSeconds: value });
                 }
               }}
               className={`${INPUT_CLASSES} tabular-nums`}
             />
           </label>
-        ) : null}
 
-        {settings.waveform === "square" ? (
           <label className="flex flex-col gap-1 text-xs">
             <span className="flex items-center justify-between gap-2 font-medium">
-              <span>{t("generator.controls.dutyCycle")}</span>
+              <span>{t("generator.controls.amplitude")}</span>
               <span dir="ltr" className="tabular-nums">
-                {(settings.dutyCycle * 100).toFixed(0)} %
+                {settings.amplitude.toFixed(2)}
               </span>
             </span>
             <input
               type="range"
-              min={0.05}
-              max={0.95}
-              step={0.05}
-              value={settings.dutyCycle}
-              data-testid="generator.control.dutyCycle"
-              onChange={(event) => updateSettings({ dutyCycle: Number(event.currentTarget.value) })}
+              min={0}
+              max={1}
+              step={0.01}
+              value={settings.amplitude}
+              data-testid="generator.control.amplitude"
+              onChange={(event) => updateSettings({ amplitude: Number(event.currentTarget.value) })}
               className={`w-full ${CONTROL_FOCUS_CLASSES}`}
             />
           </label>
-        ) : null}
 
-        {settings.waveform === "impulse" ? (
-          <label className="flex flex-col gap-1 text-xs">
-            <span className="font-medium">{t("generator.controls.impulseIndex")}</span>
-            <input
-              type="number"
-              min={0}
-              max={Math.max(0, sampleCount - 1)}
-              step={1}
-              value={settings.impulseIndex}
-              data-testid="generator.control.impulseIndex"
-              onChange={(event) =>
-                updateSettings({ impulseIndex: Number(event.currentTarget.value) })
-              }
-              className={`${INPUT_CLASSES} tabular-nums`}
-            />
-          </label>
-        ) : null}
-
-        {settings.waveform === "step" ? (
-          <label className="flex flex-col gap-1 text-xs">
-            <span className="font-medium">{t("generator.controls.stepIndex")}</span>
-            <input
-              type="number"
-              min={0}
-              max={Math.max(0, sampleCount - 1)}
-              step={1}
-              value={settings.stepIndex}
-              data-testid="generator.control.stepIndex"
-              onChange={(event) => updateSettings({ stepIndex: Number(event.currentTarget.value) })}
-              className={`${INPUT_CLASSES} tabular-nums`}
-            />
-          </label>
-        ) : null}
-
-        {settings.waveform === "chirp" ? (
-          <>
+          {isTonal ? (
             <label className="flex flex-col gap-1 text-xs">
-              <span className="font-medium">{t("generator.controls.chirpFrom")}</span>
+              <span className="font-medium">{t("generator.controls.frequency")}</span>
               <input
                 type="number"
                 min={1}
                 max={48000}
                 step={1}
-                value={settings.chirpFromHz}
-                data-testid="generator.control.chirpFrom"
+                value={settings.frequencyHz}
+                data-testid="generator.control.frequency"
+                onChange={(event) => {
+                  const value = Number(event.currentTarget.value);
+                  if (Number.isFinite(value) && value > 0 && value <= 48000) {
+                    updateSettings({ frequencyHz: value });
+                  }
+                }}
+                className={`${INPUT_CLASSES} tabular-nums`}
+              />
+            </label>
+          ) : null}
+
+          {settings.waveform === "square" ? (
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="flex items-center justify-between gap-2 font-medium">
+                <span>{t("generator.controls.dutyCycle")}</span>
+                <span dir="ltr" className="tabular-nums">
+                  {(settings.dutyCycle * 100).toFixed(0)} %
+                </span>
+              </span>
+              <input
+                type="range"
+                min={0.05}
+                max={0.95}
+                step={0.05}
+                value={settings.dutyCycle}
+                data-testid="generator.control.dutyCycle"
                 onChange={(event) =>
-                  updateSettings({ chirpFromHz: Number(event.currentTarget.value) })
+                  updateSettings({ dutyCycle: Number(event.currentTarget.value) })
+                }
+                className={`w-full ${CONTROL_FOCUS_CLASSES}`}
+              />
+            </label>
+          ) : null}
+
+          {settings.waveform === "impulse" ? (
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-medium">{t("generator.controls.impulseIndex")}</span>
+              <input
+                type="number"
+                min={0}
+                max={Math.max(0, sampleCount - 1)}
+                step={1}
+                value={settings.impulseIndex}
+                data-testid="generator.control.impulseIndex"
+                onChange={(event) =>
+                  updateSettings({ impulseIndex: Number(event.currentTarget.value) })
                 }
                 className={`${INPUT_CLASSES} tabular-nums`}
               />
             </label>
+          ) : null}
+
+          {settings.waveform === "step" ? (
             <label className="flex flex-col gap-1 text-xs">
-              <span className="font-medium">{t("generator.controls.chirpTo")}</span>
+              <span className="font-medium">{t("generator.controls.stepIndex")}</span>
+              <input
+                type="number"
+                min={0}
+                max={Math.max(0, sampleCount - 1)}
+                step={1}
+                value={settings.stepIndex}
+                data-testid="generator.control.stepIndex"
+                onChange={(event) =>
+                  updateSettings({ stepIndex: Number(event.currentTarget.value) })
+                }
+                className={`${INPUT_CLASSES} tabular-nums`}
+              />
+            </label>
+          ) : null}
+
+          {settings.waveform === "chirp" ? (
+            <>
+              <label className="flex flex-col gap-1 text-xs">
+                <span className="font-medium">{t("generator.controls.chirpFrom")}</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={48000}
+                  step={1}
+                  value={settings.chirpFromHz}
+                  data-testid="generator.control.chirpFrom"
+                  onChange={(event) =>
+                    updateSettings({ chirpFromHz: Number(event.currentTarget.value) })
+                  }
+                  className={`${INPUT_CLASSES} tabular-nums`}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs">
+                <span className="font-medium">{t("generator.controls.chirpTo")}</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={48000}
+                  step={1}
+                  value={settings.chirpToHz}
+                  data-testid="generator.control.chirpTo"
+                  onChange={(event) =>
+                    updateSettings({ chirpToHz: Number(event.currentTarget.value) })
+                  }
+                  className={`${INPUT_CLASSES} tabular-nums`}
+                />
+              </label>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={settings.chirpLog}
+                  data-testid="generator.control.chirpLog"
+                  onChange={(event) => updateSettings({ chirpLog: event.currentTarget.checked })}
+                  className={CONTROL_FOCUS_CLASSES}
+                />
+                <span className="font-medium">{t("generator.controls.chirpLog")}</span>
+              </label>
+            </>
+          ) : null}
+
+          {settings.waveform === "twoTone" ? (
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-medium">{t("generator.controls.tone2")}</span>
               <input
                 type="number"
                 min={1}
                 max={48000}
                 step={1}
-                value={settings.chirpToHz}
-                data-testid="generator.control.chirpTo"
-                onChange={(event) =>
-                  updateSettings({ chirpToHz: Number(event.currentTarget.value) })
-                }
+                value={settings.tone2Hz}
+                data-testid="generator.control.tone2"
+                onChange={(event) => updateSettings({ tone2Hz: Number(event.currentTarget.value) })}
                 className={`${INPUT_CLASSES} tabular-nums`}
               />
             </label>
-            <label className="flex items-center gap-2 text-xs">
+          ) : null}
+
+          {settings.waveform === "whiteNoise" || settings.waveform === "pinkNoise" ? (
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="font-medium">{t("generator.controls.seed")}</span>
               <input
-                type="checkbox"
-                checked={settings.chirpLog}
-                data-testid="generator.control.chirpLog"
-                onChange={(event) => updateSettings({ chirpLog: event.currentTarget.checked })}
-                className={CONTROL_FOCUS_CLASSES}
+                type="number"
+                min={0}
+                max={2 ** 31 - 1}
+                step={1}
+                value={settings.seed}
+                data-testid="generator.control.seed"
+                onChange={(event) => updateSettings({ seed: Number(event.currentTarget.value) })}
+                className={`${INPUT_CLASSES} tabular-nums`}
               />
-              <span className="font-medium">{t("generator.controls.chirpLog")}</span>
             </label>
-          </>
-        ) : null}
-
-        {settings.waveform === "twoTone" ? (
-          <label className="flex flex-col gap-1 text-xs">
-            <span className="font-medium">{t("generator.controls.tone2")}</span>
-            <input
-              type="number"
-              min={1}
-              max={48000}
-              step={1}
-              value={settings.tone2Hz}
-              data-testid="generator.control.tone2"
-              onChange={(event) => updateSettings({ tone2Hz: Number(event.currentTarget.value) })}
-              className={`${INPUT_CLASSES} tabular-nums`}
-            />
-          </label>
-        ) : null}
-
-        {settings.waveform === "whiteNoise" || settings.waveform === "pinkNoise" ? (
-          <label className="flex flex-col gap-1 text-xs">
-            <span className="font-medium">{t("generator.controls.seed")}</span>
-            <input
-              type="number"
-              min={0}
-              max={2 ** 31 - 1}
-              step={1}
-              value={settings.seed}
-              data-testid="generator.control.seed"
-              onChange={(event) => updateSettings({ seed: Number(event.currentTarget.value) })}
-              className={`${INPUT_CLASSES} tabular-nums`}
-            />
-          </label>
-        ) : null}
-      </div>
+          ) : null}
+        </div>
+      )}
 
       <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
         <div className="flex items-center gap-1">
@@ -487,35 +486,44 @@ export function GeneratorView() {
         </div>
       </dl>
 
-      {previewError ? (
-        <p role="alert" data-testid="generator.preview.error" className="text-sm text-muted">
-          {t("generator.preview.error")}
-        </p>
-      ) : preview === null ? (
-        <p data-testid="generator.preview.loading" className="text-sm text-muted">
-          {t("generator.preview.loading")}
-        </p>
-      ) : (
-        <GeneratorPreview minMax={preview} ariaLabel={t("generator.preview.label")} />
+      {tab === "fourier" ? null : (
+        <>
+          {previewError ? (
+            <p role="alert" data-testid="generator.preview.error" className="text-sm text-muted">
+              {t("generator.preview.error")}
+            </p>
+          ) : preview === null ? (
+            <p data-testid="generator.preview.loading" className="text-sm text-muted">
+              {t("generator.preview.loading")}
+            </p>
+          ) : (
+            <GeneratorPreview minMax={preview} ariaLabel={t("generator.preview.label")} />
+          )}
+
+          <div className="flex items-center gap-2">
+            <Button
+              data-testid="generator.load"
+              disabled={loadingSource}
+              onClick={() => {
+                void loadAsSource();
+              }}
+            >
+              {loadingSource ? t("generator.loadingSource") : t("generator.load")}
+            </Button>
+            {loadError ? (
+              <p role="alert" data-testid="generator.load.error" className="text-sm text-muted">
+                {t("generator.error")}
+              </p>
+            ) : null}
+          </div>
+          <p className="text-xs text-muted">{t("generator.preview.hint")}</p>
+        </>
       )}
 
-      <div className="flex items-center gap-2">
-        <Button
-          data-testid="generator.load"
-          disabled={loadingSource}
-          onClick={() => {
-            void loadAsSource();
-          }}
-        >
-          {loadingSource ? t("generator.loadingSource") : t("generator.load")}
-        </Button>
-        {loadError ? (
-          <p role="alert" data-testid="generator.load.error" className="text-sm text-muted">
-            {t("generator.error")}
-          </p>
-        ) : null}
-      </div>
-      <p className="text-xs text-muted">{t("generator.preview.hint")}</p>
+      <TheoryPanel
+        titleKey={TOOL_THEORY.generator.titleKey}
+        sections={TOOL_THEORY.generator.sections}
+      />
     </section>
   );
 }

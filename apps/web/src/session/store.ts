@@ -26,18 +26,18 @@
  *   this keeps the e2e contract (`waveform.stub.ping`) alive through the
  *   store instead of a direct rpc call from the component tree.
  *
- * Money-size note: inputHash is an O(bytes) byte loop executed on the main
- * thread exactly ONCE per successful load — ruled a load-time cost in the
- * wave pre-flight (115.2 MB worst case at 5 min/96 kHz mono Float32), alongside the
- * per-sample finiteness scan that loadSource performs anyway. No other DSP
- * runs on the main thread (AGENTS §9); audio math lives in the worker.
+ * Money-size note: inputHash is an O(N) word loop executed on the main
+ * thread exactly ONCE per successful load (115.2 MB worst case at 5 min/
+ * 96 kHz mono Float32), alongside the per-sample finiteness scan that
+ * loadSource performs anyway. No other DSP runs on the main thread
+ * (AGENTS §9); audio math lives in the worker.
  *
  * Immutability: `original` is owned by the store and MUST NOT be mutated by
  * consumers; `derive`'s optional payload is transferable and NEUTERED for the
  * caller per session/protocol.ts ownership rules — views that hand out
  * sample-buffer ranges transfer ownership that way on purpose.
  */
-import { inputHashFnv1a64 } from "@avalab/dsp";
+import { inputHash64 } from "@avalab/dsp";
 import { create, type StoreApi, type UseBoundStore } from "zustand";
 import type { DemoClipId } from "../features/input/offline";
 import type { DspOpName, DspOpParams } from "./ops";
@@ -441,7 +441,7 @@ export function createSessionStore(
           return { ok: false, code: "tooLong" };
         }
 
-        const inputHash = inputHashFnv1a64(samples);
+        const inputHash = inputHash64(samples);
         // new Map(): replaces both caches wholesale — and the late-settle
         // hash guard makes any in-flight frames of the OLD source inert.
         set({

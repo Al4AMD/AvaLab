@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
+import { ToolHeader } from "../../components/ToolHeader";
 
 import { Button } from "../../components/ui/button";
 import { formatS } from "../../lib/format";
@@ -26,6 +27,8 @@ import {
   type SpectrogramColormapName,
 } from "../spectrogram/paintSpectrogram";
 import { spectrogramGeometry } from "../spectrogram/workerJob";
+import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
 import {
   defaultSpeedRange,
   loadSpeedSettings,
@@ -415,7 +418,7 @@ export function SpeedView(): React.ReactElement {
   if (original === null) {
     return (
       <section className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold">{t("tool.speed.title")}</h2>
+        <ToolHeader titleKey="tool.speed.title" descriptionKey="tool.speed.description" />
         <UploadEmptyState />
       </section>
     );
@@ -427,7 +430,7 @@ export function SpeedView(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold">{t("tool.speed.title")}</h2>
+      <ToolHeader titleKey="tool.speed.title" descriptionKey="tool.speed.description" />
 
       <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-xs">
@@ -608,6 +611,8 @@ export function SpeedView(): React.ReactElement {
           <li>{t("speed.observe.reverse")}</li>
         </ul>
       </aside>
+
+      <TheoryPanel titleKey={TOOL_THEORY.speed.titleKey} sections={TOOL_THEORY.speed.sections} />
     </section>
   );
 }

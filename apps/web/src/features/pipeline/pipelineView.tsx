@@ -17,6 +17,7 @@ import "@xyflow/react/dist/style.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
+import { ToolHeader } from "../../components/ToolHeader";
 
 import { Button } from "../../components/ui/button";
 import { formatHz, formatS } from "../../lib/format";
@@ -25,6 +26,7 @@ import type { PipelineOutput, PipelineStageSummary } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
 import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
 import { type PipelineFlowNode, pipelineNodeTypes } from "./pipelineNode";
 import {
   addPipelineNode,
@@ -51,7 +53,6 @@ import {
   updatePipelinePosition,
   withPipelineValidation,
 } from "./pipelineState";
-import { PIPELINE_THEORY_SECTIONS, PIPELINE_THEORY_TITLE_KEY } from "./pipelineTheory";
 import { usePipelineRun } from "./usePipelineRun";
 
 const CONTROL_FOCUS_CLASSES =
@@ -983,10 +984,7 @@ export function PipelineView(): React.ReactElement {
 
   return (
     <div className="flex flex-col gap-4" data-testid="pipeline.view">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold">{t("tool.pipeline.title")}</h1>
-        <p className="text-sm text-muted">{t("tool.pipeline.description")}</p>
-      </header>
+      <ToolHeader titleKey="tool.pipeline.title" descriptionKey="tool.pipeline.description" />
       {urlWarning === null ? null : (
         <p role="alert" data-testid="pipeline.warning" className="text-xs text-amber-400">
           {t(`pipeline.warning.${urlWarning}`)}
@@ -1103,7 +1101,10 @@ export function PipelineView(): React.ReactElement {
           )}
         </section>
       )}
-      <TheoryPanel titleKey={PIPELINE_THEORY_TITLE_KEY} sections={PIPELINE_THEORY_SECTIONS} />
+      <TheoryPanel
+        titleKey={TOOL_THEORY.pipeline.titleKey}
+        sections={TOOL_THEORY.pipeline.sections}
+      />
     </div>
   );
 }

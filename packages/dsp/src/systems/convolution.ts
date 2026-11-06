@@ -21,9 +21,11 @@
  *   y[n]   = Σ_b y_b[n - bB].
  * Choosing L ≥ B + M - 1 keeps every block product equal to the LINEAR
  * convolution of that block with h (no circular wrap), and the block results
- * add in the overlap region. The default B = nextPowerOfTwo(M) and
- * L = nextPowerOfTwo(B + M - 1) mirror the usual textbook choice; the caller
- * may pin a smaller block with `blockLengthSamples`. The last block may be
+ * add in the overlap region. The default B = max(nextPowerOfTwo(M), 4096) and
+ * L = nextPowerOfTwo(B + M - 1); the 4096 floor stops short kernels (e.g. a
+ * 3-tap FIR) from degenerating into hundreds of thousands of tiny FFTs, while
+ * longer kernels still use B ≈ M. The caller may pin another block with
+ * `blockLengthSamples`. The last block may be
  * shorter than B, but `y_b` still has `blockSamples + M - 1` nonzero samples, so the final
  * M - 1 output samples are written exactly once (controller ruling R12 and
  * Review Focus 1: the classic dropped-tail bug).
@@ -39,6 +41,9 @@
  * default B ≈ M this is O(N·log M) for long signals. Float64 accumulation;
  * inputs are never mutated and every call returns a fresh Float64Array.
  *
+ * Kernels of 8 taps or fewer use the direct sum (same length and values, but
+ * faster than thousands of tiny FFT blocks); longer kernels use overlap-add.
+ *
  * Edge cases (controller rulings R11-R13): either input empty → RangeError
  * (the convolution length would be ill-defined); any NaN or ±Infinity sample
  * in either input → TypeError; `blockLengthSamples` must be an integer ≥ 1 →
@@ -47,7 +52,7 @@
  * even a one-sample block and a one-tap kernel stay exact.
  */
 
-import { fft, ifft } from "../fourier/transform.js";
+import { createFftPlan, fftRadix2WithPlan, ifftRadix2WithPlan } from "../fourier/fft.js";
 import type { FloatArray } from "../signals/extent.js";
 
 function assertFiniteSamples(samples: FloatArray, label: string): void {
@@ -95,9 +100,11 @@ export interface ConvolveFftOptions {
   readonly blockLengthSamples?: number;
 }
 
+const MIN_DEFAULT_BLOCK_LENGTH = 4096;
+
 function resolveBlockLength(blockLengthSamples: number | undefined, kernelLength: number): number {
   if (blockLengthSamples === undefined) {
-    return nextPowerOfTwo(Math.max(kernelLength, 1));
+    return Math.max(nextPowerOfTwo(Math.max(kernelLength, 1)), MIN_DEFAULT_BLOCK_LENGTH);
   }
   if (!Number.isInteger(blockLengthSamples) || blockLengthSamples < 1) {
     throw new RangeError(
@@ -154,7 +161,7 @@ export function convolveDirect(x: Float64Array, h: Float64Array): Float64Array {
  * @param x Signal samples (N ≥ 1). Never mutated.
  * @param h Kernel/impulse-response samples (M ≥ 1). Never mutated.
  * @param options `blockLengthSamples` overrides the default block
- *   nextPowerOfTwo(max(M, 1)); the FFT size is always
+ *   max(nextPowerOfTwo(max(M, 1)), 4096); the FFT size is always
  *   nextPowerOfTwo(block + M - 1).
  * @throws RangeError when either input is empty or the block length is not an
  *   integer ≥ 1.
@@ -177,6 +184,11 @@ export function convolveFft(
   const signalLength = x.length;
   const kernelLength = h.length;
   const blockLength = resolveBlockLength(options.blockLengthSamples, kernelLength);
+  // Very short kernels are cheaper as a direct sum than as hundreds of tiny
+  // FFT blocks (the 3-tap default FIR in the pipeline is the motivating case).
+  if (kernelLength <= 8) {
+    return convolveDirect(x, h);
+  }
   const fftLength = nextPowerOfTwo(blockLength + kernelLength - 1);
   const outputLength = signalLength + kernelLength - 1;
   const output = new Float64Array(outputLength);
@@ -184,9 +196,10 @@ export function convolveFft(
   // The kernel is the same for every block, so transform it once. Zero-padding
   // to fftLength turns the circular product below into the linear convolution
   // of each block with h.
+  const plan = createFftPlan(fftLength);
   const paddedKernel = new Float64Array(fftLength);
   paddedKernel.set(h);
-  const kernelSpectrum = fft(paddedKernel);
+  const kernelSpectrum = fftRadix2WithPlan(paddedKernel, plan);
 
   const productRe = new Float64Array(fftLength);
   const productIm = new Float64Array(fftLength);
@@ -195,7 +208,7 @@ export function convolveFft(
     const blockSamples = Math.min(blockLength, signalLength - blockStart);
     const paddedBlock = new Float64Array(fftLength);
     paddedBlock.set(x.subarray(blockStart, blockStart + blockSamples));
-    const blockSpectrum = fft(paddedBlock);
+    const blockSpectrum = fftRadix2WithPlan(paddedBlock, plan);
 
     for (let k = 0; k < fftLength; k += 1) {
       const blockRe = blockSpectrum.re[k] ?? 0;
@@ -206,7 +219,7 @@ export function convolveFft(
       productIm[k] = blockRe * kernelIm + blockIm * kernelRe;
     }
 
-    const blockResult = ifft({ re: productRe, im: productIm });
+    const blockResult = ifftRadix2WithPlan({ re: productRe, im: productIm }, plan);
 
     // Only the first blockSamples + M - 1 samples of the block convolution are
     // nonzero. Clamping to outputLength lets the final block write its whole

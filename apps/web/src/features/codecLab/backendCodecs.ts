@@ -7,7 +7,7 @@
  * it to the same Int16 grid the backend used. One upload is cached per
  * excerpt identity so A/B codec runs on the same excerpt do not re-upload.
  */
-import { encodeWavPcm16, floatToInt16Pcm, inputHashFnv1a64, int16PcmToFloat } from "@avalab/dsp";
+import { encodeWavPcm16, floatToInt16Pcm, inputHash64, int16PcmToFloat } from "@avalab/dsp";
 
 import type {
   CodecEncodeRequest,
@@ -237,7 +237,7 @@ async function uploadExcerpt(
 function inputHashFor(input: RealCodecInput): string {
   // `samples` IS the excerpt; the range/rate stay in the key so the same
   // bytes at a different source position or rate cannot alias.
-  return inputHashFnv1a64(input.samples);
+  return inputHash64(input.samples);
 }
 
 /** Backend-advertised codecs in their advertised order; unknown names drop. */

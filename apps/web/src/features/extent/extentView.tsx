@@ -15,6 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 import uPlot from "uplot";
+import { ToolHeader } from "../../components/ToolHeader";
 import "uplot/dist/uPlot.min.css";
 
 import { Button } from "../../components/ui/button";
@@ -29,6 +30,8 @@ import {
 import { DspRpcError } from "../../session/rpc";
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
+import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
 import { paintWaveform } from "../waveform/paintWaveform";
 import {
   defaultExtentRange,
@@ -479,7 +482,7 @@ export function ExtentView(): React.ReactElement {
   if (original === null) {
     return (
       <section className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold">{t("tool.extent.title")}</h2>
+        <ToolHeader titleKey="tool.extent.title" descriptionKey="tool.extent.description" />
         <UploadEmptyState />
       </section>
     );
@@ -494,7 +497,7 @@ export function ExtentView(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold">{t("tool.extent.title")}</h2>
+      <ToolHeader titleKey="tool.extent.title" descriptionKey="tool.extent.description" />
 
       <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-xs">
@@ -842,6 +845,8 @@ export function ExtentView(): React.ReactElement {
         <p className="text-xs text-muted">{t("extent.observe.scaleNote")}</p>
         <p className="text-xs text-muted">{t("extent.observe.units")}</p>
       </div>
+
+      <TheoryPanel titleKey={TOOL_THEORY.extent.titleKey} sections={TOOL_THEORY.extent.sections} />
     </section>
   );
 }

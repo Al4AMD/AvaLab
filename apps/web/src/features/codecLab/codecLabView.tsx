@@ -10,9 +10,9 @@ import type { TFunction } from "i18next";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
-
 import type { HealthResponse } from "../../api/client";
 import { api } from "../../api/client";
+import { ToolHeader } from "../../components/ToolHeader";
 import { Button } from "../../components/ui/button";
 import { formatS } from "../../lib/format";
 import { writeLastUsed } from "../../lib/lastUsed";
@@ -26,6 +26,8 @@ import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
 import { formatMetric, type QualityMetrics } from "../metrics/metrics";
 import { measureQualityMetrics } from "../metrics/qualityMetricsWorker";
+import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
 import {
   availableRealCodecs,
   REAL_CODEC_NAMES,
@@ -802,7 +804,7 @@ export function CodecLabView(): React.ReactElement {
   if (original === null) {
     return (
       <section className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold">{t("tool.codecLab.title")}</h2>
+        <ToolHeader titleKey="tool.codecLab.title" descriptionKey="tool.codecLab.description" />
         <UploadEmptyState />
       </section>
     );
@@ -817,7 +819,7 @@ export function CodecLabView(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold">{t("tool.codecLab.title")}</h2>
+      <ToolHeader titleKey="tool.codecLab.title" descriptionKey="tool.codecLab.description" />
 
       <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-xs">
@@ -1537,25 +1539,10 @@ export function CodecLabView(): React.ReactElement {
         ) : null}
       </div>
 
-      <details className="rounded border border-surface p-3 text-sm">
-        <summary className="cursor-pointer font-semibold">{t("codecLab.theory.title")}</summary>
-        <div className="mt-2 flex flex-col gap-2 text-xs text-muted">
-          <p>{t("codecLab.theory.rle")}</p>
-          <p>{t("codecLab.theory.huffman")}</p>
-          <p>{t("codecLab.theory.delta")}</p>
-          <p>{t("codecLab.theory.companding")}</p>
-          <p>{t("codecLab.theory.mdct")}</p>
-          <div>
-            <h4 className="font-semibold text-text">{t("codecLab.theory.observe.title")}</h4>
-            <ul className="ms-4 list-disc">
-              <li>{t("codecLab.theory.observe.lossless")}</li>
-              <li>{t("codecLab.theory.observe.entropy")}</li>
-              <li>{t("codecLab.theory.observe.bitrate")}</li>
-              <li>{t("codecLab.theory.observe.sparsity")}</li>
-            </ul>
-          </div>
-        </div>
-      </details>
+      <TheoryPanel
+        titleKey={TOOL_THEORY["codec-lab"].titleKey}
+        sections={TOOL_THEORY["codec-lab"].sections}
+      />
     </section>
   );
 }

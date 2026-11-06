@@ -32,6 +32,7 @@ import {
   bandAthDb,
   bandLevelsDb,
   barkBandEdgesHz,
+  benchmarkFft,
   biquadHighpass,
   biquadLowpass,
   biquadNotch,
@@ -57,9 +58,13 @@ import {
   entropyBitsPerSymbol,
   type FilterApplyParams,
   fft,
+  fftButterflySteps,
   floatToInt16Pcm,
+  fourierSeriesPartialSum,
   freqz,
+  generateAm,
   generateChirp,
+  generateFm,
   generateImpulse,
   generatePinkNoise,
   generateSawtooth,
@@ -83,6 +88,7 @@ import {
   magnitudeDb,
   maskingThresholdDb,
   mdct,
+  measureGibbsOvershoot,
   measureLoudness,
   measureReferencePower,
   mse,
@@ -108,6 +114,7 @@ import {
   rleEncode,
   runPipeline,
   type SpectrogramTilesParams,
+  type SpectrumCurveEdit,
   type SpectrumEdit,
   type SyntheticIrKind,
   segmentalSnrDb,
@@ -116,6 +123,7 @@ import {
   snrDb,
   spreadingDb,
   stepResponse,
+  stftBenchmarkChunk,
   support,
   timeScale,
   timeShift,
@@ -709,11 +717,136 @@ export function fftSelection(
   };
 }
 
+export type FftBenchmarkParams = { fftLengthSamples: number; iterations: number };
+export type FftBenchmarkResult = {
+  meta: {
+    fftLengthSamples: number;
+    iterations: number;
+    oursMedianMs: number;
+    libraryMedianMs: number;
+    speedRatio: number;
+    maxAbsError: number;
+  };
+};
+
+/** F08 benchmark, run in the worker so timings never block the UI thread. */
+export function fftBenchmark(
+  params: FftBenchmarkParams,
+  _payload?: TransferablePayload,
+): FftBenchmarkResult {
+  try {
+    const result = benchmarkFft(params.fftLengthSamples, params.iterations);
+    return { meta: result };
+  } catch (error) {
+    throw new DspOpError(
+      "badParams",
+      `fftBenchmark: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+export type FftButterflyParams = { fftLengthSamples: 8 | 16; startSample: number };
+export type FftButterflyResult = {
+  meta: {
+    fftLengthSamples: 8 | 16;
+    startSample: number;
+    steps: ReturnType<typeof fftButterflySteps>;
+  };
+};
+
+/** F08 teaching steps: payload is the selection slice, zero-padded to N. */
+export function fftButterfly(
+  params: FftButterflyParams,
+  payload?: TransferablePayload,
+): FftButterflyResult {
+  if (
+    params === undefined ||
+    params === null ||
+    (params.fftLengthSamples !== 8 && params.fftLengthSamples !== 16) ||
+    !Number.isInteger(params.startSample) ||
+    params.startSample < 0
+  ) {
+    throw new DspOpError("badParams", `fftButterfly: invalid params ${String(params)}`);
+  }
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "fftButterfly: a Float32 source payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError("badPayload", "fftButterfly: payload must be Float32-aligned");
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  const real = new Float64Array(params.fftLengthSamples);
+  const imag = new Float64Array(params.fftLengthSamples);
+  const count = Math.min(samples.length, params.fftLengthSamples);
+  for (let index = 0; index < count; index += 1) {
+    real[index] = samples[index] ?? 0;
+  }
+  return {
+    meta: {
+      fftLengthSamples: params.fftLengthSamples,
+      startSample: params.startSample,
+      steps: fftButterflySteps(real, imag),
+    },
+  };
+}
+
+export type StftBenchmarkParams = {
+  fftLengthSamples: number;
+  hopSamples: number;
+  startSample: number;
+  frameCount: number;
+};
+export type StftBenchmarkResult = {
+  meta: {
+    startSample: number;
+    framesProcessed: number;
+    elapsedMs: number;
+    checksum: number;
+  };
+};
+
+/** One chunk of the full-file STFT throughput benchmark. */
+export function stftBenchmark(
+  params: StftBenchmarkParams,
+  payload?: TransferablePayload,
+): StftBenchmarkResult {
+  if (
+    params === undefined ||
+    params === null ||
+    !Number.isInteger(params.startSample) ||
+    params.startSample < 0
+  ) {
+    throw new DspOpError("badParams", `stftBenchmark: invalid params ${String(params)}`);
+  }
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "stftBenchmark: a Float32 source payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError("badPayload", "stftBenchmark: payload must be Float32-aligned");
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  try {
+    const result = stftBenchmarkChunk(samples, {
+      fftLengthSamples: params.fftLengthSamples,
+      hopSamples: params.hopSamples,
+      startSample: 0,
+      frameCount: params.frameCount,
+    });
+    return { meta: { startSample: params.startSample, ...result } };
+  } catch (error) {
+    throw new DspOpError(
+      "badParams",
+      `stftBenchmark: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
 export type SpectrumEditParams = {
   sampleRateHz: number;
   startSample: number;
   endSample: number;
   edits: readonly SpectrumEdit[];
+  curves?: readonly SpectrumCurveEdit[];
   hermitian: boolean;
 };
 export type SpectrumEditResult = {
@@ -728,6 +861,7 @@ export type SpectrumEditResult = {
     imaginaryEnergyRatio: number;
     capped: boolean;
     editsApplied: number;
+    curvesApplied: number;
   };
   /** `[samples | re | im | magnitude | phase]`; samples are Float32 values
    * widened to Float64, each spectrum section is `binCount` long. */
@@ -756,6 +890,7 @@ export function spectrumEdit(
     params.startSample < 0 ||
     params.endSample < params.startSample ||
     !Array.isArray(params.edits) ||
+    (params.curves !== undefined && !Array.isArray(params.curves)) ||
     typeof params.hermitian !== "boolean"
   ) {
     throw new DspOpError("badParams", `spectrumEdit: invalid params ${String(params)}`);
@@ -781,6 +916,7 @@ export function spectrumEdit(
     edited = editSpectrum(input, {
       fftLengthSamples,
       edits: params.edits,
+      curves: params.curves ?? [],
       hermitian: params.hermitian,
     });
   } catch (error) {
@@ -808,6 +944,7 @@ export function spectrumEdit(
       imaginaryEnergyRatio: edited.imaginaryEnergyRatio,
       capped: params.endSample - params.startSample > FFT_MAX_LENGTH,
       editsApplied: params.edits.length,
+      curvesApplied: params.curves?.length ?? 0,
     },
     payload: { buffer: packed.buffer, byteOffset: 0, byteLength: packed.byteLength },
   };
@@ -922,7 +1059,9 @@ export type SynthWaveform =
   | "whiteNoise"
   | "pinkNoise"
   | "chirp"
-  | "twoTone";
+  | "twoTone"
+  | "am"
+  | "fm";
 export type SpeedTransformParams = {
   sampleRateHz: number;
   startSample: number;
@@ -2586,6 +2725,76 @@ export function aliasDemo(
   };
 }
 
+export type FourierPreviewParams = {
+  kind: "square" | "sawtooth" | "triangle";
+  sampleRateHz: number;
+  durationSeconds: number;
+  amplitude: number;
+  frequencyHz: number;
+  harmonics: number;
+  previewBucketCount: number;
+};
+export type FourierPreviewResult = {
+  meta: {
+    kind: FourierPreviewParams["kind"];
+    harmonics: number;
+    overshootRatio: number;
+    sampleCount: number;
+    bucketCount: number;
+  };
+  payload?: TransferablePayload;
+};
+
+/** F12 Fourier-series preview: partial sum plus the measured Gibbs overshoot. */
+export function fourierPreview(
+  params: FourierPreviewParams,
+  _payload?: TransferablePayload,
+): FourierPreviewResult {
+  if (
+    params === undefined ||
+    params === null ||
+    (params.kind !== "square" && params.kind !== "sawtooth" && params.kind !== "triangle") ||
+    !Number.isFinite(params.sampleRateHz) ||
+    params.sampleRateHz <= 0 ||
+    params.sampleRateHz > 96_000 ||
+    !Number.isFinite(params.durationSeconds) ||
+    params.durationSeconds < 0 ||
+    params.durationSeconds > 300 ||
+    !Number.isFinite(params.amplitude) ||
+    !Number.isFinite(params.frequencyHz) ||
+    !Number.isInteger(params.harmonics) ||
+    params.harmonics < 1 ||
+    params.harmonics > 200 ||
+    !Number.isInteger(params.previewBucketCount) ||
+    params.previewBucketCount < 1
+  ) {
+    throw new DspOpError("badParams", `fourierPreview: invalid params ${String(params)}`);
+  }
+  try {
+    const samples = fourierSeriesPartialSum({
+      kind: params.kind,
+      sampleRateHz: params.sampleRateHz,
+      durationSeconds: params.durationSeconds,
+      amplitude: params.amplitude,
+      frequencyHz: params.frequencyHz,
+      harmonics: params.harmonics,
+    });
+    const buckets = computePeakBuckets(Float32Array.from(samples), params.previewBucketCount);
+    return {
+      meta: {
+        kind: params.kind,
+        harmonics: params.harmonics,
+        overshootRatio: measureGibbsOvershoot(samples, Math.abs(params.amplitude)),
+        sampleCount: samples.length,
+        bucketCount: buckets.byteLength / 8,
+      },
+      payload: { buffer: buckets.buffer, byteOffset: 0, byteLength: buckets.byteLength },
+    };
+  } catch (error) {
+    throw new DspOpError("badParams", `fourierPreview: ${String(error)}`);
+  }
+}
+
 export type GenerateSynthParams = {
   waveform: SynthWaveform;
   sampleRateHz: number;
@@ -2600,6 +2809,9 @@ export type GenerateSynthParams = {
   chirpLog?: boolean;
   tone2Hz?: number;
   seed?: number;
+  modulationHz?: number;
+  modulationIndex?: number;
+  frequencyDeviationHz?: number;
   /** 0 = return the samples (load-as-source); > 0 = return that many
    * min/max buckets for the preview canvas. */
   previewBucketCount: number;
@@ -2626,6 +2838,8 @@ const SYNTH_WAVEFORMS: readonly SynthWaveform[] = [
   "pinkNoise",
   "chirp",
   "twoTone",
+  "am",
+  "fm",
 ];
 
 /** F12 generator plumbing: map the UI params onto the wave-1 dsp generators
@@ -2710,6 +2924,22 @@ export function generateSynth(
       values = generateTwoTone({
         ...spec,
         frequenciesHz: [params.frequencyHz ?? 440, params.tone2Hz ?? 880],
+      });
+      break;
+    case "am":
+      values = generateAm({
+        ...spec,
+        carrierHz: params.frequencyHz ?? 440,
+        modulationHz: params.modulationHz ?? 5,
+        modulationIndex: params.modulationIndex ?? 0.5,
+      });
+      break;
+    case "fm":
+      values = generateFm({
+        ...spec,
+        carrierHz: params.frequencyHz ?? 440,
+        modulationHz: params.modulationHz ?? 5,
+        frequencyDeviationHz: params.frequencyDeviationHz ?? 1000,
       });
       break;
     default:
@@ -2873,6 +3103,27 @@ export const dspOps = {
     result: undefined as unknown as FftSelectionResult,
     handler: fftSelection,
   },
+  fftBenchmark: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: { fftLengthSamples: 256, iterations: 10 },
+    result: undefined as unknown as FftBenchmarkResult,
+    handler: fftBenchmark,
+  },
+  fftButterfly: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: { fftLengthSamples: 8, startSample: 0 } as FftButterflyParams,
+    result: undefined as unknown as FftButterflyResult,
+    handler: fftButterfly,
+  },
+  stftBenchmark: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: { fftLengthSamples: 1024, hopSamples: 256, startSample: 0, frameCount: 1 },
+    result: undefined as unknown as StftBenchmarkResult,
+    handler: stftBenchmark,
+  },
   windowProfiles: {
     // Type lenses only �?" the table is read for types (DspOpParams/Result);
     // runtime code dispatches through the worker switch.
@@ -2888,6 +3139,7 @@ export const dspOps = {
       startSample: 0,
       endSample: 0,
       edits: [] as readonly SpectrumEdit[],
+      curves: [] as readonly SpectrumCurveEdit[],
       hermitian: true,
     },
     result: undefined as unknown as SpectrumEditResult,
@@ -2930,6 +3182,21 @@ export const dspOps = {
     result: undefined as unknown as PsychoacousticAnalysisResult,
     handler: psychoacousticAnalysis,
   },
+  fourierPreview: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: {
+      kind: "square" as FourierPreviewParams["kind"],
+      sampleRateHz: 48_000,
+      durationSeconds: 1,
+      amplitude: 0.8,
+      frequencyHz: 440,
+      harmonics: 10,
+      previewBucketCount: 512,
+    },
+    result: undefined as unknown as FourierPreviewResult,
+    handler: fourierPreview,
+  },
   generateSynth: {
     // Type lenses only — the table is read for types (DspOpParams/Result);
     // runtime code dispatches through the worker switch.
@@ -2939,7 +3206,7 @@ export const dspOps = {
       durationSeconds: 0,
       amplitude: 0,
       previewBucketCount: 0,
-    },
+    } as GenerateSynthParams,
     result: undefined as unknown as GenerateSynthResult,
     handler: generateSynth,
   },

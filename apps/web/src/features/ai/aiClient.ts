@@ -52,6 +52,26 @@ export type AiJobEvent = {
   readonly code: string | null;
 };
 
+/** Terminal payload shared by pitch and beat analysis jobs. */
+export type AiAnalysisResult = {
+  readonly kind: "analysis";
+  readonly analysis: Record<string, unknown>;
+  readonly stats: Record<string, unknown>;
+};
+
+export function readAnalysisResult(
+  result: Record<string, unknown> | null,
+): AiAnalysisResult | null {
+  if (result === null || result.kind !== "analysis" || !isPlainRecord(result.analysis)) {
+    return null;
+  }
+  return {
+    kind: "analysis",
+    analysis: result.analysis,
+    stats: isPlainRecord(result.stats) ? result.stats : {},
+  };
+}
+
 export type AiClient = {
   getModels(): Promise<AiModelsResponse>;
   uploadExcerpt(input: AiExcerptInput): Promise<string>;

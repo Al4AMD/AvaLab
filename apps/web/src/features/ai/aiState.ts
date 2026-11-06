@@ -1,7 +1,7 @@
 /**
  * AI-lab URL state (F14, Wave-5 Plan 01 Task 5).
  *
- * The tab is the only shareable field for now: `?task=`. The public task ids
+ * The task is the only shareable field for now: `?task=`. The public task ids
  * use hyphens, while the backend route and model registry use underscores
  * (`neural_codec`); the mapping lives here so callers never guess.
  */
@@ -10,8 +10,37 @@ import { decodeParams, encodeParams } from "../../lib/url-state";
 
 export const AI_STORAGE_KEY = "avalab.ai.last";
 
-export const AI_TASKS = ["denoise", "superres", "separation", "asr", "neural-codec"] as const;
+export const AI_TASKS = [
+  "denoise",
+  "superres",
+  "separation",
+  "asr",
+  "neural-codec",
+  "pitch",
+  "beat",
+] as const;
 export type AiTask = (typeof AI_TASKS)[number];
+
+/** Six visible tabs; pitch and beat share the `pitchBeat` tab. */
+export const AI_TABS = [
+  "denoise",
+  "superres",
+  "separation",
+  "asr",
+  "neural-codec",
+  "pitchBeat",
+] as const;
+export type AiTab = (typeof AI_TABS)[number];
+
+export type AnalysisTask = Extract<AiTask, "pitch" | "beat">;
+
+export function isAnalysisTask(task: AiTask): task is AnalysisTask {
+  return task === "pitch" || task === "beat";
+}
+
+export function aiTabForTask(task: AiTask): AiTab {
+  return isAnalysisTask(task) ? "pitchBeat" : task;
+}
 
 const BACKEND_TASK: Record<AiTask, string> = {
   denoise: "denoise",
@@ -19,6 +48,8 @@ const BACKEND_TASK: Record<AiTask, string> = {
   separation: "separation",
   asr: "asr",
   "neural-codec": "neural_codec",
+  pitch: "pitch",
+  beat: "beat",
 };
 
 /** Public id → backend path/registry id. */

@@ -33,12 +33,12 @@ export function AppLayout() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="flex items-center justify-between gap-4 border-b border-surface px-6 py-4">
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-surface px-6 py-4">
         <div>
           <h1 className="text-xl font-semibold">{t("app.title")}</h1>
           <p className="text-sm text-muted">{t("app.subtitle")}</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <HealthStatus />
           <label className="flex items-center gap-2 text-sm text-muted">
             <span>{t("app.theme.label")}</span>
@@ -72,9 +72,9 @@ export function AppLayout() {
           <LanguageToggle />
         </div>
       </header>
-      <div className="flex flex-1">
+      <div className="flex flex-1 flex-col md:flex-row">
         <Sidebar />
-        <main className="flex-1 px-6 py-8">
+        <main className="min-w-0 flex-1 px-6 py-8">
           <Outlet />
         </main>
       </div>

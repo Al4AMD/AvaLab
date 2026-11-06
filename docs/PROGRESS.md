@@ -181,9 +181,17 @@ Wave 5 plan 05 additions (machine-drafted, agent):
 - `input.demo.shareButton/shareAria/shareCopied/shareFailed`
 - `filters.export.wav`, `ai.export.wav`, `codecLab.comparison.chart.exportPng/exportFailed`
 
+Wave 6 Plan 04 additions (machine-drafted, agent):
+
+- `fftview.benchmark.*`, `fftview.butterfly.*` (F08 benchmark and butterfly teaching view)
+- `spectrumEdit.curve.*` (F09 freehand spectrum curves)
+- `generator.amFm.*`, `generator.fourier.*` (F12 AM/FM and Fourier-series preview)
+- `ai.pitchBeat.*` (F14 pitch/beat analysis)
+- Expanded `experiments.*` copy for all 19 guided experiments, plus per-tool `*.theory.*` content added in Wave 6 Plan 04
+
 ## Next recommended step
 
-Wave 6 Plan 00 is complete on `feat/wave-5`. Next: execute `docs/plans/wave-6/01-psychoacoustics.md` (F13), then plans 02–07 in order. The audit's owner-decision rows (stereo playback, general F02 comparison, F14 classification, F16 student report) remain open.
+Wave 6 Plans 00–04 are complete on `feat/wave-6`. Next: execute `docs/plans/wave-6/05-polish.md`, then plans 06–07 in order. The audit's owner-decision rows (stereo playback, general F02 comparison, F14 classification, F16 student report) remain open.
 
 ## Session log
 
@@ -549,3 +557,32 @@ Wave 6 Plan 00 is complete on `feat/wave-5`. Next: execute `docs/plans/wave-6/01
 - Gates: `pnpm check` exit 0 (biome clean; dsp 1035/1035; web 552/552 across 70 files; scripts 13/13; i18n OK); `pnpm e2e` 64/64 in 1.5 min with zero console errors in fa + en; `pnpm --filter @avalab/web build` succeeded (existing >500 kB chunk warning remains). Backend untouched.
 - Carries: `app.theme.*`, `player.loudness.*` and `shortcuts.*` Persian copy join the owner-review backlog. Metrics has no settings, so persistence is intentionally a no-op there. No commit or push.
 - **Next step:** execute Wave 6 Plan 04 — feature gaps.
+
+## 2026-11-06 — Wave 6 Plan 04 complete (feature gaps)
+
+- Status: Plan 04 Tasks 1–8 complete on `feat/wave-6`, no commit. Scope: F08 butterfly/benchmark, F09 freehand spectrum curves, F12 AM/FM + Fourier-series preview, F14 pitch/beat analysis, F16 theory panels and 19 guided experiments, docs and gates.
+- Shipped F08: `fftButterflySteps` for N = 8/16 with worker replay, and `benchmarkFft`/`stftBenchmarkChunk` against pinned `fft.js` 4.0.4; benchmark reports medians, relative speed and max coefficient error, with no wall-clock CI threshold (D-048). New benchmark/butterfly panels.
+- Shipped F09: `applySpectrumCurves` with sorted/deduplicated linear-bin curves, held endpoints, `re`/`im`/`mag`/`phase` targets and an 8192-bin `cv` URL codec; curves run after band edits and before Hermitian enforcement (D-049).
+- Shipped F12: `am`/`fm` generator presets, `fourierPreview` worker op, basic/AM-FM/Fourier tabs, overmodulation warning and 2 s/200-harmonic preview caps (D-052).
+- Shipped F14: backend `librosa.pyin` pitch and `librosa.beat.beat_track` beat analysis as non-neural 30 s excerpt jobs that bypass the model registry, plus the pitch/beat AI tab, F0 curve, tempo and beat list (D-051).
+- Shipped F16: shared theory content for all 14 non-AI tools; 19 guided experiments in `signals`/`multimedia`/`ai`/`labs` with 5–8 steps each, validated deep links, and IDs-only persistent progress (D-050).
+- Docs: `ALGORITHMS.md` has the Wave-6 algorithm rows and theory/experiment notes; `THIRD_PARTY.md` records `fft.js` 4.0.4 (MIT) and `librosa` 0.11.0 (ISC); `DECISIONS.md` records D-048–D-052.
+- Gates: `pnpm check` exit 0 (biome 341 files; dsp 1060/1060; web 618/618; scripts 13/13; i18n OK); `pnpm --filter @avalab/web e2e` 74/74 in 3.3 min with zero console errors in `fa` and `en`; API `pytest -q` 206 passed / 5 skipped, `ruff` and `mypy` clean (51 source files); production build succeeded inside e2e.
+- First `pnpm check` run overlapped with the API suite and hit the pre-existing 24 s timeout in the 48 000-sample naive-DFT golden test; the file passed alone (5.07 s) and a clean serial `pnpm check` passed. The test remains sensitive to heavy parallel load.
+- Carries: Wave 6 Persian copy joins the owner-review backlog; FFT benchmark timings are machine-dependent by design; pitch/beat and full-file analysis remain excerpt-limited; no commit or push.
+- **Next step:** execute Wave 6 Plan 05 — `docs/plans/wave-6/05-polish.md`.
+
+## 2026-11-06 — Wave 6 Plan 05 complete (polish, performance, accessibility, Persian review)
+
+- Status: Plan 05 Tasks 1–7 complete on `feat/wave-6`, no commit. Scope: measured performance, main-thread DSP audit, accessibility, RTL/Persian review, robustness cases, shared tool headers, docs hygiene.
+- Performance: the deterministic 5-minute 44.1 kHz harness (`apps/web/e2e/performance.spec.ts`) passes with 3-run medians in `docs/plans/wave-6/performance.md`: waveform after decode 304 ms (< 2 000 gate; 1 s budget), spectrogram 175 ms (< 6 000; 3 s), FFT 173 ms (< 600; 300 ms), FIR 141 ms (< 600), pipeline 253 ms (< 600), MDCT 1 380 ms, reverb 1 404 ms, loudness 368 ms. The final full-e2e run measured waveform 387 ms, spectrogram 316 ms, FFT 217 ms, MDCT 1 905 ms, FIR 193 ms, reverb 1 924 ms (under the 2 000 ms fallback gate), pipeline 261 ms, loudness 880 ms.
+- Optimizations: word-wise two-lane session hash, sequential spectrogram chunk scheduling, power-of-two `ifft` delegation, reusable FFT plans, a 4096-sample overlap-add minimum, and direct convolution for ≤ 8 taps. Both non-viable 300 ms paths are explicit and gated: the teaching O(frames·N²) MDCT (6 s gate) and 30 s reverb apply (2 s gate); D-053 records them. No WASM added.
+- Main-thread audit: `apps/web/src/session/mainThreadDsp.test.ts` blocks DSP imports in `features/**` outside canvas painters. Remaining O(n) loops are load-boundary validation/hash and `monoDownmix`, run once per source and recorded as exceptions in D-053, not hidden as DSP purity.
+- Accessibility: `apps/web/e2e/accessibility.spec.ts` 5/5 in `fa` and `en`: named visible controls, labelled canvases (uPlot descendants inherit their labelled `role="img"` host), keyboard focus, focus-trapped shortcut dialog, reduced motion, colorblind-safe `viridisCB`, and 4.5:1 dark/light tokens. Fixes: light accent contrast, pitch canvas role, reverb IR upload label.
+- RTL/Persian: `apps/web/e2e/rtl.spec.ts` 4/4 covers sidebar mirroring, LTR plots/readouts, no overflow at 1280/768/390 px, and the mobile player dock. Static scan is clean. `docs/plans/wave-6/persian-review.md` records the full pass, fixes (noise unified to «نویز», companding parenthetical, ezafe, reverb header wording) and the owner sign-off list; status is **owner sign-off pending** for «تُنُکی», «بیش‌جهش», «همبسته», and the demo-clip wording.
+- Robustness: e2e now covers a corrupted upload (translated decode error, app usable), a 300.5 s file (rejected, never truncated), denoise job cancel (terminal «لغو شد.», no spinner, Run re-enabled), and a missing denoise model (Run disabled, banner explains the download). A new store test pins that an `opFailed` frame keeps an earlier cached derivation ready.
+- Consistency: shared `apps/web/src/components/ToolHeader.tsx` gives every tool the same `h2` + short description; 13 descriptions added in both locales (pipeline already had one). The pipeline `h1` outlier and the route Suspense fallback are aligned. Dynamic header keys are covered by the exact `tool`/`psychoacoustics.description` entries in `scripts/i18n-dynamic-keys.json`, keeping `i18n:check` strict for other namespaces.
+- Hygiene: no `TODO`/`FIXME` in source, no unjustified `@ts-expect-error`, no empty catches, no commented-out code; `console.warn` calls are developer diagnostics only.
+- Gates: `pnpm check` exit 0 (biome 346 files; dsp 1 058/1 058; web 620/620 across 76 files; scripts 13/13; i18n OK); `pnpm --filter @avalab/web e2e` 88/88 in 2.5 min with zero console errors in `fa` and `en`; API `pytest -q` 206 passed / 5 skipped, `ruff` and `mypy` clean (51 source files). Production build succeeds inside e2e with the existing >500 kB chunk warning.
+- Known issues: the pre-existing 48 000-sample naive-DFT golden test can still exceed its 24 s timeout under heavy parallel load (isolated and serial runs pass); the two documented performance fallbacks remain; worker-failure UI preservation is unit-covered rather than e2e because the UI has no test hook to force a worker rejection; the load-boundary loops in D-053 remain on the main thread by decision.
+- **Next step:** execute Wave 6 Plan 06 — deployment.

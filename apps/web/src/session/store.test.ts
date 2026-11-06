@@ -356,6 +356,29 @@ describe("failures keep the cache clean and reject the ticket", () => {
   });
 });
 
+describe("worker failures preserve earlier results", () => {
+  it("an opFailed frame leaves an existing cached derivation ready", async () => {
+    const { store, transport } = makeStore();
+    expectOk(store.getState().loadSource(fakeAudio(16), 48000, "a.wav", "demoClip"));
+    const good = store.getState().derive("sessionPing", { count: 1 });
+    const goodKey = good?.key ?? "";
+    transport.deliver({ id: 0, ok: true, result: { meta: { empty: true } } });
+    await vi.waitFor(() => expect(store.getState().getDerived(goodKey).status).toBe("ready"));
+
+    const bad = store.getState().derive("sessionPing", { count: 2 });
+    const badKey = bad?.key ?? "";
+    transport.deliver({ id: 1, ok: false, error: { code: "opFailed", message: "boom" } });
+    await expect(bad?.outcome).rejects.toMatchObject({ code: "opFailed" });
+    await vi.waitFor(() => expect(store.getState().jobs.size).toBe(0));
+
+    expect(store.getState().getDerived(badKey)).toEqual({ status: "miss" });
+    expect(store.getState().getDerived(goodKey)).toEqual({
+      status: "ready",
+      entry: { key: goodKey, result: { meta: { empty: true } } },
+    });
+  });
+});
+
 describe("reload invalidates everything", () => {
   it("empties the derived cache and jobs, and changes the input hash", async () => {
     const { store, transport } = makeStore();

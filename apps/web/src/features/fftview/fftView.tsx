@@ -14,6 +14,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 import uPlot from "uplot";
+import { ToolHeader } from "../../components/ToolHeader";
 import "uplot/dist/uPlot.min.css";
 
 import { Button } from "../../components/ui/button";
@@ -26,6 +27,10 @@ import {
 } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
+import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
+import { BenchmarkPanel } from "./benchmarkPanel";
+import { ButterflyPanel } from "./butterflyPanel";
 import {
   FFT_PHASE_MASK_MAX_DB,
   FFT_PHASE_MASK_MIN_DB,
@@ -450,7 +455,7 @@ export function FftView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold">{t("tool.fftview.title")}</h2>
+      <ToolHeader titleKey="tool.fftview.title" descriptionKey="tool.fftview.description" />
       {original === null ? (
         <UploadEmptyState />
       ) : (
@@ -685,10 +690,18 @@ export function FftView() {
                   </table>
                 </>
               )}
+
+              <ButterflyPanel startSample={selection.startSample} />
+              <BenchmarkPanel startSample={selection.startSample} endSample={selection.endSample} />
             </>
           )}
         </>
       )}
+
+      <TheoryPanel
+        titleKey={TOOL_THEORY.fftview.titleKey}
+        sections={TOOL_THEORY.fftview.sections}
+      />
     </section>
   );
 }

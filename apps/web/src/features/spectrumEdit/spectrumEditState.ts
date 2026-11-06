@@ -5,10 +5,16 @@
  * field, and every edit is re-validated so a hand-edited link cannot make the
  * worker throw.
  */
-import { buildSpectrumPreset, type SpectrumEdit } from "@avalab/dsp";
+import {
+  buildSpectrumPreset,
+  nextPowerOfTwo,
+  type SpectrumCurveEdit,
+  type SpectrumEdit,
+} from "@avalab/dsp";
 import { type LastUsedStorage, readLastUsed } from "../../lib/lastUsed";
 import { decodeParams, encodeParams } from "../../lib/url-state";
 import { FFT_MAX_LENGTH } from "../../session/ops";
+import { CURVE_URL_KEY, decodeCurves, encodeCurves } from "./curveState";
 
 export const SPECTRUM_EDIT_TARGETS = ["re", "im", "mag", "phase"] as const;
 export const SPECTRUM_EDIT_MODES = ["zero", "scale", "set"] as const;
@@ -27,6 +33,7 @@ export type SpectrumEditPreset = (typeof SPECTRUM_EDIT_PRESETS)[number];
 export type SpectrumEditSettings = {
   readonly hermitian: boolean;
   readonly edits: readonly SpectrumEdit[];
+  readonly curves: readonly SpectrumCurveEdit[];
   readonly startSample: number;
   readonly endSample: number;
 };
@@ -43,6 +50,7 @@ export const SPECTRUM_EDIT_STORAGE_KEY = "avalab.spectrum-edit.last";
 export const SPECTRUM_EDIT_DEFAULT_SETTINGS: SpectrumEditSettings = {
   hermitian: true,
   edits: [],
+  curves: [],
   startSample: 0,
   endSample: 0,
 };
@@ -136,7 +144,9 @@ export function presetEdits(
 }
 
 export function spectrumEditSettingsToSearch(settings: SpectrumEditSettings): string {
+  const curves = encodeCurves(settings.curves);
   return encodeParams({
+    ...(curves === null ? {} : { [CURVE_URL_KEY]: curves }),
     ed: JSON.stringify(settings.edits),
     from: settings.startSample,
     h: settings.hermitian ? 1 : 0,
@@ -165,9 +175,13 @@ export function spectrumEditSettingsFromSearch(
     explicitRange !== null && explicitRange.endSample > explicitRange.startSample
       ? explicitRange
       : fallbackRange;
+  const analysisLength = Math.min(range.endSample - range.startSample, FFT_MAX_LENGTH);
+  const fftLengthSamples = analysisLength <= 1 ? 1 : nextPowerOfTwo(analysisLength);
+  const maxBin = Math.floor(fftLengthSamples / 2);
   return {
     hermitian: scalar("h") !== "0",
     edits: decodeEdits(scalar("ed")),
+    curves: decodeCurves(scalar(CURVE_URL_KEY), maxBin),
     startSample: range.startSample,
     endSample: range.endSample,
   };

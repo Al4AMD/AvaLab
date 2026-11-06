@@ -14,6 +14,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 import uPlot from "uplot";
+import { ToolHeader } from "../../components/ToolHeader";
 import "uplot/dist/uPlot.min.css";
 
 import { Button } from "../../components/ui/button";
@@ -22,6 +23,8 @@ import { writeLastUsed } from "../../lib/lastUsed";
 import type { AliasDemoResult, SamplingProcessResult } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
+import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
 import {
   defaultSamplingRange,
   loadSamplingSettings,
@@ -522,7 +525,7 @@ export function SamplingView(): React.ReactElement {
   if (original === null) {
     return (
       <section className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold">{t("tool.sampling.title")}</h2>
+        <ToolHeader titleKey="tool.sampling.title" descriptionKey="tool.sampling.description" />
         <UploadEmptyState />
         <AliasingCard sourceLoaded={false} />
       </section>
@@ -537,7 +540,7 @@ export function SamplingView(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold">{t("tool.sampling.title")}</h2>
+      <ToolHeader titleKey="tool.sampling.title" descriptionKey="tool.sampling.description" />
 
       <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-xs">
@@ -793,6 +796,11 @@ export function SamplingView(): React.ReactElement {
           <li>{t("sampling.observe.snr")}</li>
         </ul>
       </aside>
+
+      <TheoryPanel
+        titleKey={TOOL_THEORY.sampling.titleKey}
+        sections={TOOL_THEORY.sampling.sections}
+      />
     </section>
   );
 }

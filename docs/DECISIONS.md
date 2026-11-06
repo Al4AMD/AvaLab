@@ -384,3 +384,51 @@
 - Context: many tools already encode shareable parameters in the URL; duplicating a second serialization format for persistence would drift.
 - Decision: store the same stable query string under `avalab.<tool>.last` and reuse each tool's total decoder; a non-empty URL wins over storage, and a missing/invalid stored value falls back to defaults. A shared best-effort storage helper is used by the nine tools that need identical safe handling. Never store source audio, file names, uploaded IRs, or AI results.
 - Consequences: share links stay authoritative, reloads reopen the last panel state, private/quota-blocked storage is non-fatal, and old or hand-edited values cannot crash a view.
+
+## D-048 — F08 teaching and benchmark scopes are bounded
+
+- Date: 2026-11-06
+- Status: accepted (agent, Wave 6 Plan 04)
+- Context: the FFT teaching view needs replayable butterflies, and the benchmark needs an independent implementation without turning noisy wall-clock numbers into a CI gate.
+- Decision: `fftButterflySteps` records radix-2 DIT operations only for N = 8 and N = 16. `benchmarkFft` compares `fftRadix2` with pinned `fft.js` 4.0.4 on sizes 256/1024/4096/16384, one warm-up, median elapsed time over 1–1000 iterations, and gates only finite output plus `maxAbsError ≤ 1e-5`; no timing threshold is asserted. Both run as worker ops.
+- Consequences: students see honest relative speed on their machine, CI cannot flake on load, and the whole-file STFT benchmark remains the long-input path.
+
+## D-049 — F09 freehand spectra use linear bin curves after band edits
+
+- Date: 2026-11-06
+- Status: accepted (agent, Wave 6 Plan 04)
+- Context: F09 needs drawing on the spectrum, but arbitrary curve semantics can fight the existing band-edit presets or break Hermitian reconstruction.
+- Decision: freehand curves are linear interpolations between sorted, deduplicated `(bin, value)` points with held endpoints. At most 8 curves, 2–256 points each, integer bins inside the analysed spectrum. Curves apply after legacy band edits and before Hermitian enforcement, so the drawn shape wins. Magnitude clamps to non-negative; phase wraps to `(−π, π]`. The URL `cv` codec carries at most 8192 bins and validates every entry; legacy `ed` remains readable.
+- Consequences: URL shares and reloads are deterministic, old links keep working, and the spectrum editor never computes DSP on the main thread.
+
+## D-050 — F16 catalogue is ID-only and link-validated
+
+- Date: 2026-11-06
+- Status: accepted (agent, Wave 6 Plan 04)
+- Context: the guided-experiment catalogue grew from 3 to 19 items, and saved progress or deep links must not break when copy or routes change.
+- Decision: the closed `ExperimentId` union drives the catalogue, categories and 5–8 step content. Every optional deep link must target an existing tool route and decode through that tool's total URL parser. Progress stores IDs only under `localStorage["avalab.experiments.progress"]`; malformed JSON resets, unknown/duplicate IDs are dropped, and storage failures are non-fatal. Numerical claims in copy do not replace the algorithm rows and their golden/property tests, which remain the source of truth.
+- Consequences: share links and reloads are safe, content can be reviewed in `fa` and `en` independently, and no audio or file names enter progress storage.
+
+## D-051 — F14 pitch/beat are non-neural, excerpt-limited analysis jobs
+
+- Date: 2026-11-06
+- Status: accepted (agent, Wave 6 Plan 04)
+- Context: F14 pitch and beat tracking are available from librosa; routing them through the neural model registry would require the ML extra for a non-neural tool.
+- Decision: use `librosa.pyin(fmin=65, fmax=1000, frame_length=2048)` and `librosa.beat.beat_track(hop_length=256)` in backend analysis jobs. They use the shared 30 s route excerpt limit, return `kind="analysis"`, bypass `ml_enabled`, the model registry and the model factory, and never persist audio. `hop_length=256` is pinned because 512 misreports a synthetic 120 BPM train outside the ±2 BPM test bound.
+- Consequences: pitch/beat work with the base API install and no weights; results are labelled analysis, not AI-model output; full-file analysis remains unsupported.
+
+## D-052 — F12 AM/FM and Fourier preview reuse the generator core
+
+- Date: 2026-11-06
+- Status: accepted (agent, Wave 6 Plan 04)
+- Context: F12 needed two new generator presets and an interactive Fourier-series preview without adding a second synthesis path.
+- Decision: AM is `x[n] = a(1 + m·sin(2πf_m n/fs))·sin(2πf_c n/fs)`; FM is `x[n] = a·sin(2πf_c n/fs + β·sin(2πf_m n/fs))` with `β = deviationHz/f_m`. `generateSynth` dispatches them and the Fourier preview reuses `fourierSeriesPartialSum` plus `measureGibbsOvershoot`. The preview is capped at 2 s and 200 harmonics; URL state carries the new parameters and clamps on decode.
+- Consequences: one generator engine and one Fourier-series implementation stay authoritative; overmodulation is warned in the UI rather than silently clamped.
+
+## D-053 — Plan 05 performance fallbacks and main-thread boundaries
+
+- Date: 2026-11-06
+- Status: accepted (agent, Wave 6 Plan 05)
+- Context: the 5-minute harness exposed two paths that cannot meet the 300 ms live-parameter target without changing their educational character, plus two session-boundary loops that are not DSP transforms.
+- Decision: keep the teaching MDCT direct (O(frames·N²)) as an explicit encode/decode action with a measured 6 s test gate, and keep the reverb apply at a 30 s excerpt with a 250 ms input debounce and a 2 s test gate. Do not add WASM or replace either algorithm. Keep source validation/hash and `monoDownmix` on the main thread because they run once per load and moving them would add a new worker op outside the fixes-only scope. Record both boundaries in `docs/PROGRESS.md`.
+- Consequences: every other measured path is inside the AGENTS §9 budget; the two fallbacks are honest, visible, and regression-gated. A future WASM/FFT-MDCT change needs its own benchmark and owner approval, and a future worker-op migration must remove the boundary note.

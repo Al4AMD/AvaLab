@@ -32,6 +32,7 @@
 | zustand | 5.0.16 | MIT |
 | uplot | 1.6.32 | MIT |
 | @xyflow/react | 12.12.1 | MIT |
+| fft.js | 4.0.4 | MIT |
 | katex | 0.19.1 | MIT |
 | vite | 8.3.4 | MIT |
 | @vitejs/plugin-react | 6.1.2 | MIT |
@@ -43,7 +44,7 @@
 | @biomejs/biome | 2.5.15 | MIT |
 | @types/node | 26.6.5 | MIT |
 
-Wave 6 added `@xyflow/react` 12.12.1 (MIT, <https://reactflow.dev>) for the F15 pipeline graph editor. Its transitive `@xyflow/system` 0.0.84 is MIT and its `d3-*` interaction packages are ISC. Wave 5 added `katex` 0.19.1 (MIT) for the theory panels; Wave 4 added no new JS dependency. The comparison table and rate–distortion chart reuse the already-listed `uplot` 1.6.32 (MIT); real codecs keep using the separately-invoked `ffmpeg` binary.
+Wave 6 added `@xyflow/react` 12.12.1 (MIT, <https://reactflow.dev>) for the F15 pipeline graph editor. Its transitive `@xyflow/system` 0.0.84 is MIT and its `d3-*` interaction packages are ISC. Wave 6 Plan 04 added `fft.js` 4.0.4 (MIT) as the independent FFT baseline for the F08 benchmark panel; it is never on the audio path. Wave 5 added `katex` 0.19.1 (MIT) for the theory panels; Wave 4 added no new JS dependency. The comparison table and rate–distortion chart reuse the already-listed `uplot` 1.6.32 (MIT); real codecs keep using the separately-invoked `ffmpeg` binary.
 
 ## Python (apps/api/uv.lock, tools/golden/uv.lock, tools/demo_clips/uv.lock)
 
@@ -53,9 +54,12 @@ Wave 6 added `@xyflow/react` 12.12.1 (MIT, <https://reactflow.dev>) for the F15 
 | annotated-types | 0.8.0 | MIT |
 | anyio | 4.15.1 | MIT |
 | ast-serialize | 0.13.1 | MIT |
+| audioread | 3.1.0 | MIT |
 | certifi | 2026.10.18 | MPL-2.0 |
 | click | 8.5.0 | BSD-3-Clause |
+| cloudpickle | 3.1.2 | BSD-3-Clause |
 | colorama | 0.4.6 | BSD-3-Clause |
+| decorator | 5.3.1 | BSD-2-Clause |
 | fastapi | 0.146.0 | MIT |
 | h11 | 0.16.0 | MIT |
 | httpcore | 1.0.9 | BSD-3-Clause |
@@ -63,14 +67,23 @@ Wave 6 added `@xyflow/react` 12.12.1 (MIT, <https://reactflow.dev>) for the F15 
 | httpx | 0.28.1 | BSD-3-Clause |
 | idna | 3.20 | BSD-3-Clause |
 | iniconfig | 2.3.1 | MIT |
+| joblib | 1.6.0 | BSD-3-Clause |
+| lazy-loader | 0.6 | BSD-3-Clause |
+| librosa | 0.11.0 | ISC |
 | librt | 0.16.0 | MIT |
+| llvmlite | 0.44.0 | BSD-2-Clause |
+| msgpack | 1.2.4 | Apache-2.0 |
 | mypy | 2.4.0 | MIT |
 | mypy-extensions | 1.1.0 | MIT |
+| narwhals | 2.28.0 | MIT |
+| numba | 0.61.2 | BSD-2-Clause |
 | numpy | 2.5.4 | BSD-3-Clause (bundled: 0BSD, MIT, Zlib, CC0-1.0) |
 | opentelemetry-api | 1.45.1 | Apache-2.0 |
 | packaging | 26.3 | Apache-2.0 OR BSD-2-Clause |
 | pathspec | 1.1.1 | MPL-2.0 |
+| platformdirs | 4.14.5 | MIT |
 | pluggy | 1.7.0 | MIT |
+| pooch | 1.9.0 | BSD-3-Clause |
 | pydantic | 2.14.1 | MIT |
 | pydantic-core | 2.50.1 | MIT |
 | pydantic-settings | 2.16.0 | MIT |
@@ -80,14 +93,19 @@ Wave 6 added `@xyflow/react` 12.12.1 (MIT, <https://reactflow.dev>) for the F15 
 | python-multipart | 0.0.32 | Apache-2.0 |
 | pyyaml | 6.0.3 | MIT |
 | ruff | 0.17.1 | MIT |
+| scikit-learn | 1.9.1 | BSD-3-Clause |
 | scipy | 1.18.1 | BSD-3-Clause |
+| soxr | 1.1.0 | LGPL-2.1-or-later |
 | starlette | 1.9.0 | BSD-3-Clause |
+| threadpoolctl | 3.8.0 | BSD-3-Clause |
 | typing-extensions | 4.16.0 | PSF-2.0 |
 | typing-inspection | 0.4.4 | MIT |
 | uvicorn | 0.54.0 | BSD-3-Clause |
 | uvloop | 0.23.0 | MIT |
 | watchfiles | 1.3.0 | MIT |
 | websockets | 17.2 | BSD-3-Clause |
+
+Wave 6 added `librosa` 0.11.0 (ISC) to the API base for non-neural F14 pitch/beat analysis. Its `soxr` 1.1.0 dependency is LGPL-2.1-or-later; it is used as a library and remains GPLv3-compatible. `numba` is pinned below 0.62 because later llvmlite releases have no macOS x86_64 wheel (llvmlite 0.50 requires a local LLVM build).
 
 ### ML extra (`apps/api[ml]`, not installed by default or in CI)
 

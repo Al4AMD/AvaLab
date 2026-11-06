@@ -32,9 +32,12 @@ import {
   type DspOpResult,
   dspOps,
   extentProcess,
+  fftBenchmark,
+  fftButterfly,
   fftSelection,
   filterApply,
   filterDesign,
+  fourierPreview,
   generateSynth,
   loudnessMeasure,
   pipelineRun,
@@ -47,6 +50,7 @@ import {
   spectrogramTiles,
   spectrumEdit,
   speedTransform,
+  stftBenchmark,
   superresBaseline,
   waveformEnvelope,
   waveformOverview,
@@ -76,8 +80,11 @@ const dspHandlers = {
   codecLabProcess,
   convolutionSteps,
   extentProcess,
+  fftBenchmark,
+  fftButterfly,
   fftSelection,
   filterApply,
+  fourierPreview,
   filterDesign,
   generateSynth,
   loudnessMeasure,
@@ -90,6 +97,7 @@ const dspHandlers = {
   sessionPing,
   speedTransform,
   spectrumEdit,
+  stftBenchmark,
   superresBaseline,
   spectrogramTiles,
   waveformEnvelope,
@@ -191,8 +199,24 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
         const result = dspHandlers.fftSelection(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
+      case "fftBenchmark": {
+        const result = dspHandlers.fftBenchmark(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "fftButterfly": {
+        const result = dspHandlers.fftButterfly(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "stftBenchmark": {
+        const result = dspHandlers.stftBenchmark(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
       case "windowProfiles": {
         const result = dspHandlers.windowProfiles(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "fourierPreview": {
+        const result = dspHandlers.fourierPreview(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       case "generateSynth": {

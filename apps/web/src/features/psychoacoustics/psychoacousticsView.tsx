@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router";
+import { ToolHeader } from "../../components/ToolHeader";
 
 import { formatDb, formatHz } from "../../lib/format";
 import { writeLastUsed } from "../../lib/lastUsed";
@@ -17,6 +18,7 @@ import type {
 } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
 import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
 import {
   clampPsychoacousticsReferenceSpl,
   loadPsychoacousticsSettings,
@@ -29,7 +31,6 @@ import {
   psychoacousticsSettingsFromSearch,
   psychoacousticsSettingsToSearch,
 } from "./psychoacousticsState";
-import { PSYCHOACOUSTICS_THEORY_SECTIONS, PSYCHOACOUSTICS_THEORY_TITLE_KEY } from "./theory";
 
 const CONTROL_FOCUS_CLASSES =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
@@ -499,19 +500,19 @@ export function PsychoacousticsView(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-5">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-semibold">{t("tool.psychoacoustics.title")}</h2>
-          <p className="mt-1 max-w-3xl text-sm text-muted">{t("psychoacoustics.description")}</p>
-        </div>
-        <Link
-          to={codecLabHref}
-          data-testid="psychoacoustics.link.codecLab"
-          className="inline-flex h-9 items-center rounded-md bg-accent px-4 text-sm font-medium text-bg hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          {t("psychoacoustics.codecLink")}
-        </Link>
-      </header>
+      <ToolHeader
+        titleKey="tool.psychoacoustics.title"
+        descriptionKey="psychoacoustics.description"
+        trailing={
+          <Link
+            to={codecLabHref}
+            data-testid="psychoacoustics.link.codecLab"
+            className="inline-flex h-9 items-center rounded-md bg-accent px-4 text-sm font-medium text-bg hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            {t("psychoacoustics.codecLink")}
+          </Link>
+        }
+      />
 
       <PsychoacousticsControls settings={settings} onChange={updateSettings} />
 
@@ -546,8 +547,8 @@ export function PsychoacousticsView(): React.ReactElement {
       ) : null}
 
       <TheoryPanel
-        titleKey={PSYCHOACOUSTICS_THEORY_TITLE_KEY}
-        sections={PSYCHOACOUSTICS_THEORY_SECTIONS}
+        titleKey={TOOL_THEORY.psychoacoustics.titleKey}
+        sections={TOOL_THEORY.psychoacoustics.sections}
       />
     </section>
   );

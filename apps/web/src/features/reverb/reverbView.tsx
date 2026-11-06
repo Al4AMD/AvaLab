@@ -15,6 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 import uPlot from "uplot";
+import { ToolHeader } from "../../components/ToolHeader";
 import "uplot/dist/uPlot.min.css";
 
 import { Button } from "../../components/ui/button";
@@ -33,6 +34,8 @@ import { useSessionStore } from "../../session/store";
 import { browserDecodeWav, monoDownmix } from "../input/ingest";
 import { UploadEmptyState } from "../input/upload";
 import { paintSpectrogramChunk } from "../spectrogram/paintSpectrogram";
+import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
 import { paintWaveform } from "../waveform/paintWaveform";
 import {
   defaultReverbRange,
@@ -908,7 +911,7 @@ export function ReverbView(): React.ReactElement {
   if (original === null) {
     return (
       <section className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold">{t("tool.reverb.title")}</h2>
+        <ToolHeader titleKey="tool.reverb.title" descriptionKey="tool.reverb.description" />
         <UploadEmptyState />
       </section>
     );
@@ -925,7 +928,7 @@ export function ReverbView(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold">{t("tool.reverb.title")}</h2>
+      <ToolHeader titleKey="tool.reverb.title" descriptionKey="tool.reverb.description" />
 
       <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-xs">
@@ -1063,6 +1066,7 @@ export function ReverbView(): React.ReactElement {
           <input
             type="file"
             accept="audio/*"
+            aria-label={t("reverb.controls.upload")}
             data-testid="reverb.upload"
             onChange={(event) => {
               const file = event.currentTarget.files?.[0];
@@ -1397,6 +1401,8 @@ export function ReverbView(): React.ReactElement {
           <li>{t("reverb.observe.ir")}</li>
         </ul>
       </div>
+
+      <TheoryPanel titleKey={TOOL_THEORY.reverb.titleKey} sections={TOOL_THEORY.reverb.sections} />
     </section>
   );
 }

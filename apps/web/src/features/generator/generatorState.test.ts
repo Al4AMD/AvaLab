@@ -10,6 +10,7 @@ import {
 describe("generator URL codec", () => {
   it("round-trips every setting including the chirp flag", () => {
     const settings: GeneratorSettings = {
+      ...GENERATOR_DEFAULT_SETTINGS,
       waveform: "chirp",
       sampleRateHz: 16000,
       durationSeconds: 12.5,
@@ -23,6 +24,11 @@ describe("generator URL codec", () => {
       chirpLog: false,
       tone2Hz: 990,
       seed: 42,
+      modulationHz: 7,
+      modulationIndex: 2,
+      frequencyDeviationHz: 1500,
+      fourierKind: "triangle",
+      fourierHarmonics: 45,
     };
     expect(generatorSettingsFromSearch(`?${generatorSettingsToSearch(settings)}`)).toEqual(
       settings,
@@ -36,9 +42,18 @@ describe("generator URL codec", () => {
     });
   });
 
+  it("clamps modulation and Fourier fields independently", () => {
+    const settings = generatorSettingsFromSearch("?mh=-1&mi=99&dev=999999&fk=bogus&fh=0");
+    expect(settings.modulationHz).toBe(GENERATOR_DEFAULT_SETTINGS.modulationHz);
+    expect(settings.modulationIndex).toBe(GENERATOR_DEFAULT_SETTINGS.modulationIndex);
+    expect(settings.frequencyDeviationHz).toBe(GENERATOR_DEFAULT_SETTINGS.frequencyDeviationHz);
+    expect(settings.fourierKind).toBe(GENERATOR_DEFAULT_SETTINGS.fourierKind);
+    expect(settings.fourierHarmonics).toBe(GENERATOR_DEFAULT_SETTINGS.fourierHarmonics);
+  });
+
   it("emits a stable key order", () => {
     expect(generatorSettingsToSearch(GENERATOR_DEFAULT_SETTINGS)).toBe(
-      "a=0.8&cf=100&cl=1&ct=8000&d=2&duty=0.5&f=440&f2=880&imp=0&seed=1&sr=48000&step=0&w=sine",
+      "a=0.8&cf=100&cl=1&ct=8000&d=2&dev=1000&duty=0.5&f=440&f2=880&fh=10&fk=square&imp=0&mh=5&mi=0.5&seed=1&sr=48000&step=0&w=sine",
     );
   });
 });

@@ -34,10 +34,8 @@ const STUB_INGEST: StubIngestResponse = {
   size_bytes: 60, // 44-byte header + 8 samples * 2 bytes
 };
 
-/** Minimal valid PCM WAV (mono, 8 kHz, 8 samples of ≈0.1 amplitude). */
-function tinyWav(): Buffer {
-  const sampleCount = 8;
-  const sampleRateHz = 8000;
+/** Minimal valid PCM WAV (mono, 8 kHz), with an optional constant amplitude. */
+function wavOf(sampleCount: number, sampleRateHz = 8000, amplitude = 3277): Buffer {
   const bytesPerSample = 2;
   const dataSize = sampleCount * bytesPerSample;
   const buffer = Buffer.alloc(44 + dataSize);
@@ -55,9 +53,14 @@ function tinyWav(): Buffer {
   buffer.write("data", 36);
   buffer.writeUInt32LE(dataSize, 40);
   for (let index = 0; index < sampleCount; index += 1) {
-    buffer.writeInt16LE(3277, 44 + index * bytesPerSample); // ≈ 0.1 full-scale
+    buffer.writeInt16LE(amplitude, 44 + index * bytesPerSample); // ≈ 0.1 full-scale
   }
   return buffer;
+}
+
+/** Minimal valid PCM WAV (mono, 8 kHz, 8 samples of ≈0.1 amplitude). */
+function tinyWav(): Buffer {
+  return wavOf(8);
 }
 
 /** Scripted ingest endpoint: a 200 JSON IngestResponse (a successful lane). */
@@ -225,5 +228,54 @@ test("Persian: a settled-offline probe routes the file input to the OFFLINE lane
   await expect(page.getByTestId("input.upload.dropzone")).toHaveCount(0);
   await expect(page.getByTestId("input.upload.error")).toHaveCount(0);
   expect(ingestCalls).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test("Persian: a corrupted file in the offline lane shows the translated decode error and the app stays usable", async ({
+  page,
+}) => {
+  const errors = watchForErrors(page);
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error: Error) => {
+    pageErrors.push(error.message);
+  });
+
+  await page.goto("/");
+  await expect(page.getByTestId("input.offlineLaneOnly")).toBeVisible();
+  await page.getByTestId("input.upload.input").setInputFiles({
+    name: "broken.wav",
+    mimeType: "audio/wav",
+    buffer: Buffer.from("this is not audio"),
+  });
+
+  await expect(page.getByTestId("input.upload.error")).toBeVisible();
+  await expect(page.getByTestId("input.upload.error")).toContainText("این فایل صوتی رمزگشایی نشد.");
+  await expect(page.getByTestId("input.upload.error")).not.toContainText("input.error");
+  // Recovery: the dropzone stays and the demo cards still load a source.
+  await expect(page.getByTestId("input.upload.dropzone")).toBeVisible();
+  await page.getByTestId("input.demo.load.speech").click();
+  await expect(page.getByTestId("waveform.detail.canvas")).toBeVisible();
+  expect(pageErrors).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test("Persian: a file longer than 300 s is rejected, never truncated", async ({ page }) => {
+  const errors = watchForErrors(page);
+  await page.goto("/");
+  await expect(page.getByTestId("input.offlineLaneOnly")).toBeVisible();
+
+  const sampleRateHz = 8000;
+  const sampleCount = Math.ceil(300.5 * sampleRateHz);
+  await page.getByTestId("input.upload.input").setInputFiles({
+    name: "too-long.wav",
+    mimeType: "audio/wav",
+    buffer: wavOf(sampleCount, sampleRateHz, 0),
+  });
+
+  await expect(page.getByTestId("input.upload.error")).toContainText(
+    "طول صدا از ۵ دقیقه (۳۰۰ ثانیه) بیشتر است.",
+  );
+  await expect(page.getByTestId("input.upload.dropzone")).toBeVisible();
+  await expect(page.getByTestId("waveform.detail.canvas")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
