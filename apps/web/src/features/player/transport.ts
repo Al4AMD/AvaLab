@@ -546,24 +546,22 @@ export function createTransport(options: TransportOptions = {}): Transport {
 
 /**
  * Session-source → playback bufferLike adapter: the transport plays the
- * ORIGINAL session source at full length. Every lane (ingest/offline/demo/
- * recording) stores the mono analysis lane today (spec §2.2) — so playback
- * is mono at the source's rate; the seam already carries multichannel data
- * for the stereo session field if one is ever added (T1 owner concern 4).
- * Never mutates the store's samples.
+ * active lane's playback channels (1–2) at full length; `samples` stays the
+ * mono analysis lane and is ignored here. Never mutates store-owned bytes.
  */
-export function sourceToBufferLike(original: {
-  readonly samples: Float32Array;
+export function sourceToBufferLike(source: {
+  readonly channels: readonly Float32Array[];
   readonly sampleRateHz: number;
 }): AudioBufferLike {
   return {
-    numberOfChannels: 1,
-    sampleRate: original.sampleRateHz,
+    numberOfChannels: source.channels.length,
+    sampleRate: source.sampleRateHz,
     getChannelData(channel: number): Float32Array {
-      if (channel !== 0) {
+      const lane = source.channels[channel];
+      if (lane === undefined) {
         throw new RangeError(`sourceToBufferLike: no channel ${String(channel)}`);
       }
-      return original.samples;
+      return lane;
     },
   };
 }

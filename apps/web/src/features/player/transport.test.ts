@@ -12,6 +12,7 @@ import {
   createTransport,
   mapAbsolutePlayheadToLane,
   mapPlayheadSeconds,
+  sourceToBufferLike,
   type Transport,
   type TransportBuffer,
   type TransportContext,
@@ -752,5 +753,18 @@ describe("transport: gain seam", () => {
     harness.transport.dispose();
     expect(gain.disconnectedCount).toBe(1);
     expect(harness.transport.gainDb).toBe(0);
+  });
+});
+
+describe("sourceToBufferLike", () => {
+  it("exposes every playback channel and rejects out-of-range reads", () => {
+    const left = new Float32Array([0.25]);
+    const right = new Float32Array([-0.25]);
+    const source = sourceToBufferLike({ channels: [left, right], sampleRateHz: 48_000 });
+    expect(source.numberOfChannels).toBe(2);
+    expect(source.sampleRate).toBe(48_000);
+    expect(source.getChannelData(0)).toBe(left);
+    expect(source.getChannelData(1)).toBe(right);
+    expect(() => source.getChannelData(2)).toThrow(RangeError);
   });
 });

@@ -50,6 +50,7 @@ function realRun(bitrateKbps: number): RealCodecRun {
   return {
     reference,
     decoded,
+    channels: [decoded],
     stats: {
       resultAudioId: "id",
       sizeBytes: 100,
@@ -60,6 +61,7 @@ function realRun(bitrateKbps: number): RealCodecRun {
       alignedSampleCount: 100,
       durationSeconds: 0.002,
       sampleRateHz: 48_000,
+      channels: 1,
       bitExact: false,
       lossless: false,
     },

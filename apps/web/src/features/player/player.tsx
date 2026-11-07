@@ -88,12 +88,23 @@ export function PlayerDock({
   const loudness = useLoudnessMatch(player);
   const selection = useSessionStore((state) => state.selection);
   const original = useSessionStore((state) => state.original);
+  const processed = useSessionStore((state) => state.processed);
   const clearProcessed = useSessionStore((state) => state.clearProcessed);
   const displayedSample = useDisplayedSample(player);
 
   // A source is present only when the transport actually holds samples
   // (a zero-length source plays nothing — the hint stays honest).
   const hasSource = player.lengthSamples > 0 && player.sampleRateHz > 0;
+  const activeSource =
+    player.activeKind === "processed" && processed !== null ? processed : original;
+  const playbackChannelCount = activeSource?.channels.length ?? 0;
+  const foldedFromChannelCount =
+    activeSource === original ? original?.foldedFromChannelCount : undefined;
+  const monoResultFromStereo =
+    player.activeKind === "processed" &&
+    original !== null &&
+    original.channels.length > 1 &&
+    processed?.channels.length === 1;
   const playing = player.state.phase === "playing";
   const current = formatMmss(displayedSample, player.sampleRateHz);
   const total = formatMmss(player.lengthSamples, player.sampleRateHz);
@@ -265,6 +276,30 @@ export function PlayerDock({
             : original
               ? t(`player.lane.${original.sourceKind}`)
               : ""}
+        </span>
+      )}
+      {hasSource && playbackChannelCount > 0 && (
+        <span
+          dir="ltr"
+          data-testid="player.channels"
+          className="border border-line px-2 py-0.5 text-xs text-muted"
+        >
+          {t("player.channels.count", { count: playbackChannelCount })}
+        </span>
+      )}
+      {hasSource && playbackChannelCount === 2 && (
+        <span data-testid="player.analysis" className="text-xs text-muted">
+          {t("player.analysis.mono")}
+        </span>
+      )}
+      {monoResultFromStereo && (
+        <span data-testid="player.result.mono" className="text-xs text-muted">
+          {t("player.result.mono")}
+        </span>
+      )}
+      {hasSource && foldedFromChannelCount !== undefined && (
+        <span dir="ltr" data-testid="player.channelsFolded" className="text-xs text-muted">
+          {t("player.channels.folded", { count: foldedFromChannelCount })}
         </span>
       )}
     </section>

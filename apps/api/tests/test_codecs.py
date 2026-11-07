@@ -178,12 +178,15 @@ def test_encode_audio_uses_fixed_arguments(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr("avalab_api.codecs.available_encoders", lambda: frozenset({"libmp3lame"}))
     monkeypatch.setattr("avalab_api.codecs.subprocess.run", fake_run)
 
-    encode_audio(Path("input.wav"), Path("output.mp3"), "mp3", {"bitrate_kbps": 192})
+    encode_audio(
+        Path("input.wav"), Path("output.mp3"), "mp3", {"bitrate_kbps": 192}, channels=1
+    )
 
     assert len(calls) == 1
     args = calls[0]
     assert args[:2] == ["ffmpeg", "-nostdin"]
     assert "-i" in args and "input.wav" in args
+    assert args[args.index("-ac") + 1] == "1"
     assert args[args.index("-c:a") + 1] == "libmp3lame"
     assert args[args.index("-b:a") + 1] == "192k"
     assert args[args.index("-f") + 1] == "mp3"
@@ -201,12 +204,52 @@ def test_encode_audio_forces_s16_for_lossless_codecs(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr("avalab_api.codecs.available_encoders", lambda: frozenset({"flac"}))
     monkeypatch.setattr("avalab_api.codecs.subprocess.run", fake_run)
 
-    encode_audio(Path("input.wav"), Path("output.flac"), "flac", {"compression_level": 8})
+    encode_audio(
+        Path("input.wav"),
+        Path("output.flac"),
+        "flac",
+        {"compression_level": 8},
+        channels=2,
+    )
 
     args = calls[0]
+    assert args[args.index("-ac") + 1] == "2"
     assert args[args.index("-sample_fmt") + 1] == "s16"
     assert args[args.index("-compression_level") + 1] == "8"
     assert args[args.index("-f") + 1] == "flac"
+
+
+def test_encode_audio_rejects_invalid_channel_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("avalab_api.codecs.available_encoders", lambda: frozenset({"flac"}))
+
+    with pytest.raises(ApiError) as exc:
+        encode_audio(Path("input.wav"), Path("output.flac"), "flac", {}, channels=3)
+
+    assert (error_code(exc), exc.value.status_code) == (ErrorCode.invalid_request, 422)
+
+
+def test_vorbis_native_fallback_keeps_stereo_override_last(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        calls.append(args)
+        return subprocess.CompletedProcess(args=args, returncode=0)
+
+    monkeypatch.setattr("avalab_api.codecs.available_encoders", lambda: frozenset({"vorbis"}))
+    monkeypatch.setattr("avalab_api.codecs.subprocess.run", fake_run)
+
+    encode_audio(Path("input.wav"), Path("output.ogg"), "vorbis", {"quality": 5}, channels=1)
+
+    args = calls[0]
+    assert [value for index, value in enumerate(args) if args[index - 1] == "-ac"] == [
+        "1",
+        "2",
+    ]
+    assert args[args.index("-strict") + 1] == "-2"
 
 
 def test_encode_audio_maps_subprocess_failure_to_encode_failed(
@@ -219,6 +262,8 @@ def test_encode_audio_maps_subprocess_failure_to_encode_failed(
     monkeypatch.setattr("avalab_api.codecs.subprocess.run", failing)
 
     with pytest.raises(ApiError) as exc:
-        encode_audio(Path("input.wav"), Path("output.flac"), "flac", {})
+        encode_audio(
+            Path("input.wav"), Path("output.flac"), "flac", {}, channels=1
+        )
 
     assert (error_code(exc), exc.value.status_code) == (ErrorCode.encode_failed, 422)

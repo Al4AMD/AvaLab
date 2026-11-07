@@ -15,14 +15,14 @@
  * Decoding reuses Task 1's injectable seam — the default IS ingest.ts's
  * `browserDecodeWav` (no second decode implementation; node tests inject a
  * fake, the browser path is proven by e2e). Demo clips share the same
- * decode → downmix → guarded-load tail, differing only in the bytes' source
+ * decode → channels → guarded-load tail, differing only in the bytes' source
  * and the `sourceKind` ("demoClip" vs "offlineBrowser" — lane honesty, plan
  * Review Focus 3).
  */
 import type { SessionStore, SourceKind } from "../../session/store";
 import { useSessionStore } from "../../session/store";
 import type { LoadedSource } from "./ingest";
-import { browserDecodeWav, type DecodedAudio, type DecodeWav, monoDownmix } from "./ingest";
+import { browserDecodeWav, channelsFromDecoded, type DecodedAudio, type DecodeWav } from "./ingest";
 
 /**
  * Failure kinds of the offline lane. An UNREADABLE file (the read throws)
@@ -85,7 +85,7 @@ export type OfflineOptions = {
 };
 
 /**
- * The shared decode → mono downmix → guarded-load tail behind both offline
+ * The shared decode → channels → guarded-load tail behind both offline
  * entry points. One implementation on purpose: no lane re-decodes or
  * re-guards. The store's derived cache and jobs are emptied by the
  * successful `loadSource` — a new source never inherits the previous
@@ -106,9 +106,18 @@ async function decodeAndLoad(
     throw decodeFailedError(error);
   }
 
+  const foldedFromChannelCount =
+    decoded.numberOfChannels > 2 ? decoded.numberOfChannels : undefined;
   const load = store
     .getState()
-    .loadSource(monoDownmix(decoded), decoded.sampleRate, name, sourceKind, demoId);
+    .loadSource(
+      channelsFromDecoded(decoded),
+      decoded.sampleRate,
+      name,
+      sourceKind,
+      demoId,
+      foldedFromChannelCount === undefined ? undefined : { foldedFromChannelCount },
+    );
   if (!load.ok) {
     throw new OfflineError({
       kind: "storeCode",
@@ -151,11 +160,19 @@ export async function loadOfflineFile(
 
 /**
  * Bundled demo clips (D-016: self-generated, CC0-dedicated; byte-reproducible
- * by `tools/demo_clips/generate.py` — 48 kHz 16-bit mono, 5.0 s each).
+ * by `tools/demo_clips/generate.py` — 48 kHz 16-bit, 5.0 s each; the
+ * stereo clip carries 440 Hz left / 660 Hz right).
  * Titles are i18n keys (`input.demo.<id>.title`); these fields stay
  * technical data (units in the names, AGENTS §10).
  */
-export type DemoClipId = "chirp" | "clicks" | "pinkNoise" | "speech" | "speechNoisy" | "music";
+export type DemoClipId =
+  | "chirp"
+  | "clicks"
+  | "pinkNoise"
+  | "stereo"
+  | "speech"
+  | "speechNoisy"
+  | "music";
 
 export type DemoClip = {
   readonly id: DemoClipId;
@@ -168,6 +185,7 @@ export const DEMO_CLIPS: readonly DemoClip[] = [
   { id: "chirp", file: "chirp-log-100to8000hz-5s.wav", seconds: 5, rateHz: 48_000 },
   { id: "clicks", file: "clicks-2hz-5s.wav", seconds: 5, rateHz: 48_000 },
   { id: "pinkNoise", file: "pink-noise-5s.wav", seconds: 5, rateHz: 48_000 },
+  { id: "stereo", file: "stereo-tones-440-660hz-5s.wav", seconds: 5, rateHz: 48_000 },
   { id: "speech", file: "speech-kathleen-19s.wav", seconds: 19.6, rateHz: 48_000 },
   {
     id: "speechNoisy",

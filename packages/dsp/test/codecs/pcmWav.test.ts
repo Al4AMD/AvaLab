@@ -135,3 +135,61 @@ function readTag(bytes: Uint8Array, offset: number): string {
     bytes[offset + 3] ?? 0,
   );
 }
+
+describe("encodeWavPcm16 stereo", () => {
+  it("writes a stereo header and interleaves frames", () => {
+    const left = new Float32Array([0, -1]);
+    const right = new Float32Array([0.5, 1]);
+    const bytes = encodeWavPcm16([left, right], { sampleRateHz: 8_000 });
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    expect(bytes.length).toBe(44 + 8);
+    expect(view.getUint16(22, true)).toBe(2);
+    expect(view.getUint32(28, true)).toBe(32_000);
+    expect(view.getUint16(32, true)).toBe(4);
+    expect(view.getUint32(40, true)).toBe(8);
+    expect([
+      view.getInt16(44, true),
+      view.getInt16(46, true),
+      view.getInt16(48, true),
+      view.getInt16(50, true),
+    ]).toEqual([0, 16_384, -32_768, 32_767]);
+  });
+
+  it("treats a one-lane array exactly like a bare mono array", () => {
+    const samples = new Float32Array([0.25, -0.5, 0.75]);
+    expect(encodeWavPcm16([samples], { sampleRateHz: 48_000 })).toEqual(
+      encodeWavPcm16(samples, { sampleRateHz: 48_000 }),
+    );
+  });
+
+  it("accepts empty stereo input with a valid header", () => {
+    const bytes = encodeWavPcm16([new Float32Array(0), new Float32Array(0)], {
+      sampleRateHz: 48_000,
+    });
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    expect(bytes.length).toBe(44);
+    expect(view.getUint16(22, true)).toBe(2);
+    expect(view.getUint32(40, true)).toBe(0);
+  });
+
+  it("rejects bad channel layouts", () => {
+    expect(() =>
+      encodeWavPcm16([new Float32Array(1), new Float32Array(1), new Float32Array(1)], {
+        sampleRateHz: 48_000,
+      }),
+    ).toThrow(RangeError);
+    expect(() =>
+      encodeWavPcm16([new Float32Array(1), new Float32Array(2)], { sampleRateHz: 48_000 }),
+    ).toThrow(RangeError);
+    expect(() =>
+      encodeWavPcm16([new Float32Array(1), [0.5] as unknown as Float32Array], {
+        sampleRateHz: 48_000,
+      }),
+    ).toThrow(TypeError);
+    expect(() =>
+      encodeWavPcm16([new Float32Array(1), new Float32Array([Number.NaN])], {
+        sampleRateHz: 48_000,
+      }),
+    ).toThrow(TypeError);
+  });
+});

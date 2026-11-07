@@ -26,6 +26,7 @@ import type {
   IngestStore,
 } from "./ingest";
 import {
+  channelsFromDecoded,
   DEFAULT_MAX_UPLOAD_BYTES,
   IngestError,
   ingestFile,
@@ -209,6 +210,7 @@ describe("ingestFile success", () => {
       ok: true,
       source: {
         samples: new Float32Array([0.5, 0.2, 0, 0]),
+        channels: [new Float32Array([0, 0.2, 0.4, 0.6]), new Float32Array([1, 0.2, -0.4, -0.6])],
         sampleRateHz: 44_100,
         name: "clip.wav",
         sourceKind: "ingested",
@@ -241,6 +243,29 @@ describe("ingestFile success", () => {
     const loaded = store.getState().original;
     expect(loaded?.samples).toEqual(new Float32Array([0.25, -0.25]));
     expect(loaded?.samples).not.toBe(channel); // a copy, not the seam's view
+    expect(loaded?.channels[0]).toBe(loaded?.samples);
+  });
+
+  it("folds more than two decoded channels to mono and records the count", async () => {
+    const { store } = makeSeededStore();
+    const client = fakeIngestClient({
+      post: { status: 200, data: INGEST_OK },
+      get: { status: 200, data: new ArrayBuffer(4) },
+    });
+    await ingestFile(makeFile(16), {
+      client,
+      decodeWav: fakeDecode(
+        [new Float32Array([1, 0]), new Float32Array([0, 1]), new Float32Array([-1, 0])],
+        8_000,
+      ),
+      store,
+    });
+    const loaded = store.getState().original;
+    expect(loaded?.channels).toHaveLength(1);
+    expect(loaded?.samples).toEqual(
+      new Float32Array([0, 1 / 3].map((value) => Math.fround(value))),
+    );
+    expect(loaded?.foldedFromChannelCount).toBe(3);
   });
 });
 
@@ -472,6 +497,36 @@ describe("monoDownmix", () => {
             : new Float32Array([-1]),
     };
     expect(monoDownmix(triple)).toEqual(new Float32Array([0]));
+  });
+});
+
+describe("channelsFromDecoded", () => {
+  it("preserves one or two channels as copies and folds three to mono", () => {
+    const mono = new Float32Array([0.5, -0.5]);
+    const left = new Float32Array([1, 0]);
+    const right = new Float32Array([0, 1]);
+    const decoded = (channels: Float32Array[]): DecodedAudio => ({
+      sampleRate: 48_000,
+      numberOfChannels: channels.length,
+      getChannelData: (channel) => {
+        const view = channels[channel];
+        if (view === undefined) {
+          throw new RangeError("no channel");
+        }
+        return view;
+      },
+    });
+    const one = channelsFromDecoded(decoded([mono]));
+    expect(one).toHaveLength(1);
+    expect(one[0]).toEqual(mono);
+    expect(one[0]).not.toBe(mono);
+    const two = channelsFromDecoded(decoded([left, right]));
+    expect(two).toHaveLength(2);
+    expect(two[0]).toEqual(left);
+    expect(two[1]).toEqual(right);
+    expect(two[0]).not.toBe(left);
+    const folded = channelsFromDecoded(decoded([left, right, new Float32Array([-1, -1])]));
+    expect(folded).toEqual([new Float32Array([0, 0])]);
   });
 });
 

@@ -89,6 +89,7 @@ describe("loadOfflineFile success", () => {
       ok: true,
       source: {
         samples: new Float32Array([0.5, 0.2, 0, 0]),
+        channels: [new Float32Array([0, 0.2, 0.4, 0.6]), new Float32Array([1, 0.2, -0.4, -0.6])],
         sampleRateHz: 44_100,
         name: "clip.wav",
         sourceKind: "offlineBrowser",
@@ -231,9 +232,12 @@ describe("loadDemoClip", () => {
   });
 
   it("pins the bundled demo data (48 kHz clips with unique ids)", () => {
-    expect(DEMO_CLIPS).toHaveLength(6);
+    expect(DEMO_CLIPS).toHaveLength(7);
     const ids = DEMO_CLIPS.map((clip) => clip.id);
-    expect(new Set(ids).size).toBe(6);
+    expect(new Set(ids).size).toBe(7);
+    expect(DEMO_CLIPS.find((clip) => clip.id === "stereo")?.file).toBe(
+      "stereo-tones-440-660hz-5s.wav",
+    );
     const old = DEMO_CLIPS.filter((clip) => ["chirp", "clicks", "pinkNoise"].includes(clip.id));
     expect(old.map((clip) => clip.seconds)).toEqual([5, 5, 5]);
     for (const clip of DEMO_CLIPS) {

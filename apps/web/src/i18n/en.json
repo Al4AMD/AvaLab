@@ -95,6 +95,9 @@
       "pinkNoise": {
         "title": "Pink noise"
       },
+      "stereo": {
+        "title": "Stereo tones (440 Hz left, 660 Hz right)"
+      },
       "speech": {
         "title": "Speech (clean, English)"
       },
@@ -281,6 +284,13 @@
       "mse": "MSE",
       "psnrNote": "PSNR uses peak = 1.0 (full scale); ∞ means the reconstruction is identical."
     },
+    "toy": {
+      "mono": "Mono toy codec"
+    },
+    "metrics": {
+      "monoAnalysis": "Mono analysis metrics",
+      "monoHint": "Per-channel differences are not measured separately."
+    },
     "mdct": {
       "title": "MDCT details",
       "sparsity": "Coefficient sparsity",
@@ -378,6 +388,7 @@
       "encode": "Encode with ffmpeg",
       "running": "Encoding with ffmpeg…",
       "play": "Play decoded result",
+      "export": "Export WAV",
       "stale": "Real-codec settings changed; encode again.",
       "idle": "The backend encodes the selected excerpt and aligns it to the 16-bit PCM reference before measuring.",
       "offline": "The backend is offline; real codecs are disabled. Browser codecs still work.",
@@ -385,6 +396,8 @@
       "none": "The backend reports no ffmpeg encoders.",
       "codecUnavailable": "This codec is not available on the backend.",
       "encodedSize": "Encoded size",
+      "channels": "{{count}} ch",
+      "stereo": "Stereo",
       "delaySamples": "Codec delay",
       "alignedSamples": "Aligned samples",
       "duration": "Aligned duration",
@@ -726,7 +739,17 @@
       "hint": "Changes only playback gain; the audio file is not modified.",
       "measuring": "Measuring…"
     },
-    "reset": "Reset to original"
+    "reset": "Reset to original",
+    "channels": {
+      "count": "{{count}} ch",
+      "folded": "Folded {{count}} → mono"
+    },
+    "analysis": {
+      "mono": "Mono analysis"
+    },
+    "result": {
+      "mono": "Mono result"
+    }
   },
   "spectrogram": {
     "controls": {
@@ -1882,7 +1905,8 @@
     }
   },
   "theory": {
-    "title": "Theory and what to observe"
+    "title": "Theory and what to observe",
+    "stereoNote": "Analysis runs on a mono downmix for comparability. Playback and real codecs preserve stereo."
   },
   "experiments": {
     "title": "Guided experiments",

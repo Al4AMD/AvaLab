@@ -104,3 +104,23 @@ describe("downloadCanvasPng", () => {
     );
   });
 });
+
+describe("downloadWav stereo", () => {
+  it("downloads an interleaved 2-channel WAV", async () => {
+    const left = new Float32Array([0, -1]);
+    const right = new Float32Array([0.5, 1]);
+    downloadWav([left, right], 48_000, "stereo.wav");
+
+    expect(anchor?.download).toBe("stereo.wav");
+    const bytes = new Uint8Array(await (blob as Blob).arrayBuffer());
+    const view = new DataView(bytes.buffer);
+    expect(view.getUint16(22, true)).toBe(2);
+    expect(view.getUint16(32, true)).toBe(4);
+    expect(view.getUint32(40, true)).toBe(8);
+    expect(bytes.length).toBe(52);
+    expect(view.getInt16(44, true)).toBe(0);
+    expect(view.getInt16(46, true)).toBe(16_384);
+    expect(view.getInt16(48, true)).toBe(-32_768);
+    expect(view.getInt16(50, true)).toBe(32_767);
+  });
+});

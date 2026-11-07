@@ -70,6 +70,7 @@ describe("theory panel", () => {
     expect(markup).toContain("<ul");
     expect(markup).toContain(modules.t("filters.controls.window"));
     expect(markup).toContain(modules.t("filters.controls.taps"));
+    expect(markup).toContain(modules.t("theory.stereoNote"));
     expect(markup).toContain('dir="ltr"');
     expect(markup).toContain("katex-display");
   });

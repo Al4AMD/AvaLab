@@ -18,6 +18,7 @@ describe("realRow worker metrics", () => {
       {
         reference,
         decoded: new Float32Array(4).fill(0.25),
+        channels: [new Float32Array(4).fill(0.25)],
         stats: {
           resultAudioId: "id",
           sizeBytes: 10,
@@ -28,6 +29,7 @@ describe("realRow worker metrics", () => {
           alignedSampleCount: 4,
           durationSeconds: 1,
           sampleRateHz: 48_000,
+          channels: 1,
           bitExact: false,
           lossless: false,
         },

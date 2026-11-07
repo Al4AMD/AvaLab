@@ -45,9 +45,11 @@ function meta(patch: Partial<CodecLabMeta> = {}): CodecLabMeta {
 }
 
 function realRun(patch: Partial<RealCodecRun["stats"]> = {}): RealCodecRun {
+  const decoded = new Float32Array(1000).fill(0.25);
   return {
     reference: new Float32Array(1000).fill(0.5),
-    decoded: new Float32Array(1000).fill(0.25),
+    decoded,
+    channels: [decoded],
     stats: {
       resultAudioId: "abc",
       sizeBytes: 500,
@@ -58,6 +60,7 @@ function realRun(patch: Partial<RealCodecRun["stats"]> = {}): RealCodecRun {
       alignedSampleCount: 1000,
       durationSeconds: 1,
       sampleRateHz: 48_000,
+      channels: 1,
       bitExact: false,
       lossless: false,
       ...patch,

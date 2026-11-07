@@ -139,6 +139,7 @@ describe("denoise tab", () => {
   it("only treats the denoise result as the A/B denoised lane", () => {
     const source = {
       samples: new Float32Array([0.1]),
+      channels: [new Float32Array([0.1])],
       sampleRateHz: 48_000,
       sourceStartSample: 0,
       sourceHash: null,

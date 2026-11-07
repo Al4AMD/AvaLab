@@ -6,7 +6,7 @@
  * the published byte-wise FNV-1a-64 and makes no cryptographic claim.
  */
 import { describe, expect, it } from "vitest";
-import { inputHash64 } from "../../src/index.js";
+import { inputHash64, inputHash64Channels } from "../../src/index.js";
 
 /** Straightforward BigInt two-lane reference (one iteration per word). */
 function hash64Reference(words: Uint32Array): string {
@@ -155,5 +155,50 @@ describe("inputHash64", () => {
       expect(meanBits).toBeGreaterThanOrEqual(24);
       expect(meanBits).toBeLessThanOrEqual(40);
     }
+  });
+});
+
+describe("inputHash64Channels", () => {
+  it("delegates a single channel to inputHash64 byte-for-byte", () => {
+    for (const samples of [
+      new Float32Array(0),
+      new Float32Array([0, 0.5, -1]),
+      new Float32Array([0.1, -0.9, 4.5, 1e-20]),
+    ]) {
+      expect(inputHash64Channels([samples])).toBe(inputHash64(samples));
+    }
+  });
+
+  it("is sensitive to the right channel and channel count", () => {
+    const left = new Float32Array([0.25, -0.5, 0.75]);
+    const right = new Float32Array([-0.25, 0.5, -0.75]);
+    const stereo = inputHash64Channels([left, right]);
+    expect(stereo).toBe(inputHash64Channels([left, right.slice()]));
+    expect(stereo).not.toBe(inputHash64Channels([left, new Float32Array(right.length)]));
+    expect(stereo).not.toBe(inputHash64Channels([new Float32Array([...left, ...right])]));
+    expect(stereo).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it("rejects bad channel counts, non-Float32 lanes, and uneven lengths", () => {
+    expect(() => inputHash64Channels([])).toThrow(RangeError);
+    expect(() =>
+      inputHash64Channels([new Float32Array(1), new Float32Array(1), new Float32Array(1)]),
+    ).toThrow(RangeError);
+    expect(() =>
+      inputHash64Channels([new Float32Array(1), [1] as unknown as Float32Array]),
+    ).toThrow(TypeError);
+    expect(() => inputHash64Channels([new Float32Array(1), new Float32Array(2)])).toThrow(
+      RangeError,
+    );
+  });
+
+  it("never mutates either channel", () => {
+    const left = new Float32Array([0.25, -3.75, 12.5]);
+    const right = new Float32Array([1.5, -2.5, 0.25]);
+    const leftCopy = left.slice();
+    const rightCopy = right.slice();
+    inputHash64Channels([left, right]);
+    expect(left).toEqual(leftCopy);
+    expect(right).toEqual(rightCopy);
   });
 });

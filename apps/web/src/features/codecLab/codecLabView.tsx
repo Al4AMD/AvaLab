@@ -14,6 +14,7 @@ import type { HealthResponse } from "../../api/client";
 import { api } from "../../api/client";
 import { ToolHeader } from "../../components/ToolHeader";
 import { Button } from "../../components/ui/button";
+import { downloadWav } from "../../lib/download";
 import { formatS } from "../../lib/format";
 import { writeLastUsed } from "../../lib/lastUsed";
 import type {
@@ -89,6 +90,17 @@ type RealCodecViewResult = {
   readonly run: RealCodecRun;
   readonly settings: CodecLabSettings;
 };
+
+/** Playback payload for a real-codec result: both lanes plus the source offset. */
+export function realPlayback(
+  run: RealCodecRun,
+  settings: CodecLabSettings,
+): { readonly channels: Float32Array[]; readonly sourceStartSample: number } {
+  return {
+    channels: run.channels.slice(),
+    sourceStartSample: settings.startSample + run.stats.referenceStartSample,
+  };
+}
 
 type RealCodecStatus = "idle" | "running" | "ready" | "error";
 
@@ -617,6 +629,9 @@ export function CodecLabView(): React.ReactElement {
     runRealCodec(
       {
         samples: original.samples.subarray(runSettings.startSample, runSettings.endSample),
+        channels: original.channels.map((channel) =>
+          channel.subarray(runSettings.startSample, runSettings.endSample),
+        ),
         sampleRateHz: original.sampleRateHz,
         startSample: runSettings.startSample,
         endSample: runSettings.endSample,
@@ -708,6 +723,9 @@ export function CodecLabView(): React.ReactElement {
           runRealCodec(
             {
               samples: original.samples.subarray(startSample, cappedEnd),
+              channels: original.channels.map((channel) =>
+                channel.subarray(startSample, cappedEnd),
+              ),
               sampleRateHz: original.sampleRateHz,
               startSample,
               endSample: cappedEnd,
@@ -760,13 +778,12 @@ export function CodecLabView(): React.ReactElement {
     if (realResult === null) {
       return;
     }
+    const playback = realPlayback(realResult.run, realResult.settings);
     const installed = useSessionStore
       .getState()
-      .setProcessed(
-        realResult.run.decoded.slice(),
-        realResult.run.stats.sampleRateHz,
-        "codecLab.real",
-      );
+      .setProcessed(playback.channels, realResult.run.stats.sampleRateHz, "codecLab.real", {
+        sourceStartSample: playback.sourceStartSample,
+      });
     if (!installed.ok) {
       setRealErrorKey("codecLab.error.playback");
     }
@@ -964,6 +981,9 @@ export function CodecLabView(): React.ReactElement {
         <>
           <div className="rounded border border-surface p-3">
             <h3 className="mb-2 text-sm font-semibold">{t("codecLab.stats.title")}</h3>
+            <p data-testid="codecLab.toy.mono" className="mb-2 text-xs text-muted">
+              {t("codecLab.toy.mono")}
+            </p>
             <dl className="grid grid-cols-1 gap-x-6 text-xs sm:grid-cols-2">
               <StatRow
                 label={t("codecLab.stats.originalBytes")}
@@ -1257,6 +1277,24 @@ export function CodecLabView(): React.ReactElement {
           >
             {t("codecLab.real.play")}
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            data-testid="codecLab.real.export"
+            disabled={realResult === null}
+            onClick={() => {
+              if (realResult === null) {
+                return;
+              }
+              downloadWav(
+                realResult.run.channels,
+                realResult.run.stats.sampleRateHz,
+                `avalab-${realResult.settings.realCodec}.wav`,
+              );
+            }}
+          >
+            {t("codecLab.real.export")}
+          </Button>
           {realStale ? (
             <p data-testid="codecLab.real.stale" role="status" className="text-sm text-accent">
               {t("codecLab.real.stale")}
@@ -1275,6 +1313,23 @@ export function CodecLabView(): React.ReactElement {
         ) : null}
         {realResult !== null ? (
           <>
+            <p
+              data-testid="codecLab.real.channels"
+              dir="ltr"
+              className="mt-3 text-xs font-medium tabular-nums text-muted"
+            >
+              {realResult.run.stats.channels === 2
+                ? t("codecLab.real.stereo")
+                : t("codecLab.real.channels", { count: realResult.run.stats.channels })}
+            </p>
+            {realMetrics !== null ? (
+              <>
+                <p data-testid="codecLab.metrics.monoAnalysis" className="mt-2 text-xs font-medium">
+                  {t("codecLab.metrics.monoAnalysis")}
+                </p>
+                <p className="text-xs text-muted">{t("codecLab.metrics.monoHint")}</p>
+              </>
+            ) : null}
             <dl className="mt-3 grid grid-cols-1 gap-x-6 text-xs sm:grid-cols-2">
               <StatRow
                 label={t("codecLab.real.encodedSize")}

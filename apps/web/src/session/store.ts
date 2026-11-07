@@ -5,8 +5,8 @@
  * and `diagnostics` back; no view imports `session/rpc.ts` directly.
  *
  * Responsibilities
- * - `loadSource` guards an immutable session source (mono Float32Array
- *   analysis lane) with the app-wide caps (AGENTS §7/F01: ≤ 96 kHz, ≤ 300 s,
+ * - `loadSource` guards an immutable session source (1–2 playback channels
+ *   plus a mono analysis lane) with the app-wide caps (AGENTS §7/F01: ≤ 96 kHz, ≤ 300 s,
  *   finite samples) and empties the derived cache on success — a new source
  *   never sees the previous source's results.
  * - `derive(opKey, params[, payload])` requests a worker op through the typed
@@ -37,7 +37,7 @@
  * caller per session/protocol.ts ownership rules — views that hand out
  * sample-buffer ranges transfer ownership that way on purpose.
  */
-import { inputHash64 } from "@avalab/dsp";
+import { type AudioChannels, inputHash64Channels } from "@avalab/dsp";
 import { create, type StoreApi, type UseBoundStore } from "zustand";
 import type { DemoClipId } from "../features/input/offline";
 import type { DspOpName, DspOpParams } from "./ops";
@@ -57,14 +57,18 @@ export const MAX_PROCESSED_SECONDS = MAX_DURATION_SECONDS;
 /** Where a session source came from (spec §2.4 lanes + generator). */
 export type SourceKind = "ingested" | "offlineBrowser" | "demoClip" | "recording" | "generated";
 
-/** The immutable per-session source (spec §2.2): mono analysis lane. */
+/** The immutable per-session source (spec §2.2): playback channels plus the
+ * mono analysis lane (`samples`; identical object to `channels[0]` for mono). */
 export type SessionSource = {
   readonly samples: Float32Array;
+  readonly channels: AudioChannels;
   readonly sampleRateHz: number;
   readonly name: string;
   readonly sourceKind: SourceKind;
   /** Bundled clip id when `sourceKind` is "demoClip"; absent otherwise. */
   readonly demoId?: DemoClipId;
+  /** Input channel count when >2 channels were folded to mono on ingest. */
+  readonly foldedFromChannelCount?: number;
 };
 
 /** Playback lane: the immutable original or the current tool result. */
@@ -74,12 +78,22 @@ export type PlaybackMode = "original" | "processed";
  * store after `setProcessed`; callers must not mutate it. */
 export type ProcessedSource = {
   readonly samples: Float32Array;
+  readonly channels: AudioChannels;
   readonly sampleRateHz: number;
   readonly label: string;
   /** First source sample this lane covers; 0 for whole-source results. */
   readonly sourceStartSample: number;
   /** Input hash captured when an AI job started; null for non-AI tools. */
   readonly sourceHash: string | null;
+};
+
+/** Accepted playback input: a bare mono lane or 1–2 equal-length lanes. */
+export type SourceInput = Float32Array | AudioChannels;
+
+/** Optional load metadata. */
+export type LoadSourceOptions = {
+  /** Original channel count when >2 channels were folded to mono on ingest. */
+  readonly foldedFromChannelCount?: number;
 };
 
 /** Optional identity metadata for tool/AI results. */
@@ -131,6 +145,68 @@ export type Selection = {
   readonly endSample: number;
 };
 
+type NormalizedSource =
+  | { readonly ok: true; readonly channels: AudioChannels; readonly samples: Float32Array }
+  | { readonly ok: false; readonly code: "empty" | "invalidType" | "notFinite" };
+
+/**
+ * Validate and normalize playback input. A bare Float32Array is one lane; an
+ * array holds one or two equal-length lanes. For stereo, `samples` is the
+ * mean downmix (the mono analysis lane). Inputs are not mutated.
+ */
+function normalizeSource(source: SourceInput): NormalizedSource {
+  if (source instanceof Float32Array) {
+    return normalizeLanes([source]);
+  }
+  if (!Array.isArray(source)) {
+    return { ok: false, code: "invalidType" };
+  }
+  return normalizeLanes(source);
+}
+
+function normalizeLanes(lanes: readonly unknown[]): NormalizedSource {
+  if (lanes.length < 1 || lanes.length > 2) {
+    return { ok: false, code: "invalidType" };
+  }
+  for (const lane of lanes) {
+    if (!(lane instanceof Float32Array)) {
+      return { ok: false, code: "invalidType" };
+    }
+  }
+  const first = lanes[0] as Float32Array;
+  const second = lanes[1] as Float32Array | undefined;
+  if (second !== undefined && first.length !== second.length) {
+    return { ok: false, code: "invalidType" };
+  }
+  if (first.length === 0) {
+    return { ok: false, code: "empty" };
+  }
+  for (const lane of [first, ...(second === undefined ? [] : [second])]) {
+    for (let index = 0; index < lane.length; index += 1) {
+      const sample: number | undefined = lane[index];
+      if (sample === undefined) {
+        throw new RangeError(`normalizeSource: samples[${index}] read out of bounds`);
+      }
+      if (!Number.isFinite(sample)) {
+        return { ok: false, code: "notFinite" };
+      }
+    }
+  }
+  if (second === undefined) {
+    return { ok: true, channels: [first], samples: first };
+  }
+  const samples = new Float32Array(first.length);
+  for (let index = 0; index < first.length; index += 1) {
+    const left = first[index];
+    const right = second[index];
+    if (left === undefined || right === undefined) {
+      throw new RangeError(`normalizeSource: read out of bounds at ${index}`);
+    }
+    samples[index] = (left + right) / 2;
+  }
+  return { ok: true, channels: [first, second], samples };
+}
+
 /** Diagnostics ping status: guarded idempotency + retryable failure. */
 export type PingStatus = "idle" | "pending" | "done" | "failed";
 
@@ -161,8 +237,8 @@ export type SessionStore = {
   /** Tool-produced playback source; cleared by loadSource (D-022). */
   readonly processed: Readonly<ProcessedSource> | null;
   readonly playbackMode: PlaybackMode;
-  /** FNV-1a-64 hex of the current source's PCM bytes; null before any load.
-   * (Wave pre-flight: hashed once per loadSource; load-time cost.) */
+  /** Two-lane FNV-1a fingerprint of the current playback channels; null
+   * before any load. (Wave pre-flight: hashed once per loadSource.) */
   readonly inputHash: string | null;
   readonly derived: ReadonlyMap<string, DerivedEntry>;
   readonly jobs: ReadonlyMap<string, JobEntry>;
@@ -185,17 +261,18 @@ export type SessionStore = {
    * throw; the previously loaded source (if any) survives a rejected load
    * untouched. */
   loadSource(
-    samples: Float32Array,
+    source: SourceInput,
     sampleRateHz: number,
     name: string,
     sourceKind: SourceKind,
     demoId?: DemoClipId,
+    options?: LoadSourceOptions,
   ): LoadSourceResult;
   /** Install a tool result as the processed playback source. Takes ownership
    * (no copy); success switches `playbackMode` to `"processed"`. Rejects
    * durations above `MAX_PROCESSED_SECONDS` instead of truncating. */
   setProcessed(
-    samples: Float32Array,
+    source: SourceInput,
     sampleRateHz: number,
     label: string,
     options?: SetProcessedOptions,
@@ -406,31 +483,28 @@ export function createSessionStore(
       backendProbeSettled: false,
       diagnostics: { pingByteLength: null, pingStatus: "idle" },
 
-      loadSource(samples, sampleRateHz, name, sourceKind, demoId) {
+      loadSource(source, sampleRateHz, name, sourceKind, demoId, options = {}) {
         if (
-          !(samples instanceof Float32Array) ||
           typeof sampleRateHz !== "number" ||
           typeof name !== "string" ||
           !SOURCE_KINDS.includes(sourceKind) ||
-          (demoId !== undefined && (sourceKind !== "demoClip" || typeof demoId !== "string"))
+          (demoId !== undefined && (sourceKind !== "demoClip" || typeof demoId !== "string")) ||
+          typeof options !== "object" ||
+          options === null
         ) {
           return { ok: false, code: "invalidType" };
         }
-        // NaN samples and a non-finite rate share the "not a finite number"
-        // code; the loop doubles as the load's O(n) validation pass.
         if (!Number.isFinite(sampleRateHz)) {
           return { ok: false, code: "notFinite" };
         }
-        for (let index = 0; index < samples.length; index += 1) {
-          const sample: number | undefined = samples[index];
-          if (sample === undefined) {
-            throw new RangeError(`loadSource: samples[${index}] read out of bounds`);
-          }
-          if (!Number.isFinite(sample)) {
-            return { ok: false, code: "notFinite" };
-          }
+        const normalized = normalizeSource(source);
+        if (!normalized.ok) {
+          return {
+            ok: false,
+            code: normalized.code === "empty" ? "invalidType" : normalized.code,
+          };
         }
-        // A non-positive rate satisfies no domain ("too high" it is not).
+        const { channels, samples } = normalized;
         if (sampleRateHz <= 0) {
           return { ok: false, code: "invalidType" };
         }
@@ -440,17 +514,28 @@ export function createSessionStore(
         if (samples.length / sampleRateHz > MAX_DURATION_SECONDS) {
           return { ok: false, code: "tooLong" };
         }
+        const foldedFromChannelCount = options.foldedFromChannelCount;
+        if (
+          foldedFromChannelCount !== undefined &&
+          (!Number.isInteger(foldedFromChannelCount) ||
+            foldedFromChannelCount < 2 ||
+            channels.length !== 1)
+        ) {
+          return { ok: false, code: "invalidType" };
+        }
 
-        const inputHash = inputHash64(samples);
+        const inputHash = inputHash64Channels(channels);
         // new Map(): replaces both caches wholesale — and the late-settle
         // hash guard makes any in-flight frames of the OLD source inert.
         set({
           original: {
             samples,
+            channels,
             sampleRateHz,
             name,
             sourceKind,
             ...(demoId === undefined ? {} : { demoId }),
+            ...(foldedFromChannelCount === undefined ? {} : { foldedFromChannelCount }),
           },
           processed: null,
           playbackMode: "original",
@@ -462,9 +547,8 @@ export function createSessionStore(
         return { ok: true };
       },
 
-      setProcessed(samples, sampleRateHz, label, options = {}) {
+      setProcessed(source, sampleRateHz, label, options = {}) {
         if (
-          !(samples instanceof Float32Array) ||
           typeof sampleRateHz !== "number" ||
           typeof label !== "string" ||
           typeof options !== "object" ||
@@ -481,18 +565,11 @@ export function createSessionStore(
         if (sampleRateHz > MAX_SAMPLE_RATE_HZ) {
           return { ok: false, code: "rateTooHigh" };
         }
-        if (samples.length === 0) {
-          return { ok: false, code: "empty" };
+        const normalized = normalizeSource(source);
+        if (!normalized.ok) {
+          return { ok: false, code: normalized.code };
         }
-        for (let index = 0; index < samples.length; index += 1) {
-          const sample: number | undefined = samples[index];
-          if (sample === undefined) {
-            throw new RangeError(`setProcessed: samples[${index}] read out of bounds`);
-          }
-          if (!Number.isFinite(sample)) {
-            return { ok: false, code: "notFinite" };
-          }
-        }
+        const { channels, samples } = normalized;
         if (samples.length / sampleRateHz > MAX_PROCESSED_SECONDS) {
           return { ok: false, code: "tooLong" };
         }
@@ -515,7 +592,7 @@ export function createSessionStore(
           return { ok: false, code: "invalidType" };
         }
         set({
-          processed: { samples, sampleRateHz, label, sourceStartSample, sourceHash },
+          processed: { samples, channels, sampleRateHz, label, sourceStartSample, sourceHash },
           playbackMode: "processed",
         });
         return { ok: true };

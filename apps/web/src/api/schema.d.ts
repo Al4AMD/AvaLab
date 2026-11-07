@@ -210,6 +210,8 @@ export interface components {
             bit_exact: boolean;
             /** Bitrate Kbps */
             bitrate_kbps: number;
+            /** Channels */
+            channels: number;
             /** Codec Delay Samples */
             codec_delay_samples: number;
             /** Duration S */
@@ -667,7 +669,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                task: "denoise" | "superres" | "separation" | "asr" | "neural_codec";
+                task: ("denoise" | "superres" | "separation" | "asr" | "neural_codec") | ("pitch" | "beat");
             };
             cookie?: never;
         };

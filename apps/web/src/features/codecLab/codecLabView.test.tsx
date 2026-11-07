@@ -7,6 +7,7 @@ import { CODEC_LAB_DEFAULT_SETTINGS, type CodecLabSettings } from "./codecLabSta
 type Modules = {
   readonly CodecLabPsychoControls: typeof import("./codecLabView").CodecLabPsychoControls;
   readonly MdctBandChart: typeof import("./codecLabView").MdctBandChart;
+  readonly realPlayback: typeof import("./codecLabView").realPlayback;
   readonly t: typeof import("../../i18n").default.t;
 };
 
@@ -64,5 +65,40 @@ describe("MDCT band chart", () => {
     expect(markup).toContain('data-testid="codecLab.psycho.smrChart"');
     expect(markup).not.toContain("NaN");
     expect(markup).not.toContain("Infinity");
+  });
+});
+
+describe("real-codec playback payload", () => {
+  it("installs both lanes and offsets the reference start by the excerpt start", () => {
+    const left = new Float32Array([0.1, 0.2]);
+    const right = new Float32Array([0.3, 0.4]);
+    const playback = modules.realPlayback(
+      {
+        reference: new Float32Array(2),
+        decoded: new Float32Array(2),
+        channels: [left, right],
+        stats: {
+          resultAudioId: "id",
+          sizeBytes: 1,
+          bitrateKbps: 1,
+          encodeMs: 1,
+          codecDelaySamples: 0,
+          referenceStartSample: 37,
+          alignedSampleCount: 2,
+          durationSeconds: 1,
+          sampleRateHz: 48_000,
+          channels: 2,
+          bitExact: true,
+          lossless: true,
+        },
+      },
+      { ...SETTINGS, startSample: 100, endSample: 102 },
+    );
+
+    expect(playback.channels).toHaveLength(2);
+    expect(playback.channels[0]).toBe(left);
+    expect(playback.channels[1]).toBe(right);
+    expect(playback.channels).not.toBe([left, right]);
+    expect(playback.sourceStartSample).toBe(137);
   });
 });

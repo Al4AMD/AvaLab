@@ -74,6 +74,10 @@
             "title": "Bitrate Kbps",
             "type": "number"
           },
+          "channels": {
+            "title": "Channels",
+            "type": "integer"
+          },
           "codec_delay_samples": {
             "title": "Codec Delay Samples",
             "type": "integer"
@@ -117,6 +121,7 @@
           "aligned_sample_count",
           "duration_s",
           "sample_rate_hz",
+          "channels",
           "bit_exact",
           "lossless"
         ],
@@ -788,15 +793,26 @@
             "name": "task",
             "required": true,
             "schema": {
-              "enum": [
-                "denoise",
-                "superres",
-                "separation",
-                "asr",
-                "neural_codec"
+              "anyOf": [
+                {
+                  "enum": [
+                    "denoise",
+                    "superres",
+                    "separation",
+                    "asr",
+                    "neural_codec"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "pitch",
+                    "beat"
+                  ],
+                  "type": "string"
+                }
               ],
-              "title": "Task",
-              "type": "string"
+              "title": "Task"
             }
           }
         ],

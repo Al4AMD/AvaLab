@@ -16,6 +16,7 @@ export type {
   PitchAnalysis,
   PitchBeatAnalysis,
 } from "./analysis/pitchBeat.js";
+export type { AudioChannels } from "./audio.js";
 export type { CodecLabCodec } from "./codecs/codecLabTypes.js";
 export type {
   DeltaHuffmanDecoded,
@@ -260,6 +261,6 @@ export { imdct, mdct } from "./timestretch/mdct.js";
 export type { PitchShiftParams, TimeStretchParams } from "./timestretch/phaseVocoder.js";
 export { pitchShift, timeStretch } from "./timestretch/phaseVocoder.js";
 export { averagePowerOf, energyOf } from "./utils/energy.js";
-export { inputHash64 } from "./utils/hash.js";
+export { inputHash64, inputHash64Channels } from "./utils/hash.js";
 export { computePeakBuckets } from "./utils/peaks.js";
 export { samplesToSeconds, secondsToSamples } from "./utils/time.js";

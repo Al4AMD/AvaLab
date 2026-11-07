@@ -34,6 +34,11 @@
  * which are little-endian. A cache key is local to one browser session, so
  * cross-language reproducibility is not required.
  *
+ * Stereo playback uses `inputHash64Channels`: one channel delegates to
+ * `inputHash64` unchanged; two channels seed both lanes with the channel count
+ * before walking channel 0 and then channel 1, so a stereo pair cannot alias
+ * the mono concatenation. Inputs are never mutated.
+ *
  * Edge cases:
  * - empty input → fmix32 of both offset bases → "ab3e7c0b92ca2f0e".
  * - -0 vs +0: distinct bit patterns (0x80000000 vs 0x00000000) hash
@@ -43,6 +48,8 @@
  * - never mutates the input; hashes exactly the view's own
  *   [byteOffset, byteOffset + byteLength) subrange.
  */
+
+import type { AudioChannels } from "../audio.js";
 
 /** 32-bit FNV-1a offset basis for lane A. */
 const FNV32_OFFSET_A = 0x811c9dc5;
@@ -80,6 +87,55 @@ export function inputHash64(samples: Float32Array): string {
     }
     laneA = Math.imul(laneA ^ word, FNV32_PRIME_A);
     laneB = Math.imul(laneB ^ word, FNV32_PRIME_B);
+  }
+  return `${(fmix32(laneA) >>> 0).toString(16).padStart(8, "0")}${(fmix32(laneB) >>> 0)
+    .toString(16)
+    .padStart(8, "0")}`;
+}
+
+/**
+ * Two-lane FNV-1a fingerprint of one or two playback channels. One channel
+ * returns `inputHash64` exactly, preserving every mono cache key. A stereo
+ * pair seeds the walk with the channel count before visiting both lanes, so
+ * the hash is channel-aware without concatenating the audio.
+ */
+export function inputHash64Channels(channels: AudioChannels): string {
+  if (channels.length === 1) {
+    const only = channels[0];
+    if (only === undefined) {
+      throw new RangeError("inputHash64Channels: channels[0] is undefined");
+    }
+    return inputHash64(only);
+  }
+  if (channels.length !== 2) {
+    throw new RangeError(
+      `inputHash64Channels: expected 1 or 2 channels (got ${String(channels.length)})`,
+    );
+  }
+  const first = channels[0];
+  const second = channels[1];
+  if (!(first instanceof Float32Array) || !(second instanceof Float32Array)) {
+    throw new TypeError("inputHash64Channels: every channel must be a Float32Array");
+  }
+  if (first.length !== second.length) {
+    throw new RangeError(
+      `inputHash64Channels: unequal channel lengths (${String(first.length)} vs ${String(second.length)})`,
+    );
+  }
+
+  const firstWords = new Uint32Array(first.buffer, first.byteOffset, first.byteLength / 4);
+  const secondWords = new Uint32Array(second.buffer, second.byteOffset, second.byteLength / 4);
+  let laneA = Math.imul(FNV32_OFFSET_A ^ channels.length, FNV32_PRIME_A);
+  let laneB = Math.imul(FNV32_OFFSET_B ^ channels.length, FNV32_PRIME_B);
+  for (const words of [firstWords, secondWords]) {
+    for (let index = 0; index < words.length; index += 1) {
+      const word: number | undefined = words[index];
+      if (word === undefined) {
+        throw new RangeError(`inputHash64Channels: words[${index}] read out of bounds`);
+      }
+      laneA = Math.imul(laneA ^ word, FNV32_PRIME_A);
+      laneB = Math.imul(laneB ^ word, FNV32_PRIME_B);
+    }
   }
   return `${(fmix32(laneA) >>> 0).toString(16).padStart(8, "0")}${(fmix32(laneB) >>> 0)
     .toString(16)

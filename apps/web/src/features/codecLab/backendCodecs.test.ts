@@ -1,3 +1,4 @@
+import { floatToInt16Pcm } from "@avalab/dsp";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { CodecEncodeRequest, CodecEncodeResponse, IngestResponse } from "../../api/client";
@@ -35,6 +36,7 @@ function encodeBody(overrides: Partial<CodecEncodeResponse> = {}): CodecEncodeRe
     aligned_sample_count: 4,
     duration_s: 0.1,
     sample_rate_hz: 48_000,
+    channels: 1,
     bit_exact: true,
     lossless: true,
     ...overrides,
@@ -118,6 +120,25 @@ const INPUT: RealCodecInput = {
   startSample: 0,
   endSample: 4,
 };
+
+const LEFT = new Float32Array([0.1, 0.2, 0.3, 0.4]);
+const RIGHT = new Float32Array([-0.1, -0.2, -0.3, -0.4]);
+const STEREO_INPUT: RealCodecInput = {
+  ...INPUT,
+  channels: [LEFT, RIGHT],
+};
+
+async function uploadedChannels(file: File): Promise<{
+  readonly channels: number;
+  readonly samples: Int16Array;
+}> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const view = new DataView(bytes.buffer);
+  return {
+    channels: view.getUint16(22, true),
+    samples: new Int16Array(bytes.buffer.slice(44)),
+  };
+}
 
 beforeEach(() => {
   clearRealCodecUploads();
@@ -314,5 +335,113 @@ describe("availableRealCodecs", () => {
       }),
     ).toEqual(["mp3", "wav", "flac"]);
     expect(availableRealCodecs(null)).toEqual([]);
+  });
+});
+
+describe("runRealCodec stereo", () => {
+  it("uploads two interleaved channels when the excerpt is stereo", async () => {
+    const client = fakeClient({ encode: encodeBody({ channels: 2 }) });
+
+    await runRealCodec(
+      STEREO_INPUT,
+      { codec: "flac" },
+      {
+        client,
+        decodeWav: fakeDecode([LEFT, RIGHT]),
+      },
+    );
+
+    const file = client.ingestCalls[0]?.get("file") as File;
+    const uploaded = await uploadedChannels(file);
+    expect(uploaded.channels).toBe(2);
+    expect(file.size).toBe(44 + 2 * 2 * LEFT.length);
+    const left = Array.from(floatToInt16Pcm(LEFT));
+    const right = Array.from(floatToInt16Pcm(RIGHT));
+    expect(Array.from(uploaded.samples)).toEqual([
+      left[0],
+      right[0],
+      left[1],
+      right[1],
+      left[2],
+      right[2],
+      left[3],
+      right[3],
+    ]);
+  });
+
+  it("keys the upload cache on both channels", async () => {
+    const client = fakeClient({ encode: encodeBody({ channels: 2 }) });
+    const decodeWav = fakeDecode([LEFT, RIGHT]);
+
+    await runRealCodec(STEREO_INPUT, { codec: "flac" }, { client, decodeWav });
+    await runRealCodec(
+      { ...STEREO_INPUT, channels: [LEFT, new Float32Array(RIGHT.length).fill(0.5)] },
+      { codec: "flac" },
+      { client, decodeWav },
+    );
+
+    expect(client.ingestCalls).toHaveLength(2);
+  });
+
+  it("returns two trimmed playback lanes plus the mono metrics lanes", async () => {
+    const left = new Float32Array([0.3, 0.4]);
+    const right = new Float32Array([0.5, 0.6]);
+    const client = fakeClient({
+      encode: encodeBody({ channels: 2, aligned_sample_count: 2 }),
+    });
+
+    const run = await runRealCodec(
+      STEREO_INPUT,
+      { codec: "flac" },
+      {
+        client,
+        decodeWav: fakeDecode([left, right]),
+      },
+    );
+
+    expect(run.stats.channels).toBe(2);
+    expect(run.channels).toHaveLength(2);
+    expect(run.channels[0]).toEqual(left);
+    expect(run.channels[1]).toEqual(right);
+    expect(run.decoded[0]).toBeCloseTo(0.4, 6);
+    expect(run.reference[0]).toBeCloseTo(0.1, 4);
+  });
+
+  it("rejects a decoded channel count that differs from the backend", async () => {
+    for (const decoded of [
+      [new Float32Array([0.3, 0.4])],
+      [new Float32Array([0.3, 0.4]), new Float32Array([0.5, 0.6]), new Float32Array([0.7, 0.8])],
+    ]) {
+      const client = fakeClient({
+        encode: encodeBody({ channels: 2, aligned_sample_count: 2 }),
+      });
+      await expect(
+        runRealCodec(
+          STEREO_INPUT,
+          { codec: "flac" },
+          {
+            client,
+            decodeWav: fakeDecode(decoded),
+          },
+        ),
+      ).rejects.toMatchObject({ kind: "alignment_mismatch" });
+    }
+  });
+
+  it("rejects a channel shorter than the aligned window", async () => {
+    const client = fakeClient({
+      encode: encodeBody({ channels: 2, aligned_sample_count: 2 }),
+    });
+
+    await expect(
+      runRealCodec(
+        STEREO_INPUT,
+        { codec: "flac" },
+        {
+          client,
+          decodeWav: fakeDecode([new Float32Array([0.3, 0.4]), new Float32Array([0.5])]),
+        },
+      ),
+    ).rejects.toMatchObject({ kind: "alignment_mismatch" });
   });
 });
