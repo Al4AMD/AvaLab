@@ -45,6 +45,10 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
         headingKey: "waveform.theory.pitfalls.heading",
         bodyKey: "waveform.theory.pitfalls.body",
       },
+      {
+        headingKey: "channel.theory.heading",
+        bodyKey: "channel.theory.body",
+      },
     ],
   },
   spectrogram: {
@@ -60,6 +64,10 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
         bodyKey: "spectrogram.theory.resolution.body",
         formula:
           "\\Delta t=\\frac{N_{\\mathrm{hop}}}{f_s},\\qquad \\Delta f=\\frac{f_s}{N_{\\mathrm{FFT}}}",
+      },
+      {
+        headingKey: "channel.theory.heading",
+        bodyKey: "channel.theory.body",
       },
     ],
   },
@@ -79,6 +87,10 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
       {
         headingKey: "fftview.theory.phase.heading",
         bodyKey: "fftview.theory.phase.body",
+      },
+      {
+        headingKey: "channel.theory.heading",
+        bodyKey: "channel.theory.body",
       },
     ],
   },
@@ -264,6 +276,10 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
           "metrics.observe.lossy",
           "metrics.observe.bitrate",
         ],
+      },
+      {
+        headingKey: "channel.theory.heading",
+        bodyKey: "channel.theory.body",
       },
     ],
   },

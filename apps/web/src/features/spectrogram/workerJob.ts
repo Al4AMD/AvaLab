@@ -11,6 +11,7 @@
  * generation token so stale results never paint.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { LaneIndex } from "../../lib/channel";
 import type { SpectrogramTilesParams } from "../../session/ops";
 import type { SessionSource } from "../../session/store";
 import { useSessionStore } from "../../session/store";
@@ -116,6 +117,7 @@ export type SpectrogramJob = {
 export function useSpectrogramJob(
   original: SessionSource | null,
   params: SpectrogramAnalysisParams,
+  lane: LaneIndex,
 ): SpectrogramJob {
   const analysisKey = `${params.windowFamily}|${params.windowLengthSamples}|${params.hopFraction}`;
   // biome-ignore lint/correctness/useExhaustiveDependencies: `analysisKey` is the canonical identity of `params` (all primitives).
@@ -156,11 +158,12 @@ export function useSpectrogramJob(
       const chunkIndex = nextChunkIndex;
       nextChunkIndex += 1;
       const request = spectrogramChunkRequest(geometry, params, chunkIndex);
-      const ticket = store.deriveWithSourceSlice(
+      const ticket = store.deriveWithSourceSliceLane(
         "spectrogramTiles",
         request.params,
         request.startSample,
         request.endSample,
+        lane,
       );
       keys.push(ticket.key);
       ticket.outcome
@@ -209,7 +212,7 @@ export function useSpectrogramJob(
       }
     };
     // `analysisKey` covers every primitive of `params`.
-  }, [original, geometry, analysisKey]);
+  }, [original, geometry, analysisKey, lane]);
 
   return { geometry, chunks: chunksRef.current, paintVersion, completedChunks, error };
 }

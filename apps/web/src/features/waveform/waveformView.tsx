@@ -7,9 +7,13 @@ import { type KeyboardEvent, type PointerEvent, useEffect, useMemo, useRef, useS
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 import { ToolHeader } from "../../components/ToolHeader";
+import { displayedLanes, type LaneIndex } from "../../lib/channel";
 import { formatS } from "../../lib/format";
 import type { WaveformOverviewResult, WaveformRangeResult } from "../../session/ops";
 import { type SessionSource, useSessionStore } from "../../session/store";
+import { ChannelPicker } from "../channels/ChannelPicker";
+import { channelLabel } from "../channels/channelLabels";
+import { useChannelMode } from "../channels/useChannelMode";
 import { UploadEmptyState } from "../input/upload";
 import { TheoryPanel } from "../theory/TheoryPanel";
 import { TOOL_THEORY } from "../theory/theoryContent";
@@ -27,23 +31,30 @@ import {
 const OVERVIEW_BUCKET_COUNT = 1200;
 const DETAIL_BUCKET_COUNT = 1200;
 
-function useOverview(): { readonly minMax: Float32Array; readonly sampleCount: number } {
+function useOverview(lane: LaneIndex | null): {
+  readonly minMax: Float32Array;
+  readonly sampleCount: number;
+} {
   const original = useSessionStore((state) => state.original);
   const derived = useSessionStore((state) => state.derived);
   const [key, setKey] = useState<string | null>(null);
 
   useEffect(() => {
-    if (original === null) {
+    if (original === null || lane === null) {
       setKey(null);
       return;
     }
-    const ticket = useSessionStore.getState().deriveWithSource("waveformOverview", {
-      bucketCount: OVERVIEW_BUCKET_COUNT,
-      sampleRateHz: original.sampleRateHz,
-    });
+    const ticket = useSessionStore.getState().deriveWithSourceLane(
+      "waveformOverview",
+      {
+        bucketCount: OVERVIEW_BUCKET_COUNT,
+        sampleRateHz: original.sampleRateHz,
+      },
+      lane,
+    );
     setKey(ticket.key);
     ticket.outcome.catch(() => undefined);
-  }, [original]);
+  }, [original, lane]);
 
   const entry = key === null ? undefined : derived.get(key);
   return useMemo(() => {
@@ -61,6 +72,7 @@ function useOverview(): { readonly minMax: Float32Array; readonly sampleCount: n
 
 function useSliceEnvelope(
   original: SessionSource | null,
+  lane: LaneIndex | null,
   window: SampleWindow,
   skip: boolean,
 ): { minMax: Float32Array; range: SampleWindow } | null {
@@ -68,11 +80,11 @@ function useSliceEnvelope(
   const [key, setKey] = useState<string | null>(null);
 
   useEffect(() => {
-    if (original === null || skip) {
+    if (original === null || lane === null || skip) {
       setKey(null);
       return;
     }
-    const ticket = useSessionStore.getState().deriveWithSourceSlice(
+    const ticket = useSessionStore.getState().deriveWithSourceSliceLane(
       "waveformRange",
       {
         bucketCount: DETAIL_BUCKET_COUNT,
@@ -82,10 +94,11 @@ function useSliceEnvelope(
       },
       window.startSample,
       window.endSample,
+      lane,
     );
     setKey(ticket.key);
     ticket.outcome.catch(() => undefined);
-  }, [original, skip, window.startSample, window.endSample]);
+  }, [original, lane, skip, window.startSample, window.endSample]);
 
   const entry = key === null ? undefined : derived.get(key);
   return useMemo(() => {
@@ -113,7 +126,13 @@ export function WaveformView() {
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
   const setSelection = useSessionStore((state) => state.setSelection);
-  const { minMax, sampleCount } = useOverview();
+  const channel = useChannelMode(original, "both");
+  const lanes = displayedLanes(channel.mode);
+  const showLeft = lanes.some((lane) => lane.lane === 0);
+  const showRight = lanes.some((lane) => lane.lane === 1);
+  const overviewLeft = useOverview(showLeft ? 0 : null);
+  const overviewRight = useOverview(showRight ? 1 : null);
+  const sampleCount = original?.samples.length ?? 0;
   const [searchParams, setSearchParams] = useSearchParams();
   const [cursorTime, setCursorTime] = useState<number | null>(null);
   const dragAnchor = useRef<number | null>(null);
@@ -123,9 +142,10 @@ export function WaveformView() {
       ? { startSample: 0, endSample: 0 }
       : windowFromSearch(`?${searchParams.toString()}`, sampleCount);
   const isFullWindow = window.startSample === 0 && window.endSample === Math.max(1, sampleCount);
-  const slice = useSliceEnvelope(original, window, isFullWindow);
-  const detailMinMax = slice?.minMax ?? minMax;
-  const detailRange = slice?.range ?? { startSample: 0, endSample: sampleCount };
+  const sliceLeft = useSliceEnvelope(original, showLeft ? 0 : null, window, isFullWindow);
+  const sliceRight = useSliceEnvelope(original, showRight ? 1 : null, window, isFullWindow);
+  const detailRange = sliceLeft?.range ??
+    sliceRight?.range ?? { startSample: 0, endSample: sampleCount };
 
   function applyWindow(next: SampleWindow): void {
     if (sampleCount <= 0) {
@@ -147,15 +167,15 @@ export function WaveformView() {
     applyWindow(zoomWindow(window, sampleCount, factor, anchor));
   }
 
-  const onDetailPointerDown = (event: PointerEvent<HTMLElement>): void => {
-    const sample = sampleAt(event, detailRange);
+  const onDetailPointerDown = (event: PointerEvent<HTMLElement>, range: SampleWindow): void => {
+    const sample = sampleAt(event, range);
     dragAnchor.current = sample;
     event.currentTarget.setPointerCapture(event.pointerId);
     setSelection(sample, sample);
   };
 
-  const onDetailPointerMove = (event: PointerEvent<HTMLElement>): void => {
-    const sample = sampleAt(event, detailRange);
+  const onDetailPointerMove = (event: PointerEvent<HTMLElement>, range: SampleWindow): void => {
+    const sample = sampleAt(event, range);
     setCursorTime(sample / (original?.sampleRateHz ?? 1));
     if (dragAnchor.current !== null) {
       const anchor = dragAnchor.current;
@@ -205,9 +225,13 @@ export function WaveformView() {
   const selectionStartSeconds = selection.startSample / original.sampleRateHz;
   const selectionEndSeconds = selection.endSample / original.sampleRateHz;
   let peak = 0;
-  for (const value of minMax) {
-    peak = Math.max(peak, Math.abs(value));
+  for (const overview of [overviewLeft, overviewRight]) {
+    for (const value of overview.minMax) {
+      peak = Math.max(peak, Math.abs(value));
+    }
   }
+
+  const stacked = lanes.length > 1;
 
   return (
     <section className="flex flex-col gap-4">
@@ -225,22 +249,37 @@ export function WaveformView() {
         }
       />
 
-      <figure className="flex flex-col gap-1">
-        <figcaption className="flex items-baseline justify-between gap-2 text-sm text-muted">
-          <span>{t("waveform.overview")}</span>
-          <span dir="ltr" data-testid="waveform.overview.range" className="font-mono text-xs">
-            {formatS(0)} – {formatS(durationSeconds)}
-          </span>
-        </figcaption>
-        <WaveformCanvas
-          minMax={minMax}
-          sampleRange={{ startSample: 0, endSample: sampleCount }}
-          selectionRange={selection}
-          heightPx={120}
-          testId="waveform.overview.canvas"
-          label={t("waveform.overviewAria")}
-        />
-      </figure>
+      <ChannelPicker mode={channel.mode} modes={channel.modes} onChange={channel.setMode} />
+
+      {lanes.map(({ id, lane }) => {
+        const overview = lane === 0 ? overviewLeft : overviewRight;
+        const suffix = stacked && lane === 1 ? ".right" : "";
+        return (
+          <figure key={`overview-${id}`} className="flex flex-col gap-1">
+            <figcaption className="flex items-baseline justify-between gap-2 text-sm text-muted">
+              <span data-testid={`waveform.lane.${id}`}>
+                {t("waveform.overview")}
+                {stacked ? ` · ${channelLabel(t, id)}` : ""}
+              </span>
+              <span
+                dir="ltr"
+                data-testid={`waveform.overview.range${suffix}`}
+                className="font-mono text-xs"
+              >
+                {formatS(0)} – {formatS(durationSeconds)}
+              </span>
+            </figcaption>
+            <WaveformCanvas
+              minMax={overview.minMax}
+              sampleRange={{ startSample: 0, endSample: sampleCount }}
+              selectionRange={selection}
+              heightPx={120}
+              testId={`waveform.overview.canvas${suffix}`}
+              label={`${t("waveform.overviewAria")} (${channelLabel(t, id)})`}
+            />
+          </figure>
+        );
+      })}
 
       <div className="flex flex-wrap items-center gap-2">
         <button
@@ -297,28 +336,43 @@ export function WaveformView() {
         ) : null}
       </div>
 
-      <figure className="flex flex-col gap-1">
-        <figcaption className="flex items-baseline justify-between gap-2 text-sm text-muted">
-          <span>{t("waveform.detail")}</span>
-          <span dir="ltr" data-testid="waveform.range.value" className="font-mono text-xs">
-            {formatS(detailRange.startSample / original.sampleRateHz)} –{" "}
-            {formatS(detailRange.endSample / original.sampleRateHz)}
-          </span>
-        </figcaption>
-        <WaveformCanvas
-          minMax={detailMinMax}
-          sampleRange={detailRange}
-          selectionRange={selection}
-          heightPx={220}
-          testId="waveform.detail.canvas"
-          label={t("waveform.detailAria")}
-          interactive
-          onPointerDown={onDetailPointerDown}
-          onPointerMove={onDetailPointerMove}
-          onPointerUp={onDetailPointerUp}
-          onKeyDown={onDetailKeyDown}
-        />
-      </figure>
+      {lanes.map(({ id, lane }) => {
+        const slice = lane === 0 ? sliceLeft : sliceRight;
+        const overview = lane === 0 ? overviewLeft : overviewRight;
+        const range = slice?.range ?? detailRange;
+        const suffix = stacked && lane === 1 ? ".right" : "";
+        return (
+          <figure key={`detail-${id}`} className="flex flex-col gap-1">
+            <figcaption className="flex items-baseline justify-between gap-2 text-sm text-muted">
+              <span>
+                {t("waveform.detail")}
+                {stacked ? ` · ${channelLabel(t, id)}` : ""}
+              </span>
+              <span
+                dir="ltr"
+                data-testid={`waveform.range.value${suffix}`}
+                className="font-mono text-xs"
+              >
+                {formatS(range.startSample / original.sampleRateHz)} –{" "}
+                {formatS(range.endSample / original.sampleRateHz)}
+              </span>
+            </figcaption>
+            <WaveformCanvas
+              minMax={slice?.minMax ?? overview.minMax}
+              sampleRange={range}
+              selectionRange={selection}
+              heightPx={220}
+              testId={`waveform.detail.canvas${suffix}`}
+              label={`${t("waveform.detailAria")} (${channelLabel(t, id)})`}
+              interactive
+              onPointerDown={(event) => onDetailPointerDown(event, range)}
+              onPointerMove={(event) => onDetailPointerMove(event, range)}
+              onPointerUp={onDetailPointerUp}
+              onKeyDown={onDetailKeyDown}
+            />
+          </figure>
+        );
+      })}
 
       <CompareSlot />
 

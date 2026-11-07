@@ -50,6 +50,18 @@
       "staleSource": "The source changed while the AI job was running; run it again on the current audio."
     }
   },
+  "channel": {
+    "label": "Channel",
+    "mono": "Mono (downmix)",
+    "left": "Left channel",
+    "right": "Right channel",
+    "both": "Both channels",
+    "note": "Mono analyses the two-channel downmix. Left and Right analyse one playback channel.",
+    "theory": {
+      "heading": "Stereo and the analysis lane",
+      "body": "The player keeps both channels. Analysis tools can use mono (the mean of both channels), the left channel, or the right channel. Mono is an analysis choice, not a stereo mix; use Left and Right when the channels differ."
+    }
+  },
   "nav": {
     "landmark": "Tools",
     "waveform": "Waveform",
@@ -530,6 +542,7 @@
       "unwrapped": "Unwrapped"
     },
     "meta": {
+      "channel": "Channel",
       "sampleRate": "Sample rate",
       "binWidth": "Bin width",
       "fftLength": "FFT length",
@@ -788,6 +801,7 @@
       "label": "Spectrogram: time on the x axis, frequency on the y axis, colour shows level in dB"
     },
     "meta": {
+      "channel": "Channel",
       "sampleRate": "Sample rate",
       "duration": "Duration",
       "window": "Window",
@@ -1172,7 +1186,8 @@
     "missing": "No processed signal yet. Run a tool that installs a processed lane (for example the compression lab), then compare it here.",
     "mismatch": {
       "length": "The processed signal has a different length. Run a tool that preserves length, or compare codec-lab results against their aligned reference.",
-      "rate": "The processed signal has a different sample rate. Resample first or use a tool that preserves the rate."
+      "rate": "The processed signal has a different sample rate. Resample first or use a tool that preserves the rate.",
+      "channels": "The processed result does not have the selected channels. Choose Mono or run a channel-preserving tool."
     },
     "label": {
       "mse": "MSE",

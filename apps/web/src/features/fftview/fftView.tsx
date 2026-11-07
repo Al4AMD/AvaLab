@@ -18,6 +18,7 @@ import { ToolHeader } from "../../components/ToolHeader";
 import "uplot/dist/uPlot.min.css";
 
 import { Button } from "../../components/ui/button";
+import { type ChannelLaneId, type LaneIndex, laneIndexForSingleMode } from "../../lib/channel";
 import { formatDb, formatHz, formatS } from "../../lib/format";
 import {
   FFT_MAX_LENGTH,
@@ -26,6 +27,9 @@ import {
   type WindowProfilesResult,
 } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
+import { ChannelPicker } from "../channels/ChannelPicker";
+import { channelLabel } from "../channels/channelLabels";
+import { useChannelMode } from "../channels/useChannelMode";
 import { UploadEmptyState } from "../input/upload";
 import { TheoryPanel } from "../theory/TheoryPanel";
 import { TOOL_THEORY } from "../theory/theoryContent";
@@ -298,6 +302,7 @@ function useFftSpectrum(
   settings: FftViewSettings,
   selectionStartSample: number,
   selectionEndSample: number,
+  lane: LaneIndex,
 ): { spectrum: Spectrum | null; error: boolean } {
   const [spectrum, setSpectrum] = useState<Spectrum | null>(null);
   const [error, setError] = useState(false);
@@ -347,7 +352,13 @@ function useFftSpectrum(
     }
     const ticket = useSessionStore
       .getState()
-      .deriveWithSourceSlice("fftSelection", params, analysisStartSample, analysisEndSample);
+      .deriveWithSourceSliceLane(
+        "fftSelection",
+        params,
+        analysisStartSample,
+        analysisEndSample,
+        lane,
+      );
     ticket.outcome.then(
       (outcome) => {
         if (generationRef.current !== generation || "cancelled" in outcome) {
@@ -376,7 +387,7 @@ function useFftSpectrum(
     return () => {
       useSessionStore.getState().cancel(ticket.key);
     };
-  }, [original, params, analysisStartSample, analysisEndSample]);
+  }, [original, params, analysisStartSample, analysisEndSample, lane]);
 
   return { spectrum, error };
 }
@@ -385,6 +396,9 @@ export function FftView() {
   const { t } = useTranslation();
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
+  const channel = useChannelMode(original, "single");
+  const lane = laneIndexForSingleMode(channel.mode) ?? 0;
+  const channelLaneId: ChannelLaneId = channel.mode === "both" ? "left" : channel.mode;
   const [searchParams, setSearchParams] = useSearchParams();
   const settings = useMemo(
     () => fftSettingsFromSearch(`?${searchParams.toString()}`),
@@ -406,6 +420,7 @@ export function FftView() {
     settings,
     selection.startSample,
     selection.endSample,
+    lane,
   );
   const profiles = useWindowProfiles(original?.sampleRateHz ?? 0, settings.windowLengthSamples);
 
@@ -551,6 +566,10 @@ export function FftView() {
               </div>
             </fieldset>
 
+            <div className="flex flex-col justify-start text-xs sm:col-span-2">
+              <ChannelPicker mode={channel.mode} modes={channel.modes} onChange={channel.setMode} />
+            </div>
+
             <label className="flex flex-col gap-1 text-xs sm:col-span-2 lg:col-span-4">
               <span className="flex items-center justify-between gap-2 font-medium">
                 <span>{t("fftview.controls.phaseMask")}</span>
@@ -588,6 +607,11 @@ export function FftView() {
           ) : (
             <>
               <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+                <MetaItem
+                  label={t("fftview.meta.channel")}
+                  value={channelLabel(t, channelLaneId)}
+                  testId="fftview.meta.channel"
+                />
                 <MetaItem
                   label={t("fftview.meta.sampleRate")}
                   value={formatHz(spectrum.meta.sampleRateHz)}

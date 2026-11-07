@@ -13,6 +13,7 @@
   "app.health.loading",
   "app.health.offline",
   "app.health.ok",
+  "channel.theory",
   "codecLab.theory",
   "experiments",
   "extent.theory",

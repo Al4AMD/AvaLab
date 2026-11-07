@@ -19,9 +19,13 @@ import { useTranslation } from "react-i18next";
 import { ToolHeader } from "../../components/ToolHeader";
 
 import { Button } from "../../components/ui/button";
+import { type ChannelLaneId, laneIndexForSingleMode } from "../../lib/channel";
 import { formatDb, formatHz, formatS } from "../../lib/format";
 import type { SpectrogramTilesParams } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
+import { ChannelPicker } from "../channels/ChannelPicker";
+import { channelLabel } from "../channels/channelLabels";
+import { useChannelMode } from "../channels/useChannelMode";
 import { UploadEmptyState } from "../input/upload";
 import { TheoryPanel } from "../theory/TheoryPanel";
 import { TOOL_THEORY } from "../theory/theoryContent";
@@ -189,6 +193,9 @@ function SpectrogramCanvas({
 export function SpectrogramView() {
   const { t } = useTranslation();
   const original = useSessionStore((state) => state.original);
+  const channel = useChannelMode(original, "single");
+  const lane = laneIndexForSingleMode(channel.mode) ?? 0;
+  const channelLaneId: ChannelLaneId = channel.mode === "both" ? "left" : channel.mode;
 
   const [windowFamily, setWindowFamily] = useState<SpectrogramTilesParams["windowFamily"]>("hann");
   const [windowLengthSamples, setWindowLengthSamples] = useState(DEFAULT_WINDOW_LENGTH);
@@ -201,7 +208,7 @@ export function SpectrogramView() {
     () => ({ windowFamily, windowLengthSamples, hopFraction }),
     [windowFamily, windowLengthSamples, hopFraction],
   );
-  const job = useSpectrogramJob(original, analysis);
+  const job = useSpectrogramJob(original, analysis, lane);
   const geometry = job.geometry;
   const sampleRateHz = original?.sampleRateHz ?? 0;
   const durationS = geometry === null ? 0 : geometry.sampleCount / sampleRateHz;
@@ -363,6 +370,10 @@ export function SpectrogramView() {
                 </Button>
               </div>
             </fieldset>
+
+            <div className="flex flex-col justify-start text-xs sm:col-span-2">
+              <ChannelPicker mode={channel.mode} modes={channel.modes} onChange={channel.setMode} />
+            </div>
           </div>
 
           {job.error ? (
@@ -400,6 +411,11 @@ export function SpectrogramView() {
                   label={t("spectrogram.meta.columns")}
                   value={String(geometry.totalFrames)}
                   testId="spectrogram.meta.columns"
+                />
+                <MetaItem
+                  label={t("spectrogram.meta.channel")}
+                  value={channelLabel(t, channelLaneId)}
+                  testId="spectrogram.meta.channel"
                 />
                 <MetaItem
                   label={t("spectrogram.meta.decimation")}

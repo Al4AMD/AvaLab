@@ -40,6 +40,7 @@
 import { type AudioChannels, inputHash64Channels } from "@avalab/dsp";
 import { create, type StoreApi, type UseBoundStore } from "zustand";
 import type { DemoClipId } from "../features/input/offline";
+import type { LaneIndex } from "../lib/channel";
 import type { DspOpName, DspOpParams } from "./ops";
 import type { DspOpOutcome, TransferablePayload } from "./protocol";
 import { canonicalJson } from "./protocol";
@@ -322,6 +323,25 @@ export type SessionStore = {
     startSample: number,
     endSample: number,
   ): DeriveTicket<K>;
+  /** Lane variant of `deriveWithSource`: posts a fresh copy of one playback
+   * channel. The lane index is appended to the cache key, so left and right
+   * never collide; mono lane 0 is cached separately from the downmix derive
+   * even when their bytes match. A missing lane rejects typed `noLane`. */
+  deriveWithSourceLane<K extends DspOpName>(
+    opKey: K,
+    params: DspOpParams<K>,
+    lane: LaneIndex,
+  ): DeriveTicket<K>;
+  /** Lane variant of `deriveWithSourceSlice`: posts `[startSample,
+   * endSample)` from one playback channel. The caller pins the range in
+   * `params`; the lane suffix pins the channel. */
+  deriveWithSourceSliceLane<K extends DspOpName>(
+    opKey: K,
+    params: DspOpParams<K>,
+    startSample: number,
+    endSample: number,
+    lane: LaneIndex,
+  ): DeriveTicket<K>;
   /** Read a derivation's state by its cache key (spec polling interface). */
   getDerived(key: string): DerivedLookup;
   /** Cancel the pending job under `key`: detaches the worker frame id; a
@@ -411,6 +431,15 @@ export function createSessionStore(
       return () => set({ jobs: deleteAndClone(get().jobs, key) });
     };
 
+    const rejectedTicket = <K extends DspOpName>(
+      code: string,
+      message: string,
+    ): DeriveTicket<K> => {
+      const outcome = Promise.reject<DspOpOutcome<K>>(new DspRpcError(code, message));
+      outcome.catch(() => undefined);
+      return { key: "", outcome };
+    };
+
     /**
      * The shared miss→call→settle path behind `derive` and
      * `deriveWithSource`: canonical-key cache hit resolves synchronously
@@ -423,8 +452,9 @@ export function createSessionStore(
       canonical: string,
       inputHash: string,
       startCall: () => DspCallPromise<K>,
+      keySuffix = "",
     ): DeriveTicket<K> => {
-      const key = `${opKey}\u0000${canonical}\u0000${inputHash}`;
+      const key = `${opKey}\u0000${canonical}\u0000${inputHash}${keySuffix}`;
       const cached = get().derived.get(key);
       if (cached !== undefined) {
         // Synchronous cache hit. The cast is keyed to the cache key's op
@@ -725,6 +755,75 @@ export function createSessionStore(
             byteLength: copy.byteLength,
           });
         });
+      },
+
+      deriveWithSourceLane<K extends DspOpName>(
+        opKey: K,
+        params: DspOpParams<K>,
+        lane: LaneIndex,
+      ): DeriveTicket<K> {
+        const { original, inputHash } = get();
+        if (original === null || inputHash === null) {
+          return rejectedTicket("noSource", "deriveWithSourceLane: no source loaded");
+        }
+        const samples = original.channels[lane];
+        if (samples === undefined) {
+          return rejectedTicket("noLane", `deriveWithSourceLane: no lane ${String(lane)}`);
+        }
+        const canonical = canonicalJson(params);
+        return openDerivedJob(
+          opKey,
+          canonical,
+          inputHash,
+          () => {
+            const copy = samples.slice();
+            return rpc.call(opKey, params, {
+              buffer: copy.buffer,
+              byteOffset: 0,
+              byteLength: copy.byteLength,
+            });
+          },
+          `\u0000lane:${lane}`,
+        );
+      },
+
+      deriveWithSourceSliceLane<K extends DspOpName>(
+        opKey: K,
+        params: DspOpParams<K>,
+        startSample: number,
+        endSample: number,
+        lane: LaneIndex,
+      ): DeriveTicket<K> {
+        const { original, inputHash } = get();
+        if (original === null || inputHash === null) {
+          return rejectedTicket("noSource", "deriveWithSourceSliceLane: no source loaded");
+        }
+        const samples = original.channels[lane];
+        if (samples === undefined) {
+          return rejectedTicket("noLane", `deriveWithSourceSliceLane: no lane ${String(lane)}`);
+        }
+        const sampleCount = samples.length;
+        const start = Number.isFinite(startSample)
+          ? Math.max(0, Math.min(Math.round(startSample), sampleCount))
+          : 0;
+        const end = Number.isFinite(endSample)
+          ? Math.max(start, Math.min(Math.round(endSample), sampleCount))
+          : start;
+        const canonical = canonicalJson(params);
+        return openDerivedJob(
+          opKey,
+          canonical,
+          inputHash,
+          () => {
+            const copy = samples.slice(start, end);
+            return rpc.call(opKey, params, {
+              buffer: copy.buffer,
+              byteOffset: 0,
+              byteLength: copy.byteLength,
+            });
+          },
+          `\u0000lane:${lane}`,
+        );
       },
 
       getDerived(key) {
