@@ -35,6 +35,7 @@ export function TheoryPanel({ titleKey, sections }: TheoryPanelProps) {
             ) : null}
           </section>
         ))}
+        <p className="border-t border-surface pt-2 text-xs text-muted">{t("theory.stereoNote")}</p>
       </div>
     </details>
   );

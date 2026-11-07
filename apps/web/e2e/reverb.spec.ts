@@ -63,7 +63,11 @@ test("Persian (default): reverb presets, timing, convolution steps, reverse and 
   // Result panel: IR + result waveforms, IR spectrum, result spectrogram.
   await expectCanvasPainted(page.getByTestId("reverb.ir.waveform"));
   await expectCanvasPainted(page.getByTestId("reverb.ir.spectrum").locator("canvas").first());
-  await expectCanvasPainted(page.getByTestId("reverb.result.spectrogram"));
+  const resultSpectrogram = page.getByTestId("reverb.result.spectrogram");
+  await expectCanvasPainted(resultSpectrogram);
+  await expect
+    .poll(async () => resultSpectrogram.evaluate((element) => (element as HTMLCanvasElement).width))
+    .toBeGreaterThan(300);
   await expect(page.getByTestId("reverb.metric.method")).toBeVisible();
 
   // Wet mix is serialized and the reverb recomputes.

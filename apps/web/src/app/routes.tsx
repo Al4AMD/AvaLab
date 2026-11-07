@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { createBrowserRouter, type RouteObject, redirect } from "react-router";
 import { AiLabView } from "../features/ai/aiLabView";
 import { CodecLabView } from "../features/codecLab/codecLabView";
@@ -8,6 +9,7 @@ import { FftView } from "../features/fftview/fftView";
 import { FilterLabView } from "../features/filters/filterLabView";
 import { GeneratorView } from "../features/generator/generatorView";
 import { MetricsView } from "../features/metrics/metricsView";
+import { PsychoacousticsView } from "../features/psychoacoustics/psychoacousticsView";
 import { ReverbView } from "../features/reverb/reverbView";
 import { SamplingView } from "../features/sampling/samplingView";
 import { SpectrogramView } from "../features/spectrogram/spectrogramView";
@@ -16,6 +18,8 @@ import { SpeedView } from "../features/speed/speedView";
 import { WaveformView } from "../features/waveform/waveformView";
 import { useSessionStore } from "../session/store";
 import { AppLayout } from "./layout";
+
+const PipelineView = lazy(() => import("../features/pipeline/pipelineView"));
 
 export const TOOL_IDS = [
   "waveform",
@@ -30,6 +34,8 @@ export const TOOL_IDS = [
   "spectrum-edit",
   "codec-lab",
   "metrics",
+  "psychoacoustics",
+  "pipeline",
   "ai",
 ] as const;
 export type ToolId = (typeof TOOL_IDS)[number];
@@ -65,6 +71,23 @@ function WaveformStubPing() {
   );
 }
 
+/** Lazy F15 chunk; the fallback keeps the title visible while the canvas code loads. */
+function PipelineRoute() {
+  const { t } = useTranslation();
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-col gap-1">
+          <h2 className="text-2xl font-semibold">{t("tool.pipeline.title")}</h2>
+          <p className="text-sm text-muted">{t("pipeline.loading")}</p>
+        </div>
+      }
+    >
+      <PipelineView />
+    </Suspense>
+  );
+}
+
 /** Data-router route table (spec §2.1/§2.5): layout shell + / redirect + /tools/<id>. */
 export const appRoutes: RouteObject[] = [
   {
@@ -97,6 +120,8 @@ export const appRoutes: RouteObject[] = [
       { path: "tools/spectrum-edit", element: <SpectrumEditView /> },
       { path: "tools/codec-lab", element: <CodecLabView /> },
       { path: "tools/metrics", element: <MetricsView /> },
+      { path: "tools/psychoacoustics", element: <PsychoacousticsView /> },
+      { path: "tools/pipeline", element: <PipelineRoute /> },
       { path: "tools/ai", element: <AiLabView /> },
     ],
   },

@@ -5,7 +5,7 @@
  * browser never receives locale-dependent names, and paths never leak into
  * the `download` attribute.
  */
-import { encodeWavPcm16 } from "@avalab/dsp";
+import { type AudioChannels, encodeWavPcm16 } from "@avalab/dsp";
 import type uPlot from "uplot";
 
 /** Lowercase ASCII slug: path stripped, non-ASCII runs replaced, extension kept. */
@@ -44,9 +44,13 @@ function triggerDownload(blob: Blob, filename: string): void {
   }, 0);
 }
 
-/** Encode and download mono 16-bit PCM WAV (the session's canonical format). */
-export function downloadWav(samples: Float32Array, sampleRateHz: number, filename: string): void {
-  const bytes = encodeWavPcm16(samples, { sampleRateHz });
+/** Encode and download 16-bit PCM WAV (mono or 1–2 playback channels). */
+export function downloadWav(
+  source: Float32Array | AudioChannels,
+  sampleRateHz: number,
+  filename: string,
+): void {
+  const bytes = encodeWavPcm16(source, { sampleRateHz });
   const buffer = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(buffer).set(bytes);
   triggerDownload(new Blob([buffer], { type: "audio/wav" }), sanitizeFilename(filename));

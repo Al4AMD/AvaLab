@@ -12,7 +12,7 @@ const INPUT = {
 
 function fakeClient(overrides: Partial<AiClient> = {}): AiClient {
   return {
-    getModels: async () => ({ models: [] }),
+    getModels: async () => ({ models: [], ml_enabled: true }),
     uploadExcerpt: async () => "audio-1",
     startJob: async () => ({ job_id: "job-1" }),
     streamJob: async () => {},

@@ -54,6 +54,19 @@ def wav_2s_44k1_mono(audio_fixture_dir: Path) -> Path:
 
 
 @pytest.fixture(scope="session")
+def wav_2s_44k1_stereo(audio_fixture_dir: Path) -> Path:
+    """2 s 44.1 kHz stereo 16-bit PCM WAV with distinct left/right tones."""
+    return generate_with_ffmpeg(
+        audio_fixture_dir / "tones_2s_44100_stereo.wav",
+        (
+            "aevalsrc=0.1*sin(440*2*PI*t)|0.1*sin(660*2*PI*t)"
+            ":s=44100:d=2:c=stereo"
+        ),
+        ["-c:a", "pcm_s16le"],
+    )
+
+
+@pytest.fixture(scope="session")
 def wav_2s_44k1_mono_with_title_metadata(audio_fixture_dir: Path) -> Path:
     """2 s 44.1 kHz mono WAV carrying a source ``title`` tag (metadata stripping)."""
     return generate_with_ffmpeg(

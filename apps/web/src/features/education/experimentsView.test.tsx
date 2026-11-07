@@ -50,7 +50,9 @@ describe("experiments view", () => {
         expect(markup).toContain(modules.t(step.instructionKey));
         expect(markup).toContain(modules.t(step.observationKey));
         if (step.link !== undefined) {
-          expect(markup).toContain(`href="${step.link.path}?${step.link.search}"`);
+          const href =
+            step.link.search === "" ? step.link.path : `${step.link.path}?${step.link.search}`;
+          expect(markup).toContain(`href="${href}"`);
         }
       });
     }

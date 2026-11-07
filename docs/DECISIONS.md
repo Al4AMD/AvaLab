@@ -336,3 +336,123 @@
 - Context: the lockfile resolved Linux `torch` from PyPI, whose wheel pulls CUDA runtime packages plus `triton` even though the deployment target is CPU-only. This inflated the API image and made Docker builds fail repeatedly on large wheel downloads.
 - Decision: pin a Linux-only `torch`/`torchaudio` source to the official PyTorch CPU index (`https://download.pytorch.org/whl/cpu`) in `apps/api/pyproject.toml`; macOS keeps its existing PyPI pins. The Docker build also mounts a uv cache so retries reuse downloaded wheels.
 - Consequences: the Linux Docker image installs `torch==2.15.0+cpu`/`torchaudio==2.11.1+cpu` with no `nvidia-*` packages or `triton` (1.12 GB image). A future GPU profile needs its own lock resolution and must not silently reuse this CPU lock.
+
+## D-042 — F13 psychoacoustics is a documented symmetric Bark model
+
+- Date: 2026-11-06
+- Status: accepted (owner, Wave 6 brainstorm; implementation detail pinned by Plan 01)
+- Context: F13 must teach masking and feed a toy codec, but a full MPEG psychoacoustic model is proprietary-ish, tempo-dependent, and too heavy to explain. The design asks for one honest, reproducible model that students can verify against textbook curves.
+- Decision: use 25 equal Bark bands on the Zwicker–Terhardt critical-band-rate scale (edges by bisection), the Terhardt absolute threshold with a 20 Hz floor and no upper clamp, and Schroeder spreading evaluated on `abs(dz)` rather than the signed `dz`. The deviation makes the spreading function symmetric and bounded for far maskers, so the 25×25 teaching matrix is stable and reproducible; the signed raw form is noted in `docs/ALGORITHMS.md`. Masking is stationary per MDCT frame with no temporal masking or tonal/noise partition. The reference SPL is user-selectable from 80 to 100 dB (default 94), and `P_ref` is measured through the same MDCT rather than hard-coded. The toy codec applies the masking threshold but never below the global quantization step.
+- Consequences: the curves are deterministic and golden-tested, and the UI can show exactly which bands a codec may discard and at what bit cost. Results are teaching approximations, not an MP3/AAC compliance claim; a future perceptual model can replace the engine behind the same worker ops without touching the view.
+
+## D-043 — F15 uses React Flow for graph editing
+
+- Date: 2026-11-06
+- Status: accepted (owner, Wave 6 brainstorm; pinned by Plan 02)
+- Context: F15 needs branch/fan-out graph editing with stable node and edge IDs, drag/connect/delete interactions, and a canvas that stays LTR in both locales.
+- Decision: add `@xyflow/react` 12.12.1 (MIT) to `apps/web`. The library is installed into the lazy pipeline route only; its stylesheet is imported by that route, never by the app shell. Rejected alternatives: hand-built SVG (too much interaction work), React Flow v11 (superseded).
+- Consequences: the pipeline view gets editing primitives without hand-maintaining canvas interaction code. The dependency is recorded in `docs/THIRD_PARTY.md`; MIT is compatible with the project's GPL-3.0 license. The graph DSL, validation, and DSP execution remain ours and run outside React Flow.
+
+## D-044 — F18 loudness matching is playback-only and clamped
+
+- Date: 2026-11-06
+- Status: accepted (owner, Wave 6 Plan 03)
+- Context: A/B comparison is misleading when a codec changes level, but normalizing stored/exported audio would hide a real effect and mutate the student's result.
+- Decision: measure both playback lanes with ITU-R BS.1770 integrated loudness in the worker, apply only the difference as a transport gain, clamp it to ±24 dB, and reset the original lane to 0 dB whenever the active lane changes. Exported WAVs and processed buffers are never normalized.
+- Consequences: the listener compares timbre and artifacts at matched loudness while the measured/exported signals stay honest; a silent or unmeasurable lane reads `—` and contributes 0 dB rather than inventing a gain.
+
+## D-045 — F18 theme is a per-browser preference with a system default
+
+- Date: 2026-11-06
+- Status: accepted (owner, Wave 6 Plan 03)
+- Context: the product defaults to the dark scientific-instrument look, but users may need a light theme for projectors or accessibility.
+- Decision: store `system | light | dark` in `localStorage["avalab.theme"]`; missing or invalid values resolve to `system`, which follows `prefers-color-scheme` live. Apply the resolved theme as `data-theme` on `<html>`; keep plots and technical axes LTR in both themes and leave spectrogram colormaps unchanged.
+- Consequences: no account or server is needed, first visit respects the OS, and switching themes never changes tool state or audio.
+
+## D-046 — F18 shortcuts are global but never fire in text fields or dialogs
+
+- Date: 2026-11-06
+- Status: accepted (owner, Wave 6 Plan 03)
+- Context: transport keys should work anywhere on a tool page, but must not steal typing or break native form behavior.
+- Decision: Space toggles play/pause, ArrowLeft/ArrowRight seek ∓5 s, Shift+ArrowLeft/Right seek ∓10 s, and `?` opens the shortcut help dialog. Ignore key repeats, Ctrl/Meta/Alt combinations, editable targets (`input`, `textarea`, `select`, `contenteditable`) and any target inside an open dialog. Provide a header button as the non-keyboard entry point; the dialog traps focus and closes on Escape.
+- Consequences: one keyboard map works across all tools without per-view handlers; help remains discoverable and keyboard-accessible, and form controls keep their native arrows/space behavior.
+
+## D-047 — F18 last-used settings reuse URL codecs in namespaced localStorage
+
+- Date: 2026-11-06
+- Status: accepted (owner, Wave 6 Plan 03)
+- Context: many tools already encode shareable parameters in the URL; duplicating a second serialization format for persistence would drift.
+- Decision: store the same stable query string under `avalab.<tool>.last` and reuse each tool's total decoder; a non-empty URL wins over storage, and a missing/invalid stored value falls back to defaults. A shared best-effort storage helper is used by the nine tools that need identical safe handling. Never store source audio, file names, uploaded IRs, or AI results.
+- Consequences: share links stay authoritative, reloads reopen the last panel state, private/quota-blocked storage is non-fatal, and old or hand-edited values cannot crash a view.
+
+## D-048 — F08 teaching and benchmark scopes are bounded
+
+- Date: 2026-11-06
+- Status: accepted (agent, Wave 6 Plan 04)
+- Context: the FFT teaching view needs replayable butterflies, and the benchmark needs an independent implementation without turning noisy wall-clock numbers into a CI gate.
+- Decision: `fftButterflySteps` records radix-2 DIT operations only for N = 8 and N = 16. `benchmarkFft` compares `fftRadix2` with pinned `fft.js` 4.0.4 on sizes 256/1024/4096/16384, one warm-up, median elapsed time over 1–1000 iterations, and gates only finite output plus `maxAbsError ≤ 1e-5`; no timing threshold is asserted. Both run as worker ops.
+- Consequences: students see honest relative speed on their machine, CI cannot flake on load, and the whole-file STFT benchmark remains the long-input path.
+
+## D-049 — F09 freehand spectra use linear bin curves after band edits
+
+- Date: 2026-11-06
+- Status: accepted (agent, Wave 6 Plan 04)
+- Context: F09 needs drawing on the spectrum, but arbitrary curve semantics can fight the existing band-edit presets or break Hermitian reconstruction.
+- Decision: freehand curves are linear interpolations between sorted, deduplicated `(bin, value)` points with held endpoints. At most 8 curves, 2–256 points each, integer bins inside the analysed spectrum. Curves apply after legacy band edits and before Hermitian enforcement, so the drawn shape wins. Magnitude clamps to non-negative; phase wraps to `(−π, π]`. The URL `cv` codec carries at most 8192 bins and validates every entry; legacy `ed` remains readable.
+- Consequences: URL shares and reloads are deterministic, old links keep working, and the spectrum editor never computes DSP on the main thread.
+
+## D-050 — F16 catalogue is ID-only and link-validated
+
+- Date: 2026-11-06
+- Status: accepted (agent, Wave 6 Plan 04)
+- Context: the guided-experiment catalogue grew from 3 to 19 items, and saved progress or deep links must not break when copy or routes change.
+- Decision: the closed `ExperimentId` union drives the catalogue, categories and 5–8 step content. Every optional deep link must target an existing tool route and decode through that tool's total URL parser. Progress stores IDs only under `localStorage["avalab.experiments.progress"]`; malformed JSON resets, unknown/duplicate IDs are dropped, and storage failures are non-fatal. Numerical claims in copy do not replace the algorithm rows and their golden/property tests, which remain the source of truth.
+- Consequences: share links and reloads are safe, content can be reviewed in `fa` and `en` independently, and no audio or file names enter progress storage.
+
+## D-051 — F14 pitch/beat are non-neural, excerpt-limited analysis jobs
+
+- Date: 2026-11-06
+- Status: accepted (agent, Wave 6 Plan 04)
+- Context: F14 pitch and beat tracking are available from librosa; routing them through the neural model registry would require the ML extra for a non-neural tool.
+- Decision: use `librosa.pyin(fmin=65, fmax=1000, frame_length=2048)` and `librosa.beat.beat_track(hop_length=256)` in backend analysis jobs. They use the shared 30 s route excerpt limit, return `kind="analysis"`, bypass `ml_enabled`, the model registry and the model factory, and never persist audio. `hop_length=256` is pinned because 512 misreports a synthetic 120 BPM train outside the ±2 BPM test bound.
+- Consequences: pitch/beat work with the base API install and no weights; results are labelled analysis, not AI-model output; full-file analysis remains unsupported.
+
+## D-052 — F12 AM/FM and Fourier preview reuse the generator core
+
+- Date: 2026-11-06
+- Status: accepted (agent, Wave 6 Plan 04)
+- Context: F12 needed two new generator presets and an interactive Fourier-series preview without adding a second synthesis path.
+- Decision: AM is `x[n] = a(1 + m·sin(2πf_m n/fs))·sin(2πf_c n/fs)`; FM is `x[n] = a·sin(2πf_c n/fs + β·sin(2πf_m n/fs))` with `β = deviationHz/f_m`. `generateSynth` dispatches them and the Fourier preview reuses `fourierSeriesPartialSum` plus `measureGibbsOvershoot`. The preview is capped at 2 s and 200 harmonics; URL state carries the new parameters and clamps on decode.
+- Consequences: one generator engine and one Fourier-series implementation stay authoritative; overmodulation is warned in the UI rather than silently clamped.
+
+## D-053 — Plan 05 performance fallbacks and main-thread boundaries
+
+- Date: 2026-11-06
+- Status: accepted (agent, Wave 6 Plan 05)
+- Context: the 5-minute harness exposed two paths that cannot meet the 300 ms live-parameter target without changing their educational character, plus two session-boundary loops that are not DSP transforms.
+- Decision: keep the teaching MDCT direct (O(frames·N²)) as an explicit encode/decode action with a measured 6 s test gate, and keep the reverb apply at a 30 s excerpt with a 250 ms input debounce and a 2 s test gate. Do not add WASM or replace either algorithm. Keep source validation/hash and `monoDownmix` on the main thread because they run once per load and moving them would add a new worker op outside the fixes-only scope. Record both boundaries in `docs/PROGRESS.md`.
+- Consequences: every other measured path is inside the AGENTS §9 budget; the two fallbacks are honest, visible, and regression-gated. A future WASM/FFT-MDCT change needs its own benchmark and owner approval, and a future worker-op migration must remove the boundary note.
+
+## D-054 — Docker deployment, offline model cache, and SSE proxy
+
+- Date: 2026-11-06
+- Status: accepted (agent, Wave 6 Plan 06)
+- Context: deployment must run on a CPU-only laptop, survive an offline demo after one prefetch, and keep SSE progress incremental through the web container.
+- Decision: `compose.yaml` runs the non-root API and Caddy web service on a default same-origin network, with named volumes `avalab-storage` for temporary audio and `avalab-models` at `/models`. Runtime sets `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`, and an ephemeral `HF_HOME=/tmp/huggingface`; `download_models.py` defaults to `Settings.ml_model_cache_dir`, and the prefetch commands temporarily re-enable Hub access. Caddy routes `/api/v1/jobs/*` before the generic API handler with `flush_interval -1`; static SPA responses are compressed, API/SSE responses are not. `AVALAB_PUBLIC_ORIGIN` is appended to `AVALAB_CORS_ORIGINS` when set. The optional `compose.gpu.yaml` wires an externally built CUDA image; `AVALAB_ML_DEVICE=cuda` selects CUDA for the PyTorch ASR, separation and Encodec runners, and for LavaSR only when the ONNX runtime exposes `CUDAExecutionProvider`. DPDFNet remains CPU-only, and the GPU path is untested. `AVALAB_PUBLIC_ORIGIN` is normalized to a scheme/host origin (trailing slash stripped, path/query/fragment rejected) before CORS matching. The `numba` pin is restricted to Intel macOS because an unmarked `numba<0.62` selected numba 0.53/llvmlite 0.36 on Linux/Python 3.12 and broke the Docker build.
+- Consequences: the default stack is reproducible and offline after the 365.7 MiB prefetch; testers can verify SSE timing with `docker/smoke.sh`; GPU users must supply their own CUDA image and NVIDIA runtime; the Intel-macOS-only numba marker keeps the local lock working without forcing an old numba onto Linux.
+
+## D-055 — Deliverable PDFs are static HTML rendered by Playwright Chromium
+
+- Date: 2026-11-06
+- Status: accepted (agent, Wave 6 Plan 07)
+- Context: the release needs a Persian A4 report and 16:9 slides that build on the owner's machine and in CI without a document toolchain, while keeping RTL shaping and self-hosted fonts exact.
+- Decision: keep the report and slides as static HTML/CSS (`docs/report/`, `docs/slides/`), serve the repo through a local static server, and render both with the existing Playwright Chromium `page.pdf()`. The builder fixes `fa-IR`, the dark theme, and a 1440×900 viewport; waits for `document.fonts.ready` and all images; and fails on console errors, page errors, failed requests, missing fonts, horizontal overflow, or page/slide overflow. Fonts are the self-hosted Vazirmatn woff2 files; no CDN. `pnpm build:docs` writes `docs/deliverables/avalab-report-fa.pdf` and `avalab-slides-fa.pdf`.
+- Consequences: no pandoc/tectonic/typst dependency is added and the PDFs use the same rendering stack as the e2e tests. Screenshot capture stays a separate deterministic step (`docs/capture-report-assets.mjs`, DPR 2) and AI figures are cached files, so the PDF build never needs the API or model weights. The owner approved committing the generated PDFs on 2026-11-07.
+
+## D-056 — Stereo playback and real codecs only; per-channel DSP deferred
+
+- Date: 2026-11-07
+- Status: accepted (owner, Wave 7 Plan 01)
+- Context: F01 promises stereo playback while analysis remains mono for comparability. Extending every DSP tool, metric, AI task, and hand-written codec per channel would multiply scope and risk without changing the teaching goals.
+- Decision: preserve 1–2 source channels in the session store and use them for original playback, real-codec processed playback, and real-codec WAV export. Keep a mean mono downmix as the canonical analysis lane for waveform, spectrogram, FFT, filters, sampling, extent, speed, reverb, spectrum edit, metrics, pipeline, AI, and hand-written toy codecs. Real codecs encode/decode the preserved channels; alignment is estimated once on the mono downmix and applied to every channel; `bit_exact` requires every channel to match. More than two channels fold to mono. No worker protocol change and no per-channel processing in this wave.
+- Consequences: stereo files sound correct and round-trip through ffmpeg without silent downmixing, while existing mono results, formulas, and tests stay authoritative. Mono files behave exactly as before. Per-channel analysis, metrics, AI, toy codecs, true-stereo convolution, and full-file stereo codec jobs remain future work.

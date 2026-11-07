@@ -210,6 +210,8 @@ export interface components {
             bit_exact: boolean;
             /** Bitrate Kbps */
             bitrate_kbps: number;
+            /** Channels */
+            channels: number;
             /** Codec Delay Samples */
             codec_delay_samples: number;
             /** Duration S */
@@ -341,9 +343,11 @@ export interface components {
         };
         /**
          * ModelsResponse
-         * @description All five fixed tasks, in stable order.
+         * @description All five fixed tasks, in stable order, plus the global ML switch.
          */
         ModelsResponse: {
+            /** Ml Enabled */
+            ml_enabled: boolean;
             /** Models */
             models: components["schemas"]["ModelInfo"][];
         };
@@ -665,7 +669,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                task: "denoise" | "superres" | "separation" | "asr" | "neural_codec";
+                task: ("denoise" | "superres" | "separation" | "asr" | "neural_codec") | ("pitch" | "beat");
             };
             cookie?: never;
         };

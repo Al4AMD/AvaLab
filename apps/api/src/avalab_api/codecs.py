@@ -137,14 +137,21 @@ def validate_params(codec: CodecName, params: Mapping[str, int]) -> dict[str, in
 
 
 def encode_audio(
-    src: Path, dst: Path, codec: CodecName, params: dict[str, int]
+    src: Path,
+    dst: Path,
+    codec: CodecName,
+    params: dict[str, int],
+    *,
+    channels: int,
 ) -> None:
     """Encode ``src`` into ``dst`` with the resolved ffmpeg encoder.
 
-    The source is forced to mono to match the analysis contract (AGENTS.md
-    F01) and the route's reference/downmix path. Lossless codecs use s16 so
-    the 16-bit PCM reference is reproduced exactly.
+    The route passes the stored source channel count (1 or 2) so stereo audio
+    keeps both channels; analysis still downmixes to mono. Lossless codecs use
+    s16 so the 16-bit PCM reference is reproduced exactly.
     """
+    if channels not in (1, 2):
+        raise ApiError(ErrorCode.invalid_request, "channels must be 1 or 2", 422)
     spec = resolve_codec(codec)
     resolved = validate_params(codec, params)
 
@@ -164,7 +171,7 @@ def encode_audio(
         "-map_chapters",
         "-1",
         "-ac",
-        "1",
+        str(channels),
         "-c:a",
         spec.encoder,
     ]

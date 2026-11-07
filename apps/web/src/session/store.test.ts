@@ -10,6 +10,7 @@
  * same op+params win). Ping semantics are store-state diagnostics, not
  * derives (R23 pragma).
  */
+import { inputHash64Channels } from "@avalab/dsp";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import type { TransferablePayload } from "./protocol";
 import { createDspRpc, DspRpcError } from "./rpc";
@@ -88,6 +89,7 @@ describe("loadSource guards", () => {
     const state = store.getState();
     expect(state.original).toEqual({
       samples,
+      channels: [samples],
       sampleRateHz: 48000,
       name: "clip.wav",
       sourceKind: "demoClip",
@@ -184,6 +186,80 @@ describe("loadSource guards", () => {
     expect(after.original?.samples).toBe(before.original?.samples);
     expect(after.inputHash).toBe(before.inputHash);
     expect(after.selection).toEqual(before.selection);
+  });
+
+  it("loads stereo channels, keeps the mono downmix, and hashes the pair", () => {
+    const { store } = makeStore();
+    const left = fakeAudio(5, 3);
+    const right = fakeAudio(5, 4);
+    expectOk(store.getState().loadSource([left, right], 48000, "stereo.wav", "demoClip"));
+    const original = store.getState().original;
+    expect(original?.channels).toEqual([left, right]);
+    expect(original?.channels[0]).toBe(left);
+    expect(original?.channels[1]).toBe(right);
+    expect(original?.samples).not.toBe(left);
+    expect(Array.from(original?.samples ?? [])).toEqual(
+      Array.from(left, (sample, index) => Math.fround((sample + (right[index] ?? 0)) / 2)),
+    );
+    expect(store.getState().inputHash).toBe(inputHash64Channels([left, right]));
+    expect(store.getState().selection).toEqual({ startSample: 0, endSample: 5 });
+  });
+
+  it("rejects bad channel layouts and keeps empty mono as invalidType", () => {
+    const { store } = makeStore();
+    const left = fakeAudio(4, 5);
+    const right = fakeAudio(4, 6);
+    expectCode(
+      store.getState().loadSource([left, right, left], 48000, "x.wav", "demoClip"),
+      "invalidType",
+    );
+    expectCode(
+      store.getState().loadSource([left, fakeAudio(5, 7)], 48_000, "x.wav", "demoClip"),
+      "invalidType",
+    );
+    expectCode(store.getState().loadSource([], 48_000, "x.wav", "demoClip"), "invalidType");
+    expectCode(
+      store
+        .getState()
+        .loadSource([new Float32Array(0), new Float32Array(0)], 48_000, "x.wav", "demoClip"),
+      "invalidType",
+    );
+    expectCode(
+      store.getState().loadSource(new Float32Array(0), 48_000, "x.wav", "demoClip"),
+      "invalidType",
+    );
+    expectCode(
+      store
+        .getState()
+        .loadSource([left, new Float32Array([0, 0, 0, Number.NaN])], 48_000, "x.wav", "demoClip"),
+      "notFinite",
+    );
+  });
+
+  it("records foldedFromChannelCount for folded mono and rejects it for stereo", () => {
+    const { store } = makeStore();
+    expectOk(
+      store.getState().loadSource(fakeAudio(4), 48_000, "x.wav", "demoClip", undefined, {
+        foldedFromChannelCount: 6,
+      }),
+    );
+    expect(store.getState().original?.foldedFromChannelCount).toBe(6);
+    for (const foldedFromChannelCount of [0, 1, 1.5, Number.NaN]) {
+      expectCode(
+        store.getState().loadSource(fakeAudio(4), 48_000, "x.wav", "demoClip", undefined, {
+          foldedFromChannelCount,
+        }),
+        "invalidType",
+      );
+    }
+    expectCode(
+      store
+        .getState()
+        .loadSource([fakeAudio(4, 8), fakeAudio(4, 9)], 48_000, "x.wav", "demoClip", undefined, {
+          foldedFromChannelCount: 6,
+        }),
+      "invalidType",
+    );
   });
 });
 
@@ -353,6 +429,29 @@ describe("failures keep the cache clean and reject the ticket", () => {
     expect(retry?.key).toBe(key);
     transport.deliver({ id: 1, ok: true, result: { meta: { empty: true } } });
     await expect(retry?.outcome).resolves.toEqual({ meta: { empty: true } });
+  });
+});
+
+describe("worker failures preserve earlier results", () => {
+  it("an opFailed frame leaves an existing cached derivation ready", async () => {
+    const { store, transport } = makeStore();
+    expectOk(store.getState().loadSource(fakeAudio(16), 48000, "a.wav", "demoClip"));
+    const good = store.getState().derive("sessionPing", { count: 1 });
+    const goodKey = good?.key ?? "";
+    transport.deliver({ id: 0, ok: true, result: { meta: { empty: true } } });
+    await vi.waitFor(() => expect(store.getState().getDerived(goodKey).status).toBe("ready"));
+
+    const bad = store.getState().derive("sessionPing", { count: 2 });
+    const badKey = bad?.key ?? "";
+    transport.deliver({ id: 1, ok: false, error: { code: "opFailed", message: "boom" } });
+    await expect(bad?.outcome).rejects.toMatchObject({ code: "opFailed" });
+    await vi.waitFor(() => expect(store.getState().jobs.size).toBe(0));
+
+    expect(store.getState().getDerived(badKey)).toEqual({ status: "miss" });
+    expect(store.getState().getDerived(goodKey)).toEqual({
+      status: "ready",
+      entry: { key: goodKey, result: { meta: { empty: true } } },
+    });
   });
 });
 
@@ -667,9 +766,87 @@ describe("processed playback lane", () => {
     expect(store.getState().setProcessed(processed, 24000, "8 kHz")).toEqual({ ok: true });
 
     const state = store.getState();
-    expect(state.processed).toEqual({ samples: processed, sampleRateHz: 24000, label: "8 kHz" });
+    expect(state.processed).toEqual({
+      samples: processed,
+      channels: [processed],
+      sampleRateHz: 24000,
+      label: "8 kHz",
+      sourceStartSample: 0,
+      sourceHash: null,
+    });
     expect(state.playbackMode).toBe("processed");
     expect(selectPlaybackSource(state)?.samples).toBe(processed);
+  });
+
+  it("installs stereo processed channels with the mean analysis lane", () => {
+    const { store } = makeStore();
+    expectOk(store.getState().loadSource(fakeAudio(8), 48000, "clip.wav", "demoClip"));
+    const left = fakeAudio(4, 10);
+    const right = fakeAudio(4, 11);
+    expect(store.getState().setProcessed([left, right], 24_000, "stereo result")).toEqual({
+      ok: true,
+    });
+    const processed = store.getState().processed;
+    expect(processed?.channels).toEqual([left, right]);
+    expect(processed?.samples).not.toBe(left);
+    expect(Array.from(processed?.samples ?? [])).toEqual(
+      Array.from(left, (sample, index) => Math.fround((sample + (right[index] ?? 0)) / 2)),
+    );
+    expect(
+      store.getState().setProcessed([new Float32Array(0), new Float32Array(0)], 48_000, "x"),
+    ).toEqual({
+      ok: false,
+      code: "empty",
+    });
+  });
+
+  it("stores source identity and excerpt offsets for AI results", () => {
+    const { store } = makeStore();
+    expectOk(store.getState().loadSource(fakeAudio(8), 48000, "clip.wav", "demoClip"));
+    const inputHash = store.getState().inputHash;
+    expect(inputHash).not.toBeNull();
+    if (inputHash === null) {
+      throw new Error("loadSource must produce an input hash");
+    }
+    const processed = fakeAudio(4, 2);
+    expect(
+      store
+        .getState()
+        .setProcessed(processed, 24000, "denoise", { sourceHash: inputHash, sourceStartSample: 4 }),
+    ).toEqual({ ok: true });
+    expect(store.getState().processed).toEqual({
+      samples: processed,
+      channels: [processed],
+      sampleRateHz: 24000,
+      label: "denoise",
+      sourceHash: inputHash,
+      sourceStartSample: 4,
+    });
+  });
+
+  it("rejects stale AI results without touching the processed lane", () => {
+    const { store } = makeStore();
+    expectOk(store.getState().loadSource(fakeAudio(8), 48000, "clip.wav", "demoClip"));
+    expect(
+      store.getState().setProcessed(fakeAudio(4, 2), 24000, "denoise", {
+        sourceHash: "0000000000000000",
+      }),
+    ).toEqual({ ok: false, code: "staleSource" });
+    expect(store.getState().processed).toBeNull();
+  });
+
+  it("rejects invalid excerpt offsets", () => {
+    const { store } = makeStore();
+    expectOk(store.getState().loadSource(fakeAudio(8), 48000, "clip.wav", "demoClip"));
+    const cases = [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 9];
+    for (const sourceStartSample of cases) {
+      expect(
+        store.getState().setProcessed(fakeAudio(4, 2), 24000, "denoise", { sourceStartSample }),
+      ).toEqual({ ok: false, code: "invalidType" });
+    }
+    expect(
+      store.getState().setProcessed(fakeAudio(4, 2), 24000, "denoise", { sourceStartSample: 8 }),
+    ).toEqual({ ok: true });
   });
 
   it("rejects malformed, non-finite, empty, over-rate and over-duration sources", () => {
@@ -757,6 +934,7 @@ describe("processed playback lane", () => {
     ).toBeNull();
     const original = {
       samples: fakeAudio(2),
+      channels: [fakeAudio(2)],
       sampleRateHz: 48000,
       name: "clip.wav",
       sourceKind: "demoClip" as const,

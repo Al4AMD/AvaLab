@@ -12,6 +12,13 @@
  */
 
 export type {
+  BeatAnalysis,
+  PitchAnalysis,
+  PitchBeatAnalysis,
+} from "./analysis/pitchBeat.js";
+export type { AudioChannels } from "./audio.js";
+export type { CodecLabCodec } from "./codecs/codecLabTypes.js";
+export type {
   DeltaHuffmanDecoded,
   DeltaHuffmanEncoded,
 } from "./codecs/delta.js";
@@ -36,6 +43,19 @@ export type {
   MdctCodecStats,
 } from "./codecs/mdctCodec.js";
 export { decodeMdct, encodeMdct } from "./codecs/mdctCodec.js";
+export type {
+  MdctPsychoBandStat,
+  MdctPsychoEncoded,
+  MdctPsychoFrameStat,
+  MdctPsychoParams,
+} from "./codecs/mdctPsycho.js";
+export {
+  decodeMdctPsycho,
+  encodeMdctPsycho,
+  measureReferencePower,
+  PSYCHO_REFERENCE_SPL_DB,
+  PSYCHO_SIDE_INFO_BITS_PER_BAND,
+} from "./codecs/mdctPsycho.js";
 export type { WavPcm16Options } from "./codecs/pcmWav.js";
 export {
   bytesToInt16Pcm,
@@ -85,9 +105,21 @@ export type {
 } from "./filters/iir.js";
 export { applyFilter, designButterworth, designChebyshev1 } from "./filters/iir.js";
 export { fftBluestein } from "./fourier/bluestein.js";
+export type { ButterflyStep } from "./fourier/butterfly.js";
+export { fftButterflySteps } from "./fourier/butterfly.js";
 export type { Complex } from "./fourier/complex.js";
 export { dftNaive, idftNaive } from "./fourier/dft.js";
 export { fftRadix2, ifftRadix2 } from "./fourier/fft.js";
+export type {
+  FftBenchmarkResult,
+  StftBenchmarkChunkParams,
+  StftBenchmarkChunkResult,
+} from "./fourier/fftBenchmark.js";
+export {
+  benchmarkFft,
+  FFT_BENCHMARK_SIZES,
+  stftBenchmarkChunk,
+} from "./fourier/fftBenchmark.js";
 export { irfft, rfft } from "./fourier/rfft.js";
 export type {
   SpectrogramTilesParams,
@@ -95,6 +127,12 @@ export type {
   SpectrogramWindowFamily,
 } from "./fourier/spectrogramTiles.js";
 export { spectrogramTiles } from "./fourier/spectrogramTiles.js";
+export type {
+  SpectrumCurveEdit,
+  SpectrumCurvePoint,
+  SpectrumCurveTarget,
+} from "./fourier/spectrumCurves.js";
+export { applySpectrumCurves } from "./fourier/spectrumCurves.js";
 export type {
   EditSpectrumParams,
   EditSpectrumResult,
@@ -121,12 +159,57 @@ export {
 export type { CompandingOptions } from "./metrics/companding.js";
 export { alawDecode, alawEncode, mulawDecode, mulawEncode } from "./metrics/companding.js";
 export { entropyBitsPerSymbol } from "./metrics/entropy.js";
+export type {
+  LoudnessBlock,
+  LoudnessParams,
+  LoudnessResult,
+} from "./metrics/loudness.js";
+export {
+  kWeightingCoefficients,
+  loudnessGainDb,
+  measureLoudness,
+} from "./metrics/loudness.js";
 export type { TpdfDitherOptions, UniformQuantizeOptions } from "./metrics/quantize.js";
 export {
   quantizationError,
   quantizeUniform,
   quantizeWithTpdfDither,
 } from "./metrics/quantize.js";
+export type {
+  PipelineOutput,
+  PipelineRunResult,
+  PipelineStageSummary,
+} from "./pipeline/runPipeline.js";
+export { PipelineRunError, runPipeline } from "./pipeline/runPipeline.js";
+export type {
+  FilterApplyParams,
+  PipelineEdge,
+  PipelineGraph,
+  PipelineNode,
+  ReverbIrParams,
+  ReverbProcessParams,
+  XY,
+} from "./pipeline/types.js";
+export {
+  PIPELINE_MAX_NODES,
+  PIPELINE_MAX_OUTPUTS,
+} from "./pipeline/types.js";
+export type { PipelineErrorCode, PipelineValidation } from "./pipeline/validate.js";
+export { validatePipeline } from "./pipeline/validate.js";
+export {
+  absoluteThresholdDb,
+  bandAthDb,
+  bandLevelsDb,
+  barkBandEdgesHz,
+  barkBandIndexOf,
+  barkToHz,
+  hzToBark,
+  maskingThresholdDb,
+  maskStepForBand,
+  PSYCHO_BAND_COUNT,
+  signalToMaskRatioDb,
+  spreadingDb,
+} from "./psychoacoustics/index.js";
 export type {
   ResampleFilter,
   ResampleRationalOptions,
@@ -178,6 +261,6 @@ export { imdct, mdct } from "./timestretch/mdct.js";
 export type { PitchShiftParams, TimeStretchParams } from "./timestretch/phaseVocoder.js";
 export { pitchShift, timeStretch } from "./timestretch/phaseVocoder.js";
 export { averagePowerOf, energyOf } from "./utils/energy.js";
-export { inputHashFnv1a64 } from "./utils/hash.js";
+export { inputHash64, inputHash64Channels } from "./utils/hash.js";
 export { computePeakBuckets } from "./utils/peaks.js";
 export { samplesToSeconds, secondsToSamples } from "./utils/time.js";

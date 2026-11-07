@@ -2,12 +2,19 @@
  * Real-codec lane (F04, Wave-4 Plan 03 Task 1).
  *
  * The browser DSP path stays the default for hand-written codecs. This lane
- * only owns the backend round-trip: upload the selected mono 16-bit PCM
- * excerpt, ask ffmpeg to encode it, fetch the canonical WAV result, and align
- * it to the same Int16 grid the backend used. One upload is cached per
- * excerpt identity so A/B codec runs on the same excerpt do not re-upload.
+ * only owns the backend round-trip: upload the selected 16-bit PCM excerpt
+ * (mono or stereo), ask ffmpeg to encode it, fetch the canonical WAV result,
+ * and align it to the same Int16 grid the backend used. One upload is cached
+ * per excerpt identity so A/B codec runs on the same excerpt do not re-upload.
  */
-import { encodeWavPcm16, floatToInt16Pcm, inputHashFnv1a64, int16PcmToFloat } from "@avalab/dsp";
+import {
+  type AudioChannels,
+  encodeWavPcm16,
+  floatToInt16Pcm,
+  inputHash64,
+  inputHash64Channels,
+  int16PcmToFloat,
+} from "@avalab/dsp";
 
 import type {
   CodecEncodeRequest,
@@ -20,6 +27,7 @@ import { api } from "../../api/client";
 import { isRecordLike } from "../../session/protocol";
 import {
   browserDecodeWav,
+  channelsFromDecoded,
   type DecodeWav,
   type IngestCallResult,
   monoDownmix,
@@ -52,6 +60,8 @@ export type RealCodecParams = {
 export type RealCodecInput = {
   /** The selected excerpt (already sliced); never the whole source file. */
   readonly samples: Float32Array;
+  /** Playback lanes for the same excerpt; defaults to the mono `samples`. */
+  readonly channels?: AudioChannels;
   readonly sampleRateHz: number;
   readonly startSample: number;
   readonly endSample: number;
@@ -85,6 +95,7 @@ export type RealCodecStats = {
   readonly alignedSampleCount: number;
   readonly durationSeconds: number;
   readonly sampleRateHz: number;
+  readonly channels: number;
   readonly bitExact: boolean;
   readonly lossless: boolean;
 };
@@ -92,6 +103,7 @@ export type RealCodecStats = {
 export type RealCodecRun = {
   readonly decoded: Float32Array;
   readonly reference: Float32Array;
+  readonly channels: AudioChannels;
   readonly stats: RealCodecStats;
 };
 
@@ -173,6 +185,15 @@ function uploadForm(input: RealCodecInput): FormData {
   if (samples.length === 0) {
     throw new RangeError("real-codec: empty excerpt");
   }
+  const channels = input.channels ?? [samples];
+  if (channels.length > 2) {
+    throw new RangeError("real-codec: at most two channels are supported");
+  }
+  for (const channel of channels) {
+    if (channel.length !== samples.length) {
+      throw new RangeError("real-codec: channel length does not match samples");
+    }
+  }
   if (
     !Number.isInteger(startSample) ||
     !Number.isInteger(endSample) ||
@@ -188,7 +209,7 @@ function uploadForm(input: RealCodecInput): FormData {
       `real-codec: sampleRateHz must be an integer in (0, 96000] (got ${String(sampleRateHz)})`,
     );
   }
-  const wav = encodeWavPcm16(samples, { sampleRateHz });
+  const wav = encodeWavPcm16(channels, { sampleRateHz });
   const bytes = wav.buffer.slice(wav.byteOffset, wav.byteOffset + wav.byteLength) as ArrayBuffer;
   const form = new FormData();
   form.append("file", new File([bytes], "excerpt.wav", { type: "audio/wav" }));
@@ -235,9 +256,12 @@ async function uploadExcerpt(
 }
 
 function inputHashFor(input: RealCodecInput): string {
-  // `samples` IS the excerpt; the range/rate stay in the key so the same
-  // bytes at a different source position or rate cannot alias.
-  return inputHashFnv1a64(input.samples);
+  // `samples` IS the mono excerpt; playback lanes join only when present. The
+  // range/rate stay in the key so the same bytes at a different source
+  // position or rate cannot alias.
+  return input.channels === undefined
+    ? inputHash64(input.samples)
+    : inputHash64Channels(input.channels);
 }
 
 /** Backend-advertised codecs in their advertised order; unknown names drop. */
@@ -291,9 +315,12 @@ export async function runRealCodec(
     true,
   );
 
+  let decodedChannels: AudioChannels;
   let decoded: Float32Array;
   try {
-    decoded = monoDownmix(await decodeWav(bytes.data));
+    const decodedAudio = await decodeWav(bytes.data);
+    decodedChannels = channelsFromDecoded(decodedAudio);
+    decoded = monoDownmix(decodedAudio);
   } catch (cause) {
     throw new RealCodecError(
       { kind: "decodeFailed", messageKey: "codecLab.error.decode_failed" },
@@ -309,7 +336,11 @@ export async function runRealCodec(
       messageKey: "codecLab.error.alignment_mismatch",
     });
   }
-  if (decoded.length < aligned) {
+  if (
+    decodedChannels.length !== encoded.data.channels ||
+    decodedChannels.some((channel) => channel.length < aligned) ||
+    decoded.length < aligned
+  ) {
     throw new RealCodecError({
       kind: "alignment_mismatch",
       messageKey: "codecLab.error.alignment_mismatch",
@@ -327,6 +358,7 @@ export async function runRealCodec(
   return {
     decoded: decoded.subarray(0, aligned),
     reference: reference.subarray(referenceStart, referenceStart + aligned),
+    channels: decodedChannels.map((channel) => channel.subarray(0, aligned)),
     stats: {
       resultAudioId: encoded.data.result_audio_id,
       sizeBytes: encoded.data.size_bytes,
@@ -337,6 +369,7 @@ export async function runRealCodec(
       alignedSampleCount: aligned,
       durationSeconds: encoded.data.duration_s,
       sampleRateHz: encoded.data.sample_rate_hz,
+      channels: encoded.data.channels,
       bitExact: encoded.data.bit_exact,
       lossless: encoded.data.lossless,
     },

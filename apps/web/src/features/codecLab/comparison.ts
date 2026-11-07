@@ -8,7 +8,7 @@
  */
 import type { CodecLabMeta } from "../../session/ops";
 import type { SessionSource } from "../../session/store";
-import { computeQualityMetrics } from "../metrics/metrics";
+import type { QualityMetrics } from "../metrics/metrics";
 import type { RealCodecName, RealCodecRun } from "./backendCodecs";
 
 export type ComparisonFamily = "handwritten" | "real";
@@ -48,18 +48,14 @@ export function handwrittenRow(meta: CodecLabMeta, labelKey: string): Comparison
   };
 }
 
-export function realRow(run: RealCodecRun, codec: RealCodecName, labelKey: string): ComparisonRow {
+export function realRow(
+  run: RealCodecRun,
+  codec: RealCodecName,
+  labelKey: string,
+  metrics: QualityMetrics | null,
+): ComparisonRow {
   const stats = run.stats;
   const originalBytes = run.reference.length * 2;
-  let snrDb = Number.NaN;
-  let psnrDb = Number.NaN;
-  try {
-    const metrics = computeQualityMetrics(run.reference, run.decoded, stats.sampleRateHz);
-    snrDb = metrics.snrDb;
-    psnrDb = metrics.psnrDb;
-  } catch {
-    // The view records the row and shows NaN when alignment metadata is bad.
-  }
   return {
     id: `real:${codec}:${stats.bitrateKbps}:${stats.alignedSampleCount}`,
     family: "real",
@@ -67,8 +63,8 @@ export function realRow(run: RealCodecRun, codec: RealCodecName, labelKey: strin
     labelKey,
     bitrateKbps: stats.bitrateKbps,
     compressionRatio: stats.sizeBytes > 0 ? originalBytes / stats.sizeBytes : Infinity,
-    snrDb,
-    psnrDb,
+    snrDb: metrics?.snrDb ?? Number.NaN,
+    psnrDb: metrics?.psnrDb ?? Number.NaN,
     encodeMs: stats.encodeMs,
     bitExact: stats.bitExact,
     lossless: stats.lossless,

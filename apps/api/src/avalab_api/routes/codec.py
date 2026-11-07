@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from scipy.io import wavfile  # type: ignore[import-untyped]
 
-from avalab_api.alignment import Alignment, align_pair, estimate_alignment
+from avalab_api.alignment import Alignment, estimate_alignment
 from avalab_api.codecs import CodecName, encode_audio, resolve_codec, validate_params
 from avalab_api.config import Settings, get_settings
 from avalab_api.errors import ApiError, ErrorCode, ErrorResponse
@@ -62,6 +62,7 @@ class CodecEncodeResponse(BaseModel):
     aligned_sample_count: int
     duration_s: float
     sample_rate_hz: int
+    channels: int
     bit_exact: bool
     lossless: bool
 
@@ -97,7 +98,9 @@ def encode_codec(
     """Encode, decode, align and store one excerpt with the requested codec."""
     storage = Storage(settings.storage_dir)
     source_path = storage.canonical_path(request.audio_id)
-    source_rate = _read_source_rate(storage, source_path, request.audio_id)
+    source_rate, source_channels = _read_source_info(
+        storage, source_path, request.audio_id
+    )
 
     spec = resolve_codec(request.codec)
     params = validate_params(
@@ -111,26 +114,42 @@ def encode_codec(
 
     try:
         started = time.perf_counter()
-        encode_audio(source_path, encoded_path, request.codec, params)
+        encode_audio(
+            source_path,
+            encoded_path,
+            request.codec,
+            params,
+            channels=source_channels,
+        )
         encode_ms = (time.perf_counter() - started) * 1000.0
 
         try:
             transcode_to_canonical_wav(
-                encoded_path, decoded_path, source_rate, channels=1
+                encoded_path, decoded_path, source_rate, channels=source_channels
             )
         except ApiError as exc:
             raise ApiError(
                 ErrorCode.encode_failed, "Decoded audio could not be read", 422
             ) from exc
 
-        reference, decoded = _read_pair(source_path, decoded_path, source_rate)
-        alignment = _align(reference, decoded, source_rate)
-        reference_aligned, test_aligned = align_pair(reference, decoded, alignment)
+        reference_channels, reference_mono, decoded_channels = _read_pair(
+            source_path, decoded_path, source_rate, source_channels
+        )
+        alignment = _align(reference_mono, _mono(decoded_channels), source_rate)
+        reference_aligned = reference_channels[
+            alignment.reference_start_sample : alignment.reference_start_sample
+            + alignment.aligned_sample_count
+        ]
+        test_aligned = decoded_channels[
+            alignment.test_start_sample : alignment.test_start_sample
+            + alignment.aligned_sample_count
+        ]
         bit_exact = bool(spec.lossless and np.array_equal(reference_aligned, test_aligned))
 
-        wavfile.write(trimmed_path, source_rate, test_aligned.astype(np.float32))
+        result = test_aligned[:, 0] if source_channels == 1 else test_aligned
+        wavfile.write(trimmed_path, source_rate, result.astype(np.float32))
 
-        source_duration_s = reference.size / source_rate
+        source_duration_s = reference_channels.shape[0] / source_rate
         size_bytes = encoded_path.stat().st_size
         result_audio_id = storage.new_audio_id()
         storage.save_canonical(
@@ -140,7 +159,7 @@ def encode_codec(
                 "audio_id": result_audio_id,
                 "duration_s": alignment.aligned_sample_count / source_rate,
                 "sample_rate_hz": source_rate,
-                "channels": 1,
+                "channels": source_channels,
                 "original_format": request.codec,
                 "created_at_unix": int(time.time()),
             },
@@ -155,6 +174,7 @@ def encode_codec(
             aligned_sample_count=alignment.aligned_sample_count,
             duration_s=alignment.aligned_sample_count / source_rate,
             sample_rate_hz=source_rate,
+            channels=source_channels,
             bit_exact=bit_exact,
             lossless=spec.lossless,
         )
@@ -173,8 +193,10 @@ def _temp_path(prefix: str, suffix: str) -> Path:
     return Path(name)
 
 
-def _read_source_rate(storage: Storage, source_path: Path, audio_id: str) -> int:
-    """Read and validate ``sample_rate_hz`` from the stored metadata."""
+def _read_source_info(
+    storage: Storage, source_path: Path, audio_id: str
+) -> tuple[int, int]:
+    """Read and validate the stored sample rate and channel count."""
     try:
         if not source_path.is_file():
             raise OSError("missing canonical audio")
@@ -184,15 +206,28 @@ def _read_source_rate(storage: Storage, source_path: Path, audio_id: str) -> int
     if not isinstance(payload, dict):
         raise ApiError(ErrorCode.not_found, "Unknown audio id", 404)
     rate = payload.get("sample_rate_hz")
-    if isinstance(rate, bool) or not isinstance(rate, int) or rate <= 0:
+    channels = payload.get("channels")
+    if (
+        isinstance(rate, bool)
+        or not isinstance(rate, int)
+        or rate <= 0
+        or isinstance(channels, bool)
+        or not isinstance(channels, int)
+        or channels not in (1, 2)
+    ):
         raise ApiError(ErrorCode.not_found, "Unknown audio id", 404)
-    return rate
+    return rate, channels
 
 
 def _read_pair(
-    source_path: Path, decoded_path: Path, source_rate: int
-) -> tuple[np.ndarray, np.ndarray]:
-    """Read both WAVs as mono float64; the reference is quantized to Int16 PCM."""
+    source_path: Path, decoded_path: Path, source_rate: int, source_channels: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Read both WAVs as per-channel float64; reference lanes are Int16-quantized.
+
+    Returns ``(reference_channels, reference_mono, decoded_channels)`` where the
+    channel arrays are ``(N, C)`` and ``reference_mono`` is the quantized downmix
+    used for alignment, matching the mono behavior.
+    """
     try:
         reference_rate, reference_raw = wavfile.read(source_path)
         decoded_rate, decoded_raw = wavfile.read(decoded_path)
@@ -206,12 +241,23 @@ def _read_pair(
     ):
         raise ApiError(ErrorCode.encode_failed, "Audio could not be read", 422)
 
-    reference_mono = _mono(reference_raw)
-    reference_pcm = np.clip(
-        np.round(reference_mono * 32768.0), -32768, 32767
-    ).astype(np.int16)
-    reference = reference_pcm.astype(np.float64) / 32768.0
-    return reference, _mono(decoded_raw)
+    reference_channels = _quantize(_channels(reference_raw, source_channels))
+    reference_mono = _quantize(_mono(reference_raw))
+    return reference_channels, reference_mono, _channels(decoded_raw, source_channels)
+
+
+def _channels(samples: np.ndarray, expected: int) -> np.ndarray:
+    data = np.asarray(samples, dtype=np.float64)
+    if data.ndim == 1 and expected == 1:
+        return data.reshape(-1, 1)
+    if data.ndim == 2 and data.shape[1] == expected:
+        return data
+    raise ApiError(ErrorCode.encode_failed, "Unexpected audio shape", 422)
+
+
+def _quantize(samples: np.ndarray) -> np.ndarray:
+    pcm = np.clip(np.round(samples * 32768.0), -32768, 32767).astype(np.int16)
+    return pcm.astype(np.float64) / 32768.0
 
 
 def _mono(samples: np.ndarray) -> np.ndarray:

@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 
 from avalab_api.errors import ApiError, ErrorCode
 from avalab_api.ml.audio import duration_seconds, read_canonical_mono, write_result_wav
-from avalab_api.ml.models import MlTask, ModelRunner
+from avalab_api.ml.models import JobTask, ModelRunner
 from avalab_api.storage import Storage
 
 LOGGER = logging.getLogger(__name__)
@@ -53,13 +53,14 @@ class StemResult:
 class MlResult:
     """Runner output; samples never leave the manager as JSON."""
 
-    kind: Literal["audio", "stems", "transcript"]
+    kind: Literal["audio", "stems", "transcript", "analysis"]
     samples: np.ndarray | None = None
     sample_rate_hz: int | None = None
     stems: list[StemResult] | None = None
     text: str | None = None
     segments: list[dict[str, object]] | None = None
     language: str | None = None
+    analysis: dict[str, object] | None = None
     stats: dict[str, object] = field(default_factory=dict)
 
 
@@ -70,7 +71,7 @@ class _Cancelled(Exception):
 @dataclass
 class _Job:
     job_id: str
-    task: MlTask
+    task: JobTask
     request: MlJobRequest
     runner: ModelRunner
     created_at: float = field(default_factory=time.time)
@@ -145,7 +146,7 @@ class JobManager:
         self._stop = threading.Event()
         self._closed = False
 
-    def submit(self, task: MlTask, request: MlJobRequest, runner: ModelRunner) -> str:
+    def submit(self, task: JobTask, request: MlJobRequest, runner: ModelRunner) -> str:
         """Queue a job; raises ``ml_busy`` when all worker+queue slots are used."""
         with self._lock:
             if self._closed:
@@ -251,6 +252,10 @@ class JobManager:
             job.finish("error", None, ErrorCode.ml_failed.value)
 
     def _persist(self, job: _Job, result: MlResult) -> dict[str, object]:
+        if result.kind == "analysis":
+            if result.analysis is None:
+                raise ApiError(ErrorCode.ml_failed, "Runner returned no analysis", 500)
+            return {"kind": "analysis", "analysis": result.analysis, "stats": result.stats}
         if result.kind == "audio":
             if result.samples is None or result.sample_rate_hz is None:
                 raise ApiError(ErrorCode.ml_failed, "Runner returned no audio", 500)

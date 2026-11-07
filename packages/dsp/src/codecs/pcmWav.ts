@@ -15,13 +15,14 @@
  * recovers the same grid exactly. Clipping (not rejection) of |x| > 1 matches
  * the G.711 and quantizer conventions in this library.
  *
- * WAV layout (44-byte canonical header, mono, 16-bit PCM, little-endian):
- *   0  "RIFF"     4  uint32 36 + 2N      8  "WAVE"
+ * WAV layout (44-byte canonical header, 1 or 2 channels, 16-bit PCM,
+ * little-endian; C = channel count, N = frames):
+ *   0  "RIFF"     4  uint32 36 + 2CN     8  "WAVE"
  *   12 "fmt "     16 uint32 16           20 uint16 1 (PCM)
- *   22 uint16 1 (mono)                   24 uint32 sampleRateHz
- *   28 uint32 sampleRateHz * 2           32 uint16 2 (block align)
+ *   22 uint16 C                          24 uint32 sampleRateHz
+ *   28 uint32 sampleRateHz * 2C          32 uint16 2C (block align)
  *   34 uint16 16 (bits per sample)       36 "data"
- *   40 uint32 2N                         44 int16[N] little-endian
+ *   40 uint32 2CN                        44 int16[frame][channel] interleaved
  *
  * Reference: RIFF/WAVE PCM format (Microsoft Multimedia Standards Update,
  * 1991); the Int16 grid convention follows G.711's `clip(round(x*32768))`
@@ -32,8 +33,12 @@
  * Edge cases: non-finite input -> TypeError; empty input -> empty Int16
  * arrays and a valid 44-byte WAV header; odd byte length -> the pinned
  * RangeError; sample rates must be positive integers <= 192000; inputs are
- * never mutated and every call returns a fresh array.
+ * never mutated and every call returns a fresh array. Stereo input must be
+ * two equal-length Float32 lanes; mono output is byte-identical to the
+ * pre-stereo encoder.
  */
+
+import type { AudioChannels } from "../audio.js";
 
 /** Options of `encodeWavPcm16`; the only variable header field is the rate. */
 export interface WavPcm16Options {
@@ -105,35 +110,78 @@ export function bytesToInt16Pcm(bytes: Uint8Array): Int16Array {
 }
 
 /**
- * Encode float samples as a canonical mono 16-bit PCM WAV. `sampleRateHz`
- * must be a positive integer <= 192000; empty input produces a valid
- * header-only file.
+ * Encode float samples as a canonical 16-bit PCM WAV. A bare `Float32Array`
+ * is mono; an `AudioChannels` array is one or two equal-length lanes. Mono
+ * output is byte-identical to the previous encoder. `sampleRateHz` must be a
+ * positive integer <= 192000; empty input produces a valid header-only file.
  */
-export function encodeWavPcm16(samples: Float32Array, options: WavPcm16Options): Uint8Array {
+export function encodeWavPcm16(
+  source: Float32Array | AudioChannels,
+  options: WavPcm16Options,
+): Uint8Array {
   const { sampleRateHz } = options;
   if (!Number.isInteger(sampleRateHz) || sampleRateHz <= 0 || sampleRateHz > MAX_SAMPLE_RATE_HZ) {
     throw new RangeError(
       `encodeWavPcm16: sampleRateHz must be a positive integer <= ${MAX_SAMPLE_RATE_HZ} (got ${String(sampleRateHz)})`,
     );
   }
-  const pcmBytes = int16PcmToBytes(floatToInt16Pcm(samples));
-  const bytes = new Uint8Array(WAV_HEADER_BYTES + pcmBytes.length);
+  const channels = normalizeChannels(source);
+  const channelCount = channels.length;
+  const frameCount = channels[0]?.length ?? 0;
+  const dataBytes = frameCount * channelCount * 2;
+  const bytes = new Uint8Array(WAV_HEADER_BYTES + dataBytes);
   const view = new DataView(bytes.buffer);
   writeTag(bytes, 0, "RIFF");
-  view.setUint32(4, 36 + pcmBytes.length, true);
+  view.setUint32(4, 36 + dataBytes, true);
   writeTag(bytes, 8, "WAVE");
   writeTag(bytes, 12, "fmt ");
   view.setUint32(16, 16, true);
   view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
+  view.setUint16(22, channelCount, true);
   view.setUint32(24, sampleRateHz, true);
-  view.setUint32(28, sampleRateHz * 2, true);
-  view.setUint16(32, 2, true);
+  view.setUint32(28, sampleRateHz * 2 * channelCount, true);
+  view.setUint16(32, 2 * channelCount, true);
   view.setUint16(34, 16, true);
   writeTag(bytes, 36, "data");
-  view.setUint32(40, pcmBytes.length, true);
-  bytes.set(pcmBytes, WAV_HEADER_BYTES);
+  view.setUint32(40, dataBytes, true);
+  if (channelCount === 1) {
+    const pcm = floatToInt16Pcm(channels[0] ?? new Float32Array(0));
+    bytes.set(int16PcmToBytes(pcm), WAV_HEADER_BYTES);
+    return bytes;
+  }
+  const pcmChannels = channels.map((channel) => floatToInt16Pcm(channel));
+  let offset = WAV_HEADER_BYTES;
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    for (let channel = 0; channel < channelCount; channel += 1) {
+      const pcm = pcmChannels[channel];
+      const sample = pcm?.[frame] ?? 0;
+      view.setInt16(offset, sample, true);
+      offset += 2;
+    }
+  }
   return bytes;
+}
+
+function normalizeChannels(source: Float32Array | AudioChannels): readonly Float32Array[] {
+  if (source instanceof Float32Array) {
+    return [source];
+  }
+  if (!Array.isArray(source) || source.length < 1 || source.length > 2) {
+    throw new RangeError(`encodeWavPcm16: expected 1 or 2 channels (got ${String(source.length)})`);
+  }
+  for (const channel of source) {
+    if (!(channel instanceof Float32Array)) {
+      throw new TypeError("encodeWavPcm16: every channel must be a Float32Array");
+    }
+  }
+  const first = source[0];
+  const second = source[1];
+  if (first !== undefined && second !== undefined && first.length !== second.length) {
+    throw new RangeError(
+      `encodeWavPcm16: unequal channel lengths (${String(first.length)} vs ${String(second.length)})`,
+    );
+  }
+  return source;
 }
 
 function writeTag(bytes: Uint8Array, offset: number, tag: string): void {

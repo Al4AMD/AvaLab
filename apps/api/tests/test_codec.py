@@ -2,6 +2,7 @@
 
 # ruff: noqa: F401, F811
 
+import json
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -9,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from audio_fixtures import audio_fixture_dir, wav_2s_44k1_mono
+from audio_fixtures import audio_fixture_dir, wav_2s_44k1_mono, wav_2s_44k1_stereo
 from fastapi.testclient import TestClient
 from scipy.io import wavfile  # type: ignore[import-untyped]
 
@@ -17,6 +18,7 @@ from avalab_api.codecs import available_codecs
 from avalab_api.config import Settings, get_settings
 from avalab_api.errors import ApiError, ErrorCode
 from avalab_api.main import API_PREFIX, create_app
+from avalab_api.routes.codec import _read_pair
 
 CODEC_URL = f"{API_PREFIX}/codec/encode"
 
@@ -68,6 +70,15 @@ def read_stored_wav(storage_root: Path, audio_id: str) -> tuple[int, np.ndarray]
     return rate, samples
 
 
+def reference_channels(storage_root: Path, audio_id: str) -> np.ndarray:
+    _, samples = wavfile.read(storage_root / audio_id / "audio.wav")
+    data = np.asarray(samples, dtype=np.float64)
+    if data.ndim == 1:
+        data = data.reshape(-1, 1)
+    pcm = np.clip(np.round(data * 32768.0), -32768, 32767).astype(np.int16)
+    return pcm.astype(np.float64) / 32768.0
+
+
 def assert_temp_clean(temp_area: Path) -> None:
     leftovers = sorted(
         path.name for path in temp_area.iterdir() if path.name.startswith("avalab_")
@@ -91,6 +102,7 @@ def test_flac_round_trip_is_bit_exact(
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["lossless"] is True
+        assert body["channels"] == 1
         assert body["bit_exact"] is True
         assert body["size_bytes"] > 0
         assert body["bitrate_kbps"] > 0
@@ -129,6 +141,7 @@ def test_mp3_is_lossy_and_smaller(
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["lossless"] is False
+        assert body["channels"] == 1
         assert body["bit_exact"] is False
         assert body["size_bytes"] < original_size
         assert body["bitrate_kbps"] > 0
@@ -165,6 +178,7 @@ def test_every_available_codec_round_trips(
         body = response.json()
         assert body["aligned_sample_count"] > 0
         assert isinstance(body["codec_delay_samples"], int)
+        assert body["channels"] == 1
         if codec in {"wav", "flac"}:
             assert body["lossless"] is True
             assert body["bit_exact"] is True
@@ -265,4 +279,98 @@ def test_wrong_params_return_invalid_request(
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "invalid_request"
     assert sorted(path.name for path in storage_root.iterdir()) == [audio_id]
+    assert_temp_clean(temp_area)
+
+
+def test_stereo_flac_round_trip_keeps_both_channels_bit_exact(
+    storage_root: Path, temp_area: Path, wav_2s_44k1_stereo: Path
+) -> None:
+    with make_client(storage_root) as client:
+        audio_id = ingest_wav(client, wav_2s_44k1_stereo)
+        response = client.post(
+            CODEC_URL, json={"audio_id": audio_id, "codec": "flac", "params": {}}
+        )
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["channels"] == 2
+        assert body["lossless"] is True
+        assert body["bit_exact"] is True
+
+        expected = reference_channels(storage_root, audio_id)
+        _, stored = read_stored_wav(storage_root, body["result_audio_id"])
+        assert stored.ndim == 2 and stored.shape[1] == 2
+        start = body["reference_start_sample"]
+        count = body["aligned_sample_count"]
+        assert count == len(expected)
+        assert np.array_equal(stored.astype(np.float64), expected[start : start + count])
+
+    assert_temp_clean(temp_area)
+
+
+def test_stereo_mp3_keeps_two_channels_and_stays_lossy(
+    storage_root: Path, temp_area: Path, wav_2s_44k1_stereo: Path
+) -> None:
+    with make_client(storage_root) as client:
+        audio_id = ingest_wav(client, wav_2s_44k1_stereo)
+        response = client.post(
+            CODEC_URL,
+            json={
+                "audio_id": audio_id,
+                "codec": "mp3",
+                "params": {"bitrate_kbps": 128},
+            },
+        )
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["channels"] == 2
+        assert body["lossless"] is False
+        assert body["bit_exact"] is False
+
+        _, stored = read_stored_wav(storage_root, body["result_audio_id"])
+        assert stored.ndim == 2 and stored.shape[1] == 2
+        assert np.all(np.isfinite(stored))
+
+    assert_temp_clean(temp_area)
+
+
+def test_missing_or_invalid_channel_metadata_returns_not_found(
+    storage_root: Path, temp_area: Path, wav_2s_44k1_mono: Path
+) -> None:
+    with make_client(storage_root) as client:
+        audio_id = ingest_wav(client, wav_2s_44k1_mono)
+        meta_path = storage_root / audio_id / "meta.json"
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        meta.pop("channels")
+        meta_path.write_text(json.dumps(meta), encoding="utf-8")
+        response = client.post(
+            CODEC_URL, json={"audio_id": audio_id, "codec": "flac", "params": {}}
+        )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
+    assert_temp_clean(temp_area)
+
+
+def test_decoded_channel_mismatch_returns_encode_failed(
+    storage_root: Path,
+    temp_area: Path,
+    wav_2s_44k1_stereo: Path,
+    wav_2s_44k1_mono: Path,
+) -> None:
+    with make_client(storage_root) as client:
+        audio_id = ingest_wav(client, wav_2s_44k1_stereo)
+        with pytest.raises(ApiError) as exc:
+            _read_pair(
+                storage_root / audio_id / "audio.wav",
+                wav_2s_44k1_mono,
+                44100,
+                2,
+            )
+        assert (exc.value.code, exc.value.status_code) == (
+            ErrorCode.encode_failed,
+            422,
+        )
+
     assert_temp_clean(temp_area)

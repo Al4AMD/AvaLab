@@ -2,7 +2,8 @@
  * Upload ingest lane (F01, Wave-2 Plan 02 Task 1).
  *
  * Flow: File → POST /api/v1/ingest (multipart) → GET /audio/{id} (canonical
- * WAV) → decode seam → mono downmix → `loadSource(..., "ingested")`.
+ * WAV) → decode seam → playback channels + mono analysis lane →
+ * `loadSource(..., "ingested")`.
  *
  * - Caps are the BACKEND's truth (plan Review Focus 1): duration violations
  *   arrive as the backend's 422 `duration_too_long` envelope, and the
@@ -25,6 +26,7 @@
  *   call (never at module load), so node unit tests — which inject fakes —
  *   never touch Web Audio. Task 2's offline lane reuses the same seam.
  */
+import type { AudioChannels } from "@avalab/dsp";
 import { api, type IngestResponse } from "../../api/client";
 import { isRecordLike } from "../../session/protocol";
 import type { SessionSource, SessionStore, SourceKind } from "../../session/store";
@@ -193,6 +195,25 @@ export function monoDownmix(decoded: DecodedAudio): Float32Array {
     mixed[index] = sum / views.length;
   }
   return mixed;
+}
+
+/**
+ * Split a decoded buffer into playback channels: 1–2 lanes are copied as-is;
+ * >2 channels collapse to the mono downmix (legacy F01 behavior) and the
+ * caller records the original count via `foldedFromChannelCount`.
+ */
+export function channelsFromDecoded(decoded: DecodedAudio): AudioChannels {
+  if (decoded.numberOfChannels > 2) {
+    return [monoDownmix(decoded)];
+  }
+  const channels: Float32Array[] = [];
+  for (let channel = 0; channel < decoded.numberOfChannels; channel += 1) {
+    channels.push(decoded.getChannelData(channel).slice());
+  }
+  if (channels.length === 0) {
+    return [new Float32Array(0)];
+  }
+  return channels;
 }
 
 /** Result triple of an openapi-fetch-style call (narrowed seam). `error` is
@@ -395,9 +416,18 @@ export async function ingestFile(file: File, options: IngestOptions = {}): Promi
     );
   }
 
+  const foldedFromChannelCount =
+    decoded.numberOfChannels > 2 ? decoded.numberOfChannels : undefined;
   const load = store
     .getState()
-    .loadSource(monoDownmix(decoded), decoded.sampleRate, file.name, sourceKind);
+    .loadSource(
+      channelsFromDecoded(decoded),
+      decoded.sampleRate,
+      file.name,
+      sourceKind,
+      undefined,
+      foldedFromChannelCount === undefined ? undefined : { foldedFromChannelCount },
+    );
   if (!load.ok) {
     throw new IngestError({
       kind: "storeCode",

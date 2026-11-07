@@ -50,7 +50,7 @@ test("Persian (default): dock arms after a demo load, play advances the readout,
   // Now armed: hint gone, play available, readout at the start, the lane
   // badge names the loaded lane (the T2 carry that Task 4 owns).
   await expect(page.getByTestId("player.empty")).toHaveCount(0);
-  await expect(page.getByTestId("player.lane")).toContainText("کلیپ نمونه");
+  await expect(page.getByTestId("player.lane")).toContainText("نمونهٔ صوتی");
   const toggle = page.getByTestId("player.playToggle");
   await expect(toggle).toBeEnabled();
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
@@ -107,5 +107,29 @@ test("English (persisted preference): the same play cycle, zero console errors",
   await page.waitForTimeout(1_200);
   const stillPaused = await page.getByTestId("player.time").textContent();
   expect(stillPaused).toBe(pausedLabel);
+  expect(errors).toEqual([]);
+});
+
+test("English: the stereo demo plays two channels and advertises the mono analysis lane", async ({
+  page,
+}) => {
+  const errors = watchForErrors(page);
+  await page.addInitScript(() => {
+    localStorage.setItem("avalab.language", "en");
+  });
+  await page.goto("/");
+  await expect(page.getByTestId("input.demo.card.stereo")).toBeVisible();
+  await page.getByTestId("input.demo.load.stereo").click();
+
+  await expect(page.getByTestId("player.channels")).toHaveText("2 ch");
+  await expect(page.getByTestId("player.analysis")).toHaveText("Mono analysis");
+  await expect(page.getByTestId("player.channelsFolded")).toHaveCount(0);
+
+  const toggle = page.getByTestId("player.playToggle");
+  await expect(toggle).toBeEnabled();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("player.time")).toContainText("00:01", { timeout: 4_000 });
+  await toggle.click();
   expect(errors).toEqual([]);
 });

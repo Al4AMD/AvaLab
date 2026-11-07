@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "../../components/ui/button";
 import { isRecordLike } from "../../session/protocol";
-import { useSessionStore } from "../../session/store";
+import { type SessionSource, useSessionStore } from "../../session/store";
 import { loadDemoClip, OfflineError } from "../input/offline";
 import { UploadEmptyState } from "../input/upload";
 import {
@@ -24,7 +24,6 @@ import { type AiJobStatus, useAiJob } from "./useAiJob";
 import { wordErrorRate } from "./wer";
 
 export const REFERENCE_TRANSCRIPT_URL = "/demo/speech-kathleen-19s.txt";
-export const REFERENCE_SOURCE_NAME = "speech-kathleen-19s.wav";
 
 export type ReferenceStatus = "idle" | "loading" | "ready" | "missing" | "empty";
 
@@ -82,8 +81,10 @@ export async function fetchReferenceTranscript(fetchFn: ReferenceFetch = fetch):
   return response.text();
 }
 
-export function usesReferenceTranscript(sourceName: string | undefined): boolean {
-  return sourceName === REFERENCE_SOURCE_NAME;
+export function usesReferenceTranscript(
+  source: Pick<SessionSource, "sourceKind" | "demoId"> | null,
+): boolean {
+  return source?.sourceKind === "demoClip" && source.demoId === "speech";
 }
 
 export type AsrViewProps = {
@@ -308,7 +309,7 @@ export function AsrTab({
   }>({ status: "idle", text: null });
 
   useEffect(() => {
-    if (original === null || !usesReferenceTranscript(original.name)) {
+    if (original === null || !usesReferenceTranscript(original)) {
       setReference({ status: "idle", text: null });
       return;
     }

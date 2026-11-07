@@ -20,6 +20,7 @@ from avalab_api.errors import ApiError, ErrorCode
 from avalab_api.ml.audio import resample_to
 from avalab_api.ml.jobs import MlResult
 from avalab_api.ml.registry import register_runner
+from avalab_api.ml.runtime import torch_device
 
 MODEL_ID = "facebook/encodec_48khz"
 MODEL_RATE_HZ = 48_000
@@ -132,8 +133,11 @@ class TransformersEncodecBackend:
             sampling_rate=self.sample_rate_hz,
             return_tensors="pt",
         )
-        input_values = inputs["input_values"]
+        device = getattr(self._model, "device", "cpu")
+        input_values = inputs["input_values"].to(device)
         padding_mask = inputs.get("padding_mask")
+        if padding_mask is not None:
+            padding_mask = padding_mask.to(device)
         with torch.no_grad():
             encoded = self._model.encode(
                 input_values,
@@ -173,6 +177,7 @@ def load_encodec(model_dir: Path) -> NeuralCodecRunner:
         model = transformers.EncodecModel.from_pretrained(
             str(model_dir), local_files_only=True
         )
+        model.to(torch_device())
         model.eval()
     except Exception as exc:
         raise ApiError(ErrorCode.model_unavailable, f"Could not load Encodec: {exc}", 503) from exc

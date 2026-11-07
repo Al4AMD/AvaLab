@@ -80,10 +80,19 @@ export type TransportListener = (state: TransportState) => void;
 /** Narrow context seam: exactly what the transport needs from an
  * `AudioContext` (+ optional `resume`/`close`: a context created outside a
  * user gesture starts suspended, and the play path must activate it). */
+export type TransportGain = {
+  readonly gain: { value: number };
+  connect(destination: unknown): void;
+  disconnect(): void;
+};
+
 export type TransportContext = {
   readonly currentTime: number;
   readonly destination: unknown;
   createBuffer(numberOfChannels: number, length: number, sampleRate: number): TransportBuffer;
+  /** Optional playback gain node (F18 loudness matching); absent fakes and
+   * environments without Web Audio route the source directly. */
+  createGain?(): TransportGain;
   /** Fired fire-and-forget on play; a rejection stays silent (playback
    * would simply stay silent — no crash, no console error). */
   resume?(): void | Promise<void>;
@@ -93,6 +102,7 @@ export type TransportContext = {
 /** Narrow source-node seam: exactly the fields the machine drives/observes. */
 export type TransportNode = {
   buffer: TransportBuffer | null;
+  connect(destination: unknown): void;
   start(when?: number, offset?: number): void;
   stop(): void;
   disconnect(): void;
@@ -199,6 +209,26 @@ const clampSample = (sample: number, length: number): number =>
  * position in TIME is preserved, clamped to the last playable sample so an
  * at-end swap does not hit `play()`'s restart-from-zero rule. Non-finite
  * seconds map to 0 (mirrors the store's seek no-op convention). */
+/** Map an absolute timeline position onto a lane that starts at
+ * `laneStartSample` of the source (0 for the original/whole-source lanes). */
+export function mapAbsolutePlayheadToLane(
+  absoluteSeconds: number,
+  laneStartSample: number,
+  targetRateHz: number,
+  targetLengthSamples: number,
+): number {
+  if (
+    !Number.isFinite(absoluteSeconds) ||
+    !Number.isFinite(laneStartSample) ||
+    !Number.isFinite(targetRateHz) ||
+    targetRateHz <= 0
+  ) {
+    return 0;
+  }
+  const localSeconds = absoluteSeconds - laneStartSample / targetRateHz;
+  return mapPlayheadSeconds(Math.max(0, localSeconds), targetRateHz, targetLengthSamples);
+}
+
 export function mapPlayheadSeconds(
   seconds: number,
   targetRateHz: number,
@@ -232,6 +262,9 @@ export type Transport = {
   readonly sampleRateHz: number;
   /** F06 seam — published, pinned to 1 until Wave 3 (module header). */
   readonly playbackRate: number;
+  /** Playback gain in dB, clamped to [-24, +24]; 0 is unity. */
+  readonly gainDb: number;
+  setGainDb(gainDb: number): void;
   setSource(source: AudioBufferLike, sampleRateHz: number): void;
   play(fromSample?: number): void;
   pause(): void;
@@ -256,6 +289,8 @@ export function createTransport(options: TransportOptions = {}): Transport {
   let context: TransportContext | null = null;
   let playable: TransportBuffer | null = null;
   let liveNode: TransportNode | null = null;
+  let gainNode: TransportGain | null = null;
+  let gainDb = 0;
   /** Context-clock reading taken when the live node started (seconds). */
   let startedAtTime = 0;
   let startedAtSample = 0;
@@ -326,6 +361,9 @@ export function createTransport(options: TransportOptions = {}): Transport {
     liveNode = node;
     startedAtTime = timeSource(context);
     startedAtSample = target;
+    // A source node is silent until connected: start() alone advances only
+    // the state machine, not the speakers.
+    node.connect(gainNode ?? context.destination);
     // Buffer-relative offset in seconds (not context-clock arithmetic).
     node.start(0, target / sampleRateHz);
     const resumed = context.resume?.(); // suspended contexts activate here
@@ -387,12 +425,31 @@ export function createTransport(options: TransportOptions = {}): Transport {
       return 1; // F06 seam, pinned (module header)
     },
 
+    get gainDb(): number {
+      return gainDb;
+    },
+
+    setGainDb(nextGainDb) {
+      if (!Number.isFinite(nextGainDb)) {
+        return; // documented no-op
+      }
+      gainDb = Math.min(24, Math.max(-24, nextGainDb));
+      if (gainNode !== null) {
+        gainNode.gain.value = 10 ** (gainDb / 20);
+      }
+    },
+
     setSource(rawSource, rawSampleRateHz) {
       const source = requireBufferLike(rawSource, rawSampleRateHz);
       // Build the playable copy FIRST: a factory throw leaves the previous
       // source and playback completely intact (no half-swapped state).
       if (context === null) {
         context = contextFactory();
+        if (context.createGain !== undefined) {
+          gainNode = context.createGain();
+          gainNode.gain.value = 10 ** (gainDb / 20);
+          gainNode.connect(context.destination);
+        }
       }
       // Zero-length channel data is skipped: Web Audio cannot create a
       // 0-length AudioBuffer (NotSupportedError) — the machine lands in
@@ -465,6 +522,11 @@ export function createTransport(options: TransportOptions = {}): Transport {
 
     dispose() {
       dropLiveNode();
+      if (gainNode !== null) {
+        gainNode.disconnect();
+        gainNode = null;
+      }
+      gainDb = 0;
       lengthSamples = 0;
       sampleRateHz = 0;
       startedAtSample = 0;
@@ -484,24 +546,22 @@ export function createTransport(options: TransportOptions = {}): Transport {
 
 /**
  * Session-source → playback bufferLike adapter: the transport plays the
- * ORIGINAL session source at full length. Every lane (ingest/offline/demo/
- * recording) stores the mono analysis lane today (spec §2.2) — so playback
- * is mono at the source's rate; the seam already carries multichannel data
- * for the stereo session field if one is ever added (T1 owner concern 4).
- * Never mutates the store's samples.
+ * active lane's playback channels (1–2) at full length; `samples` stays the
+ * mono analysis lane and is ignored here. Never mutates store-owned bytes.
  */
-export function sourceToBufferLike(original: {
-  readonly samples: Float32Array;
+export function sourceToBufferLike(source: {
+  readonly channels: readonly Float32Array[];
   readonly sampleRateHz: number;
 }): AudioBufferLike {
   return {
-    numberOfChannels: 1,
-    sampleRate: original.sampleRateHz,
+    numberOfChannels: source.channels.length,
+    sampleRate: source.sampleRateHz,
     getChannelData(channel: number): Float32Array {
-      if (channel !== 0) {
+      const lane = source.channels[channel];
+      if (lane === undefined) {
         throw new RangeError(`sourceToBufferLike: no channel ${String(channel)}`);
       }
-      return original.samples;
+      return lane;
     },
   };
 }

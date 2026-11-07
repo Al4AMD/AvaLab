@@ -294,3 +294,44 @@ describe("editSpectrum guards", () => {
     expectSamplesClose(result.samples, input, 1e-9);
   });
 });
+
+describe("editSpectrum curves", () => {
+  it("keeps the no-curve result unchanged", () => {
+    const input = signal(64);
+    const without = editSpectrum(input, { edits: [edit("re", "set", 0.5, 2)], hermitian: true });
+    const empty = editSpectrum(input, {
+      edits: [edit("re", "set", 0.5, 2)],
+      curves: [],
+      hermitian: true,
+    });
+    expectSamplesClose(empty.samples, without.samples);
+  });
+
+  it("applies curves after band edits", () => {
+    const input = signal(64);
+    const result = editSpectrum(input, {
+      edits: [edit("re", "set", 0, 2)],
+      curves: [
+        {
+          target: "re",
+          points: [
+            { bin: 0, value: 1 },
+            { bin: 32, value: 1 },
+          ],
+        },
+      ],
+      hermitian: true,
+    });
+    expect(result.re[2]).toBeCloseTo(1, 12);
+  });
+
+  it("rejects a malformed curves field", () => {
+    expect(() =>
+      editSpectrum(signal(16), {
+        edits: [],
+        curves: "nope" as unknown as [],
+        hermitian: true,
+      }),
+    ).toThrow(RangeError);
+  });
+});

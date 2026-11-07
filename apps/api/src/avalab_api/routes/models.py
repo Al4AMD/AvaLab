@@ -24,8 +24,9 @@ class ModelInfo(BaseModel):
 
 
 class ModelsResponse(BaseModel):
-    """All five fixed tasks, in stable order."""
+    """All five fixed tasks, in stable order, plus the global ML switch."""
 
+    ml_enabled: bool
     models: list[ModelInfo]
 
 
@@ -34,6 +35,7 @@ def list_models(settings: Annotated[Settings, Depends(get_settings)]) -> ModelsR
     """Report local availability without importing any ML backend."""
     registry = ModelRegistry(settings.ml_model_cache_dir)
     return ModelsResponse(
+        ml_enabled=settings.ml_enabled,
         models=[
             ModelInfo(
                 task=(status := registry.status(task)).task,

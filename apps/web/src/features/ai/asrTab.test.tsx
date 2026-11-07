@@ -9,6 +9,7 @@ type Modules = {
   readonly asrRunDisabled: typeof import("./asrTab").asrRunDisabled;
   readonly fetchReferenceTranscript: typeof import("./asrTab").fetchReferenceTranscript;
   readonly readAsrResult: typeof import("./asrTab").readAsrResult;
+  readonly usesReferenceTranscript: typeof import("./asrTab").usesReferenceTranscript;
   readonly t: typeof import("../../i18n").default.t;
 };
 
@@ -48,6 +49,31 @@ function view(
 }
 
 describe("asr tab", () => {
+  it("uses the bundled reference only for the speech demo", () => {
+    expect(modules.usesReferenceTranscript({ sourceKind: "demoClip", demoId: "speech" })).toBe(
+      true,
+    );
+    expect(modules.usesReferenceTranscript({ sourceKind: "demoClip", demoId: "speechNoisy" })).toBe(
+      false,
+    );
+    expect(
+      modules.usesReferenceTranscript({
+        sourceKind: "ingested",
+        demoId: undefined,
+      }),
+    ).toBe(false);
+    expect(modules.usesReferenceTranscript(null)).toBe(false);
+  });
+
+  it("does not treat an uploaded file with the demo name as the demo", () => {
+    expect(
+      modules.usesReferenceTranscript({
+        sourceKind: "ingested",
+        demoId: undefined,
+      }),
+    ).toBe(false);
+  });
+
   it("reads the transcript, language and timestamped segments", () => {
     const info = modules.readAsrResult({
       kind: "transcript",

@@ -16,12 +16,15 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ToolHeader } from "../../components/ToolHeader";
 
 import { Button } from "../../components/ui/button";
 import { formatDb, formatHz, formatS } from "../../lib/format";
 import type { SpectrogramTilesParams } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
+import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
 import { ColormapLegend } from "./colormapLegend";
 import {
   frequencyToY,
@@ -226,7 +229,7 @@ export function SpectrogramView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold">{t("tool.spectrogram.title")}</h2>
+      <ToolHeader titleKey="tool.spectrogram.title" descriptionKey="tool.spectrogram.description" />
       {original === null ? (
         <UploadEmptyState />
       ) : (
@@ -468,6 +471,11 @@ export function SpectrogramView() {
           )}
         </>
       )}
+
+      <TheoryPanel
+        titleKey={TOOL_THEORY.spectrogram.titleKey}
+        sections={TOOL_THEORY.spectrogram.sections}
+      />
     </section>
   );
 }

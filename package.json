@@ -14,6 +14,7 @@
     "test": "pnpm -r --if-present test && node --test \"scripts/**/*.test.mjs\"",
     "i18n:check": "node scripts/i18n-check.mjs",
     "e2e": "pnpm --filter @avalab/web e2e",
+    "build:docs": "node docs/build-pdfs.mjs",
     "gen:golden": "uv run --directory tools/golden python -m avalab_golden generate",
     "gen:api": "node scripts/gen-api.mjs",
     "dev:web": "pnpm --filter @avalab/web dev",

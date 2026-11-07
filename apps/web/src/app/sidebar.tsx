@@ -21,8 +21,11 @@ function linkClass({ isActive }: { isActive: boolean }): string {
 export function Sidebar() {
   const { t } = useTranslation();
   return (
-    <nav aria-label={t("nav.landmark")} className="shrink-0 border-e border-surface px-3 py-4">
-      <ul className="flex flex-col gap-1">
+    <nav
+      aria-label={t("nav.landmark")}
+      className="w-full shrink-0 border-b border-surface px-3 py-4 md:w-auto md:border-b-0 md:border-e"
+    >
+      <ul className="flex flex-wrap gap-1 md:flex-col">
         <li>
           <NavLink to="/tools/waveform" className={linkClass}>
             {t("nav.waveform")}
@@ -81,6 +84,16 @@ export function Sidebar() {
         <li>
           <NavLink to="/tools/metrics" className={linkClass}>
             {t("nav.metrics")}
+          </NavLink>
+        </li>
+        <li>
+          <NavLink to="/tools/psychoacoustics" className={linkClass}>
+            {t("nav.psychoacoustics")}
+          </NavLink>
+        </li>
+        <li>
+          <NavLink to="/tools/pipeline" className={linkClass}>
+            {t("nav.pipeline")}
           </NavLink>
         </li>
         <li>

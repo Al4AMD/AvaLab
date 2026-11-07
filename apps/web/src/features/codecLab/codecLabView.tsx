@@ -10,15 +10,25 @@ import type { TFunction } from "i18next";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
-
 import type { HealthResponse } from "../../api/client";
 import { api } from "../../api/client";
+import { ToolHeader } from "../../components/ToolHeader";
 import { Button } from "../../components/ui/button";
+import { downloadWav } from "../../lib/download";
 import { formatS } from "../../lib/format";
-import type { CodecLabCodec, CodecLabMeta, CodecLabResult } from "../../session/ops";
+import { writeLastUsed } from "../../lib/lastUsed";
+import type {
+  CodecLabCodec,
+  CodecLabMdctBand,
+  CodecLabMeta,
+  CodecLabResult,
+} from "../../session/ops";
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
-import { computeQualityMetrics, formatMetric, type QualityMetrics } from "../metrics/metrics";
+import { formatMetric, type QualityMetrics } from "../metrics/metrics";
+import { measureQualityMetrics } from "../metrics/qualityMetricsWorker";
+import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
 import {
   availableRealCodecs,
   REAL_CODEC_NAMES,
@@ -35,12 +45,16 @@ import {
   CODEC_LAB_REAL_COMPRESSION_MIN,
   CODEC_LAB_REAL_QUALITY_MAX,
   CODEC_LAB_REAL_QUALITY_MIN,
+  CODEC_LAB_REFERENCE_SPL_MAX,
+  CODEC_LAB_REFERENCE_SPL_MIN,
+  CODEC_LAB_STORAGE_KEY,
   type CodecLabSettings,
   codecLabRangeFromSelection,
   codecLabSettingsFromSearch,
   codecLabSettingsToSearch,
   isCodecLabStale,
   isRealCodecStale,
+  loadCodecLabSettings,
 } from "./codecLabState";
 import {
   type ComparisonRow,
@@ -76,6 +90,17 @@ type RealCodecViewResult = {
   readonly run: RealCodecRun;
   readonly settings: CodecLabSettings;
 };
+
+/** Playback payload for a real-codec result: both lanes plus the source offset. */
+export function realPlayback(
+  run: RealCodecRun,
+  settings: CodecLabSettings,
+): { readonly channels: Float32Array[]; readonly sourceStartSample: number } {
+  return {
+    channels: run.channels.slice(),
+    sourceStartSample: settings.startSample + run.stats.referenceStartSample,
+  };
+}
 
 type RealCodecStatus = "idle" | "running" | "ready" | "error";
 
@@ -181,6 +206,161 @@ function Histogram({
   );
 }
 
+const BAND_CHART_WIDTH = 240;
+const BAND_CHART_HEIGHT = 72;
+const BAND_CHART_PADDING = 6;
+
+function bandSeriesPoints(values: readonly number[]): string {
+  const finite = values.filter((value) => Number.isFinite(value));
+  if (finite.length === 0) {
+    return "";
+  }
+  const min = Math.min(...finite);
+  const max = Math.max(...finite);
+  const span = max - min || 1;
+  return values
+    .map((value, index) => {
+      const x =
+        values.length <= 1
+          ? BAND_CHART_WIDTH / 2
+          : (index / (values.length - 1)) * BAND_CHART_WIDTH;
+      const normalized = Number.isFinite(value) ? (value - min) / span : 0;
+      const y =
+        BAND_CHART_PADDING + (1 - normalized) * (BAND_CHART_HEIGHT - 2 * BAND_CHART_PADDING);
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(" ");
+}
+
+function bandRange(values: readonly number[]): string {
+  const finite = values.filter((value) => Number.isFinite(value));
+  if (finite.length === 0) {
+    return "—";
+  }
+  const min = Math.min(...finite);
+  const max = Math.max(...finite);
+  return `${min.toFixed(1)} … ${max.toFixed(1)} dB`;
+}
+
+function BandSeries({
+  values,
+  label,
+  colorClass,
+  testId,
+}: {
+  readonly values: readonly number[];
+  readonly label: string;
+  readonly colorClass: string;
+  readonly testId: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs text-muted">{label}</span>
+      <svg
+        role="img"
+        aria-label={label}
+        viewBox={`0 0 ${BAND_CHART_WIDTH} ${BAND_CHART_HEIGHT}`}
+        className={`w-full rounded bg-bg ring-1 ring-surface ${colorClass}`}
+        data-testid={testId}
+      >
+        <polyline
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          points={bandSeriesPoints(values)}
+        />
+      </svg>
+      <span dir="ltr" className="text-xs tabular-nums text-muted">
+        {bandRange(values)}
+      </span>
+    </div>
+  );
+}
+
+/** Per-band threshold and SMR for the loudest psychoacoustic MDCT frame. */
+export function MdctBandChart({
+  bands,
+}: {
+  readonly bands: readonly CodecLabMdctBand[];
+}): React.ReactElement {
+  const { t } = useTranslation();
+  return (
+    <figure className="mt-3 flex flex-col gap-2" data-testid="codecLab.psycho.bandChart">
+      <figcaption className="text-xs font-medium">{t("codecLab.mdct.bandChartTitle")}</figcaption>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <BandSeries
+          values={bands.map((band) => band.thresholdDb)}
+          label={t("codecLab.mdct.threshold")}
+          colorClass="text-accent"
+          testId="codecLab.psycho.thresholdChart"
+        />
+        <BandSeries
+          values={bands.map((band) => band.smrDb)}
+          label={t("codecLab.mdct.smr")}
+          colorClass="text-danger"
+          testId="codecLab.psycho.smrChart"
+        />
+      </div>
+    </figure>
+  );
+}
+
+export function CodecLabPsychoControls({
+  settings,
+  onChange,
+}: {
+  readonly settings: CodecLabSettings;
+  readonly onChange: (patch: Partial<CodecLabSettings>) => void;
+}): React.ReactElement {
+  const { t } = useTranslation();
+  return (
+    <>
+      <label className="flex items-center gap-2 self-end text-xs">
+        <input
+          type="checkbox"
+          checked={settings.mdctPsychoacoustic}
+          data-testid="codecLab.control.psycho"
+          onChange={(event) => {
+            onChange({ mdctPsychoacoustic: event.currentTarget.checked });
+          }}
+          className={CONTROL_FOCUS_CLASSES}
+        />
+        <span className="font-medium">{t("codecLab.mdct.psycho")}</span>
+      </label>
+      <label className="flex flex-col gap-1 text-xs">
+        <span className="font-medium">{t("codecLab.mdct.referenceSpl")}</span>
+        <input
+          type="number"
+          min={CODEC_LAB_REFERENCE_SPL_MIN}
+          max={CODEC_LAB_REFERENCE_SPL_MAX}
+          step={1}
+          dir="ltr"
+          value={settings.mdctReferenceSplDb}
+          data-testid="codecLab.control.referenceSpl"
+          onChange={(event) => {
+            const raw = Number(event.currentTarget.value);
+            if (Number.isFinite(raw)) {
+              onChange({
+                mdctReferenceSplDb: Math.max(
+                  CODEC_LAB_REFERENCE_SPL_MIN,
+                  Math.min(CODEC_LAB_REFERENCE_SPL_MAX, Math.round(raw)),
+                ),
+              });
+            }
+          }}
+          className={INPUT_CLASSES}
+        />
+      </label>
+      <p
+        data-testid="codecLab.psycho.mode"
+        className="self-end text-xs text-muted sm:col-span-2 lg:col-span-4"
+      >
+        {settings.mdctPsychoacoustic ? t("codecLab.mdct.psychoOn") : t("codecLab.mdct.legacy")}
+      </p>
+    </>
+  );
+}
+
 function StatRow({
   label,
   value,
@@ -206,18 +386,20 @@ export function CodecLabView(): React.ReactElement {
   const selection = useSessionStore((state) => state.selection);
   const backendOnline = useSessionStore((state) => state.backendOnline);
   const [searchParams, setSearchParams] = useSearchParams();
-  const settings = useMemo(
-    () =>
-      codecLabSettingsFromSearch(
-        `?${searchParams.toString()}`,
-        {
-          sampleCount: original?.samples.length ?? 0,
-          sampleRateHz: original?.sampleRateHz ?? 1,
-        },
-        selection,
-      ),
-    [searchParams, original, selection],
-  );
+  const settings = useMemo(() => {
+    const source = {
+      sampleCount: original?.samples.length ?? 0,
+      sampleRateHz: original?.sampleRateHz ?? 1,
+    };
+    if (searchParams.toString() === "") {
+      return loadCodecLabSettings(source, selection);
+    }
+    return codecLabSettingsFromSearch(`?${searchParams.toString()}`, source, selection);
+  }, [searchParams, original, selection]);
+
+  useEffect(() => {
+    writeLastUsed(CODEC_LAB_STORAGE_KEY, codecLabSettingsToSearch(settings));
+  }, [settings]);
   const [status, setStatus] = useState<CodecLabStatus>("idle");
   const [result, setResult] = useState<CodecLabViewResult | null>(null);
   const [errorKey, setErrorKey] = useState<CodecLabErrorKey | null>(null);
@@ -225,6 +407,7 @@ export function CodecLabView(): React.ReactElement {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [realStatus, setRealStatus] = useState<RealCodecStatus>("idle");
   const [realResult, setRealResult] = useState<RealCodecViewResult | null>(null);
+  const [realMetrics, setRealMetrics] = useState<QualityMetrics | null>(null);
   const [realErrorKey, setRealErrorKey] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "ok" | "error">("idle");
   const [batchRows, setBatchRows] = useState<ComparisonRow[] | null>(null);
@@ -300,11 +483,12 @@ export function CodecLabView(): React.ReactElement {
           realResult.run,
           realResult.settings.realCodec,
           `codecLab.real.codec.${realResult.settings.realCodec}`,
+          realMetrics,
         ),
       );
     }
     return sortComparisonRows(rows);
-  }, [result, realResult]);
+  }, [result, realResult, realMetrics]);
 
   const comparisonRows = useMemo(
     () => sortComparisonRows(batchRows ?? singleComparisonRows),
@@ -315,19 +499,31 @@ export function CodecLabView(): React.ReactElement {
     publishCodecComparisonRows(original, comparisonRows);
   }, [original, comparisonRows]);
 
-  const realMetrics = useMemo<QualityMetrics | null>(() => {
+  useEffect(() => {
     if (realResult === null) {
-      return null;
+      setRealMetrics(null);
+      return;
     }
-    try {
-      return computeQualityMetrics(
-        realResult.run.reference,
-        realResult.run.decoded,
-        realResult.run.stats.sampleRateHz,
-      );
-    } catch {
-      return null;
-    }
+    let cancelled = false;
+    void measureQualityMetrics(
+      realResult.run.reference,
+      realResult.run.decoded,
+      realResult.run.stats.sampleRateHz,
+    ).then(
+      (metrics) => {
+        if (!cancelled) {
+          setRealMetrics(metrics);
+        }
+      },
+      () => {
+        if (!cancelled) {
+          setRealMetrics(null);
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
   }, [realResult]);
 
   function updateSettings(patch: Partial<CodecLabSettings>): void {
@@ -367,6 +563,8 @@ export function CodecLabView(): React.ReactElement {
         startSample: runSettings.startSample,
         endSample: runSettings.endSample,
         mdctBitsPerSecond: runSettings.mdctBitsPerSecond,
+        mdctPsychoacoustic: runSettings.mdctPsychoacoustic,
+        mdctReferenceSplDb: runSettings.mdctReferenceSplDb,
       },
       runSettings.startSample,
       runSettings.endSample,
@@ -431,6 +629,9 @@ export function CodecLabView(): React.ReactElement {
     runRealCodec(
       {
         samples: original.samples.subarray(runSettings.startSample, runSettings.endSample),
+        channels: original.channels.map((channel) =>
+          channel.subarray(runSettings.startSample, runSettings.endSample),
+        ),
         sampleRateHz: original.sampleRateHz,
         startSample: runSettings.startSample,
         endSample: runSettings.endSample,
@@ -506,6 +707,8 @@ export function CodecLabView(): React.ReactElement {
               startSample,
               endSample: cappedEnd,
               mdctBitsPerSecond: request.mdctBitsPerSecond,
+              mdctPsychoacoustic: settings.mdctPsychoacoustic,
+              mdctReferenceSplDb: settings.mdctReferenceSplDb,
             },
             startSample,
             cappedEnd,
@@ -520,6 +723,9 @@ export function CodecLabView(): React.ReactElement {
           runRealCodec(
             {
               samples: original.samples.subarray(startSample, cappedEnd),
+              channels: original.channels.map((channel) =>
+                channel.subarray(startSample, cappedEnd),
+              ),
               sampleRateHz: original.sampleRateHz,
               startSample,
               endSample: cappedEnd,
@@ -527,6 +733,8 @@ export function CodecLabView(): React.ReactElement {
             request.params,
             { signal: controller.signal },
           ),
+        measureQuality: (run) =>
+          measureQualityMetrics(run.reference, run.decoded, run.stats.sampleRateHz),
         signal: controller.signal,
         onProgress: (completed, total, row) => {
           if (batchAbortRef.current !== controller) {
@@ -570,13 +778,12 @@ export function CodecLabView(): React.ReactElement {
     if (realResult === null) {
       return;
     }
+    const playback = realPlayback(realResult.run, realResult.settings);
     const installed = useSessionStore
       .getState()
-      .setProcessed(
-        realResult.run.decoded.slice(),
-        realResult.run.stats.sampleRateHz,
-        "codecLab.real",
-      );
+      .setProcessed(playback.channels, realResult.run.stats.sampleRateHz, "codecLab.real", {
+        sourceStartSample: playback.sourceStartSample,
+      });
     if (!installed.ok) {
       setRealErrorKey("codecLab.error.playback");
     }
@@ -614,7 +821,7 @@ export function CodecLabView(): React.ReactElement {
   if (original === null) {
     return (
       <section className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold">{t("tool.codecLab.title")}</h2>
+        <ToolHeader titleKey="tool.codecLab.title" descriptionKey="tool.codecLab.description" />
         <UploadEmptyState />
       </section>
     );
@@ -629,7 +836,7 @@ export function CodecLabView(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold">{t("tool.codecLab.title")}</h2>
+      <ToolHeader titleKey="tool.codecLab.title" descriptionKey="tool.codecLab.description" />
 
       <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-xs">
@@ -731,6 +938,9 @@ export function CodecLabView(): React.ReactElement {
             </select>
           </label>
         ) : null}
+        {settings.codec === "mdct" ? (
+          <CodecLabPsychoControls settings={settings} onChange={updateSettings} />
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -771,6 +981,9 @@ export function CodecLabView(): React.ReactElement {
         <>
           <div className="rounded border border-surface p-3">
             <h3 className="mb-2 text-sm font-semibold">{t("codecLab.stats.title")}</h3>
+            <p data-testid="codecLab.toy.mono" className="mb-2 text-xs text-muted">
+              {t("codecLab.toy.mono")}
+            </p>
             <dl className="grid grid-cols-1 gap-x-6 text-xs sm:grid-cols-2">
               <StatRow
                 label={t("codecLab.stats.originalBytes")}
@@ -855,12 +1068,43 @@ export function CodecLabView(): React.ReactElement {
                   value={String(result.meta.frameCount)}
                   testId="codecLab.mdct.frames"
                 />
-                <StatRow
-                  label={t("codecLab.mdct.totalBits")}
-                  value={String(result.meta.bitsTotal ?? 0)}
-                  testId="codecLab.mdct.totalBits"
-                />
+                {result.meta.psychoacoustic ? (
+                  <>
+                    <StatRow
+                      label={t("codecLab.mdct.entropyBits")}
+                      value={String(result.meta.mdctEntropyBits ?? 0)}
+                      testId="codecLab.mdct.entropyBits"
+                    />
+                    <StatRow
+                      label={t("codecLab.mdct.sideInfoBits")}
+                      value={String(result.meta.mdctSideInfoBits ?? 0)}
+                      testId="codecLab.mdct.sideInfoBits"
+                    />
+                    <StatRow
+                      label={t("codecLab.mdct.totalBitrate")}
+                      value={`${formatNumber(result.meta.bitrateKbps)} kbps`}
+                      testId="codecLab.mdct.totalBitrate"
+                    />
+                    <StatRow
+                      label={t("codecLab.mdct.maskedShare")}
+                      value={`${formatNumber((result.meta.mdctMaskedFraction ?? 0) * 100)}%`}
+                      testId="codecLab.mdct.maskedShare"
+                    />
+                  </>
+                ) : (
+                  <StatRow
+                    label={t("codecLab.mdct.totalBits")}
+                    value={String(result.meta.bitsTotal ?? 0)}
+                    testId="codecLab.mdct.totalBits"
+                  />
+                )}
               </dl>
+              {result.meta.mdctBands !== null ? (
+                <MdctBandChart bands={result.meta.mdctBands} />
+              ) : null}
+              {result.meta.psychoacoustic ? (
+                <p className="mt-2 text-xs text-muted">{t("codecLab.mdct.psychoNote")}</p>
+              ) : null}
             </div>
           ) : null}
 
@@ -1033,6 +1277,24 @@ export function CodecLabView(): React.ReactElement {
           >
             {t("codecLab.real.play")}
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            data-testid="codecLab.real.export"
+            disabled={realResult === null}
+            onClick={() => {
+              if (realResult === null) {
+                return;
+              }
+              downloadWav(
+                realResult.run.channels,
+                realResult.run.stats.sampleRateHz,
+                `avalab-${realResult.settings.realCodec}.wav`,
+              );
+            }}
+          >
+            {t("codecLab.real.export")}
+          </Button>
           {realStale ? (
             <p data-testid="codecLab.real.stale" role="status" className="text-sm text-accent">
               {t("codecLab.real.stale")}
@@ -1051,6 +1313,23 @@ export function CodecLabView(): React.ReactElement {
         ) : null}
         {realResult !== null ? (
           <>
+            <p
+              data-testid="codecLab.real.channels"
+              dir="ltr"
+              className="mt-3 text-xs font-medium tabular-nums text-muted"
+            >
+              {realResult.run.stats.channels === 2
+                ? t("codecLab.real.stereo")
+                : t("codecLab.real.channels", { count: realResult.run.stats.channels })}
+            </p>
+            {realMetrics !== null ? (
+              <>
+                <p data-testid="codecLab.metrics.monoAnalysis" className="mt-2 text-xs font-medium">
+                  {t("codecLab.metrics.monoAnalysis")}
+                </p>
+                <p className="text-xs text-muted">{t("codecLab.metrics.monoHint")}</p>
+              </>
+            ) : null}
             <dl className="mt-3 grid grid-cols-1 gap-x-6 text-xs sm:grid-cols-2">
               <StatRow
                 label={t("codecLab.real.encodedSize")}
@@ -1315,25 +1594,10 @@ export function CodecLabView(): React.ReactElement {
         ) : null}
       </div>
 
-      <details className="rounded border border-surface p-3 text-sm">
-        <summary className="cursor-pointer font-semibold">{t("codecLab.theory.title")}</summary>
-        <div className="mt-2 flex flex-col gap-2 text-xs text-muted">
-          <p>{t("codecLab.theory.rle")}</p>
-          <p>{t("codecLab.theory.huffman")}</p>
-          <p>{t("codecLab.theory.delta")}</p>
-          <p>{t("codecLab.theory.companding")}</p>
-          <p>{t("codecLab.theory.mdct")}</p>
-          <div>
-            <h4 className="font-semibold text-text">{t("codecLab.theory.observe.title")}</h4>
-            <ul className="ms-4 list-disc">
-              <li>{t("codecLab.theory.observe.lossless")}</li>
-              <li>{t("codecLab.theory.observe.entropy")}</li>
-              <li>{t("codecLab.theory.observe.bitrate")}</li>
-              <li>{t("codecLab.theory.observe.sparsity")}</li>
-            </ul>
-          </div>
-        </div>
-      </details>
+      <TheoryPanel
+        titleKey={TOOL_THEORY["codec-lab"].titleKey}
+        sections={TOOL_THEORY["codec-lab"].sections}
+      />
     </section>
   );
 }

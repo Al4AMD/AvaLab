@@ -14,20 +14,26 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 import uPlot from "uplot";
+import { ToolHeader } from "../../components/ToolHeader";
 import "uplot/dist/uPlot.min.css";
 
 import { Button } from "../../components/ui/button";
 import { formatDb, formatHz, formatS } from "../../lib/format";
+import { writeLastUsed } from "../../lib/lastUsed";
 import type { AliasDemoResult, SamplingProcessResult } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
+import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
 import {
   defaultSamplingRange,
+  loadSamplingSettings,
   SAMPLING_MAX_BITS,
   SAMPLING_MAX_RATE_HZ,
   SAMPLING_MIN_BITS,
   SAMPLING_MIN_RATE_HZ,
   SAMPLING_RATE_PRESETS,
+  SAMPLING_STORAGE_KEY,
   type SamplingSettings,
   samplingSettingsFromSearch,
   samplingSettingsToSearch,
@@ -411,18 +417,20 @@ export function SamplingView(): React.ReactElement {
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
   const [searchParams, setSearchParams] = useSearchParams();
-  const settings = useMemo(
-    () =>
-      samplingSettingsFromSearch(
-        `?${searchParams.toString()}`,
-        {
-          sampleCount: original?.samples.length ?? 0,
-          sampleRateHz: original?.sampleRateHz ?? 1,
-        },
-        selection,
-      ),
-    [searchParams, original, selection],
-  );
+  const settings = useMemo(() => {
+    const source = {
+      sampleCount: original?.samples.length ?? 0,
+      sampleRateHz: original?.sampleRateHz ?? 1,
+    };
+    if (searchParams.toString() === "") {
+      return loadSamplingSettings(source, selection);
+    }
+    return samplingSettingsFromSearch(`?${searchParams.toString()}`, source, selection);
+  }, [searchParams, original, selection]);
+
+  useEffect(() => {
+    writeLastUsed(SAMPLING_STORAGE_KEY, samplingSettingsToSearch(settings));
+  }, [settings]);
   const [result, setResult] = useState<SamplingResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -517,7 +525,7 @@ export function SamplingView(): React.ReactElement {
   if (original === null) {
     return (
       <section className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold">{t("tool.sampling.title")}</h2>
+        <ToolHeader titleKey="tool.sampling.title" descriptionKey="tool.sampling.description" />
         <UploadEmptyState />
         <AliasingCard sourceLoaded={false} />
       </section>
@@ -532,7 +540,7 @@ export function SamplingView(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold">{t("tool.sampling.title")}</h2>
+      <ToolHeader titleKey="tool.sampling.title" descriptionKey="tool.sampling.description" />
 
       <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-xs">
@@ -788,6 +796,11 @@ export function SamplingView(): React.ReactElement {
           <li>{t("sampling.observe.snr")}</li>
         </ul>
       </aside>
+
+      <TheoryPanel
+        titleKey={TOOL_THEORY.sampling.titleKey}
+        sections={TOOL_THEORY.sampling.sections}
+      />
     </section>
   );
 }

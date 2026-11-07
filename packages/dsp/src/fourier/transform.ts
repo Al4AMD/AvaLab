@@ -12,8 +12,10 @@
  * carries exactly 1/N.
  *
  * `fft` delegates without touching the samples; power-of-two sizes therefore
- * produce bit-for-bit the same output as fftRadix2. `ifft` uses the conjugate
- * trick on the complex spectrum split into real and imaginary parts:
+ * produce bit-for-bit the same output as fftRadix2. Power-of-two `ifft` also
+ * delegates to ifftRadix2 (one conjugated complex butterfly pass). For
+ * arbitrary lengths it uses the conjugate trick on the spectrum split into
+ * real and imaginary parts:
  *   ifft(X) = conj(FFT(conj X)) / N, and FFT(conj X) = FFT(Re X) - j*FFT(Im X).
  * Hence Re{ifft X}[n] = (Re{FFT(Re X)}[n] + Im{FFT(Im X)}[n]) / N.
  *
@@ -37,7 +39,7 @@
 
 import { fftBluestein } from "./bluestein.js";
 import type { Complex } from "./complex.js";
-import { fftRadix2 } from "./fft.js";
+import { fftRadix2, ifftRadix2 } from "./fft.js";
 
 function valueAt(values: Float64Array, index: number, label: string): number {
   const value: number | undefined = values[index];
@@ -70,6 +72,11 @@ export function ifft(spectrum: Complex): Float64Array {
   }
   if (size === 0) {
     return new Float64Array(0);
+  }
+  if (isPowerOfTwo(size)) {
+    // One complex inverse butterfly pass; the split Bluestein path below costs
+    // two full forward transforms for the same exact real-part result.
+    return ifftRadix2(spectrum);
   }
 
   const reSpectrum = fft(spectrum.re);

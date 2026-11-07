@@ -1,99 +1,143 @@
 /**
- * Purpose: FNV-1a 64-bit content hash over the raw byte view of a
- * Float32Array — the inter-view identity of a session source. It is the
- * stable part of the Web-2 derived-cache keys in apps/web
- * (src/session/store.ts, spec §2.2): `op ∝ canonicalJson(params) ∝ inputHash`.
- * NOT cryptographic: no collision resistance is claimed; 64 bits only make a
- * coincidental key collision astronomically unlikely for one viewer's session.
+ * Purpose: content hash over a Float32Array — the inter-view identity of a
+ * session source. It is the stable part of the Web-2 derived-cache keys in
+ * apps/web (src/session/store.ts, spec §2.2): `op + canonicalJson(params) + inputHash`. NOT cryptographic; 64 output bits only make a coincidental key
+ * collision astronomically unlikely for one viewer's session.
  *
- * Formula (FNV-1a, byte at a time):
- *   h = 0xcbf29ce484222325                       (offset basis)
- *   for each byte b:  h = h XOR b
- *                     h = (h * 0x00000100000001B3) mod 2^64
- * (FNV prime = 2^40 + 2^8 + 0xb3; both constants are fixed, public-domain
- * values of the specification below.)
+ * Why not byte-wise FNV-1a-64: the published FNV recurrence visits all 4·N
+ * bytes and does 64-bit limb arithmetic per byte. On the heaviest legal load
+ * (5 min at 44.1 kHz mono = 52.9 MB of samples) that is a seconds-level main
+ * thread walk, which violates the AGENTS §9 waveform-overview budget. This
+ * hash instead visits N 32-bit words (4× fewer iterations) and runs two
+ * independent 32-bit FNV-1a lanes, concatenating their outputs:
+ *
+ *   hA = 0x811c9dc5; hB = 0x9e3779b9
+ *   for each 32-bit sample word w:
+ *     hA = (hA XOR w) · 0x01000193 mod 2^32
+ *     hB = (hB XOR w) · 0x9e3779b1 mod 2^32
+ *   output = hex8(fmix32(hA)) || hex8(fmix32(hB))
+ *
+ * Each lane uses the FNV-1a update (XOR then multiply by an odd constant);
+ * the lanes differ in offset basis and multiplier, so their outputs are not
+ * identical. Both recurrences are bijections mod 2^32, hence any one changed
+ * word changes both lane outputs. Each lane is finished with MurmurHash3's
+ * fmix32 avalanche step to fix FNV-1a's weak low-bit diffusion. The pair is a
+ * 64-bit fingerprint, not a standard FNV-1a-64 value.
  *
  * Reference: L. Fowler, G. Noll, K. Vo, "The FNV Non-Cryptographic Hash
- * Algorithm" (IETF individual draft draft-eastlake-fnv), which also lists
- * the published FNV-1a-64 test vectors the test pins.
+ * Algorithm" (IETF draft-eastlake-fnv) for the FNV-1a update and constants;
+ * A. Appleby, "MurmurHash3" (public-domain fmix32 finalizer).
  *
- * Complexity: O(B) time over the byte view (B = 4·len bytes), O(1) space. The
- * update runs in plain Number mathematics on two 32-bit limbs (see the
- * multiply derivation in the loop), so it is allocation-free inside the loop.
- * At the heaviest legal load (5 min at 48 kHz mono = 57.6 MB; 96 kHz mono =
- * 115 MB) this is a seconds-level sequential byte walk — accepted by pre-
- * flight ruling as a once-per-load cost (the session store hashes exactly
- * once per successful loadSource).
+ * Complexity: O(N) words (N = sample count), O(1) space, no allocation inside
+ * the loop. The word view is native-endian (Float32Array/Uint32Array share the
+ * buffer encoding); the result is stable on every real JS platform, all of
+ * which are little-endian. A cache key is local to one browser session, so
+ * cross-language reproducibility is not required.
  *
- * Endianness assumption and the documented fallback: the bytes hashed are the
- * Float32Array's underlying buffer in memory order. ECMAScript typed arrays
- * use the host's native byte order, and every mainstream JS engine (V8,
- * JavaScriptCore, SpiderMonkey, Hermes) runs on little-endian hardware, so
- * the view serializes as IEEE-754 little-endian and this hash is byte-stable
- * across real platforms. A hypothetical big-endian engine would reorder each
- * 4-byte word; the documented fallback for one is a one-time probe
- * (`new Uint8Array(new Float32Array([1]).buffer)[0] !== 0`) plus an explicit
- * wordwise re-encode (reverse every 4-byte word before hashing). Deliberately
- * NOT implemented: no big-endian JS engine is known to exist, and dead branch
- * code on every real machine buys nothing (ponytail cutting with a recorded
- * upgrade path).
+ * Stereo playback uses `inputHash64Channels`: one channel delegates to
+ * `inputHash64` unchanged; two channels seed both lanes with the channel count
+ * before walking channel 0 and then channel 1, so a stereo pair cannot alias
+ * the mono concatenation. Inputs are never mutated.
  *
- * Edge cases (all hashed as raw bytes — value canonicalization is DELIBERATELY
- * rejected: it would add a per-sample branch for cases no decode produces,
- * while byte fidelity is the point of hashing the PCM representation):
- * - empty input → hash of the offset basis alone → "cbf29ce484222325"
- *   (identical to the reference-favourite empty-input FNV vector).
- * - -0 vs +0: distinct bit patterns (0x80000000 vs 0x00000000), so arrays
- *   differing only in signed zero hash differently. Real decode paths (Web
- *   Audio decodeAudioData, byte-level PCM ingest) do not mint -0 samples in
- *   practice, and the consequence of the divergence is harmless in every
- *   direction: different bytes ⇒ different key ⇒ an extra recompute, never a
- *   false cache hit ("hash the bytes as-is" per task ruling).
- * - denormals / NaN payloads: distinct bit patterns hash distinctly; the
- *   session store rejects non-finite samples before hashing, so NaNs never
- *   enter a real load's cache key, and a denormal is still a finite value
- *   with a stable encoding.
+ * Edge cases:
+ * - empty input → fmix32 of both offset bases → "ab3e7c0b92ca2f0e".
+ * - -0 vs +0: distinct bit patterns (0x80000000 vs 0x00000000) hash
+ *   differently; no value canonicalization is attempted.
+ * - denormals / NaN payloads: distinct bit patterns remain distinct; the
+ *   session store rejects non-finite samples before hashing a real source.
  * - never mutates the input; hashes exactly the view's own
- *   [byteOffset, byteOffset + byteLength) subrange, so a subarray view hashes
- *   only its own samples.
+ *   [byteOffset, byteOffset + byteLength) subrange.
  */
 
-/** Low 32-bit limb of the FNV-1a-64 offset basis 0xcbf29ce484222325. */
-const FNV_OFFSET_HI = 0xcbf29ce4;
-/** High 32-bit limb of the FNV-1a-64 offset basis 0xcbf29ce484222325. */
-const FNV_OFFSET_LO = 0x84222325;
-/** Low 32-bit limb of the FNV-1a-64 prime 0x00000100000001B3 (435). */
-const FNV_PRIME_LOW = 0x1b3;
+import type { AudioChannels } from "../audio.js";
+
+/** 32-bit FNV-1a offset basis for lane A. */
+const FNV32_OFFSET_A = 0x811c9dc5;
+/** 32-bit FNV-1a prime for lane A (2^24 + 2^8 + 0x93). */
+const FNV32_PRIME_A = 0x01000193;
+/** Golden-ratio offset basis for lane B (distinct lane seed). */
+const FNV32_OFFSET_B = 0x9e3779b9;
+/** Odd 32-bit prime for lane B (0x9e3779b1). */
+const FNV32_PRIME_B = 0x9e3779b1;
+
+/** MurmurHash3 fmix32 avalanche: mixes each lane's 32 bits after the walk. */
+function fmix32(value: number): number {
+  let hash = value;
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 0x85ebca6b);
+  hash ^= hash >>> 13;
+  hash = Math.imul(hash, 0xc2b2ae35);
+  hash ^= hash >>> 16;
+  return hash;
+}
 
 /**
- * One FNV-1a update as a 64-bit multiply mod 2^64 with the prime split into
- * limbs P = 256·2^32 + 435:
- *   (xHi·2^32 + xLo)·P = xHi·256·2^64 + xHi·435·2^32 + xLo·256·2^32 + xLo·435
- * The 2^64 part vanishes mod 2^64. xLo·435 < 2^41 and xHi·435 < 2^41 are exact
- * in a double, so limb splitting stays integer-exact with no BigInt cost.
+ * Two-lane FNV-1a fingerprint of the sample words. The loop intentionally
+ * keeps signed 32-bit intermediates (Math.imul/XOR); only the emitted hex
+ * values are normalized with `>>> 0`.
  */
-export function inputHashFnv1a64(samples: Float32Array): string {
-  const bytes = new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength);
-  let highLimb = FNV_OFFSET_HI;
-  let lowLimb = FNV_OFFSET_LO;
-  const prime = FNV_PRIME_LOW;
-  const UINT32_MOD = 0x100000000;
-  for (let index = 0; index < bytes.length; index += 1) {
-    const byte: number | undefined = bytes[index];
-    if (byte === undefined) {
-      throw new RangeError(`inputHashFnv1a64: bytes[${index}] read out of bounds`);
+export function inputHash64(samples: Float32Array): string {
+  const words = new Uint32Array(samples.buffer, samples.byteOffset, samples.byteLength / 4);
+  let laneA = FNV32_OFFSET_A;
+  let laneB = FNV32_OFFSET_B;
+  for (let index = 0; index < words.length; index += 1) {
+    const word: number | undefined = words[index];
+    if (word === undefined) {
+      throw new RangeError(`inputHash64: words[${index}] read out of bounds`);
     }
-    // JS bitwise ops are SIGNED 32-bit: force the result back to unsigned so
-    // every limb stays a non-negative Number and the arithmetic stays exact.
-    const xLow = (lowLimb ^ byte) >>> 0; // xor only touches the low 8 bits (byte < 256)
-    const t = xLow * prime; // < 2^41, exact
-    const nextLow = t % UINT32_MOD;
-    const carryToHigh = (t - nextLow) / UINT32_MOD; // exact integer < 2^9
-    // xLo·2^40 mod 2^64 = (xLo mod 2^24)·2^40 — the rest carries a 2^64 factor.
-    const midLow = (xLow % 0x1000000) * 0x100; // < 2^32, exact
-    const nextHigh = (highLimb * prime + midLow + carryToHigh) % UINT32_MOD;
-    highLimb = nextHigh;
-    lowLimb = nextLow;
+    laneA = Math.imul(laneA ^ word, FNV32_PRIME_A);
+    laneB = Math.imul(laneB ^ word, FNV32_PRIME_B);
   }
-  return `${highLimb.toString(16).padStart(8, "0")}${lowLimb.toString(16).padStart(8, "0")}`;
+  return `${(fmix32(laneA) >>> 0).toString(16).padStart(8, "0")}${(fmix32(laneB) >>> 0)
+    .toString(16)
+    .padStart(8, "0")}`;
+}
+
+/**
+ * Two-lane FNV-1a fingerprint of one or two playback channels. One channel
+ * returns `inputHash64` exactly, preserving every mono cache key. A stereo
+ * pair seeds the walk with the channel count before visiting both lanes, so
+ * the hash is channel-aware without concatenating the audio.
+ */
+export function inputHash64Channels(channels: AudioChannels): string {
+  if (channels.length === 1) {
+    const only = channels[0];
+    if (only === undefined) {
+      throw new RangeError("inputHash64Channels: channels[0] is undefined");
+    }
+    return inputHash64(only);
+  }
+  if (channels.length !== 2) {
+    throw new RangeError(
+      `inputHash64Channels: expected 1 or 2 channels (got ${String(channels.length)})`,
+    );
+  }
+  const first = channels[0];
+  const second = channels[1];
+  if (!(first instanceof Float32Array) || !(second instanceof Float32Array)) {
+    throw new TypeError("inputHash64Channels: every channel must be a Float32Array");
+  }
+  if (first.length !== second.length) {
+    throw new RangeError(
+      `inputHash64Channels: unequal channel lengths (${String(first.length)} vs ${String(second.length)})`,
+    );
+  }
+
+  const firstWords = new Uint32Array(first.buffer, first.byteOffset, first.byteLength / 4);
+  const secondWords = new Uint32Array(second.buffer, second.byteOffset, second.byteLength / 4);
+  let laneA = Math.imul(FNV32_OFFSET_A ^ channels.length, FNV32_PRIME_A);
+  let laneB = Math.imul(FNV32_OFFSET_B ^ channels.length, FNV32_PRIME_B);
+  for (const words of [firstWords, secondWords]) {
+    for (let index = 0; index < words.length; index += 1) {
+      const word: number | undefined = words[index];
+      if (word === undefined) {
+        throw new RangeError(`inputHash64Channels: words[${index}] read out of bounds`);
+      }
+      laneA = Math.imul(laneA ^ word, FNV32_PRIME_A);
+      laneB = Math.imul(laneB ^ word, FNV32_PRIME_B);
+    }
+  }
+  return `${(fmix32(laneA) >>> 0).toString(16).padStart(8, "0")}${(fmix32(laneB) >>> 0)
+    .toString(16)
+    .padStart(8, "0")}`;
 }

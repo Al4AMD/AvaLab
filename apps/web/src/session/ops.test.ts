@@ -20,10 +20,14 @@ import {
   type ExtentOperation,
   extentProcess,
   FFT_MAX_LENGTH,
+  fftBenchmark,
+  fftButterfly,
   fftSelection,
   filterApply,
   filterDesign,
+  fourierPreview,
   generateSynth,
+  loudnessMeasure,
   type ReverbProcessParams,
   reverbProcess,
   type SamplingProcessParams,
@@ -34,6 +38,7 @@ import {
   spectrogramTiles,
   spectrumEdit,
   speedTransform,
+  stftBenchmark,
   superresBaseline,
   waveformOverview,
   waveformRange,
@@ -841,6 +846,33 @@ describe("spectrumEdit handler", () => {
     }
   });
 
+  it("applies curves after band edits and reports the curve count", () => {
+    const input = [0.25, -0.5, 1, 0, -1.5, 0.75, 0.125, -0.25];
+    const result = spectrumEdit(
+      {
+        sampleRateHz: SAMPLE_RATE,
+        startSample: 0,
+        endSample: input.length,
+        edits: [{ startBin: 2, endBin: 3, target: "re", mode: "zero", value: 0 }],
+        curves: [
+          {
+            target: "re",
+            points: [
+              { bin: 0, value: 1 },
+              { bin: 4, value: 1 },
+            ],
+          },
+        ],
+        hermitian: true,
+      },
+      float32PayloadOf(input),
+    );
+    const values = valuesOf(result);
+    expect(result.meta.curvesApplied).toBe(1);
+    expect(result.meta.editsApplied).toBe(1);
+    expect(values[result.meta.sampleCount + 2] ?? 0).toBeCloseTo(1, 6);
+  });
+
   it("reports imaginary energy when Hermitian symmetry is off", () => {
     const result = run(
       Array.from({ length: 64 }, (_, index) => Math.sin(0.31 * index)),
@@ -1009,6 +1041,9 @@ describe("op table wiring", () => {
     expect(dspOps.waveformRange.handler).toBe(waveformRange);
     expect(dspOps.spectrogramTiles.handler).toBe(spectrogramTiles);
     expect(dspOps.fftSelection.handler).toBe(fftSelection);
+    expect(dspOps.fftBenchmark.handler).toBe(fftBenchmark);
+    expect(dspOps.fftButterfly.handler).toBe(fftButterfly);
+    expect(dspOps.stftBenchmark.handler).toBe(stftBenchmark);
     expect(dspOps.windowProfiles.handler).toBe(windowProfiles);
     expect(dspOps.generateSynth.handler).toBe(generateSynth);
     expect(dspOps.speedTransform.handler).toBe(speedTransform);
@@ -1022,6 +1057,7 @@ describe("op table wiring", () => {
     expect(dspOps.convolutionSteps.handler).toBe(convolutionSteps);
     expect(dspOps.spectrumEdit.handler).toBe(spectrumEdit);
     expect(dspOps.codecLabProcess.handler).toBe(codecLabProcess);
+    expect(dspOps.loudnessMeasure.handler).toBe(loudnessMeasure);
   });
 
   it("derives typed params/results from the table (the add-one-entry lens)", () => {
@@ -1030,8 +1066,14 @@ describe("op table wiring", () => {
       | "spectrogramTiles"
       | "waveformOverview"
       | "waveformRange"
+      | "waveformEnvelope"
+      | "qualityMetrics"
       | "fftSelection"
+      | "fftBenchmark"
+      | "fftButterfly"
+      | "stftBenchmark"
       | "windowProfiles"
+      | "fourierPreview"
       | "generateSynth"
       | "speedTransform"
       | "filterDesign"
@@ -1044,6 +1086,10 @@ describe("op table wiring", () => {
       | "convolutionSteps"
       | "spectrumEdit"
       | "codecLabProcess"
+      | "loudnessMeasure"
+      | "pipelineRun"
+      | "psychoacousticCurves"
+      | "psychoacousticAnalysis"
     >();
     expectTypeOf<DspOpParams<"sessionPing">>().toEqualTypeOf<{ count: number }>();
     expectTypeOf<DspOpResult<"sessionPing">>().toEqualTypeOf<{
@@ -1264,5 +1310,85 @@ describe("generateSynth handler", () => {
       throw new Error("missing payload");
     }
     expect(float32ValuesOf(payload)).toHaveLength(128);
+  });
+});
+
+describe("fourierPreview handler", () => {
+  it("returns min/max buckets and the measured Gibbs overshoot", () => {
+    const result = fourierPreview({
+      kind: "square",
+      sampleRateHz: 48000,
+      durationSeconds: 1,
+      amplitude: 1,
+      frequencyHz: 100,
+      harmonics: 51,
+      previewBucketCount: 64,
+    });
+    expect(result.meta.sampleCount).toBe(48000);
+    expect(result.meta.bucketCount).toBe(64);
+    expect(result.meta.overshootRatio).toBeGreaterThan(0.17);
+    expect(result.meta.overshootRatio).toBeLessThan(0.19);
+    const payload = result.payload;
+    if (payload === undefined) {
+      throw new Error("missing payload");
+    }
+    expect(float32ValuesOf(payload)).toHaveLength(128);
+  });
+
+  it("rejects an out-of-range harmonic count", () => {
+    expect(() =>
+      fourierPreview({
+        kind: "square",
+        sampleRateHz: 48000,
+        durationSeconds: 1,
+        amplitude: 1,
+        frequencyHz: 100,
+        harmonics: 201,
+        previewBucketCount: 64,
+      }),
+    ).toThrowError(DspOpError);
+  });
+});
+
+describe("F08 benchmark ops", () => {
+  it("returns the exact butterfly step count for N=8 and N=16", () => {
+    for (const fftLengthSamples of [8, 16] as const) {
+      const result = fftButterfly(
+        { fftLengthSamples, startSample: 0 },
+        float32PayloadOf([1, 0, -0.5, 0.25, 0, 0, 0, 0]),
+      );
+      expect(result.meta.steps).toHaveLength((fftLengthSamples / 2) * Math.log2(fftLengthSamples));
+    }
+  });
+
+  it("runs the FFT benchmark in a typed op", () => {
+    const result = fftBenchmark({ fftLengthSamples: 256, iterations: 1 });
+    expect(result.meta.fftLengthSamples).toBe(256);
+    expect(result.meta.iterations).toBe(1);
+    expect(Number.isFinite(result.meta.oursMedianMs)).toBe(true);
+    expect(result.meta.maxAbsError).toBeLessThanOrEqual(1e-5);
+  });
+
+  it("benchmarks an STFT chunk and reports frame progress", () => {
+    const samples = new Float32Array(2048);
+    const result = stftBenchmark(
+      { fftLengthSamples: 256, hopSamples: 128, startSample: 512, frameCount: 4 },
+      float32PayloadOf(Array.from(samples)),
+    );
+    expect(result.meta).toMatchObject({ startSample: 512, framesProcessed: 4 });
+    expect(Number.isFinite(result.meta.checksum)).toBe(true);
+  });
+
+  it("rejects bad benchmark params", () => {
+    expect(() => fftButterfly({ fftLengthSamples: 32 as unknown as 8, startSample: 0 })).toThrow(
+      DspOpError,
+    );
+    expect(() => fftBenchmark({ fftLengthSamples: 128, iterations: 1 })).toThrow(DspOpError);
+    expect(() =>
+      stftBenchmark(
+        { fftLengthSamples: 256, hopSamples: 0, startSample: 0, frameCount: 1 },
+        float32PayloadOf([0]),
+      ),
+    ).toThrow(DspOpError);
   });
 });

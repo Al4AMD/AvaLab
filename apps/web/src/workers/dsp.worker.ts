@@ -32,17 +32,27 @@ import {
   type DspOpResult,
   dspOps,
   extentProcess,
+  fftBenchmark,
+  fftButterfly,
   fftSelection,
   filterApply,
   filterDesign,
+  fourierPreview,
   generateSynth,
+  loudnessMeasure,
+  pipelineRun,
+  psychoacousticAnalysis,
+  psychoacousticCurves,
+  qualityMetrics,
   reverbProcess,
   samplingProcess,
   sessionPing,
   spectrogramTiles,
   spectrumEdit,
   speedTransform,
+  stftBenchmark,
   superresBaseline,
+  waveformEnvelope,
   waveformOverview,
   waveformRange,
   windowProfiles,
@@ -70,17 +80,27 @@ const dspHandlers = {
   codecLabProcess,
   convolutionSteps,
   extentProcess,
+  fftBenchmark,
+  fftButterfly,
   fftSelection,
   filterApply,
+  fourierPreview,
   filterDesign,
   generateSynth,
+  loudnessMeasure,
+  pipelineRun,
+  psychoacousticAnalysis,
+  psychoacousticCurves,
+  qualityMetrics,
   reverbProcess,
   samplingProcess,
   sessionPing,
   speedTransform,
   spectrumEdit,
+  stftBenchmark,
   superresBaseline,
   spectrogramTiles,
+  waveformEnvelope,
   waveformOverview,
   waveformRange,
   windowProfiles,
@@ -135,7 +155,7 @@ function isCancelFrame(frame: Record<string, unknown>): frame is CancelFrame {
 /** Every op's `DspOpResultBase` payload (optional by constraint) is
  * transferred, never structured-cloned. */
 function transfersOf(response: DspOpResponse): Transferable[] {
-  if (response.ok && !("cancelled" in response)) {
+  if (response.ok && !("cancelled" in response) && "payload" in response.result) {
     const payload = response.result.payload;
     if (payload !== undefined) {
       return [payload.buffer];
@@ -163,6 +183,14 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
         const result = dspHandlers.waveformRange(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
+      case "waveformEnvelope": {
+        const result = dspHandlers.waveformEnvelope(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "qualityMetrics": {
+        const result = dspHandlers.qualityMetrics(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
       case "spectrogramTiles": {
         const result = dspHandlers.spectrogramTiles(request.params, request.payload);
         return { id: request.id, ok: true, result };
@@ -171,8 +199,24 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
         const result = dspHandlers.fftSelection(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
+      case "fftBenchmark": {
+        const result = dspHandlers.fftBenchmark(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "fftButterfly": {
+        const result = dspHandlers.fftButterfly(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "stftBenchmark": {
+        const result = dspHandlers.stftBenchmark(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
       case "windowProfiles": {
         const result = dspHandlers.windowProfiles(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "fourierPreview": {
+        const result = dspHandlers.fourierPreview(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       case "generateSynth": {
@@ -217,6 +261,22 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
       }
       case "codecLabProcess": {
         const result = dspHandlers.codecLabProcess(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "psychoacousticCurves": {
+        const result = dspHandlers.psychoacousticCurves(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "psychoacousticAnalysis": {
+        const result = dspHandlers.psychoacousticAnalysis(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "loudnessMeasure": {
+        const result = dspHandlers.loudnessMeasure(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "pipelineRun": {
+        const result = dspHandlers.pipelineRun(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       case "spectrumEdit": {

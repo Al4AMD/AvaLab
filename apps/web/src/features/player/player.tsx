@@ -21,9 +21,11 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useGlobalShortcuts } from "../../app/useGlobalShortcuts";
 import { Button } from "../../components/ui/button";
 import { useSessionStore } from "../../session/store";
 import { appPlayhead, type PlayheadListener } from "./playhead";
+import { useLoudnessMatch } from "./useLoudnessMatch";
 import { type PlayerApi, usePlayer } from "./usePlayer";
 
 /** Keyboard seek steps (AGENTS §10: units in the name, no magic numbers). */
@@ -36,6 +38,12 @@ function formatMmss(sample: number, sampleRateHz: number): string {
   const seconds = Math.max(0, Math.trunc(sample / sampleRateHz));
   const minutes = Math.trunc(seconds / 60);
   return `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+/** Signed one-decimal playback gain, locale-neutral (Latin digits). */
+function formatGainDb(gainDb: number): string {
+  const normalized = Math.abs(gainDb) < 0.05 ? 0 : gainDb;
+  return `${normalized > 0 ? "+" : ""}${normalized.toFixed(1)} dB`;
 }
 
 /**
@@ -69,17 +77,34 @@ function useDisplayedSample(player: PlayerApi): number {
 }
 
 /** The docked player panel — the layout renders exactly one, per page. */
-export function PlayerDock(): React.ReactElement {
+export function PlayerDock({
+  onShowHelp,
+}: {
+  readonly onShowHelp: () => void;
+}): React.ReactElement {
   const { t } = useTranslation();
   const player = usePlayer();
+  useGlobalShortcuts({ player, onShowHelp });
+  const loudness = useLoudnessMatch(player);
   const selection = useSessionStore((state) => state.selection);
   const original = useSessionStore((state) => state.original);
+  const processed = useSessionStore((state) => state.processed);
   const clearProcessed = useSessionStore((state) => state.clearProcessed);
   const displayedSample = useDisplayedSample(player);
 
   // A source is present only when the transport actually holds samples
   // (a zero-length source plays nothing — the hint stays honest).
   const hasSource = player.lengthSamples > 0 && player.sampleRateHz > 0;
+  const activeSource =
+    player.activeKind === "processed" && processed !== null ? processed : original;
+  const playbackChannelCount = activeSource?.channels.length ?? 0;
+  const foldedFromChannelCount =
+    activeSource === original ? original?.foldedFromChannelCount : undefined;
+  const monoResultFromStereo =
+    player.activeKind === "processed" &&
+    original !== null &&
+    original.channels.length > 1 &&
+    processed?.channels.length === 1;
   const playing = player.state.phase === "playing";
   const current = formatMmss(displayedSample, player.sampleRateHz);
   const total = formatMmss(player.lengthSamples, player.sampleRateHz);
@@ -172,6 +197,32 @@ export function PlayerDock(): React.ReactElement {
         </Button>
         <Button
           size="sm"
+          variant={loudness.enabled ? "default" : "outline"}
+          aria-pressed={loudness.enabled}
+          aria-label={`${t("player.loudness.label")} — ${t("player.loudness.hint")}`}
+          title={t("player.loudness.hint")}
+          data-testid="player.loudnessMatch"
+          disabled={!hasSource}
+          onClick={() => {
+            loudness.toggle();
+          }}
+        >
+          {t("player.loudness.label")}
+        </Button>
+        <span
+          dir="ltr"
+          data-testid="player.loudnessGain"
+          title={t("player.loudness.hint")}
+          className="text-xs tabular-nums text-muted"
+        >
+          {loudness.status === "measuring"
+            ? t("player.loudness.measuring")
+            : loudness.enabled && player.hasProcessed
+              ? formatGainDb(loudness.gainDb)
+              : "—"}
+        </span>
+        <Button
+          size="sm"
           variant="outline"
           data-testid="player.reset"
           disabled={!player.hasProcessed}
@@ -225,6 +276,30 @@ export function PlayerDock(): React.ReactElement {
             : original
               ? t(`player.lane.${original.sourceKind}`)
               : ""}
+        </span>
+      )}
+      {hasSource && playbackChannelCount > 0 && (
+        <span
+          dir="ltr"
+          data-testid="player.channels"
+          className="border border-line px-2 py-0.5 text-xs text-muted"
+        >
+          {t("player.channels.count", { count: playbackChannelCount })}
+        </span>
+      )}
+      {hasSource && playbackChannelCount === 2 && (
+        <span data-testid="player.analysis" className="text-xs text-muted">
+          {t("player.analysis.mono")}
+        </span>
+      )}
+      {monoResultFromStereo && (
+        <span data-testid="player.result.mono" className="text-xs text-muted">
+          {t("player.result.mono")}
+        </span>
+      )}
+      {hasSource && foldedFromChannelCount !== undefined && (
+        <span dir="ltr" data-testid="player.channelsFolded" className="text-xs text-muted">
+          {t("player.channels.folded", { count: foldedFromChannelCount })}
         </span>
       )}
     </section>

@@ -21,15 +21,17 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --extra ml --no-install-project
 
 COPY apps/api/src ./src
+COPY apps/api/scripts ./scripts
 
-# Install the project itself, then create the non-root user and the /data
-# storage volume mount point with matching ownership.
+# Install the project itself, then create the non-root user and the /data and
+# /models mount points with matching ownership. An empty named volume inherits
+# this ownership on first use, so the non-root user can fill the model cache.
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --extra ml \
     && groupadd --gid 10001 avalab \
     && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin avalab \
-    && mkdir -p /data \
-    && chown -R avalab:avalab /app /data
+    && mkdir -p /data /models \
+    && chown -R avalab:avalab /app /data /models
 
 ENV PATH="/app/.venv/bin:$PATH" \
     AVALAB_STORAGE_DIR=/data

@@ -56,8 +56,43 @@ html {
   color-scheme: dark;
 }
 
+/* Light mode keeps the same token names so every tool follows the theme.
+ * Plot canvases read --color-accent/--color-muted; spectrogram colormaps
+ * stay unchanged because they encode data, not chrome. */
+[data-theme="light"] {
+  color-scheme: light;
+  --color-bg: oklch(0.98 0.006 250);
+  --color-surface: oklch(0.93 0.01 250);
+  --color-text: oklch(0.24 0.02 250);
+  --color-muted: oklch(0.48 0.02 250);
+  --color-accent: oklch(0.48 0.13 200);
+}
+
 body {
   background-color: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
+}
+
+/* React Flow defaults its minimap to white; keep it on the app tokens. */
+html .react-flow__minimap {
+  background-color: var(--color-surface);
+}
+
+html .react-flow__minimap-mask {
+  fill: var(--color-bg);
+  opacity: 0.75;
+}
+
+/* AGENTS §9 / Plan 05 Task 3: non-essential motion is opt-out. The UI has
+ * only color transitions today, but future motion must respect this too. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    scroll-behavior: auto;
+    transition-duration: 0.01ms;
+  }
 }

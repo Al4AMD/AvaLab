@@ -6,11 +6,16 @@
  * hint instead of silently trimming or resampling. PSNR uses peak = 1.0 and
  * the note is always visible (AGENTS F05).
  */
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ToolHeader } from "../../components/ToolHeader";
 
 import { useSessionStore } from "../../session/store";
 import { UploadEmptyState } from "../input/upload";
-import { computeQualityMetrics, formatMetric, type QualityMetrics } from "./metrics";
+import { TheoryPanel } from "../theory/TheoryPanel";
+import { TOOL_THEORY } from "../theory/theoryContent";
+import { formatMetric, type QualityMetrics } from "./metrics";
+import { measureQualityMetrics } from "./qualityMetricsWorker";
 
 function MetricCard({
   label,
@@ -35,36 +40,57 @@ export function MetricsView(): React.ReactElement {
   const { t } = useTranslation();
   const original = useSessionStore((state) => state.original);
   const processed = useSessionStore((state) => state.processed);
+  const [metrics, setMetrics] = useState<QualityMetrics | null>(null);
+  const [pending, setPending] = useState(false);
+
+  const problem: "missing" | "lengthMismatch" | "rateMismatch" | null =
+    processed === null
+      ? "missing"
+      : original !== null && processed.sampleRateHz !== original.sampleRateHz
+        ? "rateMismatch"
+        : original !== null && processed.samples.length !== original.samples.length
+          ? "lengthMismatch"
+          : null;
+
+  useEffect(() => {
+    if (original === null || processed === null || problem !== null) {
+      setMetrics(null);
+      setPending(false);
+      return;
+    }
+    let cancelled = false;
+    setPending(true);
+    void measureQualityMetrics(original.samples, processed.samples, original.sampleRateHz).then(
+      (next) => {
+        if (!cancelled) {
+          setMetrics(next);
+          setPending(false);
+        }
+      },
+      () => {
+        if (!cancelled) {
+          setMetrics(null);
+          setPending(false);
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [original, processed, problem]);
 
   if (original === null) {
     return (
       <section className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold">{t("tool.metrics.title")}</h2>
+        <ToolHeader titleKey="tool.metrics.title" descriptionKey="tool.metrics.description" />
         <UploadEmptyState />
       </section>
     );
   }
 
-  let metrics: QualityMetrics | null = null;
-  let problem: "missing" | "lengthMismatch" | "rateMismatch" | null =
-    processed === null ? "missing" : null;
-  if (processed !== null) {
-    if (processed.sampleRateHz !== original.sampleRateHz) {
-      problem = "rateMismatch";
-    } else if (processed.samples.length !== original.samples.length) {
-      problem = "lengthMismatch";
-    } else {
-      try {
-        metrics = computeQualityMetrics(original.samples, processed.samples, original.sampleRateHz);
-      } catch {
-        problem = "lengthMismatch";
-      }
-    }
-  }
-
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-2xl font-semibold">{t("tool.metrics.title")}</h2>
+      <ToolHeader titleKey="tool.metrics.title" descriptionKey="tool.metrics.description" />
 
       {problem === "missing" ? (
         <p data-testid="metrics.missing" className="text-sm text-muted">
@@ -79,6 +105,12 @@ export function MetricsView(): React.ReactElement {
       {problem === "rateMismatch" ? (
         <p data-testid="metrics.mismatch.rate" className="text-sm text-muted">
           {t("metrics.mismatch.rate")}
+        </p>
+      ) : null}
+
+      {pending ? (
+        <p data-testid="metrics.pending" className="text-sm text-muted">
+          {t("metrics.pending")}
         </p>
       ) : null}
 
@@ -123,22 +155,10 @@ export function MetricsView(): React.ReactElement {
         </>
       ) : null}
 
-      <details className="rounded border border-surface p-3 text-sm">
-        <summary className="cursor-pointer font-semibold">{t("metrics.theory.title")}</summary>
-        <div className="mt-2 flex flex-col gap-2 text-xs text-muted">
-          <p>{t("metrics.theory.energy")}</p>
-          <p>{t("metrics.theory.segmental")}</p>
-          <p>{t("metrics.theory.psnr")}</p>
-          <div>
-            <h4 className="font-semibold text-text">{t("metrics.observe.title")}</h4>
-            <ul className="ms-4 list-disc">
-              <li>{t("metrics.observe.lossless")}</li>
-              <li>{t("metrics.observe.lossy")}</li>
-              <li>{t("metrics.observe.bitrate")}</li>
-            </ul>
-          </div>
-        </div>
-      </details>
+      <TheoryPanel
+        titleKey={TOOL_THEORY.metrics.titleKey}
+        sections={TOOL_THEORY.metrics.sections}
+      />
     </section>
   );
 }

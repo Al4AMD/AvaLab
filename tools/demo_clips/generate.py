@@ -2,15 +2,16 @@
 
 Purpose
 -------
-Produce three small, deterministic mono WAV files used by the web app's demo
+Produce four small, deterministic WAV files used by the web app's demo
 buttons and by e2e tests. Clips are self-generated (no third-party audio), so
 they are committed to the repository and licensed CC0/public domain along with
 the project (see ``docs/THIRD_PARTY.md``).
 
 Contract
 --------
-Every clip: 48000 Hz, 16-bit PCM, mono, 5.0 s (480000 PCM payload bytes +
-44-byte WAV header). All randomness uses fixed seeds and all parameters are
+Every clip: 48000 Hz, 16-bit PCM, 5.0 s. Three clips are mono; the stereo
+clip carries 440 Hz in the left channel and 660 Hz in the right (480000 frames;
+a mono clip is a 480044-byte file, the stereo clip is 960044 bytes). All randomness uses fixed seeds and all parameters are
 constants, so two runs are byte-identical. Output directory is
 ``<repo-root>/apps/web/public/demo`` where the repo root is found by walking
 up from this file until a directory containing ``.git`` is reached (same
@@ -26,6 +27,8 @@ Clips
   density falls as ``1/f``; scaled to peak 0.7.
 - ``clicks-2hz-5s.wav`` — impulse train at 2 clicks/s (every 0.5 s), each click
   a 2 kHz tone with exponential decay ``exp(-t/4ms)``, 40 ms long, amplitude 0.9.
+- ``stereo-tones-440-660hz-5s.wav`` — 440 Hz sine in the left channel, 660 Hz
+  sine in the right, amplitude 0.8 each (stereo playback demo).
 
 Usage::
 
@@ -89,12 +92,26 @@ def clicks_2hz() -> np.ndarray:
     return samples
 
 
+def stereo_tones() -> np.ndarray:
+    """440 Hz left / 660 Hz right, amplitude 0.8; shape ``(N, 2)``."""
+    t = np.arange(NUM_SAMPLES) / SAMPLE_RATE_HZ
+    left = 0.8 * np.sin(2.0 * np.pi * 440.0 * t)
+    right = 0.8 * np.sin(2.0 * np.pi * 660.0 * t)
+    return np.stack((left, right), axis=1)
+
+
 def write_wav(path: Path, samples: np.ndarray) -> None:
-    """Write float samples in [-1, 1] as 16-bit PCM mono WAV."""
-    pcm = np.clip(np.round(samples * 32767.0), -32768, 32767).astype("<i2")
+    """Write float samples in [-1, 1] as 16-bit PCM WAV.
+
+    A 1-D array is mono; a 2-D ``(frames, channels)`` array is interleaved.
+    """
+    values = samples[:, np.newaxis] if samples.ndim == 1 else samples
+    if values.ndim != 2:
+        raise ValueError(f"write_wav: expected 1-D or 2-D samples, got {samples.ndim}-D")
+    pcm = np.clip(np.round(values * 32767.0), -32768, 32767).astype("<i2")
     path.parent.mkdir(parents=True, exist_ok=True)
     with wave.open(str(path), "wb") as wav:
-        wav.setnchannels(1)
+        wav.setnchannels(values.shape[1])
         wav.setsampwidth(2)
         wav.setframerate(SAMPLE_RATE_HZ)
         wav.writeframes(pcm.tobytes())
@@ -106,6 +123,7 @@ def main() -> int:
         "chirp-log-100to8000hz-5s.wav": chirp_log_100to8000hz(),
         "pink-noise-5s.wav": pink_noise(),
         "clicks-2hz-5s.wav": clicks_2hz(),
+        "stereo-tones-440-660hz-5s.wav": stereo_tones(),
     }
     for name, samples in clips.items():
         path = out_dir / name
