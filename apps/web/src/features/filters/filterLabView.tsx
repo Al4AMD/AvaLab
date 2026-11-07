@@ -15,6 +15,15 @@ import { ToolHeader } from "../../components/ToolHeader";
 import { Button } from "../../components/ui/button";
 import { downloadWav } from "../../lib/download";
 import { formatDb, formatHz, formatS } from "../../lib/format";
+import { combineLaneResults, type LaneResults } from "../../lib/laneCombine";
+import {
+  laneParamsLinked,
+  relinkLaneParams,
+  resolveLaneParams,
+  setPrimaryLane,
+  setRightLane,
+  unlinkLaneParams,
+} from "../../lib/laneParams";
 import type {
   FilterApplyParams,
   FilterBand,
@@ -24,6 +33,8 @@ import type {
   FilterWindowKind,
 } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
+import { ChannelPicker } from "../channels/ChannelPicker";
+import { useChannelMode } from "../channels/useChannelMode";
 import { UploadEmptyState } from "../input/upload";
 import { TheoryPanel } from "../theory/TheoryPanel";
 import { TOOL_THEORY } from "../theory/theoryContent";
@@ -31,12 +42,14 @@ import { FilterLinePlot } from "./filterPlots";
 import {
   FILTER_DESIGN_KINDS,
   FILTER_WINDOWS,
+  type FilterEditLane,
+  type FilterPairSettings,
   type FilterSettings,
-  filterSettingsAtRate,
-  filterSettingsFromSearch,
-  filterSettingsToSearch,
-  loadFilterSettings,
-  saveFilterSettings,
+  filterPairAtRate,
+  filterPairFromSearch,
+  filterPairToSearch,
+  loadFilterPair,
+  saveFilterPair,
 } from "./filterState";
 import { PoleZeroPlot } from "./poleZeroPlot";
 
@@ -51,6 +64,7 @@ export type FilterAppliedRange = {
   readonly startSample: number;
   readonly endSample: number;
   readonly delaySamples: number;
+  readonly rightDelaySamples?: number;
 };
 
 export type FilterLabPanelProps = {
@@ -65,6 +79,8 @@ export type FilterLabPanelProps = {
   readonly applied: FilterAppliedRange | null;
   readonly exportAvailable?: boolean;
   readonly onExportWav?: () => void;
+  readonly channelControls?: React.ReactNode;
+  readonly rightDelaySamples?: number;
 };
 
 export function filterBandsForKind(kind: FilterDesignKind): readonly FilterBand[] {
@@ -236,6 +252,8 @@ export function FilterLabPanel({
   applied,
   exportAvailable = false,
   onExportWav,
+  channelControls,
+  rightDelaySamples,
 }: FilterLabPanelProps): React.ReactElement {
   const { t } = useTranslation();
   const valid = filterSettingsValid(settings);
@@ -246,10 +264,13 @@ export function FilterLabPanel({
   const rootsOmitted = settings.kind === "fir" && settings.taps > 33;
   const sampleAxis = Array.from({ length: 256 }, (_, index) => index);
   const showSecondCutoff = settings.band === "bandpass" || settings.band === "bandstop";
+  const rightDelay = rightDelaySamples ?? applied?.rightDelaySamples;
 
   return (
     <section className="flex flex-col gap-4">
       <ToolHeader titleKey="tool.filters.title" descriptionKey="tool.filters.description" />
+
+      {channelControls}
 
       <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-xs">
@@ -636,13 +657,24 @@ export function FilterLabPanel({
               </p>
             ) : null}
             {applied !== null ? (
-              <p data-testid="filters.apply.done" dir="ltr" className="text-xs text-muted">
-                {t("filters.apply.done", {
-                  start: formatS(applied.startSample / settings.sampleRateHz),
-                  end: formatS(applied.endSample / settings.sampleRateHz),
-                  delay: applied.delaySamples,
-                })}
-              </p>
+              <>
+                <p data-testid="filters.apply.done" dir="ltr" className="text-xs text-muted">
+                  {t("filters.apply.done", {
+                    start: formatS(applied.startSample / settings.sampleRateHz),
+                    end: formatS(applied.endSample / settings.sampleRateHz),
+                    delay: applied.delaySamples,
+                  })}
+                </p>
+                {rightDelay !== undefined ? (
+                  <p
+                    data-testid="filters.result.delayRight"
+                    dir="ltr"
+                    className="text-xs text-muted"
+                  >
+                    {t("filters.result.delayRight")}: {rightDelay} samples
+                  </p>
+                ) : null}
+              </>
             ) : null}
           </>
         ) : null}
@@ -655,13 +687,19 @@ export function FilterLabPanel({
   );
 }
 
+type FilterDesignLanes = {
+  left: FilterDesignResult | null;
+  right: FilterDesignResult | null;
+};
+
 export function FilterLabView(): React.ReactElement {
   const { t } = useTranslation();
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
   const processed = useSessionStore((state) => state.processed);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [design, setDesign] = useState<FilterDesignResult | null>(null);
+  const channel = useChannelMode(original, "both");
+  const [designs, setDesigns] = useState<FilterDesignLanes | null>(null);
   const [designBusy, setDesignBusy] = useState(false);
   const [designError, setDesignError] = useState<string | null>(null);
   const [applyBusy, setApplyBusy] = useState(false);
@@ -669,26 +707,57 @@ export function FilterLabView(): React.ReactElement {
   const [applied, setApplied] = useState<FilterAppliedRange | null>(null);
   const designGenerationRef = useRef(0);
 
-  const settings = useMemo(() => {
-    const fromSearch = filterSettingsFromSearch(`?${searchParams.toString()}`);
-    const base = searchParams.toString() === "" ? loadFilterSettings() : fromSearch;
-    if (original === null) {
-      return base;
-    }
-    return filterSettingsAtRate(base, original.sampleRateHz);
-  }, [searchParams, original]);
+  const search = searchParams.toString();
+  const pair = useMemo(() => {
+    const base = search === "" ? loadFilterPair() : filterPairFromSearch(`?${search}`);
+    return original === null ? base : filterPairAtRate(base, original.sampleRateHz);
+  }, [search, original]);
+  const resolved = useMemo(() => resolveLaneParams(pair), [pair]);
+  const effectiveLane: FilterEditLane =
+    channel.mode === "both" ? pair.editLane : channel.mode === "right" ? "right" : "left";
+  const settings = effectiveLane === "right" ? resolved.right : resolved.left;
+  const linked = laneParamsLinked(pair);
 
   useEffect(() => {
-    saveFilterSettings(settings);
-  }, [settings]);
+    saveFilterPair(pair);
+  }, [pair]);
 
-  function updateSettings(patch: Partial<FilterSettings>): void {
-    const next = { ...settings, ...patch };
+  function writePair(nextPair: FilterPairSettings): void {
     const params = new URLSearchParams(searchParams);
-    for (const [key, value] of new URLSearchParams(filterSettingsToSearch(next))) {
+    for (const key of Array.from(params.keys())) {
+      if (key === "el" || (key.startsWith("rr") && key.length > 2)) {
+        params.delete(key);
+      }
+    }
+    for (const [key, value] of new URLSearchParams(filterPairToSearch(nextPair))) {
       params.set(key, value);
     }
     setSearchParams(params, { replace: true });
+  }
+
+  function updateSettings(patch: Partial<FilterSettings>): void {
+    const current = effectiveLane === "right" ? resolved.right : pair.primary;
+    const next = { ...current, ...patch };
+    const nextPair =
+      effectiveLane === "right" ? setRightLane(pair, next) : setPrimaryLane(pair, next);
+    writePair({ ...nextPair, editLane: pair.editLane });
+  }
+
+  function updateSharedSettings(patch: Partial<FilterSettings>): void {
+    writePair({
+      ...pair,
+      primary: { ...pair.primary, ...patch },
+      ...(pair.right === undefined ? {} : { right: { ...pair.right, ...patch } }),
+    });
+  }
+
+  function selectEditLane(lane: FilterEditLane): void {
+    writePair({ ...pair, editLane: lane });
+  }
+
+  function setLinked(nextLinked: boolean): void {
+    const next = nextLinked ? relinkLaneParams(pair) : unlinkLaneParams(pair);
+    writePair({ ...next, editLane: pair.editLane });
   }
 
   useEffect(() => {
@@ -698,26 +767,55 @@ export function FilterLabView(): React.ReactElement {
     const generation = designGenerationRef.current + 1;
     designGenerationRef.current = generation;
     setDesignError(null);
-    if (!filterSettingsValid(settings)) {
-      setDesign(null);
+    const both = channel.mode === "both";
+    const targets: readonly { lane: FilterEditLane; settings: FilterSettings }[] = both
+      ? linked
+        ? [{ lane: "left", settings: resolved.left }]
+        : [
+            { lane: "left", settings: resolved.left },
+            { lane: "right", settings: resolved.right },
+          ]
+      : [{ lane: effectiveLane, settings }];
+    if (targets.some((target) => !filterSettingsValid(target.settings))) {
+      setDesigns(null);
       setDesignBusy(false);
+      if (both) {
+        setDesignError(t("filters.error.invalid"));
+      }
       return;
     }
     setDesignBusy(true);
     const timer = window.setTimeout(() => {
-      const ticket = useSessionStore
-        .getState()
-        .deriveStandalone("filterDesign", filterDesignParams(settings));
-      ticket.outcome.then(
-        (outcome) => {
-          if (designGenerationRef.current !== generation || "cancelled" in outcome) {
+      const tickets = targets.map((target) => ({
+        target,
+        ticket: useSessionStore
+          .getState()
+          .deriveStandalone("filterDesign", filterDesignParams(target.settings)),
+      }));
+      Promise.all(
+        tickets.map(async ({ target, ticket }) => ({ target, outcome: await ticket.outcome })),
+      ).then(
+        (settled) => {
+          if (designGenerationRef.current !== generation) {
             return;
           }
-          setDesign(outcome);
+          const next: FilterDesignLanes = { left: null, right: null };
+          for (const { target, outcome } of settled) {
+            if ("cancelled" in outcome) {
+              setDesignBusy(false);
+              return;
+            }
+            next[target.lane] = outcome;
+          }
+          if (both && linked) {
+            next.right = next.left;
+          }
+          setDesigns(next);
           setDesignBusy(false);
         },
         () => {
           if (designGenerationRef.current === generation) {
+            setDesigns(null);
             setDesignBusy(false);
             setDesignError(t("filters.error.designFailed"));
           }
@@ -727,13 +825,13 @@ export function FilterLabView(): React.ReactElement {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [original, settings, t]);
+  }, [original, channel.mode, effectiveLane, resolved, settings, linked, t]);
 
   async function applyFilter(scope: "selection" | "all"): Promise<void> {
-    if (original === null || design === null || !filterSettingsValid(settings)) {
+    if (original === null) {
       return;
     }
-    updateSettings({ applyScope: scope });
+    updateSharedSettings({ applyScope: scope });
     const range = filterApplyRange(
       scope,
       selection,
@@ -746,22 +844,107 @@ export function FilterLabView(): React.ReactElement {
     }
     setApplyBusy(true);
     setApplyError(null);
-    const slice = original.samples.slice(range.startSample, range.endSample);
     try {
-      const ticket = useSessionStore
-        .getState()
-        .deriveStandalone("filterApply", filterApplyParams(settings, design), {
-          buffer: slice.buffer,
-          byteOffset: 0,
-          byteLength: slice.byteLength,
+      if (channel.mode === "mono") {
+        const monoDesign = designs?.left ?? null;
+        if (monoDesign === null || !filterSettingsValid(pair.primary)) {
+          return;
+        }
+        const slice = original.samples.slice(range.startSample, range.endSample);
+        const ticket = useSessionStore
+          .getState()
+          .deriveStandalone("filterApply", filterApplyParams(pair.primary, monoDesign), {
+            buffer: slice.buffer,
+            byteOffset: 0,
+            byteLength: slice.byteLength,
+          });
+        const outcome = await ticket.outcome;
+        if ("cancelled" in outcome) {
+          return;
+        }
+        const installed = useSessionStore
+          .getState()
+          .setProcessed(outcome.samples, pair.primary.sampleRateHz, PROCESSED_LABEL);
+        if (!installed.ok) {
+          setApplyError(t("filters.error.playback"));
+          return;
+        }
+        setApplied({
+          startSample: range.startSample,
+          endSample: range.endSample,
+          delaySamples: outcome.delaySamples,
         });
-      const outcome = await ticket.outcome;
-      if ("cancelled" in outcome) {
+        return;
+      }
+
+      let active: readonly {
+        lane: 0 | 1;
+        settings: FilterSettings;
+        design: FilterDesignResult;
+      }[];
+      if (channel.mode === "both") {
+        const leftDesign = designs?.left ?? null;
+        const rightDesign = designs?.right ?? null;
+        if (leftDesign === null || rightDesign === null) {
+          return;
+        }
+        active = [
+          { lane: 0, settings: resolved.left, design: leftDesign },
+          { lane: 1, settings: resolved.right, design: rightDesign },
+        ];
+      } else {
+        const laneDesign = designs?.[effectiveLane] ?? null;
+        if (laneDesign === null) {
+          return;
+        }
+        active = [{ lane: effectiveLane === "right" ? 1 : 0, settings, design: laneDesign }];
+      }
+      if (active.some((entry) => !filterSettingsValid(entry.settings))) {
+        return;
+      }
+
+      const settled = await Promise.all(
+        active.map(async (entry) => {
+          const ticket = useSessionStore
+            .getState()
+            .deriveWithSourceSliceLane(
+              "filterApply",
+              filterApplyParams(entry.settings, entry.design),
+              range.startSample,
+              range.endSample,
+              entry.lane,
+            );
+          return { lane: entry.lane, outcome: await ticket.outcome };
+        }),
+      );
+      if (settled.some(({ outcome }) => "cancelled" in outcome)) {
+        return;
+      }
+      const laneResults: { left?: Float32Array; right?: Float32Array } = {};
+      for (const { lane, outcome } of settled) {
+        if ("cancelled" in outcome) {
+          return;
+        }
+        if (lane === 0) {
+          laneResults.left = outcome.samples;
+        } else {
+          laneResults.right = outcome.samples;
+        }
+      }
+      const combined = combineLaneResults(
+        channel.mode,
+        original.channels,
+        range.startSample,
+        range.endSample - range.startSample,
+        laneResults as LaneResults,
+      );
+      if (combined === null) {
+        setApplyError(t("filters.error.playback"));
         return;
       }
       const installed = useSessionStore
         .getState()
-        .setProcessed(outcome.samples, settings.sampleRateHz, PROCESSED_LABEL);
+        .setProcessed(combined, original.sampleRateHz, PROCESSED_LABEL);
       if (!installed.ok) {
         setApplyError(t("filters.error.playback"));
         return;
@@ -769,7 +952,11 @@ export function FilterLabView(): React.ReactElement {
       setApplied({
         startSample: range.startSample,
         endSample: range.endSample,
-        delaySamples: outcome.delaySamples,
+        delaySamples:
+          (channel.mode === "both" ? designs?.left : designs?.[effectiveLane])?.delaySamples ?? 0,
+        ...(channel.mode === "both"
+          ? { rightDelaySamples: designs?.right?.delaySamples ?? 0 }
+          : {}),
       });
     } catch {
       setApplyError(t("filters.error.applyFailed"));
@@ -787,11 +974,62 @@ export function FilterLabView(): React.ReactElement {
     );
   }
 
+  const displayedDesign = designs?.[effectiveLane] ?? null;
+  const panelDesign =
+    channel.mode === "both" && designs !== null && (designs.left === null || designs.right === null)
+      ? null
+      : displayedDesign;
+
+  const laneLabels = {
+    left: t("filters.lane.left"),
+    right: t("filters.lane.right"),
+  } as const;
+
+  const channelControls = (
+    <div className="flex flex-col gap-3 rounded border border-surface p-3">
+      <ChannelPicker mode={channel.mode} modes={channel.modes} onChange={channel.setMode} />
+      {channel.mode === "both" ? (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            {(["left", "right"] as const).map((lane) => (
+              <Button
+                key={lane}
+                size="sm"
+                variant={effectiveLane === lane ? "default" : "outline"}
+                aria-pressed={effectiveLane === lane}
+                data-testid={`filters.lane.${lane}`}
+                onClick={() => {
+                  selectEditLane(lane);
+                }}
+              >
+                {laneLabels[lane]}
+              </Button>
+            ))}
+          </div>
+          <label className="flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              data-testid="filters.linkRight"
+              checked={linked}
+              onChange={(event) => {
+                setLinked(event.currentTarget.checked);
+              }}
+            />
+            <span>{t("filters.lane.link")}</span>
+          </label>
+          <p data-testid="filters.lane.status" className="text-xs text-muted">
+            {linked ? t("filters.lane.linked") : t("filters.lane.separate")}
+          </p>
+        </>
+      ) : null}
+    </div>
+  );
+
   return (
     <FilterLabPanel
       settings={settings}
       onSettingsChange={updateSettings}
-      design={design}
+      design={panelDesign}
       designBusy={designBusy}
       designError={designError}
       onApply={(scope) => {
@@ -806,8 +1044,9 @@ export function FilterLabView(): React.ReactElement {
         if (filtered === null || filtered.label !== PROCESSED_LABEL) {
           return;
         }
-        downloadWav(filtered.samples, filtered.sampleRateHz, "avalab-filters.wav");
+        downloadWav(filtered.channels, filtered.sampleRateHz, "avalab-filters.wav");
       }}
+      channelControls={channelControls}
     />
   );
 }

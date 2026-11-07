@@ -236,6 +236,13 @@
     }
   },
   "codecLab": {
+    "lane": {
+      "left": "Left lane",
+      "right": "Right lane",
+      "link": "Use the same codec settings for both lanes",
+      "linked": "Right lane mirrors the left lane.",
+      "separate": "Right lane has separate settings."
+    },
     "excerpt": {
       "start": "Excerpt start (s)",
       "end": "Excerpt end (s)",
@@ -279,6 +286,11 @@
     },
     "stats": {
       "title": "Compression statistics",
+      "aggregate": "Both lanes",
+      "lane": {
+        "left": "Left lane",
+        "right": "Right lane"
+      },
       "originalBytes": "Original size",
       "compressedBytes": "Compressed size",
       "ratio": "Compression ratio",
@@ -297,7 +309,9 @@
       "psnrNote": "PSNR uses peak = 1.0 (full scale); ∞ means the reconstruction is identical."
     },
     "toy": {
-      "mono": "Mono toy codec"
+      "mono": "Mono toy codec",
+      "lane": "This result processes the selected lane; the other lane is passed through.",
+      "stereo": "Each lane is encoded and decoded independently; stats aggregate both lanes."
     },
     "metrics": {
       "monoAnalysis": "Mono analysis metrics",
@@ -332,6 +346,7 @@
     },
     "comparison": {
       "title": "Method comparison",
+      "stereoNote": "Switch to Mono, Left, or Right to add a single-lane comparison row.",
       "empty": "Encode with a hand-written codec or a real codec to compare the measured rows here.",
       "copy": "Copy CSV",
       "copied": "CSV copied to the clipboard.",
@@ -377,6 +392,10 @@
       "delta": "The first-order predictor codes differences between adjacent samples; the smaller range makes Huffman more compact.",
       "companding": "μ-law and A-law (G.711) compress amplitude logarithmically; 8 bits sound acceptable but are not bit-exact.",
       "mdct": "A windowed MDCT with TDAC turns the signal into coefficients; uniform quantization under a bit budget produces playback-friendly error.",
+      "lanes": {
+        "heading": "Independent lane coding",
+        "body": "Each lane gets its own codec and quantization settings. Real MP3 and AAC encoders often share side information across channels (joint stereo) to spend fewer bits; this lab keeps the lanes independent to make the trade-off visible."
+      },
       "observe": {
         "title": "What to observe",
         "lossless": "RLE, Huffman and delta+Huffman must show “bit-exact ✓”; μ-law, A-law and MDCT must not.",
@@ -425,6 +444,13 @@
     }
   },
   "spectrumEdit": {
+    "lane": {
+      "left": "Left lane",
+      "right": "Right lane",
+      "link": "Use the same edits for both lanes",
+      "linked": "Edits apply to both lanes.",
+      "separate": "Edits apply to the selected lane only."
+    },
     "controls": {
       "bandStart": "Band start (Hz)",
       "bandEnd": "Band end (Hz)",
@@ -475,6 +501,7 @@
       "phase": "Phase"
     },
     "meta": {
+      "channel": "Channel",
       "sampleCount": "Samples",
       "fftLength": "FFT length",
       "binWidth": "Bin width",
@@ -518,6 +545,10 @@
       "hermitian": {
         "heading": "Hermitian symmetry",
         "body": "For a real signal, bin N−k is the conjugate of bin k. Editing magnitude or phase independently can break that rule; the toggle shows the consequence instead of hiding it."
+      },
+      "lanes": {
+        "heading": "Per-lane spectra",
+        "body": "Hermitian symmetry and the edit list belong to one lane at a time. Independent editing can break the stereo relationship the original recording carried; using the same edits on both lanes keeps them aligned."
       },
       "gibbs": {
         "heading": "Sharp masks ring",
@@ -1635,6 +1666,13 @@
     }
   },
   "filters": {
+    "lane": {
+      "left": "Left lane",
+      "right": "Right lane",
+      "link": "Use the same settings for both lanes",
+      "linked": "Right lane mirrors the left lane.",
+      "separate": "Right lane has separate settings."
+    },
     "controls": {
       "kind": "Design kind",
       "band": "Band",
@@ -1673,6 +1711,7 @@
       "stable": "Stable",
       "unstable": "Unstable",
       "delay": "Delay",
+      "delayRight": "Right delay",
       "coefficients": "Coefficients"
     },
     "status": {
@@ -1741,6 +1780,10 @@
       "poles": {
         "heading": "Poles and stability",
         "body": "Inside the unit circle is stable, outside is unstable, and on the circle is marginal. A pole closer to the circle produces a sharper resonance and slower decay."
+      },
+      "lanes": {
+        "heading": "Per-lane filters",
+        "body": "A linked pair applies one design to both playback lanes. Unlink the pair to give each lane its own cutoff or design; the response and pole-zero plots show the selected lane. Independent filtering can widen, narrow, or shift the stereo image."
       },
       "observe": {
         "heading": "What to observe",

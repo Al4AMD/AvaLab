@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createDspRpc } from "./rpc";
 import { createSessionStore } from "./store";
-import { type FakeTransport, makeFakeTransport, requestsOf } from "./testDoubles";
+import { cancelFramesOf, type FakeTransport, makeFakeTransport, requestsOf } from "./testDoubles";
 
 const WAVEFORM_PARAMS = { bucketCount: 4, sampleRateHz: 48_000 } as const;
 const RANGE_PARAMS = {
@@ -17,8 +17,8 @@ type Harness = {
   readonly transport: FakeTransport;
 };
 
-function makeStore(): Harness {
-  const transport = makeFakeTransport("echo");
+function makeStore(mode: "echo" | "silent" = "echo"): Harness {
+  const transport = makeFakeTransport(mode);
   return { store: createSessionStore(createDspRpc(transport)), transport };
 }
 
@@ -57,8 +57,8 @@ describe("deriveWithSourceLane", () => {
     });
   });
 
-  it("keys the two lanes apart while sharing the source hash", async () => {
-    const { store } = makeStore();
+  it("keys the two lanes apart and keeps both concurrent calls alive", async () => {
+    const { store, transport } = makeStore("silent");
     loadStereo(store);
 
     const leftTicket = store
@@ -68,9 +68,24 @@ describe("deriveWithSourceLane", () => {
       .getState()
       .deriveWithSourceLane("waveformOverview", WAVEFORM_PARAMS, 1);
     expect(leftTicket.key).not.toBe(rightTicket.key);
-    expect(leftTicket.key.split("\u0000").at(-1)).toBe("lane:0");
-    expect(rightTicket.key.split("\u0000").at(-1)).toBe("lane:1");
-    await Promise.all([leftTicket.outcome, rightTicket.outcome]);
+    expect(leftTicket.key.endsWith("\u0000lane:0")).toBe(true);
+    expect(rightTicket.key.endsWith("\u0000lane:1")).toBe(true);
+    const [leftRequest, rightRequest] = requestsOf(transport);
+    expect(leftRequest?.id).not.toBe(rightRequest?.id);
+    expect(cancelFramesOf(transport)).toEqual([]);
+
+    transport.deliver({
+      id: leftRequest?.id,
+      ok: true,
+      result: { meta: { received: "left" } },
+    });
+    transport.deliver({
+      id: rightRequest?.id,
+      ok: true,
+      result: { meta: { received: "right" } },
+    });
+    await expect(leftTicket.outcome).resolves.toEqual({ meta: { received: "left" } });
+    await expect(rightTicket.outcome).resolves.toEqual({ meta: { received: "right" } });
   });
 
   it("serves a second lane derive from cache without another frame", async () => {
@@ -107,7 +122,7 @@ describe("deriveWithSourceSliceLane", () => {
     const ticket = store
       .getState()
       .deriveWithSourceSliceLane("waveformRange", RANGE_PARAMS, 2, 5, 1);
-    expect(ticket.key.endsWith("\u0000lane:1")).toBe(true);
+    expect(ticket.key).toContain("\u0000lane:1\u0000range:2:5");
     expect(payloadValues(transport, 0)).toEqual([...right.slice(2, 5)]);
     await ticket.outcome;
 
@@ -122,6 +137,54 @@ describe("deriveWithSourceSliceLane", () => {
       );
     expect(payloadValues(transport, 1)).toEqual([...right]);
     await clamped.outcome;
+  });
+
+  it("keys different slice ranges apart even when params are identical", async () => {
+    const { store, transport } = makeStore();
+    const { right } = loadStereo(store);
+    const params = {
+      b: [0.5],
+      a: [1],
+      fir: true,
+      sampleRateHz: 48_000,
+      compensateDelay: true,
+    };
+
+    const first = store.getState().deriveWithSourceSliceLane("filterApply", params, 2, 5, 1);
+    await first.outcome;
+    const second = store.getState().deriveWithSourceSliceLane("filterApply", params, 4, 7, 1);
+    await second.outcome;
+
+    expect(second.key).not.toBe(first.key);
+    expect(requestsOf(transport)).toHaveLength(2);
+    expect(payloadValues(transport, 0)).toEqual([...right.slice(2, 5)]);
+    expect(payloadValues(transport, 1)).toEqual([...right.slice(4, 7)]);
+  });
+
+  it("does not supersede a concurrent same-params right-lane slice", async () => {
+    const { store, transport } = makeStore("silent");
+    loadStereo(store);
+
+    const leftTicket = store
+      .getState()
+      .deriveWithSourceSliceLane("waveformRange", RANGE_PARAMS, 2, 5, 0);
+    const rightTicket = store
+      .getState()
+      .deriveWithSourceSliceLane("waveformRange", RANGE_PARAMS, 2, 5, 1);
+    const [leftRequest, rightRequest] = requestsOf(transport);
+    expect(cancelFramesOf(transport)).toEqual([]);
+    transport.deliver({
+      id: leftRequest?.id,
+      ok: true,
+      result: { meta: { received: "left" } },
+    });
+    transport.deliver({
+      id: rightRequest?.id,
+      ok: true,
+      result: { meta: { received: "right" } },
+    });
+    await expect(leftTicket.outcome).resolves.toEqual({ meta: { received: "left" } });
+    await expect(rightTicket.outcome).resolves.toEqual({ meta: { received: "right" } });
   });
 
   it("rejects a missing lane before any payload copy", async () => {

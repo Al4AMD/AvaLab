@@ -213,6 +213,10 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
         formula: "X[N-k]=X^{*}[k]",
       },
       {
+        headingKey: "spectrumEdit.theory.lanes.heading",
+        bodyKey: "spectrumEdit.theory.lanes.body",
+      },
+      {
         headingKey: "spectrumEdit.theory.gibbs.heading",
         bodyKey: "spectrumEdit.theory.gibbs.body",
       },
@@ -235,6 +239,10 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
         headingKey: "codecLab.theory.headings.mdct",
         bodyKey: "codecLab.theory.mdct",
         formula: "R=\\frac{\\text{bits per second}}{1000}\\ \\mathrm{kbps}",
+      },
+      {
+        headingKey: "codecLab.theory.lanes.heading",
+        bodyKey: "codecLab.theory.lanes.body",
       },
       {
         headingKey: "codecLab.theory.observe.title",

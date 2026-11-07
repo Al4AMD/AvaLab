@@ -777,11 +777,12 @@ export function createSessionStore(
           inputHash,
           () => {
             const copy = samples.slice();
-            return rpc.call(opKey, params, {
-              buffer: copy.buffer,
-              byteOffset: 0,
-              byteLength: copy.byteLength,
-            });
+            return rpc.call(
+              opKey,
+              params,
+              { buffer: copy.buffer, byteOffset: 0, byteLength: copy.byteLength },
+              { supersede: false },
+            );
           },
           `\u0000lane:${lane}`,
         );
@@ -816,13 +817,14 @@ export function createSessionStore(
           inputHash,
           () => {
             const copy = samples.slice(start, end);
-            return rpc.call(opKey, params, {
-              buffer: copy.buffer,
-              byteOffset: 0,
-              byteLength: copy.byteLength,
-            });
+            return rpc.call(
+              opKey,
+              params,
+              { buffer: copy.buffer, byteOffset: 0, byteLength: copy.byteLength },
+              { supersede: false },
+            );
           },
-          `\u0000lane:${lane}`,
+          `\u0000lane:${lane}\u0000range:${start}:${end}`,
         );
       },
 

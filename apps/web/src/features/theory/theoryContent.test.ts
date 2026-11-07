@@ -37,6 +37,12 @@ describe("tool theory content", () => {
     expect(Object.keys(TOOL_THEORY).sort()).toEqual([...REQUIRED_TOOL_IDS].sort());
   });
 
+  it("documents independent lane coding for the codec lab", () => {
+    expect(TOOL_THEORY["codec-lab"].sections.map((section) => section.headingKey)).toContain(
+      "codecLab.theory.lanes.heading",
+    );
+  });
+
   it.each(REQUIRED_TOOL_IDS)("%s has at least two sections and one formula", (toolId) => {
     const entry = TOOL_THEORY[toolId];
     expect(entry.sections.length).toBeGreaterThanOrEqual(2);

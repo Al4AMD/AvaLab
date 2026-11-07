@@ -9,6 +9,7 @@
  */
 
 import type {
+  SpectrumCurveEdit,
   SpectrumCurvePoint,
   SpectrumCurveTarget,
   SpectrumEdit,
@@ -23,10 +24,21 @@ import { ToolHeader } from "../../components/ToolHeader";
 import "uplot/dist/uPlot.min.css";
 
 import { Button } from "../../components/ui/button";
+import type { ChannelMode } from "../../lib/channel";
 import { formatHz, formatS } from "../../lib/format";
-import { writeLastUsed } from "../../lib/lastUsed";
+import { combineLaneResults, type LaneResults } from "../../lib/laneCombine";
+import {
+  laneParamsLinked,
+  relinkLaneParams,
+  resolveLaneParams,
+  setPrimaryLane,
+  setRightLane,
+  unlinkLaneParams,
+} from "../../lib/laneParams";
 import { FFT_MAX_LENGTH, type SpectrumEditResult } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
+import { ChannelPicker } from "../channels/ChannelPicker";
+import { useChannelMode } from "../channels/useChannelMode";
 import { UploadEmptyState } from "../input/upload";
 import { TheoryPanel } from "../theory/TheoryPanel";
 import { TOOL_THEORY } from "../theory/theoryContent";
@@ -39,16 +51,18 @@ import {
 } from "./curveState";
 import {
   binsFromHz,
-  loadSpectrumEditSettings,
+  loadSpectrumEditPair,
   presetEdits,
   SPECTRUM_EDIT_MODES,
   SPECTRUM_EDIT_PRESETS,
-  SPECTRUM_EDIT_STORAGE_KEY,
   SPECTRUM_EDIT_TARGETS,
+  type SpectrumEditLaneSettings,
+  type SpectrumEditPairSettings,
   type SpectrumEditPreset,
   type SpectrumEditSettings,
-  spectrumEditSettingsFromSearch,
-  spectrumEditSettingsToSearch,
+  saveSpectrumEditPair,
+  spectrumEditPairFromSearch,
+  spectrumEditPairToSearch,
 } from "./spectrumEditState";
 
 const PLOT_HEIGHT_PX = 180;
@@ -97,6 +111,42 @@ function unpackResult(outcome: {
     im: values.subarray(sampleCount + binCount, sampleCount + binCount * 2),
     magnitude: values.subarray(sampleCount + binCount * 2, sampleCount + binCount * 3),
     phase: values.subarray(sampleCount + binCount * 3, sampleCount + binCount * 4),
+  };
+}
+
+function designTargets(
+  mode: ChannelMode,
+  effectiveLane: "left" | "right",
+): readonly ("left" | "right")[] {
+  if (mode === "mono" || mode === "left") {
+    return ["left"];
+  }
+  if (mode === "right") {
+    return ["right"];
+  }
+  return [effectiveLane, effectiveLane === "left" ? "right" : "left"];
+}
+
+function paramsFor(
+  lane: SpectrumEditLaneSettings,
+  startSample: number,
+  endSample: number,
+  sampleRateHz: number,
+): {
+  readonly sampleRateHz: number;
+  readonly startSample: number;
+  readonly endSample: number;
+  readonly edits: readonly SpectrumEdit[];
+  readonly curves: readonly SpectrumCurveEdit[];
+  readonly hermitian: boolean;
+} {
+  return {
+    sampleRateHz,
+    startSample,
+    endSample,
+    edits: lane.edits,
+    curves: lane.curves,
+    hermitian: lane.hermitian,
   };
 }
 
@@ -206,21 +256,67 @@ export function SpectrumEditView(): React.ReactElement {
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
   const [searchParams, setSearchParams] = useSearchParams();
-  const settings = useMemo(() => {
+  const channel = useChannelMode(original, "both");
+  const search = searchParams.toString();
+  const pair = useMemo(() => {
     const source = {
       sampleCount: original?.samples.length ?? 0,
       sampleRateHz: original?.sampleRateHz ?? 1,
     };
-    if (searchParams.toString() === "") {
-      return loadSpectrumEditSettings(source, selection);
-    }
-    return spectrumEditSettingsFromSearch(`?${searchParams.toString()}`, source, selection);
-  }, [searchParams, original, selection]);
+    return search === ""
+      ? loadSpectrumEditPair(source, selection)
+      : spectrumEditPairFromSearch(`?${search}`, source, selection);
+  }, [search, original, selection]);
+  const resolved = useMemo(() => resolveLaneParams(pair.lanes), [pair.lanes]);
+  const effectiveLane =
+    channel.mode === "both" ? pair.editLane : channel.mode === "right" ? "right" : "left";
+  const settings = useMemo<SpectrumEditSettings>(
+    () => ({
+      ...resolved[effectiveLane],
+      startSample: pair.startSample,
+      endSample: pair.endSample,
+    }),
+    [resolved, effectiveLane, pair.startSample, pair.endSample],
+  );
+  const linked = laneParamsLinked(pair.lanes);
 
   useEffect(() => {
-    writeLastUsed(SPECTRUM_EDIT_STORAGE_KEY, spectrumEditSettingsToSearch(settings));
-  }, [settings]);
-  const [result, setResult] = useState<SpectrumEditViewResult | null>(null);
+    saveSpectrumEditPair(pair);
+  }, [pair]);
+
+  function writePair(nextPair: SpectrumEditPairSettings): void {
+    const params = new URLSearchParams(searchParams);
+    for (const key of Array.from(params.keys())) {
+      if (key === "el" || key === CURVE_URL_KEY || (key.startsWith("rr") && key.length > 2)) {
+        params.delete(key);
+      }
+    }
+    for (const [key, value] of new URLSearchParams(spectrumEditPairToSearch(nextPair))) {
+      params.set(key, value);
+    }
+    setSearchParams(params, { replace: true });
+  }
+
+  function updateSettings(patch: Partial<SpectrumEditLaneSettings>): void {
+    const current = effectiveLane === "right" ? resolved.right : pair.lanes.primary;
+    const next = { ...current, ...patch };
+    const lanes =
+      effectiveLane === "right" ? setRightLane(pair.lanes, next) : setPrimaryLane(pair.lanes, next);
+    writePair({ ...pair, lanes });
+  }
+
+  function selectEditLane(lane: "left" | "right"): void {
+    writePair({ ...pair, editLane: lane });
+  }
+
+  function setLinked(nextLinked: boolean): void {
+    const lanes = nextLinked ? relinkLaneParams(pair.lanes) : unlinkLaneParams(pair.lanes);
+    writePair({ ...pair, lanes });
+  }
+
+  const [laneResults, setLaneResults] = useState<
+    Partial<Record<"left" | "right", SpectrumEditViewResult>>
+  >({});
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const [bandStartHz, setBandStartHz] = useState(500);
@@ -232,16 +328,6 @@ export function SpectrumEditView(): React.ReactElement {
   const [curveDraft, setCurveDraft] = useState<readonly SpectrumCurvePoint[]>([]);
   const generationRef = useRef(0);
 
-  function updateSettings(patch: Partial<SpectrumEditSettings>): void {
-    const next = { ...settings, ...patch };
-    const params = new URLSearchParams(searchParams);
-    params.delete(CURVE_URL_KEY);
-    for (const [key, entry] of new URLSearchParams(spectrumEditSettingsToSearch(next))) {
-      params.set(key, entry);
-    }
-    setSearchParams(params, { replace: true });
-  }
-
   const rangeStart = Math.max(0, Math.min(settings.startSample, original?.samples.length ?? 0));
   const rangeEnd = Math.max(
     rangeStart,
@@ -250,52 +336,69 @@ export function SpectrumEditView(): React.ReactElement {
   const analysisStart = rangeStart;
   const analysisEnd = Math.min(rangeEnd, rangeStart + FFT_MAX_LENGTH);
 
-  const params = useMemo(
-    () => ({
-      sampleRateHz: original?.sampleRateHz ?? 0,
-      startSample: rangeStart,
-      endSample: rangeEnd,
-      edits: settings.edits,
-      curves: settings.curves,
-      hermitian: settings.hermitian,
-    }),
-    [original, rangeStart, rangeEnd, settings.edits, settings.curves, settings.hermitian],
-  );
-
   useEffect(() => {
     generationRef.current += 1;
     const generation = generationRef.current;
     setFailed(false);
     if (original === null || analysisEnd <= analysisStart) {
-      setResult(null);
+      setLaneResults({});
       setBusy(false);
       return;
     }
     setBusy(true);
-    let ticketKey: string | null = null;
+    let tickets: { readonly key: string }[] = [];
     const timer = window.setTimeout(() => {
-      const ticket = useSessionStore
-        .getState()
-        .deriveWithSourceSlice("spectrumEdit", params, analysisStart, analysisEnd);
-      ticketKey = ticket.key;
-      ticket.outcome.then(
-        (outcome) => {
-          if (generationRef.current !== generation || "cancelled" in outcome) {
+      const pending = designTargets(channel.mode, effectiveLane).map((targetLane) => {
+        const laneSettings = resolved[targetLane];
+        const ticket =
+          channel.mode === "mono"
+            ? useSessionStore
+                .getState()
+                .deriveWithSourceSlice(
+                  "spectrumEdit",
+                  paramsFor(laneSettings, rangeStart, rangeEnd, original.sampleRateHz),
+                  analysisStart,
+                  analysisEnd,
+                )
+            : useSessionStore
+                .getState()
+                .deriveWithSourceSliceLane(
+                  "spectrumEdit",
+                  paramsFor(laneSettings, rangeStart, rangeEnd, original.sampleRateHz),
+                  analysisStart,
+                  analysisEnd,
+                  targetLane === "right" ? 1 : 0,
+                );
+        return { lane: targetLane, ticket };
+      });
+      tickets = pending.map((entry) => entry.ticket);
+      void Promise.all(
+        pending.map(async (entry) => ({ lane: entry.lane, outcome: await entry.ticket.outcome })),
+      ).then(
+        (settled) => {
+          if (generationRef.current !== generation) {
             return;
           }
-          const unpacked = unpackResult(outcome);
-          if (unpacked === null) {
-            setResult(null);
-            setBusy(false);
-            setFailed(true);
-            return;
+          const next: Partial<Record<"left" | "right", SpectrumEditViewResult>> = {};
+          for (const { lane, outcome } of settled) {
+            if ("cancelled" in outcome) {
+              return;
+            }
+            const unpacked = unpackResult(outcome);
+            if (unpacked === null) {
+              setLaneResults({});
+              setBusy(false);
+              setFailed(true);
+              return;
+            }
+            next[lane] = unpacked;
           }
-          setResult(unpacked);
+          setLaneResults(next);
           setBusy(false);
         },
         () => {
           if (generationRef.current === generation) {
-            setResult(null);
+            setLaneResults({});
             setBusy(false);
             setFailed(true);
           }
@@ -304,11 +407,69 @@ export function SpectrumEditView(): React.ReactElement {
     }, DEBOUNCE_MS);
     return () => {
       window.clearTimeout(timer);
-      if (ticketKey !== null) {
-        useSessionStore.getState().cancel(ticketKey);
+      for (const ticket of tickets) {
+        useSessionStore.getState().cancel(ticket.key);
       }
     };
-  }, [original, params, analysisStart, analysisEnd]);
+  }, [
+    original,
+    channel.mode,
+    effectiveLane,
+    resolved,
+    rangeStart,
+    rangeEnd,
+    analysisStart,
+    analysisEnd,
+  ]);
+
+  const result = laneResults[effectiveLane] ?? null;
+
+  function playResult(): void {
+    if (result === null || original === null) {
+      return;
+    }
+    if (channel.mode === "mono") {
+      const installed = useSessionStore
+        .getState()
+        .setProcessed(result.samples.slice(), result.meta.sampleRateHz, "spectrumEdit");
+      setFailed(!installed.ok);
+      return;
+    }
+    let results: LaneResults;
+    if (channel.mode === "both") {
+      const left = laneResults.left;
+      const right = laneResults.right;
+      if (left === undefined || right === undefined) {
+        setFailed(true);
+        return;
+      }
+      const sampleCount = result.meta.sampleCount;
+      if (left.meta.sampleCount !== sampleCount || right.meta.sampleCount !== sampleCount) {
+        setFailed(true);
+        return;
+      }
+      results = { left: left.samples, right: right.samples };
+    } else if (channel.mode === "right") {
+      results = { right: result.samples };
+    } else {
+      results = { left: result.samples };
+    }
+    const combined = combineLaneResults(
+      channel.mode,
+      original.channels,
+      analysisStart,
+      result.meta.sampleCount,
+      results,
+    );
+    if (combined === null) {
+      setFailed(true);
+      return;
+    }
+    const installed = useSessionStore
+      .getState()
+      .setProcessed(combined, original.sampleRateHz, "spectrumEdit");
+    setFailed(!installed.ok);
+  }
 
   const targetLabels: Record<SpectrumEditTarget, string> = {
     re: t("spectrumEdit.target.re"),
@@ -321,6 +482,10 @@ export function SpectrumEditView(): React.ReactElement {
     scale: t("spectrumEdit.mode.scale"),
     set: t("spectrumEdit.mode.set"),
   };
+  const laneLabels = {
+    left: t("spectrumEdit.lane.left"),
+    right: t("spectrumEdit.lane.right"),
+  } as const;
   const presetLabels: Record<SpectrumEditPreset, string> = {
     zeroIm: t("spectrumEdit.preset.zeroIm"),
     zeroRe: t("spectrumEdit.preset.zeroRe"),
@@ -403,16 +568,6 @@ export function SpectrumEditView(): React.ReactElement {
     setCurveDraft([]);
   }
 
-  function playResult(): void {
-    if (result === null) {
-      return;
-    }
-    const installed = useSessionStore
-      .getState()
-      .setProcessed(result.samples.slice(), result.meta.sampleRateHz, "spectrumEdit");
-    setFailed(!installed.ok);
-  }
-
   if (original === null) {
     return (
       <section className="flex flex-col gap-4">
@@ -434,6 +589,44 @@ export function SpectrumEditView(): React.ReactElement {
         titleKey="tool.spectrumEdit.title"
         descriptionKey="tool.spectrumEdit.description"
       />
+
+      <div className="flex flex-col gap-3 rounded border border-surface p-3">
+        <ChannelPicker mode={channel.mode} modes={channel.modes} onChange={channel.setMode} />
+        {channel.mode === "both" ? (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              {(["left", "right"] as const).map((lane) => (
+                <Button
+                  key={lane}
+                  size="sm"
+                  variant={effectiveLane === lane ? "default" : "outline"}
+                  aria-pressed={effectiveLane === lane}
+                  data-testid={`spectrumEdit.lane.${lane}`}
+                  onClick={() => {
+                    selectEditLane(lane);
+                  }}
+                >
+                  {laneLabels[lane]}
+                </Button>
+              ))}
+            </div>
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                data-testid="spectrumEdit.linkRight"
+                checked={linked}
+                onChange={(event) => {
+                  setLinked(event.currentTarget.checked);
+                }}
+              />
+              <span>{t("spectrumEdit.lane.link")}</span>
+            </label>
+            <p data-testid="spectrumEdit.lane.status" className="text-xs text-muted">
+              {linked ? t("spectrumEdit.lane.linked") : t("spectrumEdit.lane.separate")}
+            </p>
+          </>
+        ) : null}
+      </div>
 
       <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-3">
         <label className="flex flex-col gap-1 text-xs">
@@ -695,6 +888,11 @@ export function SpectrumEditView(): React.ReactElement {
         ) : (
           <>
             <dl className="flex flex-wrap gap-4 text-xs text-muted">
+              <MetaItem
+                label={t("spectrumEdit.meta.channel")}
+                value={laneLabels[effectiveLane]}
+                testId="spectrumEdit.meta.channel"
+              />
               <MetaItem
                 label={t("spectrumEdit.meta.sampleCount")}
                 value={String(result.meta.sampleCount)}
