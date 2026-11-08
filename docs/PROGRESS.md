@@ -2,6 +2,14 @@
 
 > Living log. Agents update every session: what changed, what is next, known issues, items needing owner review.
 
+## 2026-11-09 — Compression Lab ingest 422 fixed
+
+- Root cause: both browser ingest adapters wrapped the multipart body as `{ file: FormData }`. `openapi-fetch` only passes a body through untouched when it is a `FormData` instance; the wrapper was serialized as JSON (`{"file":{}}`) with `Content-Type: application/json`, while `POST /api/v1/ingest` requires `multipart/form-data`, so FastAPI answered 422 `invalid_request`. The same bug affected normal file uploads, not only real codecs.
+- Fix: `createDefaultIngestClient` and the real-codec default client now pass the `FormData` body directly (the cast only satisfies the generated `{ file: string }` schema). Added Playwright assertions that both upload paths send `multipart/form-data` with a `file` part, so a JSON regression fails the e2e suite.
+- Evidence: live Docker stack on port 8081 — demo stereo → Compression Lab real-codec FLAC returned `200` for health, ingest, encode, and audio fetch, showed `استریو` (stereo), and logged zero console/page errors. Targeted Playwright upload + codec suites pass 15/15; `pnpm check` green (web 85 files / 734 tests, dsp 46 / 1,066, scripts 13, i18n OK).
+- Committed as `9a5bc2c`; branch `wave-07` and PR [#14](https://github.com/Al4AMD/AvaLab/pull/14) updated.
+- **Next step:** owner re-check of the Compression Lab real-codec flow in the browser.
+
 ## 2026-11-08 — Whole-branch review and fixes
 
 - Ran the `code-review` skill at fixed point `2f76da4` (previous branch tip) with parallel Standards and Spec reviews over the committed Phase 1–2 work plus the Phase 3–6 and Wave 7 worktree.
