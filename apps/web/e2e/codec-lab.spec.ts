@@ -85,8 +85,11 @@ async function stubStereoBackend(page: Page): Promise<void> {
       }),
     }),
   );
-  await page.route("**/api/v1/ingest", (route) =>
-    route.fulfill({
+  await page.route("**/api/v1/ingest", (route) => {
+    const request = route.request();
+    expect(request.headers()["content-type"]).toContain("multipart/form-data");
+    expect(request.postDataBuffer()?.toString("latin1")).toContain('name="file"');
+    return route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
@@ -96,8 +99,8 @@ async function stubStereoBackend(page: Page): Promise<void> {
         sample_rate_hz: 48_000,
         size_bytes: 960_000,
       }),
-    }),
-  );
+    });
+  });
   const result = {
     result_audio_id: "e2e-stereo-result",
     size_bytes: 19_244,
