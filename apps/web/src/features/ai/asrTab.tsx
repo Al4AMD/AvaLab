@@ -1,7 +1,7 @@
 /**
  * ASR tab (F14, Wave-5 Plan 03 Task 4).
  *
- * The backend runs Whisper tiny; this view shows the transcript, timestamped
+ * The backend runs faster-whisper medium; this view shows the transcript, timestamped
  * segments, and — when the bundled speech demo is loaded — the WER against
  * the shipped reference transcript. The reference is static teaching data,
  * so it is fetched from `/demo/`, never from the API.

@@ -3,6 +3,30 @@
 > Every deviation from AGENTS.md and every owner decision from AGENTS.md §16 is recorded here.
 > Format: ID, date, status, context, decision, consequences.
 
+## D-058 — ASR uses faster-whisper medium instead of Whisper tiny
+
+Date: 2026-11-09. Owner override.
+
+- Context: Whisper tiny was weak outside English. The owner already downloaded
+  and tested `Systran/faster-whisper-medium` in MeetingRecording and requested
+  it for AvaLab's ASR lane.
+- Decision: replace `openai/whisper-tiny` with
+  `Systran/faster-whisper-medium` pinned at
+  `08e178d48790749d25932bbc082711ddcfdfbc4f` (MIT). Load it through
+  `faster-whisper` 1.2.1 / CTranslate2 4.8.5, CPU int8 by default and CUDA
+  float16 when `AVALAB_ML_DEVICE=cuda`. Keep the 30 s excerpt cap and the
+  existing job/SSE/UI contract. No model selector; this is a replacement.
+- Budget: the model files total 1,530,571,735 bytes. This exceeds the
+  400 MB per-model budget and raises the pinned total to 2,104,958,472 bytes
+  (~1.96 GiB / 2.1 GB), above the 2 GB decimal budget. The owner explicitly
+  approved this override. Reclaim space only by removing another model after
+  a new owner decision.
+- Consequences: prefetch is ~2.1 GB; CPU transcription is slower than tiny
+  (measured 10.35 s for the 19.6 s English demo and 18.6 s for a 30 s Persian
+  excerpt after load). The bundled English reference still drives WER; a
+  Persian excerpt transcribes without WER. The CUDA path is untested and
+  needs a CTranslate2 CUDA build; the CPU floor remains mandatory.
+
 ## D-057 — AudioSet classification model and windowing
 
 Date: 2026-11-08. Wave 7 F14.

@@ -7,7 +7,7 @@ Run with the ML extra::
     uv run --directory apps/api --extra ml python scripts/download_models.py --all
 
 ``--check`` never downloads and exits 1 when a task is incomplete. ``--all`` is
-explicit because it fetches roughly 730 MB. Files are copied out of the
+explicit because it fetches roughly 2.1 GB. Files are copied out of the
 HuggingFace cache into ``<cache>/<task>/`` so runtime loaders can stay offline
 without depending on HuggingFace cache internals.
 """

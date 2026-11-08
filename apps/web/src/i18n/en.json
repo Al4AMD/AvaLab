@@ -1379,7 +1379,7 @@
   },
   "ai": {
     "tabsLabel": "AI tools",
-    "intro": "Run a pinned small model on the current audio. Each job uses a mono excerpt of at most 30 s; model output is an approximation, not an exact DSP operation.",
+    "intro": "Run a pinned model on the current audio. Each job uses a mono excerpt of at most 30 s; model output is an approximation, not an exact DSP operation.",
     "excerpt": "Runs on the first {{seconds}} s of the loaded audio.",
     "run": "Run",
     "cancel": "Cancel",
@@ -1528,7 +1528,7 @@
       "metricsFailed": "The decoded audio could not be compared with the source."
     },
     "asr": {
-      "intro": "Speech recognition runs Whisper tiny on the first 30 s of the source. The tab shows the transcript, timestamped segments, and — for the bundled speech demo — the word error rate (WER) against its reference transcript.",
+      "intro": "Speech recognition runs faster-whisper medium on the first 30 s of the source. The tab shows the transcript, timestamped segments, and — for the bundled speech demo — the word error rate (WER) against its reference transcript. The model is multilingual; CPU transcription takes noticeably longer than a tiny model.",
       "loadDemo": "Load speech demo",
       "demoLoading": "Loading demo…",
       "model": "Model: {{modelId}}",
@@ -2558,23 +2558,23 @@
     },
     "aiAsr": {
       "title": "Automatic speech recognition and WER",
-      "goal": "Measure recognition quality, compute WER, and recognise the limits of a tiny model.",
+      "goal": "Measure recognition quality, compute WER, and read the trade-offs of a multilingual model.",
       "steps": {
         "s1": {
-          "instruction": "Load the English speech demo and open the ASR task.",
-          "observation": "The demo is English because tiny models are weak on Persian."
+          "instruction": "Load the speech demo and open the ASR task.",
+          "observation": "The bundled demo is English, so the shipped reference transcript enables WER; the model can also transcribe Persian without a reference."
         },
         "s2": {
-          "instruction": "Run Whisper Tiny.",
-          "observation": "The job returns text with timestamps and a model label."
+          "instruction": "Run faster-whisper medium.",
+          "observation": "The job returns text with timestamps and the model label; CPU jobs may take tens of seconds for the 30 s excerpt."
         },
         "s3": {
           "instruction": "Read the transcript against the known demo sentence.",
           "observation": "Substitutions and missing words are visible; compare case-insensitively."
         },
         "s4": {
-          "instruction": "Run Whisper Base on the same excerpt.",
-          "observation": "The larger model usually lowers WER but costs more time."
+          "instruction": "Compare the transcript with the reference sentence.",
+          "observation": "Read substitutions, deletions and insertions; WER normalization ignores case."
         },
         "s5": {
           "instruction": "Compute WER from substitutions, deletions, and insertions.",
@@ -2585,12 +2585,12 @@
           "observation": "This lab reads the original source; use the codec lab to hear the compressed version and discuss the mismatch."
         },
         "s7": {
-          "instruction": "Note the language limitation.",
-          "observation": "Persian transcription needs a larger model and is outside the default offline budget."
+          "instruction": "Transcribe a Persian excerpt when one is available.",
+          "observation": "Medium supports Persian, but no bundled Persian reference exists, so WER stays hidden."
         },
         "s8": {
-          "instruction": "Compare two model sizes and record speed.",
-          "observation": "Accuracy and CPU time trade off; choose the smallest model that meets the task."
+          "instruction": "Record CPU time for the excerpt.",
+          "observation": "Medium trades speed for multilingual accuracy; choose the smallest model that meets the task."
         }
       }
     },

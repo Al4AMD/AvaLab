@@ -27,7 +27,7 @@ function view(
   return {
     backendOnline: true,
     modelState: "available" as AiModelState,
-    modelId: "openai/whisper-tiny",
+    modelId: "Systran/faster-whisper-medium",
     hasSource: true,
     transcript: null,
     segments: [],
@@ -83,13 +83,13 @@ describe("asr tab", () => {
         { start_s: 0, end_s: 1.2, text: "Hello" },
         { start_s: 1.2, end_s: 2.4, text: "world." },
       ],
-      stats: { model_id: "openai/whisper-tiny" },
+      stats: { model_id: "Systran/faster-whisper-medium" },
     });
 
     expect(info).toEqual({
       text: "Hello world.",
       language: "en",
-      modelId: "openai/whisper-tiny",
+      modelId: "Systran/faster-whisper-medium",
       segments: [
         { startS: 0, endS: 1.2, text: "Hello" },
         { startS: 1.2, endS: 2.4, text: "world." },

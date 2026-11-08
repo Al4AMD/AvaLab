@@ -2,6 +2,19 @@
 
 > Living log. Agents update every session: what changed, what is next, known issues, items needing owner review.
 
+## 2026-11-09 — ASR replaced with faster-whisper medium
+
+- Replaced `openai/whisper-tiny` with `Systran/faster-whisper-medium` pinned at `08e178d48790749d25932bbc082711ddcfdfbc4f` (MIT). The adapter now loads the pinned CTranslate2 model through `faster-whisper` 1.2.1, uses int8 on CPU and float16 on CUDA, and keeps the 30 s excerpt, job, SSE and UI contracts. No model selector; this is a replacement. Recorded as D-058.
+- Added segment-level progress mapping into the existing job progress range, so medium CPU runs show movement instead of a long silent wait. `AsrRunner` still rejects empty, silent, non-finite and empty-transcript results.
+- Added `faster-whisper==1.2.1` to the `ml` extra; the lockfile adds `ctranslate2 4.8.5` (MIT) and `av 19.0.2` (BSD-3-Clause). `transformers` stays for EnCodec and classification.
+- Updated the ASR model spec, registry test, fake-backend test, real-medium smoke, ASR tab comment, model-id fixtures and Persian/English ASR intro/theory copy. The English speech demo still drives WER; a Persian excerpt transcribes without a reference.
+- Docs: `MODELS.md`, `DEPLOYMENT.md`, `THIRD_PARTY.md`, `DECISIONS.md` D-058 and the prefetch size text. The pinned total is 2,104,958,472 bytes (1.96 GiB); the owner explicitly approved exceeding the 400 MB/model and 2 GB total budgets.
+- Evidence: host real-medium smoke passed offline (`1 passed`, 12.43 s including load). Adapter measurement on the 19.6 s English demo: 4.51 s load, 10.35 s run (RTF 0.53). A 30 s Persian excerpt: 3.86 s load, 18.6 s run (RTF 0.62), auto-detected `fa`.
+- Docker: rebuilt API and web; prefetched into the named volume; `download_models.py --check` reported all six `available` offline. Live upload → `POST /api/v1/ml/asr` → SSE returned incremental progress and `done` after 20.8 s with English text, three segments, `language: "en"`, and the medium `model_id`. The development volume is 2,257,912,560 bytes because it still contains unused Whisper-tiny files; a fresh volume is 2,104,958,472 bytes.
+- Gates: backend 254 passed / 6 skipped; ruff and mypy clean; `pnpm check` green (web 85 files / 734 tests, dsp 46 / 1,066, scripts 13, i18n OK); web build green; full Playwright 106/106 in 2.8 min.
+- Uncommitted on `wave-07` (PR [#15](https://github.com/Al4AMD/AvaLab/pull/15)).
+- **Next step:** owner listens to medium on a Persian and an English clip, then request the commit/push.
+
 ## 2026-11-09 — Compression Lab ingest 422 fixed
 
 - Root cause: both browser ingest adapters wrapped the multipart body as `{ file: FormData }`. `openapi-fetch` only passes a body through untouched when it is a `FormData` instance; the wrapper was serialized as JSON (`{"file":{}}`) with `Content-Type: application/json`, while `POST /api/v1/ingest` requires `multipart/form-data`, so FastAPI answered 422 `invalid_request`. The same bug affected normal file uploads, not only real codecs.
