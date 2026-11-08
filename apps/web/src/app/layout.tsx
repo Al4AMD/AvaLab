@@ -6,6 +6,7 @@ import { HealthStatus } from "../components/HealthStatus";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { Button } from "../components/ui/button";
 import { PlayerDock } from "../features/player/player";
+import { LabReportButton } from "../features/report/LabReportButton";
 import { ShortcutHelpDialog } from "./ShortcutHelpDialog";
 import { Sidebar } from "./sidebar";
 import { useTheme } from "./useTheme";
@@ -40,6 +41,7 @@ export function AppLayout() {
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <HealthStatus />
+          <LabReportButton />
           <label className="flex items-center gap-2 text-sm text-muted">
             <span>{t("app.theme.label")}</span>
             <select

@@ -18,7 +18,7 @@ import { ToolHeader } from "../../components/ToolHeader";
 import "uplot/dist/uPlot.min.css";
 
 import { Button } from "../../components/ui/button";
-import { type ChannelLaneId, type LaneIndex, laneIndexForSingleMode } from "../../lib/channel";
+import { type AnalysisLane, type ChannelLaneId, singleAnalysisLane } from "../../lib/channel";
 import { formatDb, formatHz, formatS } from "../../lib/format";
 import {
   FFT_MAX_LENGTH,
@@ -302,7 +302,7 @@ function useFftSpectrum(
   settings: FftViewSettings,
   selectionStartSample: number,
   selectionEndSample: number,
-  lane: LaneIndex,
+  lane: AnalysisLane,
 ): { spectrum: Spectrum | null; error: boolean } {
   const [spectrum, setSpectrum] = useState<Spectrum | null>(null);
   const [error, setError] = useState(false);
@@ -350,15 +350,22 @@ function useFftSpectrum(
       setSpectrum(null);
       return;
     }
-    const ticket = useSessionStore
-      .getState()
-      .deriveWithSourceSliceLane(
-        "fftSelection",
-        params,
-        analysisStartSample,
-        analysisEndSample,
-        lane,
-      );
+    const store = useSessionStore.getState();
+    const ticket =
+      lane === "mono"
+        ? store.deriveWithSourceSlice(
+            "fftSelection",
+            params,
+            analysisStartSample,
+            analysisEndSample,
+          )
+        : store.deriveWithSourceSliceLane(
+            "fftSelection",
+            params,
+            analysisStartSample,
+            analysisEndSample,
+            lane,
+          );
     ticket.outcome.then(
       (outcome) => {
         if (generationRef.current !== generation || "cancelled" in outcome) {
@@ -397,7 +404,7 @@ export function FftView() {
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
   const channel = useChannelMode(original, "single");
-  const lane = laneIndexForSingleMode(channel.mode) ?? 0;
+  const lane = singleAnalysisLane(channel.mode);
   const channelLaneId: ChannelLaneId = channel.mode === "both" ? "left" : channel.mode;
   const [searchParams, setSearchParams] = useSearchParams();
   const settings = useMemo(

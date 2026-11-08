@@ -1,15 +1,16 @@
 import { floatToInt16Pcm } from "@avalab/dsp";
 import { beforeEach, describe, expect, it } from "vitest";
-
 import type { CodecEncodeRequest, CodecEncodeResponse, IngestResponse } from "../../api/client";
 import type { DecodedAudio, DecodeWav } from "../input/ingest";
 import {
   availableRealCodecs,
   clearRealCodecUploads,
+  parseCodecJobEvent,
   type RealCodecClient,
   RealCodecError,
   type RealCodecInput,
   runRealCodec,
+  runWholeFileCodec,
 } from "./backendCodecs";
 
 type Call<T> = { data?: T; error?: unknown; response: Response };
@@ -54,15 +55,21 @@ function fakeClient(options?: {
   readonly ingestCalls: FormData[];
   readonly encodeCalls: CodecEncodeRequest[];
   readonly audioCalls: string[];
+  readonly jobCalls: CodecEncodeRequest[];
+  readonly cancelCalls: string[];
 } {
   const ingestCalls: FormData[] = [];
   const encodeCalls: CodecEncodeRequest[] = [];
   const audioCalls: string[] = [];
+  const jobCalls: CodecEncodeRequest[] = [];
+  const cancelCalls: string[] = [];
   return {
     ingestCalls,
     encodeCalls,
     audioCalls,
-    async POST(path: "/ingest" | "/codec/encode", callOptions: unknown) {
+    jobCalls,
+    cancelCalls,
+    async POST(path: "/ingest" | "/codec/encode" | "/codec/jobs", callOptions: unknown) {
       if (path === "/ingest") {
         if (options?.ingestError !== undefined) {
           throw options.ingestError;
@@ -81,8 +88,17 @@ function fakeClient(options?: {
         throw options.encodeError;
       }
       const body = (callOptions as { body: CodecEncodeRequest }).body;
+      if (path === "/codec/jobs") {
+        jobCalls.push(body);
+        return ok({ job_id: "job-1" });
+      }
       encodeCalls.push(body);
       return options?.encodeResult ?? ok(options?.encode ?? encodeBody());
+    },
+    async DELETE(_path: "/codec/jobs/{job_id}", callOptions: unknown) {
+      const jobId = (callOptions as { params: { path: { job_id: string } } }).params.path.job_id;
+      cancelCalls.push(jobId);
+      return ok({ cancelled: true });
     },
     async GET(_path: "/audio/{audio_id}", callOptions: unknown) {
       if (options?.fetchAudioError !== undefined) {
@@ -97,6 +113,8 @@ function fakeClient(options?: {
     readonly ingestCalls: FormData[];
     readonly encodeCalls: CodecEncodeRequest[];
     readonly audioCalls: string[];
+    readonly jobCalls: CodecEncodeRequest[];
+    readonly cancelCalls: string[];
   };
 }
 
@@ -443,5 +461,96 @@ describe("runRealCodec stereo", () => {
         },
       ),
     ).rejects.toMatchObject({ kind: "alignment_mismatch" });
+  });
+});
+
+describe("runWholeFileCodec jobs", () => {
+  it("submits the full source, streams progress, and aligns the result", async () => {
+    const client = fakeClient({
+      decoded: [new Float32Array([0.2, 0.3, 0.4, 0])],
+    });
+    const progress: number[] = [];
+
+    const run = await runWholeFileCodec(
+      INPUT,
+      { codec: "mp3", bitrateKbps: 96 },
+      {
+        client,
+        decodeWav: fakeDecode([new Float32Array([0.2, 0.3, 0.4, 0])]),
+        onProgress: (value) => progress.push(value),
+        openEvents: async (_jobId, options) => {
+          options.onEvent({ event: "progress", progress: 0.5 });
+          options.onEvent({ event: "done", result: encodeBody() });
+        },
+      },
+    );
+
+    expect(client.jobCalls).toEqual([
+      { audio_id: "id-1", codec: "mp3", params: { bitrate_kbps: 96 } },
+    ]);
+    expect(progress).toEqual([0.5]);
+    expect(run.stats.resultAudioId).toBe("result-id");
+  });
+
+  it("cancels the backend job when the signal aborts", async () => {
+    const client = fakeClient();
+    let rejectEvents: ((error: unknown) => void) | null = null;
+    let notifyOpened: (() => void) | null = null;
+    const opened = new Promise<void>((resolve) => {
+      notifyOpened = resolve;
+    });
+    const controller = new AbortController();
+    const pending = runWholeFileCodec(
+      INPUT,
+      { codec: "flac" },
+      {
+        client,
+        signal: controller.signal,
+        decodeWav: fakeDecode([new Float32Array([0.2, 0.3, 0.4, 0])]),
+        openEvents: () => {
+          notifyOpened?.();
+          return new Promise((_resolve, reject) => {
+            rejectEvents = reject;
+          });
+        },
+      },
+    );
+    await opened;
+    controller.abort();
+    if (rejectEvents !== null) {
+      (rejectEvents as (error: unknown) => void)(new DOMException("aborted", "AbortError"));
+    }
+    await expect(pending).rejects.toBeDefined();
+    expect(client.cancelCalls).toEqual(["job-1"]);
+  });
+
+  it("maps a full codec queue to a translated backend error", async () => {
+    const client = fakeClient();
+    await expect(
+      runWholeFileCodec(
+        INPUT,
+        { codec: "flac" },
+        {
+          client,
+          decodeWav: fakeDecode([new Float32Array([0.2, 0.3, 0.4, 0])]),
+          openEvents: async (_jobId, options) => {
+            options.onEvent({ event: "error", code: "job_busy" });
+          },
+        },
+      ),
+    ).rejects.toMatchObject({ kind: "backendCode", code: "job_busy" });
+  });
+});
+
+describe("parseCodecJobEvent", () => {
+  it("accepts known events and rejects malformed frames", () => {
+    expect(parseCodecJobEvent('{"event":"progress","progress":0.5}')).toEqual({
+      event: "progress",
+      progress: 0.5,
+    });
+    expect(parseCodecJobEvent('{"event":"done"}')).toEqual({ event: "done" });
+    expect(parseCodecJobEvent("not json")).toBeNull();
+    expect(parseCodecJobEvent('{"event":"unknown"}')).toBeNull();
+    expect(parseCodecJobEvent("[]")).toBeNull();
   });
 });

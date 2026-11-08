@@ -25,6 +25,7 @@ class ErrorCode(StrEnum):
     model_unavailable = "model_unavailable"
     job_not_found = "job_not_found"
     job_cancelled = "job_cancelled"
+    job_busy = "job_busy"
     ml_failed = "ml_failed"
     ml_busy = "ml_busy"
 

@@ -137,6 +137,10 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
         bodyKey: "speed.theory.reverse.body",
         formula: "x_{\\mathrm{rev}}[n]=x[N-1-n]",
       },
+      {
+        headingKey: "speed.theory.lanes.heading",
+        bodyKey: "speed.theory.lanes.body",
+      },
     ],
   },
   sampling: {
@@ -158,6 +162,10 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
         formula:
           "\\Delta=\\frac{2A}{2^N},\\qquad \\mathrm{SNR}_{\\text{ideal}}\\approx 6.02N+1.76\\ \\mathrm{dB}",
       },
+      {
+        headingKey: "sampling.theory.lanes.heading",
+        bodyKey: "sampling.theory.lanes.body",
+      },
     ],
   },
   extent: {
@@ -178,6 +186,10 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
         bodyKey: "extent.theory.timeScale.body",
         formula: "x(at)\\;\\longleftrightarrow\\;\\frac{1}{|a|}X\\!\\left(\\frac{f}{a}\\right)",
       },
+      {
+        headingKey: "extent.theory.lanes.heading",
+        bodyKey: "extent.theory.lanes.body",
+      },
     ],
   },
   reverb: {
@@ -196,6 +208,12 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
       {
         headingKey: "reverb.theory.direct.heading",
         bodyKey: "reverb.theory.direct.body",
+      },
+      {
+        headingKey: "reverb.theory.stereo.heading",
+        bodyKey: "reverb.theory.stereo.body",
+        formula:
+          "\\begin{bmatrix}y_L\\\\y_R\\end{bmatrix}=\\begin{bmatrix}LL&RL\\\\LR&RR\\end{bmatrix}\\begin{bmatrix}x_L\\\\x_R\\end{bmatrix}",
       },
     ],
   },

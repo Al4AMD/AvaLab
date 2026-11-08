@@ -8,6 +8,7 @@ import pytest
 
 from avalab_api.codecs import (
     CODEC_SPECS,
+    _run_cancellable,
     available_codecs,
     available_encoders,
     encode_audio,
@@ -267,3 +268,30 @@ def test_encode_audio_maps_subprocess_failure_to_encode_failed(
         )
 
     assert (error_code(exc), exc.value.status_code) == (ErrorCode.encode_failed, 422)
+
+
+def test_cancellable_encode_stops_at_the_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class HangingProcess:
+        killed = False
+
+        def wait(self, timeout: float | None = None) -> int:
+            if self.killed:
+                return -9
+            raise subprocess.TimeoutExpired(["ffmpeg"], timeout or 0.0)
+
+        def kill(self) -> None:
+            self.killed = True
+
+        def poll(self) -> int | None:
+            return -9 if self.killed else None
+
+    process = HangingProcess()
+    monkeypatch.setattr("avalab_api.codecs.subprocess.Popen", lambda *args, **kwargs: process)
+    monkeypatch.setattr("avalab_api.codecs.ENCODE_TIMEOUT_SECONDS", -1.0)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        _run_cancellable(["ffmpeg", "-i", "in.wav", "out.flac"], lambda: False)
+
+    assert process.killed

@@ -56,6 +56,7 @@
     "left": "Left channel",
     "right": "Right channel",
     "both": "Both channels",
+    "stereo": "Stereo",
     "note": "Mono analyses the two-channel downmix. Left and Right analyse one playback channel.",
     "theory": {
       "heading": "Stereo and the analysis lane",
@@ -121,7 +122,7 @@
       }
     },
     "error": {
-      "file_too_large": "The file is larger than the upload limit (100 MB).",
+      "file_too_large": "The file is larger than the upload limit (200 MB).",
       "duration_too_long": "The audio is longer than 5 minutes (300 s).",
       "decode_failed": "The audio could not be decoded.",
       "not_found": "The uploaded audio is no longer on the server (it may have expired).",
@@ -224,7 +225,7 @@
     },
     "ai": {
       "title": "AI lab",
-      "description": "Run pre-trained models for separation, denoising, super-resolution, neural coding and speech transcription."
+      "description": "Run pre-trained models for separation, denoising, super-resolution, neural coding, speech transcription and AudioSet classification."
     },
     "filters": {
       "title": "Filter design",
@@ -271,6 +272,9 @@
       "idle": "Pick a codec and excerpt, then press Encode."
     },
     "error": {
+      "job_busy": "The backend codec queue is full. Wait for a job to finish and try again.",
+      "job_cancelled": "The whole-file job was cancelled.",
+      "job_not_found": "The whole-file job expired on the server. Start it again.",
       "failed": "Encoding failed. Try a shorter excerpt or another codec.",
       "playback": "The result could not be installed for playback (length or sample rate over the cap).",
       "codec_unavailable": "The backend encoder is unavailable. Choose another codec.",
@@ -422,6 +426,17 @@
       "export": "Export WAV",
       "stale": "Real-codec settings changed; encode again.",
       "idle": "The backend encodes the selected excerpt and aligns it to the 16-bit PCM reference before measuring.",
+      "wholeEncode": "Process whole file",
+      "wholeRunning": "Processing whole file…",
+      "wholeCancel": "Cancel job",
+      "wholeProgress": "{{percent}}% — {{stage}}",
+      "wholeHint": "Whole-file mode uploads the full source once; the server deletes it automatically after the privacy TTL.",
+      "stage": {
+        "encode": "Encoding",
+        "decode": "Decoding",
+        "align": "Aligning",
+        "store": "Storing"
+      },
       "offline": "The backend is offline; real codecs are disabled. Browser codecs still work.",
       "checking": "Checking backend codec availability…",
       "none": "The backend reports no ffmpeg encoders.",
@@ -854,6 +869,13 @@
         "heading": "Time–frequency trade-off",
         "body": "A longer window gives finer frequency resolution but blurs short events; a shorter window does the opposite. The hop sets time spacing, while zero-padding only interpolates the displayed spectrum."
       }
+    },
+    "compare": {
+      "show": "Show processed signal beside the original",
+      "missing": "Run a tool that installs a processed lane to compare it here.",
+      "original": "Original",
+      "processed": "Processed",
+      "processedAria": "Processed spectrogram"
     }
   },
   "compare": {
@@ -872,6 +894,15 @@
       "customSpeed": "Speed factor",
       "semitones": "Pitch shift (semitones)",
       "reverse": "Reverse"
+    },
+    "lane": {
+      "label": "Lane",
+      "left": "Left lane",
+      "right": "Right lane",
+      "link": "Use the same reverse setting for both lanes",
+      "linked": "The right lane mirrors the left lane.",
+      "separate": "The right lane has its own reverse setting.",
+      "gridNote": "Speed mode, speed factor, pitch shift and range are shared by both lanes."
     },
     "preset": "{{factor}}×",
     "range": {
@@ -916,6 +947,10 @@
       "reverse": {
         "heading": "Reverse is not reverb",
         "body": "Time reversal flips the sample order. Magnitude stays the same, phase is conjugated, and attacks become decays. Reverb, by contrast, convolves with a room impulse response."
+      },
+      "lanes": {
+        "heading": "Stereo lanes",
+        "body": "In both mode, each lane runs its own speed transform. Speed, mode, pitch shift and range are shared; reverse is per lane. Independent phase-vocoder lanes can drift in phase and move the stereo image, so check the result against mono when comparing."
       }
     }
   },
@@ -937,6 +972,15 @@
       "bits": "Bit depth",
       "antiAlias": "Anti-alias filter",
       "dither": "TPDF dither"
+    },
+    "lane": {
+      "label": "Lane",
+      "left": "Left lane",
+      "right": "Right lane",
+      "link": "Use the same bit depth and dither for both lanes",
+      "linked": "The right lane mirrors the left lane.",
+      "separate": "The right lane has its own bit depth and dither.",
+      "gridNote": "The target rate and anti-alias filter are shared by both lanes."
     },
     "error": {
       "failed": "The sampling process failed. Try a shorter range or another rate."
@@ -995,6 +1039,10 @@
       "quantization": {
         "heading": "Quantization and SNR",
         "body": "Reducing bit depth rounds every sample to a coarser grid. The step size grows, the error power grows, and the signal-to-noise ratio falls. Dither trades a little noise for the removal of correlated quantization distortion."
+      },
+      "lanes": {
+        "heading": "Stereo lanes",
+        "body": "Both lanes share the target rate and anti-alias filter because those fix the output grid. Bit depth and dither are per lane, so the measured SNR can differ between channels."
       }
     }
   },
@@ -1017,6 +1065,12 @@
       "truncate": "Truncate",
       "zeroPad": "Zero-pad",
       "periodic": "Periodic extension"
+    },
+    "lane": {
+      "label": "Lane",
+      "left": "Left lane",
+      "right": "Right lane",
+      "gridNote": "Operation parameters are shared by both lanes; each lane is processed and measured separately."
     },
     "range": {
       "pattern": "Source range {{start}} – {{end}}"
@@ -1088,6 +1142,10 @@
       "timeScale": {
         "heading": "Time scaling",
         "body": "Compressing time by a widens the spectrum by a and shifts every frequency upward. This is the Fourier time-scaling property students see when the extent factor changes."
+      },
+      "lanes": {
+        "heading": "Stereo lanes",
+        "body": "Both lanes share the operation parameters. Each lane is processed and measured separately, so energy, power and support can differ between channels."
       }
     }
   },
@@ -1101,7 +1159,7 @@
       "wetMix": "Wet mix",
       "method": "Convolution method",
       "upload": "Upload impulse response",
-      "uploadHint": "WAV, up to 10 s, mono downmix."
+      "uploadHint": "WAV, up to 10 s; mono, stereo, or 4-channel (LL, LR, RL, RR)."
     },
     "irPreset": {
       "room": "Room",
@@ -1140,6 +1198,7 @@
     "result": {
       "title": "Reverb result",
       "duration": "Duration",
+      "channels": "Channels",
       "irSamples": "IR samples",
       "preDelay": "Pre-delay",
       "elapsed": "Elapsed",
@@ -1148,7 +1207,20 @@
       "waveformAria": "Reverb result waveform",
       "spectrogram": "Result spectrogram",
       "spectrogramAria": "Reverb result spectrogram",
-      "spectrogramNote": "Spectrogram shows the first 30 s."
+      "spectrogramNote": "Spectrogram shows the first 30 s.",
+      "stereoNote": "The left result lane is plotted; playback carries both processed channels."
+    },
+    "stereo": {
+      "note": "True-stereo mode convolves four paths: y_L = x_L*LL + x_R*RL and y_R = x_L*LR + x_R*RR. The plots show the left result lane; both lanes play."
+    },
+    "matrix": {
+      "title": "True-stereo path matrix",
+      "output": "Output",
+      "fromLeft": "From left (xL)",
+      "fromRight": "From right (xR)",
+      "outLeft": "Left (yL)",
+      "outRight": "Right (yR)",
+      "order": "4-channel IR order: LL, LR, RL, RR."
     },
     "play": "Play processed result",
     "timing": {
@@ -1185,7 +1257,8 @@
       "reverb": "Reverb convolves the signal with an impulse response; a longer IR adds a longer tail.",
       "tail": "The output keeps the full convolution tail: pre-delay + source length + IR length − 1 samples.",
       "direct": "Direct convolution is easy to read but grows with source length × IR length; the FFT path is faster for long inputs.",
-      "ir": "Changing the IR seed changes the noise detail, not the RT60 decay envelope or the overall energy."
+      "ir": "Changing the IR seed changes the noise detail, not the RT60 decay envelope or the overall energy.",
+      "stereo": "In stereo mode the impulse response has four paths: direct left/right plus two cross paths. The cross paths decorrelate the channels and widen the image; a mono source cannot enter this mode."
     },
     "error": {
       "tooLong": "The result would exceed the 300 s processed-playback cap.",
@@ -1193,6 +1266,7 @@
       "irMissing": "Upload an impulse response or choose a synthetic preset.",
       "irTooLong": "The impulse response must be 10 s or shorter.",
       "irInvalid": "The impulse response contains invalid samples.",
+      "irChannels": "Stereo mode needs a 2-channel (L, R) or 4-channel (LL, LR, RL, RR) impulse response. A mono IR works in mono, left, and right modes.",
       "irDecode": "Could not decode that impulse response file. Try a WAV file.",
       "failed": "The reverb operation failed. Try a shorter range or different parameters."
     },
@@ -1209,6 +1283,10 @@
       "direct": {
         "heading": "Direct versus FFT convolution",
         "body": "Direct convolution is easy to inspect but costs O(NL). Overlap-add FFT convolution is O(N log N) and is the default for long IRs. Both must produce the same samples apart from rounding."
+      },
+      "stereo": {
+        "heading": "True-stereo four-path reverb",
+        "body": "A stereo room answers each source channel into both ears. The matrix applies four convolutions: the diagonal paths LL and RR keep the source on its own side, while RL and LR carry each source into the opposite output. A two-channel IR fills only the diagonal; a four-channel IR stores LL, LR, RL and RR. The built-in cross paths use decorrelated seeds and a fixed 0.5 gain, so the image widens without renormalizing the wet level."
       }
     }
   },
@@ -1312,7 +1390,8 @@
       "separation": "Source separation",
       "asr": "Speech to text (ASR)",
       "neuralCodec": "Neural codec",
-      "pitchBeat": "Pitch & beat"
+      "pitchBeat": "Pitch & beat",
+      "classification": "Audio classification"
     },
     "models": {
       "disabled": "Machine-learning tools are disabled on this server.",
@@ -1659,10 +1738,47 @@
             "cut": "The 30 s excerpt can cut a phrase, so the first and last beats deserve less trust."
           }
         }
+      },
+      "classification": {
+        "title": "Audio classification: AudioSet labels",
+        "concept": {
+          "heading": "From spectrogram patches to labels",
+          "body": "AST turns the log-mel spectrogram into overlapping patches and applies a transformer encoder. A linear head produces one logit per AudioSet class; a sigmoid turns each logit into an independent score."
+        },
+        "observe": {
+          "heading": "What to observe",
+          "body": "Use a short excerpt with one clear sound source, then compare the top labels with what you hear.",
+          "bullets": {
+            "overlap": "Several labels can be high at once: a music clip may also score singing, speech or instruments.",
+            "windows": "Averaging 10 s windows makes the score stable; a short event can disappear under a long steady background.",
+            "domain": "The model knows AudioSet classes only. Sounds outside that vocabulary are forced into the nearest class."
+          }
+        },
+        "pitfalls": {
+          "heading": "Common pitfalls",
+          "body": "A high score is not a detection guarantee and a missing label is not proof of absence.",
+          "bullets": {
+            "taxonomy": "The labels are the English AudioSet taxonomy; translation would change the classes, so the UI keeps the original names.",
+            "notCaption": "Classification is not speech recognition or audio captioning: it returns class scores, not words or descriptions."
+          }
+        }
       }
     },
     "export": {
       "wav": "Export WAV"
+    },
+    "classification": {
+      "intro": "Fine-tuned Audio Spectrogram Transformer (AST) scores the excerpt against the 527 AudioSet classes. The backend averages independent sigmoid scores over non-overlapping 10 s windows; the result is a ranked approximation, not a caption.",
+      "loadDemo": "Load music demo",
+      "demoLoading": "Loading demo…",
+      "model": "Model: {{modelId}}",
+      "modelMissing": "The AST model is not downloaded. Fetch it with the command below, then reload.",
+      "noSource": "Load audio, or use the music demo, to classify the excerpt.",
+      "windows": "Analyzed {{seconds}} s in {{count}} × {{window}} s windows.",
+      "labelsTitle": "Top AudioSet labels",
+      "labelProbability": "{{percent}}%",
+      "empty": "The model returned no labels for this excerpt.",
+      "taxonomyNote": "Labels come from AudioSet’s English taxonomy and are not translated. Scores are independent, so they do not sum to 100%."
     }
   },
   "filters": {
@@ -1810,6 +1926,11 @@
     }
   },
   "pipeline": {
+    "lane": {
+      "title": "Lane",
+      "left": "Left lane",
+      "right": "Right lane"
+    },
     "loading": "Loading the pipeline editor…",
     "palette": {
       "title": "Add node"
@@ -1924,10 +2045,15 @@
       "noResult": "Run the pipeline before installing an output.",
       "missingOutput": "That output is not present in the last run.",
       "install": "Could not install the output.",
-      "failed": "The pipeline run failed."
+      "failed": "The pipeline run failed.",
+      "gridMismatch": "The graph produced different output grids per lane, so the lanes cannot be combined. Run a graph that keeps both lanes at the same rate and length."
     },
     "theory": {
       "title": "Pipeline theory and what to observe",
+      "stereo": {
+        "heading": "Stereo lanes",
+        "body": "With both lanes selected the same validated graph runs once per lane. Outputs combine only when rate and length match, so a graph that changes lanes differently is refused instead of silently misaligned."
+      },
       "sampling": {
         "heading": "Sampling and aliasing",
         "body": "A resample block changes the sample rate. If the anti-alias filter is off, content above the new Nyquist frequency folds back as an alias; the graph shows the same trade-off as the sampling lab."
@@ -2619,6 +2745,34 @@
           "observation": "The model is illustrative, not a certified perceptual standard."
         }
       }
+    }
+  },
+  "report": {
+    "button": "Lab report",
+    "busy": "Preparing report…",
+    "needSource": "Load audio to export a lab report.",
+    "failed": "The lab report could not be generated.",
+    "metricsFailed": "The metrics could not be measured for this report.",
+    "title": "AvaLab lab report",
+    "toolFallback": "AvaLab tool",
+    "labels": {
+      "source": "Source",
+      "parameters": "Parameters",
+      "setting": "Setting",
+      "value": "Value",
+      "metrics": "Metrics",
+      "lane": "Lane",
+      "metric": "Metric",
+      "figures": "Figures",
+      "notice": "This report contains measured values and rendered figures only. No audio samples are embedded, and the share URL never contains uploaded audio.",
+      "print": "Print / Save as PDF",
+      "name": "Name",
+      "duration": "Duration",
+      "sampleRate": "Sample rate",
+      "channels": "Channels",
+      "processedLane": "Processed lane",
+      "processedDuration": "Processed duration",
+      "figure": "Figure {index}"
     }
   }
 }

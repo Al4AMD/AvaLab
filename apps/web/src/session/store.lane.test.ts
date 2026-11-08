@@ -39,6 +39,22 @@ function payloadValues(transport: FakeTransport, index: number): number[] {
   return [...new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4)];
 }
 
+describe("mono analysis source", () => {
+  it("derives from the mono downmix, not channel 0", async () => {
+    const { store, transport } = makeStore();
+    const source = loadStereo(store);
+
+    const mono = store.getState().deriveWithSource("waveformOverview", WAVEFORM_PARAMS);
+    const left = store.getState().deriveWithSourceLane("waveformOverview", WAVEFORM_PARAMS, 0);
+
+    expect(payloadValues(transport, 0)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(payloadValues(transport, 1)).toEqual([...source.left]);
+    expect(mono.key).not.toBe(left.key);
+    await expect(mono.outcome).resolves.toBeDefined();
+    await expect(left.outcome).resolves.toBeDefined();
+  });
+});
+
 describe("deriveWithSourceLane", () => {
   it("posts the selected channel copy and includes the lane in the cache key", async () => {
     const { store, transport } = makeStore();

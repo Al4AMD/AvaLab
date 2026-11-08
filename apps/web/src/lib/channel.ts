@@ -6,6 +6,8 @@ export type ChannelMode = (typeof CHANNEL_MODES)[number];
 export type LaneIndex = 0 | 1;
 export type ChannelLaneId = "mono" | "left" | "right";
 export type ChannelToolSupport = "single" | "both";
+/** A playback lane, or the mono analysis downmix (`SessionSource.samples`). */
+export type AnalysisLane = LaneIndex | "mono";
 
 export type ChannelSource = {
   readonly samples: Float32Array;
@@ -66,6 +68,19 @@ export function displayedLanes(mode: ChannelMode): readonly DisplayedLane[] {
 
 export function laneIndexForSingleMode(mode: ChannelMode): LaneIndex | null {
   return mode === "both" ? null : mode === "right" ? 1 : 0;
+}
+
+/** The single-panel analysis source: mono uses the downmix, not channel 0. */
+export function singleAnalysisLane(mode: ChannelMode): AnalysisLane {
+  switch (mode) {
+    case "mono":
+      return "mono";
+    case "right":
+      return 1;
+    case "left":
+    case "both":
+      return 0;
+  }
 }
 
 export function channelModeFromSearch(params: URLSearchParams): ChannelMode {

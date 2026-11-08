@@ -17,10 +17,14 @@ import { ToolHeader } from "../../components/ToolHeader";
 
 import { Button } from "../../components/ui/button";
 import { formatS } from "../../lib/format";
+import { combineLaneOutputs, type LaneResults } from "../../lib/laneCombine";
+import { laneParamsLinked } from "../../lib/laneParams";
 import { writeLastUsed } from "../../lib/lastUsed";
 import type { SpectrogramTilesParams } from "../../session/ops";
 import { DspRpcError } from "../../session/rpc";
 import { useSessionStore } from "../../session/store";
+import { ChannelPicker } from "../channels/ChannelPicker";
+import { useChannelMode } from "../channels/useChannelMode";
 import { UploadEmptyState } from "../input/upload";
 import {
   paintSpectrogramChunk,
@@ -38,8 +42,10 @@ import {
   SPEED_SEMITONE_MAX,
   SPEED_SEMITONE_MIN,
   SPEED_STORAGE_KEY,
+  type SpeedLaneSettings,
   type SpeedMode,
   type SpeedSettings,
+  speedLanes,
   speedSettingsFromSearch,
   speedSettingsToSearch,
 } from "./speedState";
@@ -273,19 +279,63 @@ export function SpeedView(): React.ReactElement {
   useEffect(() => {
     writeLastUsed(SPEED_STORAGE_KEY, speedSettingsToSearch(settings));
   }, [settings]);
-  const [result, setResult] = useState<SpeedResultView | null>(null);
+  const channel = useChannelMode(original, "both");
+  const resolved = useMemo(() => speedLanes(settings), [settings]);
+  const effectiveLane: "left" | "right" =
+    channel.mode === "both" ? settings.editLane : channel.mode === "right" ? "right" : "left";
+  const laneSettings = resolved[effectiveLane];
+  const lanePair = useMemo(
+    () => ({
+      primary: { reverse: settings.reverse },
+      ...(settings.right === undefined ? {} : { right: settings.right }),
+    }),
+    [settings.reverse, settings.right],
+  );
+  const linked = laneParamsLinked(lanePair);
+
+  const [laneResults, setLaneResults] = useState<
+    Partial<Record<"left" | "right", SpeedResultView>>
+  >({});
   const [spectrogram, setSpectrogram] = useState<SpectrogramView | null>(null);
   const [busy, setBusy] = useState(false);
   const [errorCode, setErrorCode] = useState<SpeedErrorCode | null>(null);
   const generationRef = useRef(0);
+  const result = laneResults[effectiveLane] ?? null;
 
-  function updateSettings(patch: Partial<SpeedSettings>): void {
-    const next = { ...settings, ...patch };
+  function writeSettings(next: SpeedSettings): void {
     const params = new URLSearchParams(searchParams);
+    for (const key of Array.from(params.keys())) {
+      if (key === "el" || (key.startsWith("rr") && key.length > 2)) {
+        params.delete(key);
+      }
+    }
     for (const [key, value] of new URLSearchParams(speedSettingsToSearch(next))) {
       params.set(key, value);
     }
     setSearchParams(params, { replace: true });
+  }
+
+  function updateSettings(patch: Partial<SpeedSettings>): void {
+    writeSettings({ ...settings, ...patch });
+  }
+
+  function updateLaneSettings(patch: Partial<SpeedLaneSettings>): void {
+    const next = { ...laneSettings, ...patch };
+    writeSettings(
+      effectiveLane === "right" ? { ...settings, right: next } : { ...settings, ...next },
+    );
+  }
+
+  function selectEditLane(lane: "left" | "right"): void {
+    writeSettings({ ...settings, editLane: lane });
+  }
+
+  function setLinked(nextLinked: boolean): void {
+    writeSettings({
+      ...settings,
+      ...(nextLinked ? { right: undefined } : { right: resolved.left }),
+      editLane: settings.editLane,
+    });
   }
 
   useEffect(() => {
@@ -296,68 +346,112 @@ export function SpeedView(): React.ReactElement {
     generationRef.current = generation;
     setErrorCode(null);
     setBusy(true);
+    let tickets: { readonly key: string }[] = [];
     const timer = window.setTimeout(() => {
       const startSample = Math.max(0, Math.min(settings.startSample, original.samples.length));
       const endSample = Math.max(
         startSample,
         Math.min(settings.endSample, original.samples.length),
       );
-      const slice = original.samples.slice(startSample, endSample);
-      if (slice.length === 0) {
+      if (endSample <= startSample) {
         setBusy(false);
         setErrorCode("failed");
         return;
       }
       const store = useSessionStore.getState();
-      const ticket = store.deriveStandalone(
-        "speedTransform",
-        {
+      const targets = channel.mode === "both" ? (["left", "right"] as const) : [effectiveLane];
+      const pending = targets.map((lane) => {
+        const params = {
           sampleRateHz: original.sampleRateHz,
           startSample,
           endSample,
           mode: settings.mode,
           speedFactor: settings.speedFactor,
           semitones: settings.semitones,
-          reverse: settings.reverse,
-        },
-        { buffer: slice.buffer, byteOffset: 0, byteLength: slice.byteLength },
-      );
-      ticket.outcome.then(
-        (outcome) => {
-          if (generationRef.current !== generation || "cancelled" in outcome) {
+          reverse: resolved[lane].reverse,
+        };
+        if (channel.mode === "mono") {
+          const slice = original.samples.slice(startSample, endSample);
+          return {
+            lane,
+            ticket: store.deriveStandalone("speedTransform", params, {
+              buffer: slice.buffer,
+              byteOffset: 0,
+              byteLength: slice.byteLength,
+            }),
+          };
+        }
+        return {
+          lane,
+          ticket: store.deriveWithSourceSliceLane(
+            "speedTransform",
+            params,
+            startSample,
+            endSample,
+            lane === "right" ? 1 : 0,
+          ),
+        };
+      });
+      tickets = pending.map((entry) => entry.ticket);
+      void Promise.all(
+        pending.map(async (entry) => ({ lane: entry.lane, outcome: await entry.ticket.outcome })),
+      ).then(
+        (settled) => {
+          if (generationRef.current !== generation) {
             return;
           }
-          const payload = outcome.payload;
-          if (payload === undefined) {
+          const next: Partial<Record<"left" | "right", SpeedResultView>> = {};
+          for (const { lane, outcome } of settled) {
+            if ("cancelled" in outcome) {
+              return;
+            }
+            const payload = outcome.payload;
+            if (payload === undefined) {
+              setBusy(false);
+              setErrorCode("failed");
+              return;
+            }
+            next[lane] = {
+              samples: new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4),
+              sampleRateHz: outcome.meta.sampleRateHz,
+              outputSampleCount: outcome.meta.outputSampleCount,
+              actualSpeedFactor: outcome.meta.actualSpeedFactor,
+              elapsedMs: outcome.meta.elapsedMs,
+            };
+          }
+          setLaneResults(next);
+          const selected = next[effectiveLane];
+          if (selected === undefined) {
             setBusy(false);
             setErrorCode("failed");
             return;
           }
-          const samples = new Float32Array(
-            payload.buffer,
-            payload.byteOffset,
-            payload.byteLength / 4,
-          );
-          const installed = store.setProcessed(samples, outcome.meta.sampleRateHz, "speed");
+          const outputs: LaneResults =
+            channel.mode === "both"
+              ? { left: next.left?.samples, right: next.right?.samples }
+              : channel.mode === "right"
+                ? { right: selected.samples }
+                : { left: selected.samples };
+          const playback =
+            channel.mode === "mono" ? selected.samples : combineLaneOutputs(channel.mode, outputs);
+          if (playback === null) {
+            setBusy(false);
+            setErrorCode("failed");
+            return;
+          }
+          const installed = store.setProcessed(playback, selected.sampleRateHz, "speed");
           if (!installed.ok) {
             setBusy(false);
             setErrorCode(installed.code === "tooLong" ? "tooLong" : "failed");
             return;
           }
-          setResult({
-            samples,
-            sampleRateHz: outcome.meta.sampleRateHz,
-            outputSampleCount: outcome.meta.outputSampleCount,
-            actualSpeedFactor: outcome.meta.actualSpeedFactor,
-            elapsedMs: outcome.meta.elapsedMs,
-          });
-          const request = spectrogramRequest(samples, outcome.meta.sampleRateHz);
+          const request = spectrogramRequest(selected.samples, selected.sampleRateHz);
           if (request.frameCount === 0) {
             setSpectrogram(null);
             setBusy(false);
             return;
           }
-          const copy = samples.slice();
+          const copy = selected.samples.slice();
           const spectrogramTicket = store.deriveStandalone("spectrogramTiles", request.params, {
             buffer: copy.buffer,
             byteOffset: 0,
@@ -382,7 +476,7 @@ export function SpeedView(): React.ReactElement {
                 ),
                 binCount: request.binCount,
                 frameCount: request.frameCount,
-                nyquistHz: outcome.meta.sampleRateHz / 2,
+                nyquistHz: selected.sampleRateHz / 2,
               });
               setBusy(false);
             },
@@ -407,13 +501,20 @@ export function SpeedView(): React.ReactElement {
     }, 200);
     return () => {
       window.clearTimeout(timer);
+      for (const ticket of tickets) {
+        useSessionStore.getState().cancel(ticket.key);
+      }
     };
-  }, [original, settings]);
+  }, [original, settings, channel.mode, effectiveLane, resolved]);
 
   const modeLabels: Record<SpeedMode, string> = {
     resample: t("speed.mode.resample"),
     timeStretch: t("speed.mode.timeStretch"),
   };
+  const laneLabels = {
+    left: t("speed.lane.left"),
+    right: t("speed.lane.right"),
+  } as const;
 
   if (original === null) {
     return (
@@ -431,6 +532,47 @@ export function SpeedView(): React.ReactElement {
   return (
     <section className="flex flex-col gap-4">
       <ToolHeader titleKey="tool.speed.title" descriptionKey="tool.speed.description" />
+
+      <div className="flex flex-col gap-3 rounded border border-surface p-3">
+        <ChannelPicker mode={channel.mode} modes={channel.modes} onChange={channel.setMode} />
+        {channel.mode === "both" ? (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              {(["left", "right"] as const).map((lane) => (
+                <Button
+                  key={lane}
+                  size="sm"
+                  variant={effectiveLane === lane ? "default" : "outline"}
+                  aria-pressed={effectiveLane === lane}
+                  data-testid={`speed.lane.${lane}`}
+                  onClick={() => {
+                    selectEditLane(lane);
+                  }}
+                >
+                  {laneLabels[lane]}
+                </Button>
+              ))}
+            </div>
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                data-testid="speed.linkRight"
+                checked={linked}
+                onChange={(event) => {
+                  setLinked(event.currentTarget.checked);
+                }}
+              />
+              <span>{t("speed.lane.link")}</span>
+            </label>
+            <p data-testid="speed.lane.status" className="text-xs text-muted">
+              {linked ? t("speed.lane.linked") : t("speed.lane.separate")}
+            </p>
+          </>
+        ) : null}
+        <p data-testid="speed.lane.gridNote" className="text-xs text-muted">
+          {t("speed.lane.gridNote")}
+        </p>
+      </div>
 
       <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-xs">
@@ -498,10 +640,10 @@ export function SpeedView(): React.ReactElement {
         <label className="flex items-center gap-2 self-end text-sm">
           <input
             type="checkbox"
-            checked={settings.reverse}
+            checked={laneSettings.reverse}
             data-testid="speed.control.reverse"
             onChange={(event) => {
-              updateSettings({ reverse: event.currentTarget.checked });
+              updateLaneSettings({ reverse: event.currentTarget.checked });
             }}
             className={CONTROL_FOCUS_CLASSES}
           />
@@ -587,6 +729,37 @@ export function SpeedView(): React.ReactElement {
                 </dd>
               </div>
             </dl>
+            {channel.mode === "both" && (
+              <table data-testid="speed.result.lanes" className="w-full text-xs">
+                <thead className="text-muted">
+                  <tr>
+                    <th className="text-start font-medium">{t("speed.lane.label")}</th>
+                    <th className="text-start font-medium">{t("speed.result.duration")}</th>
+                    <th className="text-start font-medium">{t("speed.result.actualSpeed")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(["left", "right"] as const).map((lane) => {
+                    const laneResult = laneResults[lane];
+                    return (
+                      <tr key={lane} data-testid={`speed.result.lane.${lane}`}>
+                        <td>{laneLabels[lane]}</td>
+                        <td dir="ltr" className="tabular-nums">
+                          {laneResult === undefined
+                            ? "—"
+                            : formatS(laneResult.outputSampleCount / laneResult.sampleRateHz)}
+                        </td>
+                        <td dir="ltr" className="tabular-nums">
+                          {laneResult === undefined
+                            ? "—"
+                            : `×${laneResult.actualSpeedFactor.toFixed(2)}`}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
             <SpeedWaveformCanvas
               samples={result.samples}
               ariaLabel={t("speed.result.waveformAria")}

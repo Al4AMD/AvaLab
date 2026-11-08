@@ -12,6 +12,7 @@ import json
 import os
 import tempfile
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated
 
@@ -28,6 +29,13 @@ from avalab_api.ffmpeg import transcode_to_canonical_wav
 from avalab_api.storage import Storage
 
 router = APIRouter()
+
+ProgressCallback = Callable[[float], None]
+CancelCheck = Callable[[], bool]
+
+
+class CodecJobCancelled(Exception):
+    """Raised between job phases when cancellation was requested."""
 
 ENCODED_TEMP_PREFIX = "avalab_codec_encoded_"
 DECODED_TEMP_PREFIX = "avalab_codec_decoded_"
@@ -96,9 +104,20 @@ def encode_codec(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> CodecEncodeResponse:
     """Encode, decode, align and store one excerpt with the requested codec."""
+    return encode_and_store(settings, request)
+
+
+def encode_and_store(
+    settings: Settings,
+    request: CodecEncodeRequest,
+    *,
+    progress: ProgressCallback | None = None,
+    cancel: CancelCheck | None = None,
+) -> CodecEncodeResponse:
+    """Shared synchronous/async codec execution with optional job callbacks."""
     storage = Storage(settings.storage_dir)
     source_path = storage.canonical_path(request.audio_id)
-    source_rate, source_channels = _read_source_info(
+    source_rate, source_channels = read_source_info(
         storage, source_path, request.audio_id
     )
 
@@ -107,12 +126,22 @@ def encode_codec(
         request.codec, request.params.model_dump(exclude_none=True)
     )
 
+    def report(value: float) -> None:
+        if progress is not None:
+            progress(value)
+
+    def check_cancel() -> None:
+        if cancel is not None and cancel():
+            raise CodecJobCancelled
+
     encoded_path = _temp_path(ENCODED_TEMP_PREFIX, spec.extension)
     decoded_path = _temp_path(DECODED_TEMP_PREFIX, ".wav")
     trimmed_path = _temp_path(TRIMMED_TEMP_PREFIX, ".wav")
     result_audio_id: str | None = None
 
     try:
+        report(0.05)
+        check_cancel()
         started = time.perf_counter()
         encode_audio(
             source_path,
@@ -120,8 +149,11 @@ def encode_codec(
             request.codec,
             params,
             channels=source_channels,
+            cancel=cancel,
         )
         encode_ms = (time.perf_counter() - started) * 1000.0
+        report(0.6)
+        check_cancel()
 
         try:
             transcode_to_canonical_wav(
@@ -135,7 +167,10 @@ def encode_codec(
         reference_channels, reference_mono, decoded_channels = _read_pair(
             source_path, decoded_path, source_rate, source_channels
         )
+        report(0.75)
         alignment = _align(reference_mono, _mono(decoded_channels), source_rate)
+        report(0.9)
+        check_cancel()
         reference_aligned = reference_channels[
             alignment.reference_start_sample : alignment.reference_start_sample
             + alignment.aligned_sample_count
@@ -164,6 +199,7 @@ def encode_codec(
                 "created_at_unix": int(time.time()),
             },
         )
+        report(1.0)
         return CodecEncodeResponse(
             result_audio_id=result_audio_id,
             size_bytes=size_bytes,
@@ -193,7 +229,7 @@ def _temp_path(prefix: str, suffix: str) -> Path:
     return Path(name)
 
 
-def _read_source_info(
+def read_source_info(
     storage: Storage, source_path: Path, audio_id: str
 ) -> tuple[int, int]:
     """Read and validate the stored sample rate and channel count."""

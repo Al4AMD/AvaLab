@@ -21,6 +21,25 @@ function hasSourceRange(
   return source.every((lane) => endSample <= lane.length);
 }
 
+export function combineLaneOutputs(mode: ChannelMode, results: LaneResults): AudioChannels | null {
+  switch (mode) {
+    case "mono":
+      return results.mono === undefined || results.mono.length === 0 ? null : [results.mono];
+    case "left":
+      return results.left === undefined || results.left.length === 0 ? null : [results.left];
+    case "right":
+      return results.right === undefined || results.right.length === 0 ? null : [results.right];
+    case "both": {
+      const left = results.left;
+      const right = results.right;
+      if (left === undefined || right === undefined || left.length === 0) {
+        return null;
+      }
+      return left.length === right.length ? [left, right] : null;
+    }
+  }
+}
+
 export function combineLaneResults(
   mode: ChannelMode,
   source: AudioChannels,

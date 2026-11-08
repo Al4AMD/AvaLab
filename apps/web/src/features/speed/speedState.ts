@@ -6,18 +6,26 @@
  * full source range into the URL.
  */
 
+import { type ResolvedLaneParams, resolveLaneParams } from "../../lib/laneParams";
 import { type LastUsedStorage, readLastUsed } from "../../lib/lastUsed";
 import { decodeParams, encodeParams } from "../../lib/url-state";
 
 export type SpeedMode = "resample" | "timeStretch";
 
-export type SpeedSettings = {
+export type SpeedLaneSettings = {
+  readonly reverse: boolean;
+};
+
+export type SpeedEditLane = "left" | "right";
+
+export type SpeedSettings = SpeedLaneSettings & {
   readonly mode: SpeedMode;
   readonly speedFactor: number;
   readonly semitones: number;
-  readonly reverse: boolean;
   readonly startSample: number;
   readonly endSample: number;
+  readonly right?: SpeedLaneSettings;
+  readonly editLane: SpeedEditLane;
 };
 
 export type SpeedRange = { readonly startSample: number; readonly endSample: number };
@@ -40,6 +48,7 @@ export const SPEED_DEFAULT_SETTINGS: SpeedSettings = {
   reverse: false,
   startSample: 0,
   endSample: 0,
+  editLane: "left",
 };
 
 function clampRange(start: number, end: number, sampleCount: number): SpeedRange {
@@ -68,14 +77,38 @@ export function defaultSpeedRange(
 }
 
 export function speedSettingsToSearch(settings: SpeedSettings): string {
-  return encodeParams({
+  const params: Record<string, string | number> = {
     from: settings.startSample,
     m: settings.mode,
     p: settings.semitones,
     rv: settings.reverse ? 1 : 0,
     sp: settings.speedFactor,
     to: settings.endSample,
+  };
+  if (settings.editLane === "right") {
+    params.el = "right";
+  }
+  if (settings.right !== undefined) {
+    params.rrrv = settings.right.reverse ? 1 : 0;
+  }
+  return encodeParams(params);
+}
+
+export function speedLanes(settings: SpeedSettings): ResolvedLaneParams<SpeedLaneSettings> {
+  return resolveLaneParams({
+    primary: { reverse: settings.reverse },
+    ...(settings.right === undefined ? {} : { right: settings.right }),
   });
+}
+
+function laneReverse(raw: string | undefined, fallback: boolean): boolean {
+  if (raw === "1") {
+    return true;
+  }
+  if (raw === "0") {
+    return false;
+  }
+  return fallback;
 }
 
 export function speedSettingsFromSearch(
@@ -101,6 +134,11 @@ export function speedSettingsFromSearch(
     explicitRange !== null && explicitRange.endSample > explicitRange.startSample
       ? explicitRange
       : fallbackRange;
+  const primaryReverse = laneReverse(scalar("rv"), SPEED_DEFAULT_SETTINGS.reverse);
+  const hasRight = Object.keys(decoded).some(
+    (key) => key.startsWith("rr") && key.length > "rr".length,
+  );
+  const right = hasRight ? { reverse: laneReverse(scalar("rrrv"), primaryReverse) } : undefined;
   return {
     mode: scalar("m") === "timeStretch" ? "timeStretch" : "resample",
     speedFactor:
@@ -113,9 +151,11 @@ export function speedSettingsFromSearch(
       semitones <= SPEED_SEMITONE_MAX
         ? semitones
         : SPEED_DEFAULT_SETTINGS.semitones,
-    reverse: scalar("rv") === "1",
+    reverse: primaryReverse,
     startSample: range.startSample,
     endSample: range.endSample,
+    ...(right === undefined ? {} : { right }),
+    editLane: scalar("el") === "right" ? "right" : "left",
   };
 }
 

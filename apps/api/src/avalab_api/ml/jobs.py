@@ -53,7 +53,7 @@ class StemResult:
 class MlResult:
     """Runner output; samples never leave the manager as JSON."""
 
-    kind: Literal["audio", "stems", "transcript", "analysis"]
+    kind: Literal["audio", "stems", "transcript", "analysis", "classification"]
     samples: np.ndarray | None = None
     sample_rate_hz: int | None = None
     stems: list[StemResult] | None = None
@@ -61,6 +61,7 @@ class MlResult:
     segments: list[dict[str, object]] | None = None
     language: str | None = None
     analysis: dict[str, object] | None = None
+    labels: list[dict[str, object]] | None = None
     stats: dict[str, object] = field(default_factory=dict)
 
 
@@ -256,6 +257,10 @@ class JobManager:
             if result.analysis is None:
                 raise ApiError(ErrorCode.ml_failed, "Runner returned no analysis", 500)
             return {"kind": "analysis", "analysis": result.analysis, "stats": result.stats}
+        if result.kind == "classification":
+            if result.labels is None:
+                raise ApiError(ErrorCode.ml_failed, "Runner returned no labels", 500)
+            return {"kind": "classification", "labels": result.labels, "stats": result.stats}
         if result.kind == "audio":
             if result.samples is None or result.sample_rate_hz is None:
                 raise ApiError(ErrorCode.ml_failed, "Runner returned no audio", 500)

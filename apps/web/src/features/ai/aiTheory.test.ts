@@ -26,6 +26,7 @@ const THEORY_NAMESPACE: Record<AiTask, string> = {
   separation: "separation",
   asr: "asr",
   "neural-codec": "neuralCodec",
+  classification: "classification",
   pitch: "pitch",
   beat: "beat",
 };
@@ -83,6 +84,7 @@ describe("AI theory data", () => {
       "separation",
       "asr",
       "neural-codec",
+      "classification",
       "pitch",
       "beat",
     ]);

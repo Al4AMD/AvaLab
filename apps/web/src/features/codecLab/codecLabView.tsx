@@ -40,6 +40,7 @@ import {
   type RealCodecName,
   type RealCodecRun,
   runRealCodec,
+  runWholeFileCodec,
 } from "./backendCodecs";
 import { aggregateCodecLanes } from "./codecLabLanes";
 import {
@@ -118,6 +119,19 @@ export function realPlayback(
 
 type RealCodecStatus = "idle" | "running" | "ready" | "error";
 
+function wholeStageLabel(t: TFunction, progress: number): string {
+  if (progress < 0.6) {
+    return t("codecLab.real.stage.encode");
+  }
+  if (progress < 0.75) {
+    return t("codecLab.real.stage.decode");
+  }
+  if (progress < 0.9) {
+    return t("codecLab.real.stage.align");
+  }
+  return t("codecLab.real.stage.store");
+}
+
 function realErrorText(t: TFunction, key: string | null): string {
   switch (key) {
     case "codecLab.error.codec_unavailable":
@@ -138,6 +152,12 @@ function realErrorText(t: TFunction, key: string | null): string {
       return t("codecLab.error.alignment_mismatch");
     case "codecLab.error.backend_unavailable":
       return t("codecLab.error.backend_unavailable");
+    case "codecLab.error.job_busy":
+      return t("codecLab.error.job_busy");
+    case "codecLab.error.job_cancelled":
+      return t("codecLab.error.job_cancelled");
+    case "codecLab.error.job_not_found":
+      return t("codecLab.error.job_not_found");
     case "codecLab.error.unknown":
       return t("codecLab.error.unknown");
     default:
@@ -429,6 +449,10 @@ export function CodecLabView(): React.ReactElement {
   const [realResult, setRealResult] = useState<RealCodecViewResult | null>(null);
   const [realMetrics, setRealMetrics] = useState<QualityMetrics | null>(null);
   const [realErrorKey, setRealErrorKey] = useState<string | null>(null);
+  const [realIsWhole, setRealIsWhole] = useState(false);
+  const [wholeStatus, setWholeStatus] = useState<"idle" | "running">("idle");
+  const [wholeProgress, setWholeProgress] = useState(0);
+  const [wholeErrorKey, setWholeErrorKey] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "ok" | "error">("idle");
   const [batchRows, setBatchRows] = useState<ComparisonRow[] | null>(null);
   const [batchStatus, setBatchStatus] = useState<"idle" | "running">("idle");
@@ -438,6 +462,8 @@ export function CodecLabView(): React.ReactElement {
   const batchAbortRef = useRef<AbortController | null>(null);
   const realRunIdRef = useRef(0);
   const realAbortRef = useRef<AbortController | null>(null);
+  const wholeRunIdRef = useRef(0);
+  const wholeAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     runIdRef.current += 1;
@@ -449,6 +475,12 @@ export function CodecLabView(): React.ReactElement {
     setRealStatus("idle");
     setRealResult(null);
     setRealErrorKey(null);
+    setRealIsWhole(false);
+    wholeRunIdRef.current += 1;
+    wholeAbortRef.current?.abort();
+    setWholeStatus("idle");
+    setWholeProgress(0);
+    setWholeErrorKey(null);
     setCopyStatus("idle");
     batchAbortRef.current?.abort();
     batchAbortRef.current = null;
@@ -487,6 +519,7 @@ export function CodecLabView(): React.ReactElement {
   useEffect(
     () => () => {
       realAbortRef.current?.abort();
+      wholeAbortRef.current?.abort();
       batchAbortRef.current?.abort();
     },
     [],
@@ -713,6 +746,84 @@ export function CodecLabView(): React.ReactElement {
   const realAvailable = availableRealCodecs(health);
   const realCodecAvailable = realAvailable.includes(settings.realCodec);
 
+  function runWholeFile(): void {
+    if (
+      original === null ||
+      wholeStatus === "running" ||
+      realStatus === "running" ||
+      !backendOnline ||
+      !realCodecAvailable
+    ) {
+      return;
+    }
+    const runId = wholeRunIdRef.current + 1;
+    wholeRunIdRef.current = runId;
+    wholeAbortRef.current?.abort();
+    const controller = new AbortController();
+    wholeAbortRef.current = controller;
+    const wholeSettings: CodecLabSettings = {
+      ...settings,
+      startSample: 0,
+      endSample: original.samples.length,
+    };
+    setWholeStatus("running");
+    setWholeProgress(0);
+    setWholeErrorKey(null);
+    runWholeFileCodec(
+      {
+        samples: original.samples,
+        channels: original.channels,
+        sampleRateHz: original.sampleRateHz,
+        startSample: 0,
+        endSample: original.samples.length,
+      },
+      {
+        codec: settings.realCodec,
+        bitrateKbps: settings.realBitrateKbps,
+        quality: settings.realQuality,
+        compressionLevel: settings.realCompressionLevel,
+      },
+      {
+        signal: controller.signal,
+        onProgress: (progress) => {
+          if (wholeRunIdRef.current === runId) {
+            setWholeProgress(progress);
+          }
+        },
+      },
+    ).then(
+      (run) => {
+        if (wholeRunIdRef.current !== runId || controller.signal.aborted) {
+          return;
+        }
+        setWholeStatus("idle");
+        setWholeProgress(1);
+        setRealResult({ run, settings: wholeSettings });
+        setRealIsWhole(true);
+        setBatchRows(null);
+        setRealStatus("ready");
+      },
+      (error: unknown) => {
+        if (wholeRunIdRef.current !== runId || controller.signal.aborted) {
+          return;
+        }
+        setWholeStatus("idle");
+        setWholeErrorKey(
+          error instanceof RealCodecError ? error.messageKey : "codecLab.error.failed",
+        );
+      },
+    );
+  }
+
+  function cancelWholeFile(): void {
+    if (wholeStatus !== "running") {
+      return;
+    }
+    wholeAbortRef.current?.abort();
+    setWholeStatus("idle");
+    setWholeProgress(0);
+  }
+
   function runReal(): void {
     if (
       original === null ||
@@ -754,6 +865,7 @@ export function CodecLabView(): React.ReactElement {
           return;
         }
         setRealResult({ run, settings: runSettings });
+        setRealIsWhole(false);
         setBatchRows(null);
         setRealStatus("ready");
       },
@@ -934,7 +1046,8 @@ export function CodecLabView(): React.ReactElement {
 
   const stale =
     result !== null && (isCodecLabStale(settings, result.settings) || result.mode !== channel.mode);
-  const realStale = realResult !== null && isRealCodecStale(settings, realResult.settings);
+  const realStale =
+    realResult !== null && !realIsWhole && isRealCodecStale(settings, realResult.settings);
   const diagnosticLane =
     result?.mode === "both"
       ? effectiveLane
@@ -1539,12 +1652,41 @@ export function CodecLabView(): React.ReactElement {
           <Button
             data-testid="codecLab.real.encode"
             disabled={
-              !backendOnline || !realCodecAvailable || realStatus === "running" || rangeEmpty
+              !backendOnline ||
+              !realCodecAvailable ||
+              realStatus === "running" ||
+              wholeStatus === "running" ||
+              rangeEmpty
             }
             onClick={runReal}
           >
             {realStatus === "running" ? t("codecLab.real.running") : t("codecLab.real.encode")}
           </Button>
+          <Button
+            data-testid="codecLab.real.wholeEncode"
+            variant="outline"
+            disabled={
+              !backendOnline ||
+              !realCodecAvailable ||
+              realStatus === "running" ||
+              wholeStatus === "running"
+            }
+            onClick={runWholeFile}
+          >
+            {wholeStatus === "running"
+              ? t("codecLab.real.wholeRunning")
+              : t("codecLab.real.wholeEncode")}
+          </Button>
+          {wholeStatus === "running" ? (
+            <Button
+              size="sm"
+              variant="outline"
+              data-testid="codecLab.real.wholeCancel"
+              onClick={cancelWholeFile}
+            >
+              {t("codecLab.real.wholeCancel")}
+            </Button>
+          ) : null}
           <Button
             size="sm"
             variant="outline"
@@ -1581,13 +1723,36 @@ export function CodecLabView(): React.ReactElement {
             <p className="text-xs text-muted">{t("codecLab.real.codecUnavailable")}</p>
           ) : null}
         </div>
+        {wholeStatus === "running" ? (
+          <p
+            data-testid="codecLab.real.wholeProgress"
+            role="status"
+            dir="ltr"
+            className="mt-2 text-xs tabular-nums text-muted"
+          >
+            {t("codecLab.real.wholeProgress", {
+              percent: Math.round(wholeProgress * 100),
+              stage: wholeStageLabel(t, wholeProgress),
+            })}
+          </p>
+        ) : null}
+        {wholeErrorKey !== null ? (
+          <p
+            data-testid="codecLab.real.wholeError"
+            role="alert"
+            className="mt-2 text-sm text-danger"
+          >
+            {realErrorText(t, wholeErrorKey)}
+          </p>
+        ) : null}
         {realErrorKey !== null ? (
           <p data-testid="codecLab.real.error" role="alert" className="mt-2 text-sm text-danger">
             {realErrorText(t, realErrorKey)}
           </p>
-        ) : realStatus === "idle" ? (
+        ) : realStatus === "idle" && wholeStatus === "idle" ? (
           <p className="mt-2 text-xs text-muted">{t("codecLab.real.idle")}</p>
         ) : null}
+        <p className="mt-2 text-xs text-muted">{t("codecLab.real.wholeHint")}</p>
         {realResult !== null ? (
           <>
             <p
@@ -1695,7 +1860,8 @@ export function CodecLabView(): React.ReactElement {
                 batchStatus === "running" ||
                 rangeEmpty ||
                 status === "running" ||
-                realStatus === "running"
+                realStatus === "running" ||
+                wholeStatus === "running"
               }
               onClick={runBatch}
             >

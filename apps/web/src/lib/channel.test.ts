@@ -8,6 +8,7 @@ import {
   channelSignals,
   displayedLanes,
   laneIndexForSingleMode,
+  singleAnalysisLane,
 } from "./channel";
 
 function source(left: Float32Array, right?: Float32Array): ChannelSource {
@@ -80,6 +81,14 @@ describe("laneIndexForSingleMode", () => {
     expect(laneIndexForSingleMode("left")).toBe(0);
     expect(laneIndexForSingleMode("right")).toBe(1);
     expect(laneIndexForSingleMode("both")).toBeNull();
+  });
+});
+
+describe("singleAnalysisLane", () => {
+  it("uses the downmix for mono and a playback lane otherwise", () => {
+    expect(singleAnalysisLane("mono")).toBe("mono");
+    expect(singleAnalysisLane("left")).toBe(0);
+    expect(singleAnalysisLane("right")).toBe(1);
   });
 });
 

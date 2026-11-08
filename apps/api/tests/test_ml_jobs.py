@@ -164,6 +164,37 @@ def test_stems_are_persisted_in_order(tmp_path: Path) -> None:
         manager.shutdown()
 
 
+def test_classification_labels_are_returned_without_audio(tmp_path: Path) -> None:
+    storage = _storage(tmp_path)
+    _seed(storage)
+
+    class LabelRunner:
+        def run(
+            self,
+            samples: np.ndarray,
+            sample_rate_hz: int,
+            params: dict[str, object],
+            progress: Callable[[float], None],
+        ) -> MlResult:
+            progress(0.5)
+            return MlResult(
+                kind="classification",
+                labels=[{"label": "Music", "probability": 0.8}],
+                stats={"window_count": 1},
+            )
+
+    manager = JobManager(storage)
+    try:
+        job_id = manager.submit("classification", MlJobRequest(audio_id=AUDIO_ID), LabelRunner())
+        done = _collect(manager, job_id)[-1]
+        assert done.event == "done" and done.result is not None
+        assert done.result["kind"] == "classification"
+        assert done.result["labels"] == [{"label": "Music", "probability": 0.8}]
+        assert "result_audio_id" not in done.result
+    finally:
+        manager.shutdown()
+
+
 def test_transcript_result_is_returned_without_audio(tmp_path: Path) -> None:
     storage = _storage(tmp_path)
     _seed(storage)

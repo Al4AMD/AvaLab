@@ -19,9 +19,13 @@ import "uplot/dist/uPlot.min.css";
 
 import { Button } from "../../components/ui/button";
 import { formatDb, formatHz, formatS } from "../../lib/format";
+import { combineLaneOutputs, type LaneResults } from "../../lib/laneCombine";
+import { laneParamsLinked } from "../../lib/laneParams";
 import { writeLastUsed } from "../../lib/lastUsed";
 import type { AliasDemoResult, SamplingProcessResult } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
+import { ChannelPicker } from "../channels/ChannelPicker";
+import { useChannelMode } from "../channels/useChannelMode";
 import { UploadEmptyState } from "../input/upload";
 import { TheoryPanel } from "../theory/TheoryPanel";
 import { TOOL_THEORY } from "../theory/theoryContent";
@@ -34,7 +38,9 @@ import {
   SAMPLING_MIN_RATE_HZ,
   SAMPLING_RATE_PRESETS,
   SAMPLING_STORAGE_KEY,
+  type SamplingLaneSettings,
   type SamplingSettings,
+  samplingLanes,
   samplingSettingsFromSearch,
   samplingSettingsToSearch,
 } from "./samplingState";
@@ -412,10 +418,36 @@ function AliasingCard({ sourceLoaded }: { readonly sourceLoaded: boolean }) {
   );
 }
 
+type SamplingLaneKey = "left" | "right";
+
+function readSamplingResult(outcome: {
+  readonly meta: SamplingProcessResult["meta"];
+  readonly payload?: {
+    readonly buffer: ArrayBuffer;
+    readonly byteOffset: number;
+    readonly byteLength: number;
+  };
+}): SamplingResult | null {
+  const payload = outcome.payload;
+  if (payload === undefined) {
+    return null;
+  }
+  const values = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  const sampleCount = outcome.meta.outputSampleCount;
+  const quantized = values.slice(0, sampleCount);
+  const error = values.slice(sampleCount, sampleCount * 2);
+  const reference = new Float32Array(sampleCount);
+  for (let index = 0; index < sampleCount; index += 1) {
+    reference[index] = (quantized[index] ?? 0) + (error[index] ?? 0);
+  }
+  return { meta: outcome.meta, quantized, error, reference };
+}
+
 export function SamplingView(): React.ReactElement {
   const { t } = useTranslation();
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
+  const channel = useChannelMode(original, "both");
   const [searchParams, setSearchParams] = useSearchParams();
   const settings = useMemo(() => {
     const source = {
@@ -427,22 +459,64 @@ export function SamplingView(): React.ReactElement {
     }
     return samplingSettingsFromSearch(`?${searchParams.toString()}`, source, selection);
   }, [searchParams, original, selection]);
+  const resolved = useMemo(() => samplingLanes(settings), [settings]);
+  const effectiveLane: SamplingLaneKey =
+    channel.mode === "both" ? settings.editLane : channel.mode === "right" ? "right" : "left";
+  const laneSettings = resolved[effectiveLane];
+  const lanePair = useMemo(
+    () => ({
+      primary: { bits: settings.bits, dither: settings.dither },
+      ...(settings.right === undefined ? {} : { right: settings.right }),
+    }),
+    [settings.bits, settings.dither, settings.right],
+  );
+  const linked = laneParamsLinked(lanePair);
 
   useEffect(() => {
     writeLastUsed(SAMPLING_STORAGE_KEY, samplingSettingsToSearch(settings));
   }, [settings]);
-  const [result, setResult] = useState<SamplingResult | null>(null);
+  const [laneResults, setLaneResults] = useState<Partial<Record<SamplingLaneKey, SamplingResult>>>(
+    {},
+  );
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const generationRef = useRef(0);
+  const result = laneResults[effectiveLane] ?? null;
 
-  function updateSettings(patch: Partial<SamplingSettings>): void {
-    const next = { ...settings, ...patch };
+  function writeSettings(next: SamplingSettings): void {
     const params = new URLSearchParams(searchParams);
+    for (const key of Array.from(params.keys())) {
+      if (key === "el" || (key.startsWith("rr") && key.length > 2)) {
+        params.delete(key);
+      }
+    }
     for (const [key, value] of new URLSearchParams(samplingSettingsToSearch(next))) {
       params.set(key, value);
     }
     setSearchParams(params, { replace: true });
+  }
+
+  function updateSettings(patch: Partial<SamplingSettings>): void {
+    writeSettings({ ...settings, ...patch });
+  }
+
+  function updateLaneSettings(patch: Partial<SamplingLaneSettings>): void {
+    const next = { ...laneSettings, ...patch };
+    writeSettings(
+      effectiveLane === "right" ? { ...settings, right: next } : { ...settings, ...next },
+    );
+  }
+
+  function selectEditLane(lane: SamplingLaneKey): void {
+    writeSettings({ ...settings, editLane: lane });
+  }
+
+  function setLinked(nextLinked: boolean): void {
+    writeSettings({
+      ...settings,
+      ...(nextLinked ? { right: undefined } : { right: resolved.left }),
+      editLane: settings.editLane,
+    });
   }
 
   useEffect(() => {
@@ -453,56 +527,76 @@ export function SamplingView(): React.ReactElement {
     generationRef.current = generation;
     setFailed(false);
     setBusy(true);
+    let tickets: { readonly key: string }[] = [];
     const timer = window.setTimeout(() => {
       const startSample = Math.max(0, Math.min(settings.startSample, original.samples.length));
       const endSample = Math.max(
         startSample,
         Math.min(settings.endSample, original.samples.length),
       );
-      const slice = original.samples.slice(startSample, endSample);
-      if (slice.length === 0) {
+      if (endSample <= startSample) {
         setBusy(false);
         setFailed(true);
         return;
       }
-      const ticket = useSessionStore.getState().deriveStandalone(
-        "samplingProcess",
-        {
+      const store = useSessionStore.getState();
+      const targets: SamplingLaneKey[] =
+        channel.mode === "both" ? ["left", "right"] : [effectiveLane];
+      const pending = targets.map((lane) => {
+        const params = {
           sampleRateHz: original.sampleRateHz,
           startSample,
           endSample,
           targetRateHz: settings.targetRateHz,
           antiAlias: settings.antiAlias,
-          bits: settings.bits,
-          dither: settings.dither,
+          bits: resolved[lane].bits,
+          dither: resolved[lane].dither,
           seed: settings.seed,
-        },
-        { buffer: slice.buffer, byteOffset: 0, byteLength: slice.byteLength },
-      );
-      ticket.outcome.then(
-        (outcome) => {
-          if (generationRef.current !== generation || "cancelled" in outcome) {
+        };
+        if (channel.mode === "mono") {
+          const slice = original.samples.slice(startSample, endSample);
+          return {
+            lane,
+            ticket: store.deriveStandalone("samplingProcess", params, {
+              buffer: slice.buffer,
+              byteOffset: 0,
+              byteLength: slice.byteLength,
+            }),
+          };
+        }
+        return {
+          lane,
+          ticket: store.deriveWithSourceSliceLane(
+            "samplingProcess",
+            params,
+            startSample,
+            endSample,
+            lane === "right" ? 1 : 0,
+          ),
+        };
+      });
+      tickets = pending.map((entry) => entry.ticket);
+      void Promise.all(
+        pending.map(async (entry) => ({ lane: entry.lane, outcome: await entry.ticket.outcome })),
+      ).then(
+        (settled) => {
+          if (generationRef.current !== generation) {
             return;
           }
-          const payload = outcome.payload;
-          if (payload === undefined) {
-            setBusy(false);
-            setFailed(true);
-            return;
+          const next: Partial<Record<SamplingLaneKey, SamplingResult>> = {};
+          for (const { lane, outcome } of settled) {
+            if ("cancelled" in outcome) {
+              return;
+            }
+            const unpacked = readSamplingResult(outcome);
+            if (unpacked === null) {
+              setBusy(false);
+              setFailed(true);
+              return;
+            }
+            next[lane] = unpacked;
           }
-          const values = new Float32Array(
-            payload.buffer,
-            payload.byteOffset,
-            payload.byteLength / 4,
-          );
-          const sampleCount = outcome.meta.outputSampleCount;
-          const quantized = values.slice(0, sampleCount);
-          const error = values.slice(sampleCount, sampleCount * 2);
-          const reference = new Float32Array(sampleCount);
-          for (let index = 0; index < sampleCount; index += 1) {
-            reference[index] = (quantized[index] ?? 0) + (error[index] ?? 0);
-          }
-          setResult({ meta: outcome.meta, quantized, error, reference });
+          setLaneResults(next);
           setBusy(false);
         },
         () => {
@@ -515,8 +609,11 @@ export function SamplingView(): React.ReactElement {
     }, 200);
     return () => {
       window.clearTimeout(timer);
+      for (const ticket of tickets) {
+        useSessionStore.getState().cancel(ticket.key);
+      }
     };
-  }, [original, settings]);
+  }, [original, settings, channel.mode, effectiveLane, resolved]);
 
   const previewRange = original
     ? defaultSamplingRange(selection, original.samples.length, original.sampleRateHz)
@@ -537,10 +634,84 @@ export function SamplingView(): React.ReactElement {
   const targetIsPreset = SAMPLING_RATE_PRESETS.includes(
     settings.targetRateHz as (typeof SAMPLING_RATE_PRESETS)[number],
   );
+  const laneLabels: Record<SamplingLaneKey, string> = {
+    left: t("sampling.lane.left"),
+    right: t("sampling.lane.right"),
+  };
+
+  function play(kind: "quantized" | "error"): void {
+    const selected = laneResults[effectiveLane];
+    if (selected === null || selected === undefined) {
+      return;
+    }
+    if (channel.mode === "mono") {
+      const installed = useSessionStore
+        .getState()
+        .setProcessed(selected[kind].slice(), selected.meta.sampleRateHz, "sampling");
+      setFailed(!installed.ok);
+      return;
+    }
+    const outputs: LaneResults =
+      channel.mode === "both"
+        ? { left: laneResults.left?.[kind], right: laneResults.right?.[kind] }
+        : channel.mode === "right"
+          ? { right: selected[kind] }
+          : { left: selected[kind] };
+    const combined = combineLaneOutputs(channel.mode, outputs);
+    if (combined === null) {
+      setFailed(true);
+      return;
+    }
+    const installed = useSessionStore
+      .getState()
+      .setProcessed(combined, selected.meta.sampleRateHz, "sampling");
+    setFailed(!installed.ok);
+  }
 
   return (
     <section className="flex flex-col gap-4">
       <ToolHeader titleKey="tool.sampling.title" descriptionKey="tool.sampling.description" />
+
+      <div className="flex flex-col gap-3 rounded border border-surface p-3">
+        <ChannelPicker mode={channel.mode} modes={channel.modes} onChange={channel.setMode} />
+        {channel.mode === "both" ? (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              {(["left", "right"] as const).map((lane) => (
+                <Button
+                  key={lane}
+                  size="sm"
+                  variant={effectiveLane === lane ? "default" : "outline"}
+                  aria-pressed={effectiveLane === lane}
+                  data-testid={`sampling.lane.${lane}`}
+                  onClick={() => {
+                    selectEditLane(lane);
+                  }}
+                >
+                  {laneLabels[lane]}
+                </Button>
+              ))}
+            </div>
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                data-testid="sampling.linkRight"
+                checked={linked}
+                onChange={(event) => {
+                  setLinked(event.currentTarget.checked);
+                }}
+              />
+              <span>{t("sampling.lane.link")}</span>
+            </label>
+            <p data-testid="sampling.lane.status" className="text-xs text-muted">
+              {linked ? t("sampling.lane.linked") : t("sampling.lane.separate")}
+            </p>
+          </>
+        ) : null}
+        <p data-testid="sampling.lane.gridNote" className="text-xs text-muted">
+          {t("sampling.lane.gridNote")}
+        </p>
+      </div>
 
       <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-xs">
@@ -590,17 +761,17 @@ export function SamplingView(): React.ReactElement {
 
         <label className="flex flex-col gap-1 text-xs">
           <span className="font-medium">
-            {t("sampling.controls.bits")} <span dir="ltr">{settings.bits}</span>
+            {t("sampling.controls.bits")} <span dir="ltr">{laneSettings.bits}</span>
           </span>
           <input
             type="range"
             min={SAMPLING_MIN_BITS}
             max={SAMPLING_MAX_BITS}
             step={1}
-            value={settings.bits}
+            value={laneSettings.bits}
             data-testid="sampling.control.bits"
             onChange={(event) => {
-              updateSettings({ bits: Number(event.currentTarget.value) });
+              updateLaneSettings({ bits: Number(event.currentTarget.value) });
             }}
             className={CONTROL_FOCUS_CLASSES}
           />
@@ -622,10 +793,10 @@ export function SamplingView(): React.ReactElement {
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
-              checked={settings.dither}
+              checked={laneSettings.dither}
               data-testid="sampling.control.dither"
               onChange={(event) => {
-                updateSettings({ dither: event.currentTarget.checked });
+                updateLaneSettings({ dither: event.currentTarget.checked });
               }}
               className={CONTROL_FOCUS_CLASSES}
             />
@@ -716,6 +887,44 @@ export function SamplingView(): React.ReactElement {
             <p className="text-xs text-muted">{t("sampling.metrics.psnrNote")}</p>
             <p className="text-xs text-muted">{t("sampling.metrics.theoryNote")}</p>
 
+            {channel.mode === "both" && (
+              <table data-testid="sampling.metrics.lanes" className="w-full text-xs">
+                <thead className="text-muted">
+                  <tr>
+                    <th className="text-start font-medium">{t("sampling.lane.label")}</th>
+                    <th className="text-start font-medium">{t("sampling.metrics.snr")}</th>
+                    <th className="text-start font-medium">{t("sampling.metrics.segmentalSnr")}</th>
+                    <th className="text-start font-medium">{t("sampling.metrics.psnr")}</th>
+                    <th className="text-start font-medium">{t("sampling.metrics.mse")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(["left", "right"] as const).map((lane) => {
+                    const laneResult = laneResults[lane];
+                    return (
+                      <tr key={lane} data-testid={`sampling.metrics.lane.${lane}`}>
+                        <td>{laneLabels[lane]}</td>
+                        <td dir="ltr" className="tabular-nums">
+                          {laneResult === undefined ? "—" : formatDb(laneResult.meta.snrDb)}
+                        </td>
+                        <td dir="ltr" className="tabular-nums">
+                          {laneResult === undefined
+                            ? "—"
+                            : formatDb(laneResult.meta.segmentalSnrDb)}
+                        </td>
+                        <td dir="ltr" className="tabular-nums">
+                          {laneResult === undefined ? "—" : formatDb(laneResult.meta.psnrDb)}
+                        </td>
+                        <td dir="ltr" className="tabular-nums">
+                          {laneResult === undefined ? "—" : laneResult.meta.mse.toExponential(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <figure className="flex flex-col gap-1">
                 <MiniWaveform
@@ -750,9 +959,7 @@ export function SamplingView(): React.ReactElement {
                 size="sm"
                 data-testid="sampling.play.processed"
                 onClick={() => {
-                  useSessionStore
-                    .getState()
-                    .setProcessed(result.quantized.slice(), result.meta.sampleRateHz, "sampling");
+                  play("quantized");
                 }}
               >
                 {t("sampling.play.processed")}
@@ -762,9 +969,7 @@ export function SamplingView(): React.ReactElement {
                 variant="outline"
                 data-testid="sampling.play.residual"
                 onClick={() => {
-                  useSessionStore
-                    .getState()
-                    .setProcessed(result.error.slice(), result.meta.sampleRateHz, "sampling");
+                  play("error");
                 }}
               >
                 {t("sampling.play.residual")}

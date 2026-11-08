@@ -123,10 +123,10 @@ assert status == 200 and health["status"] == "ok", health
 assert health["ffmpeg"] is True, health
 
 status, models = get("/api/v1/models")
-assert status == 200 and len(models["models"]) == 5, models
+assert status == 200 and len(models["models"]) == 6, models
 states = {row["task"]: row["state"] for row in models["models"]}
 assert all(state == "available" for state in states.values()), states
-print("health=ok ffmpeg=true models=5 available")
+print("health=ok ffmpeg=true models=6 available")
 
 status, ingested = upload(wav_bytes())
 assert status == 200, ingested
@@ -228,7 +228,7 @@ def request(path, *, data=None, headers=None, method=None):
 
 
 status, models = request("/models", method="GET")
-assert status == 200 and len(models["models"]) == 5, models
+assert status == 200 and len(models["models"]) == 6, models
 assert all(row["state"] == "available" for row in models["models"]), models
 
 frames = bytearray()
@@ -268,7 +268,7 @@ with urllib.request.urlopen(f"{base}/jobs/{job['job_id']}/events", timeout=120) 
         if raw.startswith(b"data: ")
     ]
 assert events and events[-1]["event"] == "done", events
-print(f"offline=true models=5 denoise={events[-1]['event']}")
+print(f"offline=true models=6 denoise={events[-1]['event']}")
 PY
 
 echo "== reconnect, restart, and verify volume persistence =="
@@ -285,12 +285,12 @@ import urllib.request
 base, audio_id = sys.argv[1], sys.argv[2]
 with urllib.request.urlopen(base + "/api/v1/models", timeout=30) as response:
     models = json.load(response)
-assert len(models["models"]) == 5, models
+assert len(models["models"]) == 6, models
 assert all(row["state"] == "available" for row in models["models"]), models
 with urllib.request.urlopen(base + f"/api/v1/audio/{audio_id}", timeout=30) as response:
     assert response.status == 200
     assert response.read(4) == b"RIFF"
-print("persistence: models=5 storage_audio=ok")
+print("persistence: models=6 storage_audio=ok")
 PY
 
 echo "== smoke passed =="

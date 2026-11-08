@@ -164,7 +164,7 @@ def test_analysis_route_bypasses_model_registry(
         get_settings.cache_clear()
 
 
-def test_models_still_lists_only_five_model_tasks(
+def test_models_still_lists_only_model_tasks(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     app = _app(monkeypatch, tmp_path)
@@ -173,7 +173,8 @@ def test_models_still_lists_only_five_model_tasks(
             response = client.get("/api/v1/models")
             assert response.status_code == 200
             tasks = [row["task"] for row in response.json()["models"]]
-            assert len(tasks) == 5
+            assert len(tasks) == 6
+            assert "classification" in tasks
             assert "pitch" not in tasks and "beat" not in tasks
     finally:
         get_settings.cache_clear()

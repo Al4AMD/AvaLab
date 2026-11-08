@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { combineLaneResults } from "./laneCombine";
+import { combineLaneOutputs, combineLaneResults } from "./laneCombine";
 
 function lanes(left: number[], right?: number[]): readonly Float32Array[] {
   const leftLane = new Float32Array(left);
@@ -96,5 +96,40 @@ describe("combineLaneResults", () => {
     });
 
     expect(source.map((lane) => Array.from(lane))).toEqual(before);
+  });
+});
+
+describe("combineLaneOutputs", () => {
+  it("returns the processed output for single-lane modes", () => {
+    const mono = new Float32Array([1, 2]);
+    const left = new Float32Array([3, 4]);
+    const right = new Float32Array([5, 6]);
+
+    expect(combineLaneOutputs("mono", { mono })).toEqual([mono]);
+    expect(combineLaneOutputs("left", { left })).toEqual([left]);
+    expect(combineLaneOutputs("right", { right })).toEqual([right]);
+  });
+
+  it("returns both outputs when the lengths match", () => {
+    const left = new Float32Array([1, 2]);
+    const right = new Float32Array([3, 4]);
+
+    expect(combineLaneOutputs("both", { left, right })).toEqual([left, right]);
+  });
+
+  it("rejects missing, empty, or mismatched outputs", () => {
+    expect(combineLaneOutputs("mono", {})).toBeNull();
+    expect(combineLaneOutputs("left", { left: new Float32Array(0) })).toBeNull();
+    expect(combineLaneOutputs("right", {})).toBeNull();
+    expect(combineLaneOutputs("both", { left: new Float32Array([1]) })).toBeNull();
+    expect(
+      combineLaneOutputs("both", {
+        left: new Float32Array([1, 2]),
+        right: new Float32Array([3]),
+      }),
+    ).toBeNull();
+    expect(
+      combineLaneOutputs("both", { left: new Float32Array(0), right: new Float32Array(0) }),
+    ).toBeNull();
   });
 });

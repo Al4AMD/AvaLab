@@ -29,7 +29,9 @@ import {
   generateSynth,
   loudnessMeasure,
   type ReverbProcessParams,
+  type ReverbStereoProcessParams,
   reverbProcess,
+  reverbStereoProcess,
   type SamplingProcessParams,
   type SpectrumEditParams,
   type SuperresBaselineParams,
@@ -724,6 +726,133 @@ describe("reverbProcess handler", () => {
   });
 });
 
+describe("reverbStereoProcess handler", () => {
+  const SAMPLE_RATE = 48_000;
+  const IR = {
+    kind: "hall" as const,
+    durationSeconds: 0.2,
+    rt60Seconds: 0.4,
+    seed: 7,
+  };
+
+  function run(
+    left: number[],
+    right: number[],
+    uploadedIr: number[],
+    overrides: Partial<ReverbStereoProcessParams> = {},
+  ) {
+    const params: ReverbStereoProcessParams = {
+      sampleRateHz: SAMPLE_RATE,
+      ir: IR,
+      uploadedIrChannelCount: uploadedIr.length > 0 ? 2 : 0,
+      uploadedIrSampleCount: uploadedIr.length > 0 ? uploadedIr.length / 2 : 0,
+      preDelayMs: 0,
+      wetMix: 1,
+      method: "fft",
+      ...overrides,
+    };
+    const values = [...left, ...right, ...uploadedIr];
+    const result = reverbStereoProcess(params, float32PayloadOf(values));
+    const payload = result.payload;
+    if (payload === undefined) {
+      throw new Error("missing payload");
+    }
+    const output = float32ValuesOf(payload);
+    return {
+      result,
+      left: output.slice(0, result.meta.outputSampleCount),
+      right: output.slice(result.meta.outputSampleCount),
+    };
+  }
+
+  it("applies the documented LL, LR, RL, RR matrix", () => {
+    const { left, right } = run([1, 0], [0, 1], [1, 2, 3, 4], {
+      uploadedIrChannelCount: 4,
+      uploadedIrSampleCount: 1,
+    });
+    expect(left).toEqual([1, 3]);
+    expect(right).toEqual([2, 4]);
+  });
+
+  it("maps a two-channel upload to the diagonal with zero cross paths", () => {
+    const { left, right, result } = run([1, 1], [1, 1], [1, 2]);
+    expect(left).toEqual([1, 1]);
+    expect(right).toEqual([2, 2]);
+    expect(result.meta).toMatchObject({ channelCount: 2, irSampleCount: 1 });
+  });
+
+  it("keeps the diagonal paths identical to two mono reverbs", () => {
+    const source = Array.from({ length: 32 }, (_, index) => Math.sin(index / 3));
+    const mono = reverbProcess(
+      {
+        sampleRateHz: SAMPLE_RATE,
+        startSample: 0,
+        endSample: source.length,
+        ir: IR,
+        uploadedIrSampleCount: 0,
+        preDelayMs: 0,
+        wetMix: 1,
+        method: "fft",
+      },
+      float32PayloadOf(source),
+    );
+    const monoValues = float32ValuesOf(mono.payload as TransferablePayload);
+    const { left } = run(source, new Array<number>(source.length).fill(0), []);
+    expect(left.length).toBe(monoValues.length);
+    let maxDifference = 0;
+    for (let index = 0; index < left.length; index += 1) {
+      maxDifference = Math.max(
+        maxDifference,
+        Math.abs((left[index] ?? 0) - (monoValues[index] ?? 0)),
+      );
+    }
+    expect(maxDifference).toBeLessThan(1e-6);
+  });
+
+  it("agrees between the FFT and direct methods", () => {
+    const source = Array.from({ length: 2_000 }, (_, index) => Math.sin(index / 5));
+    const ir = Array.from({ length: 16 }, (_, index) => 0.8 ** index);
+    const fft = run(source, source, [...ir, ...ir]);
+    const direct = run(source, source, [...ir, ...ir], { method: "direct" });
+    let maxDifference = 0;
+    for (let index = 0; index < fft.left.length; index += 1) {
+      maxDifference = Math.max(
+        maxDifference,
+        Math.abs((fft.left[index] ?? 0) - (direct.left[index] ?? 0)),
+      );
+    }
+    expect(maxDifference).toBeLessThan(1e-6);
+  });
+
+  it("rejects invalid shapes and limits", () => {
+    const base: ReverbStereoProcessParams = {
+      sampleRateHz: SAMPLE_RATE,
+      ir: IR,
+      uploadedIrChannelCount: 0,
+      uploadedIrSampleCount: 0,
+      preDelayMs: 0,
+      wetMix: 1,
+      method: "fft",
+    };
+    expect(() =>
+      reverbStereoProcess(
+        { ...base, uploadedIrChannelCount: 3 as 0 | 2 | 4 },
+        float32PayloadOf([1, 1]),
+      ),
+    ).toThrowError(expect.objectContaining({ code: "badParams" }));
+    expect(() => reverbStereoProcess(base, float32PayloadOf([1, 2, 3]))).toThrowError(
+      expect.objectContaining({ code: "badParams" }),
+    );
+    const long = new Array<number>(2 * SAMPLE_RATE + 1).fill(0);
+    expect(() =>
+      reverbStereoProcess({ ...base, method: "direct" }, float32PayloadOf([...long, ...long])),
+    ).toThrowError(expect.objectContaining({ code: "badParams" }));
+    expect(() =>
+      reverbStereoProcess({ ...base, preDelayMs: 300_000 }, float32PayloadOf([1, 1])),
+    ).toThrowError(expect.objectContaining({ code: "tooLong" }));
+  });
+});
+
 describe("convolutionSteps handler", () => {
   function directConvolution(signal: number[], ir: number[]): number[] {
     const output = new Array<number>(signal.length + ir.length - 1).fill(0);
@@ -1054,6 +1183,7 @@ describe("op table wiring", () => {
     expect(dspOps.aliasDemo.handler).toBe(aliasDemo);
     expect(dspOps.extentProcess.handler).toBe(extentProcess);
     expect(dspOps.reverbProcess.handler).toBe(reverbProcess);
+    expect(dspOps.reverbStereoProcess.handler).toBe(reverbStereoProcess);
     expect(dspOps.convolutionSteps.handler).toBe(convolutionSteps);
     expect(dspOps.spectrumEdit.handler).toBe(spectrumEdit);
     expect(dspOps.codecLabProcess.handler).toBe(codecLabProcess);
@@ -1083,6 +1213,7 @@ describe("op table wiring", () => {
       | "aliasDemo"
       | "extentProcess"
       | "reverbProcess"
+      | "reverbStereoProcess"
       | "convolutionSteps"
       | "spectrumEdit"
       | "codecLabProcess"

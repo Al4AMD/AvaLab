@@ -136,7 +136,7 @@ test("Persian: rate-distortion chart PNG export is a real PNG", async ({ page })
   expect(errors).toEqual([]);
 });
 
-test("English: experiments, LTR theory, and all six AI theory panels", async ({ page }) => {
+test("English: experiments, LTR theory, and every AI theory panel", async ({ page }) => {
   const errors = watchForErrors(page);
   await page.addInitScript(() => {
     localStorage.setItem("avalab.language", "en");
@@ -165,6 +165,7 @@ test("English: experiments, LTR theory, and all six AI theory panels", async ({ 
     separation: /Source separation: masks and reconstruction/,
     asr: /Automatic speech recognition and WER/,
     "neural-codec": /Neural codec: RVQ and rate–distortion/,
+    classification: /Audio classification: AudioSet labels/,
     pitchBeat: /Pitch tracking: F0 over time/,
   };
   for (const [task, title] of Object.entries(expected)) {

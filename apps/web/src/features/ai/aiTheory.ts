@@ -171,6 +171,33 @@ export const AI_THEORY: Record<AiTask, AiTheoryEntry> = {
       },
     ],
   },
+  classification: {
+    titleKey: "ai.theory.classification.title",
+    sections: [
+      {
+        headingKey: "ai.theory.classification.concept.heading",
+        bodyKey: "ai.theory.classification.concept.body",
+        formula: "\\hat{p}_k=\\frac{1}{W}\\sum_{w=1}^{W}\\sigma\\!\\left(z_{k,w}\\right)",
+      },
+      {
+        headingKey: "ai.theory.classification.observe.heading",
+        bodyKey: "ai.theory.classification.observe.body",
+        bulletKeys: [
+          "ai.theory.classification.observe.bullets.overlap",
+          "ai.theory.classification.observe.bullets.windows",
+          "ai.theory.classification.observe.bullets.domain",
+        ],
+      },
+      {
+        headingKey: "ai.theory.classification.pitfalls.heading",
+        bodyKey: "ai.theory.classification.pitfalls.body",
+        bulletKeys: [
+          "ai.theory.classification.pitfalls.bullets.taxonomy",
+          "ai.theory.classification.pitfalls.bullets.notCaption",
+        ],
+      },
+    ],
+  },
   "neural-codec": {
     titleKey: "ai.theory.neuralCodec.title",
     sections: [

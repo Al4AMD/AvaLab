@@ -7,7 +7,7 @@ import { type KeyboardEvent, type PointerEvent, useEffect, useMemo, useRef, useS
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 import { ToolHeader } from "../../components/ToolHeader";
-import { displayedLanes, type LaneIndex } from "../../lib/channel";
+import { type AnalysisLane, displayedLanes } from "../../lib/channel";
 import { formatS } from "../../lib/format";
 import type { WaveformOverviewResult, WaveformRangeResult } from "../../session/ops";
 import { type SessionSource, useSessionStore } from "../../session/store";
@@ -31,7 +31,7 @@ import {
 const OVERVIEW_BUCKET_COUNT = 1200;
 const DETAIL_BUCKET_COUNT = 1200;
 
-function useOverview(lane: LaneIndex | null): {
+function useOverview(lane: AnalysisLane | null): {
   readonly minMax: Float32Array;
   readonly sampleCount: number;
 } {
@@ -44,14 +44,14 @@ function useOverview(lane: LaneIndex | null): {
       setKey(null);
       return;
     }
-    const ticket = useSessionStore.getState().deriveWithSourceLane(
-      "waveformOverview",
-      {
-        bucketCount: OVERVIEW_BUCKET_COUNT,
-        sampleRateHz: original.sampleRateHz,
-      },
-      lane,
-    );
+    const props = {
+      bucketCount: OVERVIEW_BUCKET_COUNT,
+      sampleRateHz: original.sampleRateHz,
+    };
+    const ticket =
+      lane === "mono"
+        ? useSessionStore.getState().deriveWithSource("waveformOverview", props)
+        : useSessionStore.getState().deriveWithSourceLane("waveformOverview", props, lane);
     setKey(ticket.key);
     ticket.outcome.catch(() => undefined);
   }, [original, lane]);
@@ -72,7 +72,7 @@ function useOverview(lane: LaneIndex | null): {
 
 function useSliceEnvelope(
   original: SessionSource | null,
-  lane: LaneIndex | null,
+  lane: AnalysisLane | null,
   window: SampleWindow,
   skip: boolean,
 ): { minMax: Float32Array; range: SampleWindow } | null {
@@ -84,18 +84,23 @@ function useSliceEnvelope(
       setKey(null);
       return;
     }
-    const ticket = useSessionStore.getState().deriveWithSourceSliceLane(
-      "waveformRange",
-      {
-        bucketCount: DETAIL_BUCKET_COUNT,
-        sampleRateHz: original.sampleRateHz,
-        startSample: window.startSample,
-        endSample: window.endSample,
-      },
-      window.startSample,
-      window.endSample,
-      lane,
-    );
+    const props = {
+      bucketCount: DETAIL_BUCKET_COUNT,
+      sampleRateHz: original.sampleRateHz,
+      startSample: window.startSample,
+      endSample: window.endSample,
+    };
+    const store = useSessionStore.getState();
+    const ticket =
+      lane === "mono"
+        ? store.deriveWithSourceSlice("waveformRange", props, window.startSample, window.endSample)
+        : store.deriveWithSourceSliceLane(
+            "waveformRange",
+            props,
+            window.startSample,
+            window.endSample,
+            lane,
+          );
     setKey(ticket.key);
     ticket.outcome.catch(() => undefined);
   }, [original, lane, skip, window.startSample, window.endSample]);
@@ -128,9 +133,10 @@ export function WaveformView() {
   const setSelection = useSessionStore((state) => state.setSelection);
   const channel = useChannelMode(original, "both");
   const lanes = displayedLanes(channel.mode);
+  const mono = channel.mode === "mono";
   const showLeft = lanes.some((lane) => lane.lane === 0);
   const showRight = lanes.some((lane) => lane.lane === 1);
-  const overviewLeft = useOverview(showLeft ? 0 : null);
+  const overviewLeft = useOverview(mono ? "mono" : showLeft ? 0 : null);
   const overviewRight = useOverview(showRight ? 1 : null);
   const sampleCount = original?.samples.length ?? 0;
   const [searchParams, setSearchParams] = useSearchParams();
@@ -142,7 +148,12 @@ export function WaveformView() {
       ? { startSample: 0, endSample: 0 }
       : windowFromSearch(`?${searchParams.toString()}`, sampleCount);
   const isFullWindow = window.startSample === 0 && window.endSample === Math.max(1, sampleCount);
-  const sliceLeft = useSliceEnvelope(original, showLeft ? 0 : null, window, isFullWindow);
+  const sliceLeft = useSliceEnvelope(
+    original,
+    mono ? "mono" : showLeft ? 0 : null,
+    window,
+    isFullWindow,
+  );
   const sliceRight = useSliceEnvelope(original, showRight ? 1 : null, window, isFullWindow);
   const detailRange = sliceLeft?.range ??
     sliceRight?.range ?? { startSample: 0, endSample: sampleCount };

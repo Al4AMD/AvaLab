@@ -7,9 +7,10 @@ type ChannelPickerProps = {
   readonly mode: ChannelMode;
   readonly modes: readonly ChannelMode[];
   readonly onChange: (mode: ChannelMode) => void;
+  readonly labelOverrides?: Partial<Record<ChannelMode, string>>;
 };
 
-export function ChannelPicker({ mode, modes, onChange }: ChannelPickerProps) {
+export function ChannelPicker({ mode, modes, onChange, labelOverrides }: ChannelPickerProps) {
   const { t } = useTranslation();
   if (modes.length < 2) {
     return null;
@@ -18,7 +19,7 @@ export function ChannelPicker({ mode, modes, onChange }: ChannelPickerProps) {
     mono: t("channel.mono"),
     left: t("channel.left"),
     right: t("channel.right"),
-    both: t("channel.both"),
+    both: labelOverrides?.both ?? t("channel.both"),
   };
 
   return (

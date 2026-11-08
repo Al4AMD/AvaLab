@@ -51,6 +51,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/codec/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Codec Job
+         * @description Validate the stored source and params, then queue a full-file job.
+         */
+        post: operations["start_codec_job_api_v1_codec_jobs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/codec/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Cancel Codec Job
+         * @description Cancel a queued or running codec job; unknown ids are 404.
+         */
+        delete: operations["cancel_codec_job_api_v1_codec_jobs__job_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/codec/jobs/{job_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Codec Job Events
+         * @description Stream one snapshot, progress updates, then a terminal event.
+         */
+        get: operations["codec_job_events_api_v1_codec_jobs__job_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -186,6 +246,14 @@ export interface components {
             cancelled: boolean;
         };
         /**
+         * CodecCancelResponse
+         * @description Cancellation result; false means the job had already finished.
+         */
+        CodecCancelResponse: {
+            /** Cancelled */
+            cancelled: boolean;
+        };
+        /**
          * CodecEncodeRequest
          * @description Reference to a stored canonical excerpt and the requested codec.
          */
@@ -228,6 +296,14 @@ export interface components {
             sample_rate_hz: number;
             /** Size Bytes */
             size_bytes: number;
+        };
+        /**
+         * CodecJobResponse
+         * @description Accepted codec job reference.
+         */
+        CodecJobResponse: {
+            /** Job Id */
+            job_id: string;
         };
         /**
          * CodecParams
@@ -339,7 +415,7 @@ export interface components {
              * Task
              * @enum {string}
              */
-            task: "denoise" | "superres" | "separation" | "asr" | "neural_codec";
+            task: "denoise" | "superres" | "separation" | "asr" | "neural_codec" | "classification";
         };
         /**
          * ModelsResponse
@@ -531,6 +607,137 @@ export interface operations {
             };
         };
     };
+    start_codec_job_api_v1_codec_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodecEncodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodecJobResponse"];
+                };
+            };
+            /** @description Unknown audio id (not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Invalid codec/params or unavailable encoder */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Codec queue is full (job_busy) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_codec_job_api_v1_codec_jobs__job_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodecCancelResponse"];
+                };
+            };
+            /** @description Unknown job id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    codec_job_events_api_v1_codec_jobs__job_id__events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Unknown job id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_api_v1_health_get: {
         parameters: {
             query?: never;
@@ -669,7 +876,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                task: ("denoise" | "superres" | "separation" | "asr" | "neural_codec") | ("pitch" | "beat");
+                task: ("denoise" | "superres" | "separation" | "asr" | "neural_codec" | "classification") | ("pitch" | "beat");
             };
             cookie?: never;
         };

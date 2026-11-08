@@ -39,7 +39,7 @@ import { useSessionStore } from "../../session/store";
  * so only the default constant can be mirrored; the backend's 413 envelope
  * stays the truth (plan Review Focus 1). Units in the name (AGENTS §10).
  */
-export const DEFAULT_MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+export const DEFAULT_MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
 
 /** Stable backend guard codes this flow surfaces, one key each (AGENTS §7). */
 const KNOWN_BACKEND_CODES: readonly string[] = [
