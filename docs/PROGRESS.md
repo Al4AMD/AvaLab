@@ -15,7 +15,7 @@
   - Reordered `docs/DECISIONS.md` and `docs/PROGRESS.md` so the H1 and intro stay first; joined the split `reverbStereoProcess` table row in `docs/ALGORITHMS.md`.
 - Accepted as-is after review: channel mode follows the URL (`absent → mono`) while each tool already persists its lane settings; shared grid controls stay enabled with the shared-grid note because disabling them would break preview workflows; the codec-job manager and report metric rows reuse existing structures rather than adding new abstractions.
 - Gates on 2026-11-08 after the fixes: `pnpm check` exit 0 (web 85 files / 734 tests, dsp 46 / 1066, scripts 13); web build exit 0; full Playwright suite 106/106 in 2.7 min; backend 252 passed / 6 skipped, ruff and mypy clean; gated AST smoke passed in 7.2 s; `docker/smoke.sh` passed with six models available offline (health ok, FLAC bit-exact, 6 incremental SSE events, fa/en zero console errors, offline denoise done, volumes persistent).
-- No commit: awaiting owner request.
+- Committed as `7aaeaa9` and opened PR [#14](https://github.com/Al4AMD/AvaLab/pull/14) against `main` (`wave-07`, mergeable clean).
 
 ## 2026-11-08 — Wave 7 F14 complete (AudioSet classification)
 
