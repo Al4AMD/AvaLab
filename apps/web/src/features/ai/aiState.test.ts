@@ -38,13 +38,14 @@ describe("AI task URL state", () => {
     expect(aiTaskFromBackend("unknown")).toBeNull();
   });
 
-  it("shares one sixth tab between pitch and beat while keeping task URLs", () => {
+  it("shares one seventh tab between pitch and beat while keeping task URLs", () => {
     expect(AI_TABS).toEqual([
       "denoise",
       "superres",
       "separation",
       "asr",
       "neural-codec",
+      "classification",
       "pitchBeat",
     ]);
     expect(aiTabForTask("pitch")).toBe("pitchBeat");

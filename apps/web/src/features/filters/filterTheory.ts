@@ -40,6 +40,10 @@ export const FILTER_THEORY_SECTIONS: readonly FilterTheorySection[] = [
     formula: "|p_k|<1",
   },
   {
+    headingKey: "filters.theory.lanes.heading",
+    bodyKey: "filters.theory.lanes.body",
+  },
+  {
     headingKey: "filters.theory.observe.heading",
     bodyKey: "filters.theory.observe.body",
     bulletKeys: [

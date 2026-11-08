@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   defaultSpeedRange,
   SPEED_DEFAULT_SETTINGS,
+  speedLanes,
   speedSettingsFromSearch,
   speedSettingsToSearch,
 } from "./speedState";
@@ -34,6 +35,36 @@ describe("speed state codec", () => {
     expect(settings.reverse).toBe(false);
     expect(settings.startSample).toBe(0);
     expect(settings.endSample).toBe(SOURCE.sampleCount);
+  });
+
+  it("round-trips independent lane reverse flags", () => {
+    const settings = {
+      ...SPEED_DEFAULT_SETTINGS,
+      reverse: true,
+      right: { reverse: false },
+      editLane: "right" as const,
+      startSample: 100,
+      endSample: 20_000,
+    };
+    expect(speedSettingsFromSearch(`?${speedSettingsToSearch(settings)}`, SOURCE, FULL)).toEqual(
+      settings,
+    );
+    expect(speedLanes(settings)).toEqual({
+      left: { reverse: true },
+      right: { reverse: false },
+    });
+  });
+
+  it("keeps old links linked to the primary lane", () => {
+    const settings = speedSettingsFromSearch("?rv=1", SOURCE, FULL);
+    expect(settings.right).toBeUndefined();
+    expect(settings.editLane).toBe("left");
+    expect(speedLanes(settings).right).toEqual({ reverse: true });
+  });
+
+  it("falls back an invalid right reverse flag to the primary lane", () => {
+    const settings = speedSettingsFromSearch("?rv=1&rrrv=x", SOURCE, FULL);
+    expect(settings.right).toEqual({ reverse: true });
   });
 
   it("clamps an explicit range to the source", () => {

@@ -11,6 +11,7 @@
  * generation token so stale results never paint.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { AnalysisLane } from "../../lib/channel";
 import type { SpectrogramTilesParams } from "../../session/ops";
 import type { SessionSource } from "../../session/store";
 import { useSessionStore } from "../../session/store";
@@ -43,6 +44,39 @@ export type SpectrogramChunk = {
   readonly frameCount: number;
   readonly rows: Float32Array;
 };
+
+/** A buffer to analyse without a session-source payload lane. Used by the
+ * general processed-spectrogram comparison: the buffer is copied per chunk
+ * because the worker transfer neuters the payload. */
+export type SpectrogramSource = {
+  readonly samples: Float32Array;
+  readonly sampleRateHz: number;
+};
+
+/** Chunk cache keyed weakly by the analysed buffer, then by analysis params.
+ * Weak keys mean a replaced processed buffer drops its cached rows with no
+ * manual eviction. */
+const standaloneChunkCache = new WeakMap<
+  Float32Array,
+  Map<string, Map<number, SpectrogramChunk>>
+>();
+
+function standaloneCacheFor(
+  source: SpectrogramSource,
+  analysisKey: string,
+): Map<number, SpectrogramChunk> {
+  let byAnalysis = standaloneChunkCache.get(source.samples);
+  if (byAnalysis === undefined) {
+    byAnalysis = new Map();
+    standaloneChunkCache.set(source.samples, byAnalysis);
+  }
+  let chunks = byAnalysis.get(analysisKey);
+  if (chunks === undefined) {
+    chunks = new Map();
+    byAnalysis.set(analysisKey, chunks);
+  }
+  return chunks;
+}
 
 export function spectrogramGeometry(
   sampleCount: number,
@@ -116,16 +150,23 @@ export type SpectrogramJob = {
 export function useSpectrogramJob(
   original: SessionSource | null,
   params: SpectrogramAnalysisParams,
+  lane: AnalysisLane,
+  override: SpectrogramSource | null = null,
 ): SpectrogramJob {
   const analysisKey = `${params.windowFamily}|${params.windowLengthSamples}|${params.hopFraction}`;
+  const samples =
+    override?.samples ??
+    (original === null ? null : lane === "mono" ? original.samples : original.channels[lane]) ??
+    null;
+  const sampleRateHz = override?.sampleRateHz ?? original?.sampleRateHz ?? 0;
   // biome-ignore lint/correctness/useExhaustiveDependencies: `analysisKey` is the canonical identity of `params` (all primitives).
   const geometry = useMemo(() => {
-    if (original === null) {
+    if (samples === null || sampleRateHz <= 0) {
       return null;
     }
-    return spectrogramGeometry(original.samples.length, original.sampleRateHz, params);
+    return spectrogramGeometry(samples.length, sampleRateHz, params);
     // `analysisKey` is the canonical identity of `params` (all primitives).
-  }, [original, analysisKey]);
+  }, [samples, sampleRateHz, analysisKey]);
   const chunksRef = useRef<Map<number, SpectrogramChunk>>(new Map());
   const [paintVersion, setPaintVersion] = useState(0);
   const [completedChunks, setCompletedChunks] = useState(0);
@@ -137,31 +178,67 @@ export function useSpectrogramJob(
     setCompletedChunks(0);
     setError(false);
     setPaintVersion((version) => version + 1);
-    if (original === null || geometry === null || geometry.chunkCount === 0) {
+    if (samples === null || geometry === null || geometry.chunkCount === 0) {
       return;
     }
     let cancelled = false;
     let nextChunkIndex = 0;
     const keys: string[] = [];
     const store = useSessionStore.getState();
+    const cache = override === null ? null : standaloneCacheFor(override, analysisKey);
+    if (cache !== null) {
+      for (const [index, chunk] of cache) {
+        if (index < geometry.chunkCount) {
+          chunksRef.current.set(index, chunk);
+        }
+      }
+      if (chunksRef.current.size > 0) {
+        setCompletedChunks(chunksRef.current.size);
+        setPaintVersion((version) => version + 1);
+      }
+    }
     // One chunk in flight at a time. The worker is a single synchronous
     // event loop: posting every chunk up front queues minutes of STFT work
     // that a later tool's request (or a tool switch) must wait behind. The
     // sequential fan-out keeps at most one stale chunk running after unmount
     // while the first chunk still paints as soon as it settles.
     const requestNextChunk = (): void => {
-      if (cancelled || nextChunkIndex >= geometry.chunkCount) {
+      if (cancelled) {
+        return;
+      }
+      while (cache?.has(nextChunkIndex)) {
+        nextChunkIndex += 1;
+      }
+      if (nextChunkIndex >= geometry.chunkCount) {
         return;
       }
       const chunkIndex = nextChunkIndex;
       nextChunkIndex += 1;
       const request = spectrogramChunkRequest(geometry, params, chunkIndex);
-      const ticket = store.deriveWithSourceSlice(
-        "spectrogramTiles",
-        request.params,
-        request.startSample,
-        request.endSample,
-      );
+      const ticket =
+        override === null
+          ? lane === "mono"
+            ? store.deriveWithSourceSlice(
+                "spectrogramTiles",
+                request.params,
+                request.startSample,
+                request.endSample,
+              )
+            : store.deriveWithSourceSliceLane(
+                "spectrogramTiles",
+                request.params,
+                request.startSample,
+                request.endSample,
+                lane,
+              )
+          : store.deriveStandalone(
+              "spectrogramTiles",
+              request.params,
+              (() => {
+                const copy = override.samples.slice(request.startSample, request.endSample);
+                return { buffer: copy.buffer, byteOffset: 0, byteLength: copy.byteLength };
+              })(),
+            );
       keys.push(ticket.key);
       ticket.outcome
         .then(
@@ -182,11 +259,13 @@ export function useSpectrogramJob(
               payload.byteOffset,
               payload.byteLength / 4,
             );
-            chunksRef.current.set(chunkIndex, {
+            const chunk = {
               rowStart: outcome.meta.rowStart,
               frameCount: outcome.meta.rowCount,
               rows,
-            });
+            };
+            chunksRef.current.set(chunkIndex, chunk);
+            cache?.set(chunkIndex, chunk);
             setCompletedChunks(chunksRef.current.size);
             setPaintVersion((version) => version + 1);
           },
@@ -209,7 +288,7 @@ export function useSpectrogramJob(
       }
     };
     // `analysisKey` covers every primitive of `params`.
-  }, [original, geometry, analysisKey]);
+  }, [original, samples, sampleRateHz, geometry, analysisKey, lane, override]);
 
   return { geometry, chunks: chunksRef.current, paintVersion, completedChunks, error };
 }

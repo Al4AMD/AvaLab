@@ -1763,6 +1763,239 @@ export function reverbProcess(
   };
 }
 
+export type ReverbStereoProcessParams = {
+  readonly sampleRateHz: number;
+  readonly ir: ReverbIrParams;
+  readonly uploadedIrChannelCount: 0 | 2 | 4;
+  readonly uploadedIrSampleCount: number;
+  readonly uploadedIrSampleRateHz?: number;
+  readonly preDelayMs: number;
+  readonly wetMix: number;
+  readonly method: "fft" | "direct";
+};
+
+export type ReverbStereoProcessResult = {
+  meta: {
+    outputSampleCount: number;
+    channelCount: 2;
+    irSampleCount: number;
+    elapsedMs: number;
+    method: "fft" | "direct";
+    preDelaySamples: number;
+  };
+  payload?: TransferablePayload;
+};
+
+/**
+ * F10 true-stereo reverb. Payload layout is planar:
+ * `[xL (N), xR (N), IR channels (M each)]`. The result is planar `[yL, yR]`.
+ * Uploaded IR paths follow `LL, LR, RL, RR`; a two-channel upload maps to the
+ * diagonal (`LL=L`, `RR=R`) with zero cross paths. Built-in presets use the
+ * requested seed for `LL`/`RR` and adjacent seeds for the cross paths, scaled
+ * by a fixed 0.5 gain; no renormalization is applied, so the wet/dry control
+ * owns the level.
+ */
+export function reverbStereoProcess(
+  params: ReverbStereoProcessParams,
+  payload?: TransferablePayload,
+): ReverbStereoProcessResult {
+  const ir = params?.ir;
+  if (
+    params === undefined ||
+    params === null ||
+    !Number.isFinite(params.sampleRateHz) ||
+    params.sampleRateHz <= 0 ||
+    params.sampleRateHz > 96_000 ||
+    ir === undefined ||
+    ir === null ||
+    !SYNTHETIC_IR_KINDS.includes(ir.kind) ||
+    !Number.isFinite(ir.durationSeconds) ||
+    ir.durationSeconds <= 0 ||
+    !Number.isFinite(ir.rt60Seconds) ||
+    ir.rt60Seconds <= 0 ||
+    !Number.isFinite(ir.seed) ||
+    (params.uploadedIrChannelCount !== 0 &&
+      params.uploadedIrChannelCount !== 2 &&
+      params.uploadedIrChannelCount !== 4) ||
+    !Number.isInteger(params.uploadedIrSampleCount) ||
+    params.uploadedIrSampleCount < 0 ||
+    (params.uploadedIrSampleCount > 0 &&
+      params.uploadedIrSampleRateHz !== undefined &&
+      (!Number.isFinite(params.uploadedIrSampleRateHz) ||
+        params.uploadedIrSampleRateHz <= 0 ||
+        params.uploadedIrSampleRateHz > 96_000)) ||
+    !Number.isFinite(params.preDelayMs) ||
+    params.preDelayMs < 0 ||
+    !Number.isFinite(params.wetMix) ||
+    params.wetMix < 0 ||
+    params.wetMix > 1 ||
+    (params.method !== "fft" && params.method !== "direct")
+  ) {
+    throw new DspOpError("badParams", `reverbStereoProcess: invalid params ${String(params)}`);
+  }
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "reverbStereoProcess: a Float32 source payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError("badPayload", "reverbStereoProcess: payload must be Float32-aligned");
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  const uploadedLaneCount = params.uploadedIrChannelCount;
+  const irValues = uploadedLaneCount * params.uploadedIrSampleCount;
+  const sourceTotal = samples.length - irValues;
+  if (sourceTotal <= 0 || sourceTotal % 2 !== 0) {
+    throw new DspOpError(
+      "badParams",
+      "reverbStereoProcess: the payload must carry two equal source lanes and the uploaded IR",
+    );
+  }
+  const sourceLength = sourceTotal / 2;
+  if (uploadedLaneCount > 0 && params.uploadedIrSampleCount <= 0) {
+    throw new DspOpError("badParams", "reverbStereoProcess: the uploaded IR is empty");
+  }
+  if (params.method === "direct" && sourceLength / params.sampleRateHz > MAX_DIRECT_INPUT_SECONDS) {
+    throw new DspOpError(
+      "badParams",
+      `reverbStereoProcess: direct convolution is limited to ${MAX_DIRECT_INPUT_SECONDS} s excerpts`,
+    );
+  }
+
+  const preDelaySamples = Math.round((params.preDelayMs * params.sampleRateHz) / 1000);
+  const uploadedRateHz = params.uploadedIrSampleRateHz ?? params.sampleRateHz;
+  const expectedIrLength =
+    params.uploadedIrSampleCount > 0
+      ? Math.round((params.uploadedIrSampleCount * params.sampleRateHz) / uploadedRateHz)
+      : Math.round(ir.durationSeconds * params.sampleRateHz);
+  if (!Number.isSafeInteger(expectedIrLength) || expectedIrLength <= 0) {
+    throw new DspOpError("badParams", "reverbStereoProcess: the impulse response is empty");
+  }
+  const outputLength = preDelaySamples + sourceLength + expectedIrLength - 1;
+  if (
+    !Number.isSafeInteger(outputLength) ||
+    outputLength / params.sampleRateHz > MAX_REVERB_OUTPUT_SECONDS
+  ) {
+    throw new DspOpError(
+      "tooLong",
+      `reverbStereoProcess: output is ${(outputLength / params.sampleRateHz).toFixed(1)} s, ` +
+        `above the ${MAX_REVERB_OUTPUT_SECONDS} s processed cap`,
+    );
+  }
+
+  const startedMs = performance.now();
+  const left = Float64Array.from(samples.subarray(0, sourceLength));
+  const right = Float64Array.from(samples.subarray(sourceLength, sourceLength * 2));
+  const uploaded = samples.subarray(sourceLength * 2);
+  let ll: Float64Array;
+  let lr: Float64Array;
+  let rl: Float64Array;
+  let rr: Float64Array;
+  if (uploadedLaneCount > 0) {
+    const resampleLane = (lane: Float64Array): Float64Array => {
+      if (uploadedRateHz === params.sampleRateHz) {
+        return lane;
+      }
+      return resampleRational(lane, {
+        inputRateHz: uploadedRateHz,
+        outputRateHz: params.sampleRateHz,
+        filter: "kaiserSinc",
+      });
+    };
+    const lane = (index: number): Float64Array =>
+      resampleLane(
+        Float64Array.from(
+          uploaded.subarray(
+            index * params.uploadedIrSampleCount,
+            (index + 1) * params.uploadedIrSampleCount,
+          ),
+        ),
+      );
+    if (uploadedLaneCount === 2) {
+      ll = lane(0);
+      rr = lane(1);
+      lr = new Float64Array(expectedIrLength);
+      rl = new Float64Array(expectedIrLength);
+    } else {
+      ll = lane(0);
+      lr = lane(1);
+      rl = lane(2);
+      rr = lane(3);
+    }
+  } else {
+    const diagonal = generateSyntheticIr({
+      kind: ir.kind,
+      sampleRateHz: params.sampleRateHz,
+      durationSeconds: ir.durationSeconds,
+      rt60Seconds: ir.rt60Seconds,
+      seed: ir.seed,
+    });
+    const nextSeed = (offset: number): number => (ir.seed + offset) % 4_294_967_296;
+    const cross = (seed: number): Float64Array => {
+      const generated = generateSyntheticIr({
+        kind: ir.kind,
+        sampleRateHz: params.sampleRateHz,
+        durationSeconds: ir.durationSeconds,
+        rt60Seconds: ir.rt60Seconds,
+        seed,
+      });
+      return generated.map((value) => value * 0.5);
+    };
+    ll = diagonal;
+    rr = diagonal;
+    lr = cross(nextSeed(1));
+    rl = cross(nextSeed(2));
+  }
+
+  const delayedLeft = new Float64Array(preDelaySamples + left.length);
+  const delayedRight = new Float64Array(preDelaySamples + right.length);
+  delayedLeft.set(left, preDelaySamples);
+  delayedRight.set(right, preDelaySamples);
+  const convolve = (signal: Float64Array, impulse: Float64Array): Float64Array =>
+    params.method === "direct" ? convolveDirect(signal, impulse) : convolveFft(signal, impulse);
+  const paths = [
+    convolve(delayedLeft, ll),
+    convolve(delayedLeft, lr),
+    convolve(delayedRight, rl),
+    convolve(delayedRight, rr),
+  ];
+  const maxWetLength = Math.max(...paths.map((path) => path.length));
+  if (maxWetLength / params.sampleRateHz > MAX_REVERB_OUTPUT_SECONDS) {
+    throw new DspOpError(
+      "tooLong",
+      `reverbStereoProcess: output is ${(maxWetLength / params.sampleRateHz).toFixed(1)} s, ` +
+        `above the ${MAX_REVERB_OUTPUT_SECONDS} s processed cap`,
+    );
+  }
+  const leftFromLeft = paths[0] ?? new Float64Array(0);
+  const leftFromRight = paths[2] ?? new Float64Array(0);
+  const rightFromLeft = paths[1] ?? new Float64Array(0);
+  const rightFromRight = paths[3] ?? new Float64Array(0);
+  const outLeft = new Float64Array(maxWetLength);
+  const outRight = new Float64Array(maxWetLength);
+  for (let index = 0; index < maxWetLength; index += 1) {
+    const dryLeft = (1 - params.wetMix) * (left[index] ?? 0);
+    const dryRight = (1 - params.wetMix) * (right[index] ?? 0);
+    outLeft[index] =
+      dryLeft + params.wetMix * ((leftFromLeft[index] ?? 0) + (leftFromRight[index] ?? 0));
+    outRight[index] =
+      dryRight + params.wetMix * ((rightFromLeft[index] ?? 0) + (rightFromRight[index] ?? 0));
+  }
+  const elapsedMs = performance.now() - startedMs;
+  const out = new Float32Array(maxWetLength * 2);
+  out.set(Float32Array.from(outLeft), 0);
+  out.set(Float32Array.from(outRight), maxWetLength);
+  return {
+    meta: {
+      outputSampleCount: maxWetLength,
+      channelCount: 2,
+      irSampleCount: expectedIrLength,
+      elapsedMs,
+      method: params.method,
+      preDelaySamples,
+    },
+    payload: { buffer: out.buffer, byteOffset: 0, byteLength: out.byteLength },
+  };
+}
+
 export type ConvolutionStepsParams = {
   signal: readonly number[];
   ir: readonly number[];
@@ -3290,6 +3523,26 @@ export const dspOps = {
     },
     result: undefined as unknown as ReverbProcessResult,
     handler: reverbProcess,
+  },
+  reverbStereoProcess: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: {
+      sampleRateHz: 0,
+      ir: {
+        kind: "hall" as ReverbIrParams["kind"],
+        durationSeconds: 1,
+        rt60Seconds: 0.5,
+        seed: 1,
+      },
+      uploadedIrChannelCount: 0,
+      uploadedIrSampleCount: 0,
+      preDelayMs: 0,
+      wetMix: 1,
+      method: "fft",
+    } as ReverbStereoProcessParams,
+    result: undefined as unknown as ReverbStereoProcessResult,
+    handler: reverbStereoProcess,
   },
   convolutionSteps: {
     // Type lenses only — the table is read for types (DspOpParams/Result);

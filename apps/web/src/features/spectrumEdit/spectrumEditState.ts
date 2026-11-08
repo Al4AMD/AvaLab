@@ -11,7 +11,8 @@ import {
   type SpectrumCurveEdit,
   type SpectrumEdit,
 } from "@avalab/dsp";
-import { type LastUsedStorage, readLastUsed } from "../../lib/lastUsed";
+import type { LaneParams } from "../../lib/laneParams";
+import { type LastUsedStorage, readLastUsed, writeLastUsed } from "../../lib/lastUsed";
 import { decodeParams, encodeParams } from "../../lib/url-state";
 import { FFT_MAX_LENGTH } from "../../session/ops";
 import { CURVE_URL_KEY, decodeCurves, encodeCurves } from "./curveState";
@@ -37,6 +38,18 @@ export type SpectrumEditSettings = {
   readonly startSample: number;
   readonly endSample: number;
 };
+
+export type SpectrumEditLaneSettings = Pick<SpectrumEditSettings, "hermitian" | "edits" | "curves">;
+
+export type SpectrumEditPairSettings = {
+  readonly lanes: LaneParams<SpectrumEditLaneSettings>;
+  readonly startSample: number;
+  readonly endSample: number;
+  readonly editLane: "left" | "right";
+};
+
+const RIGHT_PREFIX = "rr";
+const LANE_KEYS = new Set(["h", "ed", CURVE_URL_KEY]);
 
 export type SpectrumEditRange = { readonly startSample: number; readonly endSample: number };
 
@@ -187,6 +200,89 @@ export function spectrumEditSettingsFromSearch(
   };
 }
 
+export function spectrumEditPairToSearch(pair: SpectrumEditPairSettings): string {
+  const primary: SpectrumEditSettings = {
+    ...pair.lanes.primary,
+    startSample: pair.startSample,
+    endSample: pair.endSample,
+  };
+  const record: Record<string, string | readonly string[]> = {
+    ...decodeParams(spectrumEditSettingsToSearch(primary)),
+  };
+  if (pair.lanes.right !== undefined) {
+    const right: SpectrumEditSettings = {
+      ...pair.lanes.right,
+      startSample: pair.startSample,
+      endSample: pair.endSample,
+    };
+    for (const [key, value] of Object.entries(decodeParams(spectrumEditSettingsToSearch(right)))) {
+      if (LANE_KEYS.has(key)) {
+        record[`${RIGHT_PREFIX}${key}`] = value;
+      }
+    }
+  }
+  if (pair.editLane === "right") {
+    record.el = "right";
+  }
+  return encodeParams(record);
+}
+
+export function spectrumEditPairFromSearch(
+  search: string,
+  source: SpectrumEditSourceInfo,
+  selection: SpectrumEditRange,
+): SpectrumEditPairSettings {
+  const decoded = decodeParams(search);
+  const primary = spectrumEditSettingsFromSearch(search, source, selection);
+  const rightParams = new URLSearchParams(spectrumEditSettingsToSearch(primary));
+  const hasRight = Object.keys(decoded).some(
+    (key) => key.startsWith(RIGHT_PREFIX) && key.length > RIGHT_PREFIX.length,
+  );
+  if (hasRight) {
+    for (const [key, value] of Object.entries(decoded)) {
+      if (!key.startsWith(RIGHT_PREFIX) || key.length <= RIGHT_PREFIX.length) {
+        continue;
+      }
+      const stripped = key.slice(RIGHT_PREFIX.length);
+      if (!LANE_KEYS.has(stripped)) {
+        continue;
+      }
+      const values = typeof value === "string" ? [value] : value;
+      for (const item of values) {
+        rightParams.set(stripped, item);
+      }
+    }
+  }
+  return {
+    lanes: {
+      primary: {
+        hermitian: primary.hermitian,
+        edits: primary.edits,
+        curves: primary.curves,
+      },
+      ...(hasRight
+        ? {
+            right: (() => {
+              const right = spectrumEditSettingsFromSearch(
+                rightParams.toString(),
+                source,
+                selection,
+              );
+              return {
+                hermitian: right.hermitian,
+                edits: right.edits,
+                curves: right.curves,
+              };
+            })(),
+          }
+        : {}),
+    },
+    startSample: primary.startSample,
+    endSample: primary.endSample,
+    editLane: decoded.el === "right" ? "right" : "left",
+  };
+}
+
 /** Last-used panel; missing/invalid storage decodes to the same defaults. */
 export function loadSpectrumEditSettings(
   source: SpectrumEditSourceInfo,
@@ -195,4 +291,20 @@ export function loadSpectrumEditSettings(
 ): SpectrumEditSettings {
   const stored = readLastUsed(SPECTRUM_EDIT_STORAGE_KEY, storage);
   return spectrumEditSettingsFromSearch(stored === null ? "" : stored, source, selection);
+}
+
+export function loadSpectrumEditPair(
+  source: SpectrumEditSourceInfo,
+  selection: SpectrumEditRange,
+  storage?: LastUsedStorage | null,
+): SpectrumEditPairSettings {
+  const stored = readLastUsed(SPECTRUM_EDIT_STORAGE_KEY, storage);
+  return spectrumEditPairFromSearch(stored === null ? "" : stored, source, selection);
+}
+
+export function saveSpectrumEditPair(
+  settings: SpectrumEditPairSettings,
+  storage?: LastUsedStorage | null,
+): void {
+  writeLastUsed(SPECTRUM_EDIT_STORAGE_KEY, spectrumEditPairToSearch(settings), storage);
 }

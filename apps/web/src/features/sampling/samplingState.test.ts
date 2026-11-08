@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   defaultSamplingRange,
   SAMPLING_DEFAULT_SETTINGS,
+  samplingLanes,
   samplingSettingsFromSearch,
   samplingSettingsToSearch,
 } from "./samplingState";
@@ -36,6 +37,37 @@ describe("sampling state codec", () => {
     expect(settings.seed).toBe(SAMPLING_DEFAULT_SETTINGS.seed);
     expect(settings.startSample).toBe(0);
     expect(settings.endSample).toBe(SOURCE.sampleCount);
+  });
+
+  it("round-trips independent lane bit depths and dither", () => {
+    const settings = {
+      ...SAMPLING_DEFAULT_SETTINGS,
+      bits: 12,
+      dither: false,
+      right: { bits: 4, dither: true },
+      editLane: "right" as const,
+      startSample: 100,
+      endSample: 20_000,
+    };
+    expect(
+      samplingSettingsFromSearch(`?${samplingSettingsToSearch(settings)}`, SOURCE, FULL),
+    ).toEqual(settings);
+    expect(samplingLanes(settings)).toEqual({
+      left: { bits: 12, dither: false },
+      right: { bits: 4, dither: true },
+    });
+  });
+
+  it("keeps old links linked to the primary lane", () => {
+    const settings = samplingSettingsFromSearch("?bd=8&dt=1", SOURCE, FULL);
+    expect(settings.right).toBeUndefined();
+    expect(settings.editLane).toBe("left");
+    expect(samplingLanes(settings).right).toEqual({ bits: 8, dither: true });
+  });
+
+  it("falls back invalid right-lane fields to the primary lane", () => {
+    const settings = samplingSettingsFromSearch("?bd=6&dt=0&rrbd=x&rrdt=x", SOURCE, FULL);
+    expect(settings.right).toEqual({ bits: 6, dither: false });
   });
 
   it("clamps an explicit range to the source", () => {

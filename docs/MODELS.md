@@ -11,8 +11,9 @@ the flat per-task cache; after that the API runs with `HF_HUB_OFFLINE=1`.
 | separation | `adefossez/HTDemucs` | `cbc8a9b1a87023b7fd74e7b3412e6321c0eab003` | `htdemucs.yaml`, `955717e8.safetensors` | 84.0 MB | MIT upstream; model card has no license field | `demucs` |
 | asr | `openai/whisper-tiny` | `169d4a4341b33bc18d8881c4b69c2e104e1cc0af` | tokenizer/config files + `model.safetensors` | 155.4 MB | Apache-2.0 | `transformers` Whisper |
 | neural codec | `facebook/encodec_48khz` | `c3def8e7185ac8c8efdce6eb8c4a651e487a503e` | `config.json`, `model.safetensors`, `preprocessor_config.json` | 76.3 MB | MIT | `transformers` EnCodec |
+| classification | `MIT/ast-finetuned-audioset-10-10-0.4593` | `f826b80d28226b62986cc218e5cec390b1096902` | `config.json`, `model.safetensors`, `preprocessor_config.json` | 346.4 MB | BSD-3-Clause | `transformers` AST |
 
-Total download: about 383 MB, below the 2 GB budget and under 400 MB per model.
+Total download: about 730 MB, below the 2 GB budget and under 400 MB per model.
 
 ## Runtime contracts
 
@@ -45,6 +46,14 @@ Total download: about 383 MB, below the 2 GB budget and under 400 MB per model.
   estimated encoded size and decoded audio, not a real container bitstream.
   Length is restored exactly by trimming or zero-padding after resampling back
   to the source rate.
+- **AST AudioSet classification**: multi-label, not softmax. The wrapper
+  resamples mono audio to 16 kHz and splits the excerpt into non-overlapping
+  10 s windows (AST's fixed input is 10.24 s). It applies sigmoid to every
+  class logit per window, averages scores across windows, and returns the top
+  1–20 labels. Scores are independent and do not sum to 100%. The labels are
+  AudioSet's English taxonomy; the UI does not translate them. A silent
+  excerpt is an error, not an empty classification. The 30 s job cap means at
+  most three windows.
 
 ## Real-model smoke (2026-11-03)
 
@@ -60,11 +69,13 @@ Result after Plan 03: `5 passed, 198 deselected` in 13.2 s. DPDFNet ran a
 8–48 kHz speech fixture with the high band (10–20 kHz) increased by more than
 3 dB. HTDemucs returned four length-matched 44.1 kHz stems, Whisper tiny
 returned non-empty text/segments at 16 kHz, and EnCodec decoded finite audio
-at the source rate and exact length. The first EnCodec run exposed that the
+at the source rate and exact length. On 2026-11-08 the AST smoke passed
+offline (`1 passed`, 7.4 s): the 15 s music demo returned ranked, descending
+AudioSet scores (Music 0.60, Rock music 0.15, ...). The first EnCodec run exposed that the
 48 kHz processor rejects mono; the wrapper now duplicates mono to stereo and
 downmixes the decoded output (commit `2d63be3`).
 
-All five wrappers also have non-gated fake-model tests covering source rates
+All six wrappers also have non-gated fake-model tests covering source rates
 8 000, 16 000, 22 050, 44 100, 48 000 and 96 000 Hz, exact output length,
 short-input padding/trimming, silence, empty input and non-finite rejection.
 The EnCodec fake-backend test pins the stereo processor input and mono output
@@ -85,6 +96,7 @@ vary with CPU, thread count and excerpt content.
 | separation | 15.0 s music, 48 kHz | 1 729 | 14 398 |
 | asr | 19.6 s speech, 48 kHz → 16 kHz | 1 402 | 2 862 |
 | neural codec | 19.6 s speech, 6 kbps, 48 kHz | 110 | 6 254 |
+| classification | 15.0 s music, 48 kHz | 4 669 | 2 272 |
 
 The API loads each backend once and keeps it for the process lifetime. Jobs
 have a 30 s excerpt cap (D-035); the demo clips are shorter, so the table
@@ -114,7 +126,7 @@ all five entries as `available` and no network access was needed.
 
 The missing-cache path was checked by starting the API with an empty
 `AVALAB_ML_MODEL_CACHE_DIR`. `GET /api/v1/models` reported `missing` for all
-five tasks, `/tools/ai` rendered all tabs, and the model-bearing run controls
+six tasks, `/tools/ai` rendered all tabs, and the model-bearing run controls
 were disabled with a translated missing-model hint. The super-resolution
 `path=sinc` baseline stays enabled because it is a signal-processing baseline,
 not a learned model; switching to `path=lavasr` shows the missing-model hint

@@ -180,8 +180,8 @@ describe("ingestFile pre-check", () => {
     expect(client.calls).toEqual([]);
   });
 
-  it("defaults the cap to the mirrored backend default (100 MB)", () => {
-    expect(DEFAULT_MAX_UPLOAD_BYTES).toBe(104_857_600);
+  it("defaults the cap to the mirrored backend default (200 MB)", () => {
+    expect(DEFAULT_MAX_UPLOAD_BYTES).toBe(209_715_200);
   });
 });
 

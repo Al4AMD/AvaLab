@@ -6,6 +6,7 @@
  * worker op rejects longer payloads.
  */
 
+import { type ResolvedLaneParams, resolveLaneParams } from "../../lib/laneParams";
 import { type LastUsedStorage, readLastUsed } from "../../lib/lastUsed";
 import { decodeParams, encodeParams } from "../../lib/url-state";
 import type { CodecLabCodec } from "../../session/ops";
@@ -35,17 +36,22 @@ export const CODEC_LAB_REFERENCE_SPL_MIN = 80;
 export const CODEC_LAB_REFERENCE_SPL_MAX = 100;
 export const CODEC_LAB_DEFAULT_REFERENCE_SPL = 94;
 
-export type CodecLabSettings = {
+export type CodecLabLaneSettings = {
   readonly codec: CodecLabCodec;
   readonly mdctBitsPerSecond: number;
   readonly mdctPsychoacoustic: boolean;
   readonly mdctReferenceSplDb: number;
+};
+
+export type CodecLabSettings = CodecLabLaneSettings & {
   readonly startSample: number;
   readonly endSample: number;
   readonly realCodec: RealCodecName;
   readonly realBitrateKbps: number;
   readonly realQuality: number;
   readonly realCompressionLevel: number;
+  readonly right?: CodecLabLaneSettings;
+  readonly editLane: "left" | "right";
 };
 
 export type CodecLabRange = { readonly startSample: number; readonly endSample: number };
@@ -68,6 +74,7 @@ export const CODEC_LAB_DEFAULT_SETTINGS: CodecLabSettings = {
   realBitrateKbps: CODEC_LAB_DEFAULT_REAL_BITRATE_KBPS,
   realQuality: 5,
   realCompressionLevel: 5,
+  editLane: "left",
 };
 
 function clampRange(
@@ -159,7 +166,7 @@ function clampReferenceSpl(raw: number): number {
 }
 
 export function codecLabSettingsToSearch(settings: CodecLabSettings): string {
-  return encodeParams({
+  const params: Record<string, string | number> = {
     c: settings.codec,
     from: settings.startSample,
     mbr: settings.mdctBitsPerSecond / 1000,
@@ -170,7 +177,17 @@ export function codecLabSettingsToSearch(settings: CodecLabSettings): string {
     rq: settings.realQuality,
     rspl: settings.mdctReferenceSplDb,
     to: settings.endSample,
-  });
+  };
+  if (settings.editLane === "right") {
+    params.el = "right";
+  }
+  if (settings.right !== undefined) {
+    params.rrc = settings.right.codec;
+    params.rrmbr = settings.right.mdctBitsPerSecond / 1000;
+    params.rrpm = settings.right.mdctPsychoacoustic ? 1 : 0;
+    params.rrrspl = settings.right.mdctReferenceSplDb;
+  }
+  return encodeParams(params);
 }
 
 export function codecLabSettingsFromSearch(
@@ -202,7 +219,7 @@ export function codecLabSettingsFromSearch(
     explicitRange !== null && explicitRange.endSample > explicitRange.startSample
       ? explicitRange
       : fallbackRange;
-  return {
+  const primary: CodecLabLaneSettings = {
     codec: CODEC_LAB_CODECS.includes(codec as CodecLabCodec)
       ? (codec as CodecLabCodec)
       : CODEC_LAB_DEFAULT_SETTINGS.codec,
@@ -213,6 +230,31 @@ export function codecLabSettingsFromSearch(
       rspl === undefined || rspl.trim() === ""
         ? CODEC_LAB_DEFAULT_REFERENCE_SPL
         : clampReferenceSpl(Number(rspl)),
+  };
+  const hasRight = Object.keys(decoded).some((key) => key.startsWith("rr") && key.length > 2);
+  let right: CodecLabLaneSettings | undefined;
+  if (hasRight) {
+    const rightCodec = scalar("rrc");
+    const rightKbps = scalar("rrmbr");
+    const rightPm = scalar("rrpm");
+    const rightSpl = scalar("rrrspl");
+    right = {
+      codec: CODEC_LAB_CODECS.includes(rightCodec as CodecLabCodec)
+        ? (rightCodec as CodecLabCodec)
+        : primary.codec,
+      mdctBitsPerSecond:
+        rightKbps === undefined
+          ? primary.mdctBitsPerSecond
+          : snapMdctKbps(Number(rightKbps)) * 1000,
+      mdctPsychoacoustic: rightPm === undefined ? primary.mdctPsychoacoustic : rightPm === "1",
+      mdctReferenceSplDb:
+        rightSpl === undefined || rightSpl.trim() === ""
+          ? primary.mdctReferenceSplDb
+          : clampReferenceSpl(Number(rightSpl)),
+    };
+  }
+  return {
+    ...primary,
     startSample: range.startSample,
     endSample: range.endSample,
     realCodec: (REAL_CODEC_NAMES as readonly string[]).includes(realCodec ?? "")
@@ -231,18 +273,54 @@ export function codecLabSettingsFromSearch(
       CODEC_LAB_REAL_COMPRESSION_MAX,
       CODEC_LAB_DEFAULT_SETTINGS.realCompressionLevel,
     ),
+    ...(right === undefined ? {} : { right }),
+    editLane: scalar("el") === "right" ? "right" : "left",
   };
+}
+
+export function codecLabLanes(
+  settings: CodecLabSettings,
+): ResolvedLaneParams<CodecLabLaneSettings> {
+  return resolveLaneParams({
+    primary: codecLabLaneSettings(settings),
+    ...(settings.right === undefined ? {} : { right: settings.right }),
+  });
+}
+
+export function codecLabLaneFor(
+  settings: CodecLabSettings,
+  lane: "left" | "right",
+): CodecLabLaneSettings {
+  return codecLabLanes(settings)[lane];
+}
+
+function codecLabLaneSettings(settings: CodecLabSettings): CodecLabLaneSettings {
+  return {
+    codec: settings.codec,
+    mdctBitsPerSecond: settings.mdctBitsPerSecond,
+    mdctPsychoacoustic: settings.mdctPsychoacoustic,
+    mdctReferenceSplDb: settings.mdctReferenceSplDb,
+  };
+}
+
+function sameLaneSettings(a: CodecLabLaneSettings, b: CodecLabLaneSettings): boolean {
+  return (
+    a.codec === b.codec &&
+    a.mdctBitsPerSecond === b.mdctBitsPerSecond &&
+    a.mdctPsychoacoustic === b.mdctPsychoacoustic &&
+    a.mdctReferenceSplDb === b.mdctReferenceSplDb
+  );
 }
 
 export function isCodecLabStale(
   current: CodecLabSettings,
   resultSettings: CodecLabSettings,
 ): boolean {
+  const currentLanes = codecLabLanes(current);
+  const resultLanes = codecLabLanes(resultSettings);
   return (
-    current.codec !== resultSettings.codec ||
-    current.mdctBitsPerSecond !== resultSettings.mdctBitsPerSecond ||
-    current.mdctPsychoacoustic !== resultSettings.mdctPsychoacoustic ||
-    current.mdctReferenceSplDb !== resultSettings.mdctReferenceSplDb ||
+    !sameLaneSettings(currentLanes.left, resultLanes.left) ||
+    !sameLaneSettings(currentLanes.right, resultLanes.right) ||
     current.startSample !== resultSettings.startSample ||
     current.endSample !== resultSettings.endSample
   );

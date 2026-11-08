@@ -41,8 +41,8 @@ async function spectrogramSignature(page: Page): Promise<number> {
   });
 }
 
-async function expectSpectrogramPainted(page: Page): Promise<void> {
-  const canvas = page.getByTestId("spectrogram.canvas");
+async function expectSpectrogramPainted(page: Page, testId = "spectrogram.canvas"): Promise<void> {
+  const canvas = page.getByTestId(testId);
   await expect(canvas).toBeVisible();
   await expect
     .poll(
@@ -126,5 +126,28 @@ test("English (persisted preference): spectrogram paints with zero console error
   await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
   await page.getByTestId("input.demo.load.pinkNoise").click();
   await expectSpectrogramPainted(page);
+  expect(errors).toEqual([]);
+});
+
+test("general before/after comparison paints the processed spectrogram", async ({ page }) => {
+  const errors = watchForErrors(page);
+  await page.goto("/tools/speed");
+  await page.getByTestId("input.demo.load.chirp").click();
+  await page.getByTestId("speed.preset.2").click();
+  await expect(page.getByTestId("player.ab.processed")).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByRole("link", { name: "طیف‌نگاره (Spectrogram)" }).click();
+  await expect(page).toHaveURL(/\/tools\/spectrogram/);
+  await expect(page.getByTestId("spectrogram.compare.toggle")).toBeChecked();
+  await expectSpectrogramPainted(page);
+  await expectSpectrogramPainted(page, "spectrogram.canvas.processed");
+  await expect(page.getByTestId("spectrogram.compare.processed")).toBeVisible();
+  await expect(page.getByTestId("spectrogram.compare.missing")).toHaveCount(0);
+
+  await page.getByTestId("spectrogram.compare.toggle").uncheck();
+  await expect(page.getByTestId("spectrogram.canvas.processed")).toHaveCount(0);
+  await expectSpectrogramPainted(page);
+  await page.getByTestId("spectrogram.compare.toggle").check();
+  await expectSpectrogramPainted(page, "spectrogram.canvas.processed");
   expect(errors).toEqual([]);
 });

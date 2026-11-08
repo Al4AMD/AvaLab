@@ -16,6 +16,7 @@ export const AI_TASKS = [
   "separation",
   "asr",
   "neural-codec",
+  "classification",
   "pitch",
   "beat",
 ] as const;
@@ -28,6 +29,7 @@ export const AI_TABS = [
   "separation",
   "asr",
   "neural-codec",
+  "classification",
   "pitchBeat",
 ] as const;
 export type AiTab = (typeof AI_TABS)[number];
@@ -48,6 +50,7 @@ const BACKEND_TASK: Record<AiTask, string> = {
   separation: "separation",
   asr: "asr",
   "neural-codec": "neural_codec",
+  classification: "classification",
   pitch: "pitch",
   beat: "beat",
 };

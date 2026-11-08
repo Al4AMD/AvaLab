@@ -24,6 +24,8 @@ import { formatHz, formatS } from "../../lib/format";
 import { writeLastUsed } from "../../lib/lastUsed";
 import type { PipelineOutput, PipelineStageSummary } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
+import { ChannelPicker } from "../channels/ChannelPicker";
+import { useChannelMode } from "../channels/useChannelMode";
 import { UploadEmptyState } from "../input/upload";
 import { TheoryPanel } from "../theory/TheoryPanel";
 import { TOOL_THEORY } from "../theory/theoryContent";
@@ -53,7 +55,7 @@ import {
   updatePipelinePosition,
   withPipelineValidation,
 } from "./pipelineState";
-import { usePipelineRun } from "./usePipelineRun";
+import { type PipelineRunResult, usePipelineRun } from "./usePipelineRun";
 
 const CONTROL_FOCUS_CLASSES =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
@@ -781,6 +783,45 @@ function OutputControls({
   );
 }
 
+function LaneStats({ result }: { readonly result: PipelineRunResult }): React.ReactElement | null {
+  const { t } = useTranslation();
+  if (result.laneSamples.length < 2 || result.outputs.length === 0) {
+    return null;
+  }
+  const labels = [t("pipeline.lane.left"), t("pipeline.lane.right")];
+  return (
+    <table data-testid="pipeline.result.lanes" dir="ltr" className="w-full text-xs">
+      <thead>
+        <tr className="text-muted">
+          <th className="text-start font-medium">{t("pipeline.lane.title")}</th>
+          <th className="text-start font-medium">{t("pipeline.output.select")}</th>
+          <th className="text-start font-medium">{t("pipeline.stage.rate")}</th>
+          <th className="text-start font-medium">{t("pipeline.stage.duration")}</th>
+          <th className="text-start font-medium">{t("pipeline.stage.peak")}</th>
+          <th className="text-start font-medium">{t("pipeline.stage.rms")}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {result.outputs.flatMap((output) =>
+          result.laneStages.map((stages, lane) => {
+            const stage = stages.find((candidate) => candidate.nodeId === output.nodeId);
+            return (
+              <tr key={`${output.nodeId}-${String(lane)}`}>
+                <td>{labels[lane] ?? String(lane)}</td>
+                <td>{output.label}</td>
+                <td>{formatHz(stage?.sampleRateHz ?? output.sampleRateHz)}</td>
+                <td>{formatS(stage?.durationSeconds ?? 0)}</td>
+                <td>{stage === undefined ? "-" : stage.peak.toFixed(4)}</td>
+                <td>{stage === undefined ? "-" : stage.rms.toFixed(4)}</td>
+              </tr>
+            );
+          }),
+        )}
+      </tbody>
+    </table>
+  );
+}
+
 export function PipelineView(): React.ReactElement {
   const { t } = useTranslation();
   const original = useSessionStore((session) => session.original);
@@ -801,7 +842,8 @@ export function PipelineView(): React.ReactElement {
     () => pipelineRunRange(selection, original?.samples.length ?? 0, original?.sampleRateHz ?? 1),
     [original, selection],
   );
-  const run = usePipelineRun(state, range);
+  const channel = useChannelMode(original, "both");
+  const run = usePipelineRun(state, range, channel.mode);
   const paramsError = pipelineParamsError(state.graph);
   const canRun =
     original !== null &&
@@ -1043,6 +1085,7 @@ export function PipelineView(): React.ReactElement {
           onDeleteEdge={handleDeleteEdge}
         />
       </div>
+      <ChannelPicker mode={channel.mode} modes={channel.modes} onChange={channel.setMode} />
       <PipelineToolbar
         canRun={canRun}
         running={run.status === "running"}
@@ -1081,6 +1124,7 @@ export function PipelineView(): React.ReactElement {
           <p dir="ltr" className="text-xs text-muted">
             {formatS(run.result.totalElapsedMs / 1000)}
           </p>
+          <LaneStats result={run.result} />
           <PipelineStageCards stages={run.result.stages} />
           <OutputControls
             outputs={run.result.outputs}

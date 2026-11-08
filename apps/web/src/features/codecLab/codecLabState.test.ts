@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   CODEC_LAB_DEFAULT_SETTINGS,
   type CodecLabSettings,
+  codecLabLaneFor,
+  codecLabLanes,
   codecLabRangeFromSelection,
   codecLabSettingsFromSearch,
   codecLabSettingsToSearch,
@@ -27,6 +29,7 @@ describe("codec lab state codec", () => {
       realBitrateKbps: 192,
       realQuality: 7,
       realCompressionLevel: 9,
+      editLane: "left",
     };
     expect(
       codecLabSettingsFromSearch(`?${codecLabSettingsToSearch(settings)}`, SOURCE, FULL),
@@ -132,5 +135,90 @@ describe("codec lab state codec", () => {
     expect(isRealCodecStale(result, { ...result, realBitrateKbps: 64 })).toBe(true);
     expect(isRealCodecStale(result, { ...result, realCodec: "mp3" })).toBe(true);
     expect(isRealCodecStale(result, { ...result, mdctBitsPerSecond: 64_000 })).toBe(false);
+  });
+});
+
+describe("codec lab stereo state", () => {
+  const primary: CodecLabSettings = {
+    ...CODEC_LAB_DEFAULT_SETTINGS,
+    startSample: 0,
+    endSample: 24_000,
+  };
+
+  it("keeps primary-only URLs free of right-lane keys", () => {
+    const search = codecLabSettingsToSearch(primary);
+    expect(search).not.toMatch(/rr|el=/);
+    expect(codecLabSettingsFromSearch(`?${search}`, SOURCE, FULL)).toEqual(primary);
+    expect(codecLabSettingsFromSearch(`?${search}`, SOURCE, FULL).right).toBeUndefined();
+  });
+
+  it("round-trips independent right-lane settings", () => {
+    const settings: CodecLabSettings = {
+      ...primary,
+      right: {
+        codec: "mdct",
+        mdctBitsPerSecond: 320_000,
+        mdctPsychoacoustic: false,
+        mdctReferenceSplDb: 88,
+      },
+      editLane: "right",
+    };
+    const parsed = codecLabSettingsFromSearch(
+      `?${codecLabSettingsToSearch(settings)}`,
+      SOURCE,
+      FULL,
+    );
+    expect(parsed).toEqual(settings);
+    expect(codecLabLaneFor(parsed, "right")).toEqual(settings.right);
+    expect(codecLabLanes(parsed)).toEqual({
+      left: {
+        codec: settings.codec,
+        mdctBitsPerSecond: settings.mdctBitsPerSecond,
+        mdctPsychoacoustic: settings.mdctPsychoacoustic,
+        mdctReferenceSplDb: settings.mdctReferenceSplDb,
+      },
+      right: settings.right,
+    });
+  });
+
+  it("falls back partially specified right fields to the primary lane", () => {
+    const parsed = codecLabSettingsFromSearch(
+      "?c=mdct&mbr=96&pm=0&rspl=90&rrc=huffman",
+      SOURCE,
+      FULL,
+    );
+    expect(parsed.right).toEqual({
+      codec: "huffman",
+      mdctBitsPerSecond: 96_000,
+      mdctPsychoacoustic: false,
+      mdctReferenceSplDb: 90,
+    });
+  });
+
+  it("decodes old URLs as mono/primary with the left edit lane", () => {
+    const parsed = codecLabSettingsFromSearch("?c=mdct&mbr=64", SOURCE, FULL);
+    expect(parsed.right).toBeUndefined();
+    expect(parsed.editLane).toBe("left");
+    expect(codecLabLanes(parsed).right).toEqual(codecLabLaneFor(parsed, "left"));
+  });
+
+  it("marks the toy result stale when only the right codec changes", () => {
+    const result = { ...primary, right: { ...primary, codec: "rle" as const } };
+    expect(
+      isCodecLabStale(result, {
+        ...result,
+        right: { ...result.right, codec: "huffman" },
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps real-codec staleness independent of right toy fields", () => {
+    const result = { ...primary, right: { ...primary, codec: "rle" as const } };
+    expect(
+      isRealCodecStale(result, {
+        ...result,
+        right: { ...result.right, codec: "huffman" },
+      }),
+    ).toBe(false);
   });
 });

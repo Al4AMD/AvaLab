@@ -16,7 +16,7 @@ or certificate.
 
 - Docker Engine with Compose v2 (this session used Docker 29.7 and Compose 5.3).
 - About 8 GB free disk: the API image carries PyTorch and ffmpeg (about 5 GB),
-  while the pinned model weights total about 366 MiB.
+  while the pinned model weights total about 696 MiB (730 MB).
 - Port 80 inside the `web` container; publish it on any free host port.
 - For `docker/smoke.sh`: host `curl`, Python 3, and Playwright Chromium
   (`pnpm --filter @avalab/web exec playwright install chromium`).
@@ -60,7 +60,7 @@ docker compose run --rm --no-deps \
   api python scripts/download_models.py --check
 ```
 
-`--all` downloads roughly 366 MiB (the project budget allows up to 2 GB).
+`--all` downloads roughly 696 MiB / 730 MB (the project budget allows up to 2 GB).
 Pinned sizes:
 
 | Task | Model | Bytes |
@@ -70,6 +70,7 @@ Pinned sizes:
 | separation | `adefossez/HTDemucs` | 84,025,461 |
 | asr | `openai/whisper-tiny` | 155,434,424 |
 | neural_codec | `facebook/encodec_48khz` | 76,292,186 |
+| classification | `MIT/ast-finetuned-audioset-10-10-0.4593` | 346,432,008 |
 
 The cache is `avalab-models`, mounted at `/models`, owned by UID 10001. It is
 independent of container lifetime. `docker compose down` keeps it; only
@@ -100,7 +101,7 @@ variables through pydantic-settings.
 |---|---|---|
 | `AVALAB_HTTP_PORT` | `8080` | Host port published by the `web` service. |
 | `AVALAB_STORAGE_DIR` | `/data` in Docker | Temporary audio storage. |
-| `AVALAB_MAX_UPLOAD_BYTES` | `104857600` | Upload byte cap. |
+| `AVALAB_MAX_UPLOAD_BYTES` | `209715200` | Upload byte cap (200 MB). |
 | `AVALAB_MAX_DURATION_SECONDS` | `300` | Audio duration cap. |
 | `AVALAB_MAX_SAMPLE_RATE_HZ` | `96000` | Higher rates are resampled down. |
 | `AVALAB_MAX_CHANNELS` | `2` | More channels are downmixed. |
@@ -174,7 +175,7 @@ pnpm --filter @avalab/web exec playwright install chromium  # once
 AVALAB_HTTP_PORT=18080 docker/smoke.sh
 ```
 
-The script builds both images, starts the stack, checks health and all five
+The script builds both images, starts the stack, checks health and all six
 model states, uploads generated audio, verifies a bit-exact FLAC round trip,
 checks incremental denoise SSE events, opens the SPA in Playwright in Persian
 and English, restarts the API with the network disconnected, and confirms the
@@ -183,24 +184,24 @@ model and storage volumes survive `docker compose down`/`up`.
 The script uses the default Compose project name so it can reuse the prefetched
 model cache. Run it only where stopping this project is acceptable.
 
-Verification results from this session:
+Verification results from the latest session:
 
-- Date: 2026-11-06; host port 18080; Docker 29.7.2 / Compose v5.3.1.
-- `docker compose build` succeeded for both images. API image 1,298,499,073
-  bytes; web image 31,799,710 bytes. Observed memory during the smoke: API 135.4 MiB,
-  web 19.12 MiB (the first run measured 208.3 MiB / 69.15 MiB).
-- `/api/v1/health` returned `status=ok`, `ffmpeg=true`; all five models were
-  `available`; model volume size 365.7 MiB.
+- Date: 2026-11-08; host port 18080.
+- `docker compose build` succeeded for both images. API image 1,298,509,301
+  bytes; web image 31,842,520 bytes. Observed memory during the smoke: API
+  177.1 MiB, web 25.21 MiB.
+- `/api/v1/health` returned `status=ok`, `ffmpeg=true`; all six models were
+  `available`; model volume size about 696 MiB.
 - 10 s mono 16 kHz WAV upload succeeded; FLAC encode returned `lossless=true`,
   `bit_exact=true`, `size_bytes=73627`.
 - Denoise SSE produced 6 events, first at 0.008 s and terminal `done` at
-  3.491 s, so progress arrived incrementally.
+  3.513 s, so progress arrived incrementally.
 - Playwright loaded the SPA in Persian RTL and switched to English LTR with
   zero console errors.
-- With the API disconnected from `avalab_default` and restarted, all five
+- With the API disconnected from `avalab_default` and restarted, all six
   model files still reported `available`, and a 2 s denoise job loaded the
   model and reached `done`. Other model backends were not run offline.
-- After reconnect, `docker compose down` and `up`, all five models remained
+- After reconnect, `docker compose down` and `up`, all six models remained
   available and a previously ingested audio id still served RIFF audio.
 - The smoke script exited 0: `docker/smoke.sh` with `AVALAB_HTTP_PORT=18080`.
 

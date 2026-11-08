@@ -19,9 +19,13 @@ import { useTranslation } from "react-i18next";
 import { ToolHeader } from "../../components/ToolHeader";
 
 import { Button } from "../../components/ui/button";
+import { type ChannelLaneId, channelSignals, singleAnalysisLane } from "../../lib/channel";
 import { formatDb, formatHz, formatS } from "../../lib/format";
 import type { SpectrogramTilesParams } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
+import { ChannelPicker } from "../channels/ChannelPicker";
+import { channelLabel } from "../channels/channelLabels";
+import { useChannelMode } from "../channels/useChannelMode";
 import { UploadEmptyState } from "../input/upload";
 import { TheoryPanel } from "../theory/TheoryPanel";
 import { TOOL_THEORY } from "../theory/theoryContent";
@@ -33,7 +37,12 @@ import {
   type SpectrogramColormapName,
   spectrogramFrequencyTicks,
 } from "./paintSpectrogram";
-import { type SpectrogramGeometry, useSpectrogramJob } from "./workerJob";
+import {
+  type SpectrogramGeometry,
+  type SpectrogramJob,
+  type SpectrogramSource,
+  useSpectrogramJob,
+} from "./workerJob";
 
 const PLOT_HEIGHT_PX = 320;
 const DEFAULT_WINDOW_LENGTH = 1024;
@@ -91,6 +100,7 @@ type SpectrogramCanvasProps = {
   readonly colormap: SpectrogramColormapName;
   readonly dbMinDb: number;
   readonly ariaLabel: string;
+  readonly testId?: string;
 };
 
 function SpectrogramCanvas({
@@ -101,6 +111,7 @@ function SpectrogramCanvas({
   colormap,
   dbMinDb,
   ariaLabel,
+  testId = "spectrogram.canvas",
 }: SpectrogramCanvasProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -178,7 +189,7 @@ function SpectrogramCanvas({
         ref={canvasRef}
         role="img"
         aria-label={ariaLabel}
-        data-testid="spectrogram.canvas"
+        data-testid={testId}
         style={{ height: `${PLOT_HEIGHT_PX}px` }}
         className="block w-full rounded bg-bg ring-1 ring-surface"
       />
@@ -186,9 +197,108 @@ function SpectrogramCanvas({
   );
 }
 
+type SpectrogramPlotProps = {
+  readonly job: SpectrogramJob;
+  readonly axisMode: SpectrogramAxisMode;
+  readonly colormap: SpectrogramColormapName;
+  readonly dbFloorDb: number;
+  readonly ariaLabel: string;
+  readonly testId: string;
+  readonly errorTestId: string;
+  readonly emptyTestId: string;
+};
+
+function SpectrogramPlot({
+  job,
+  axisMode,
+  colormap,
+  dbFloorDb,
+  ariaLabel,
+  testId,
+  errorTestId,
+  emptyTestId,
+}: SpectrogramPlotProps) {
+  const { t } = useTranslation();
+  const geometry = job.geometry;
+  const axisGeometry = {
+    rowCount: geometry?.binCount ?? 2,
+    heightPx: PLOT_HEIGHT_PX,
+    axisMode,
+    nyquistHz: (geometry?.sampleRateHz ?? 0) / 2,
+  };
+  const frequencyTicks =
+    geometry === null || geometry.sampleRateHz <= 0 ? [] : spectrogramFrequencyTicks(axisGeometry);
+  const durationS = geometry === null ? 0 : geometry.sampleCount / geometry.sampleRateHz;
+  const timeTicks = [0, 0.25, 0.5, 0.75, 1];
+
+  if (job.error) {
+    return (
+      <p role="alert" data-testid={errorTestId} className="text-sm text-muted">
+        {t("spectrogram.error")}
+      </p>
+    );
+  }
+  if (geometry === null || geometry.totalFrames === 0) {
+    return (
+      <p role="alert" data-testid={emptyTestId} className="text-sm text-muted">
+        {t("spectrogram.empty")}
+      </p>
+    );
+  }
+  return (
+    <section className="flex flex-col gap-2" dir="ltr">
+      <div className="flex items-center justify-between gap-2 text-xs text-muted">
+        <span>{t("spectrogram.axis.frequency")}</span>
+        <ColormapLegend
+          label={t("spectrogram.legend.label")}
+          colormap={colormap}
+          dbMinDb={dbFloorDb}
+          dbMaxDb={DB_MAX_DB}
+        />
+      </div>
+
+      <div className="flex gap-2">
+        <div className="relative w-16 shrink-0" style={{ height: `${PLOT_HEIGHT_PX}px` }}>
+          {frequencyTicks.map((tickHz) => (
+            <span
+              key={tickHz}
+              className="absolute end-0 -translate-y-1/2 text-[10px] text-muted tabular-nums"
+              style={{ top: `${frequencyToY(tickHz, axisGeometry)}px` }}
+            >
+              {formatHz(tickHz)}
+            </span>
+          ))}
+        </div>
+        <div className="min-w-0 flex-1">
+          <SpectrogramCanvas
+            geometry={geometry}
+            chunks={job.chunks}
+            paintVersion={job.paintVersion}
+            axisMode={axisMode}
+            colormap={colormap}
+            dbMinDb={dbFloorDb}
+            ariaLabel={ariaLabel}
+            testId={testId}
+          />
+        </div>
+      </div>
+
+      <div className="flex justify-between ps-[4.5rem] text-[10px] text-muted tabular-nums">
+        {timeTicks.map((fraction) => (
+          <span key={fraction}>{formatS(fraction * durationS)}</span>
+        ))}
+      </div>
+      <p className="text-xs text-muted">{t("spectrogram.axis.time")}</p>
+    </section>
+  );
+}
+
 export function SpectrogramView() {
   const { t } = useTranslation();
   const original = useSessionStore((state) => state.original);
+  const channel = useChannelMode(original, "single");
+  const lane = singleAnalysisLane(channel.mode);
+  const channelLaneId: ChannelLaneId = channel.mode === "both" ? "left" : channel.mode;
 
   const [windowFamily, setWindowFamily] = useState<SpectrogramTilesParams["windowFamily"]>("hann");
   const [windowLengthSamples, setWindowLengthSamples] = useState(DEFAULT_WINDOW_LENGTH);
@@ -196,24 +306,32 @@ export function SpectrogramView() {
   const [dbFloorDb, setDbFloorDb] = useState(DEFAULT_DB_FLOOR_DB);
   const [axisMode, setAxisMode] = useState<SpectrogramAxisMode>("linear");
   const [colormap, setColormap] = useState<SpectrogramColormapName>("viridis");
+  const [showProcessed, setShowProcessed] = useState(true);
+  const processed = useSessionStore((state) => state.processed);
 
   const analysis = useMemo(
     () => ({ windowFamily, windowLengthSamples, hopFraction }),
     [windowFamily, windowLengthSamples, hopFraction],
   );
-  const job = useSpectrogramJob(original, analysis);
+  const job = useSpectrogramJob(original, analysis, lane);
   const geometry = job.geometry;
   const sampleRateHz = original?.sampleRateHz ?? 0;
   const durationS = geometry === null ? 0 : geometry.sampleCount / sampleRateHz;
-  const axisGeometry = {
-    rowCount: geometry?.binCount ?? 2,
-    heightPx: PLOT_HEIGHT_PX,
-    axisMode,
-    nyquistHz: sampleRateHz / 2,
-  };
-  const frequencyTicks =
-    geometry === null || sampleRateHz <= 0 ? [] : spectrogramFrequencyTicks(axisGeometry);
-  const timeTicks = [0, 0.25, 0.5, 0.75, 1];
+  const processedSamples =
+    processed === null ? null : (channelSignals(processed, channel.mode)[0] ?? null);
+  const processedAnalysis = useMemo<SpectrogramSource | null>(() => {
+    if (processed === null || processedSamples === null) {
+      return null;
+    }
+    return { samples: processedSamples, sampleRateHz: processed.sampleRateHz };
+  }, [processed, processedSamples]);
+  const compareVisible = processed !== null && showProcessed;
+  const processedJob = useSpectrogramJob(
+    null,
+    analysis,
+    0,
+    compareVisible ? processedAnalysis : null,
+  );
   const windowLabels: Record<SpectrogramTilesParams["windowFamily"], string> = {
     rect: t("spectrogram.window.rect"),
     hann: t("spectrogram.window.hann"),
@@ -363,6 +481,26 @@ export function SpectrogramView() {
                 </Button>
               </div>
             </fieldset>
+
+            <div className="flex flex-col justify-start gap-2 text-xs sm:col-span-2">
+              <ChannelPicker mode={channel.mode} modes={channel.modes} onChange={channel.setMode} />
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={showProcessed}
+                  disabled={processed === null}
+                  data-testid="spectrogram.compare.toggle"
+                  onChange={(event) => setShowProcessed(event.currentTarget.checked)}
+                  className="accent-accent"
+                />
+                <span>{t("spectrogram.compare.show")}</span>
+              </label>
+              {processed === null ? (
+                <span data-testid="spectrogram.compare.missing" className="text-muted">
+                  {t("spectrogram.compare.missing")}
+                </span>
+              ) : null}
+            </div>
           </div>
 
           {job.error ? (
@@ -402,6 +540,11 @@ export function SpectrogramView() {
                   testId="spectrogram.meta.columns"
                 />
                 <MetaItem
+                  label={t("spectrogram.meta.channel")}
+                  value={channelLabel(t, channelLaneId)}
+                  testId="spectrogram.meta.channel"
+                />
+                <MetaItem
                   label={t("spectrogram.meta.decimation")}
                   value={`×${geometry.frameStride}`}
                   testId="spectrogram.meta.decimation"
@@ -424,49 +567,47 @@ export function SpectrogramView() {
                 </p>
               ) : null}
 
-              <section className="flex flex-col gap-2" dir="ltr">
-                <div className="flex items-center justify-between gap-2 text-xs text-muted">
-                  <span>{t("spectrogram.axis.frequency")}</span>
-                  <ColormapLegend
-                    label={t("spectrogram.legend.label")}
+              <div
+                className={
+                  compareVisible ? "grid grid-cols-1 gap-4 lg:grid-cols-2" : "flex flex-col"
+                }
+              >
+                <figure className="flex min-w-0 flex-col gap-1">
+                  <figcaption className="text-xs font-medium">
+                    {t("spectrogram.compare.original")}
+                  </figcaption>
+                  <SpectrogramPlot
+                    job={job}
+                    axisMode={axisMode}
                     colormap={colormap}
-                    dbMinDb={dbFloorDb}
-                    dbMaxDb={DB_MAX_DB}
+                    dbFloorDb={dbFloorDb}
+                    ariaLabel={t("spectrogram.canvas.label")}
+                    testId="spectrogram.canvas"
+                    errorTestId="spectrogram.error"
+                    emptyTestId="spectrogram.empty"
                   />
-                </div>
-
-                <div className="flex gap-2">
-                  <div className="relative w-16 shrink-0" style={{ height: `${PLOT_HEIGHT_PX}px` }}>
-                    {frequencyTicks.map((tickHz) => (
-                      <span
-                        key={tickHz}
-                        className="absolute end-0 -translate-y-1/2 text-[10px] text-muted tabular-nums"
-                        style={{ top: `${frequencyToY(tickHz, axisGeometry)}px` }}
-                      >
-                        {formatHz(tickHz)}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <SpectrogramCanvas
-                      geometry={geometry}
-                      chunks={job.chunks}
-                      paintVersion={job.paintVersion}
+                </figure>
+                {compareVisible && processed !== null ? (
+                  <figure
+                    data-testid="spectrogram.compare.processed"
+                    className="flex min-w-0 flex-col gap-1"
+                  >
+                    <figcaption className="text-xs font-medium">
+                      {t("spectrogram.compare.processed")}
+                    </figcaption>
+                    <SpectrogramPlot
+                      job={processedJob}
                       axisMode={axisMode}
                       colormap={colormap}
-                      dbMinDb={dbFloorDb}
-                      ariaLabel={t("spectrogram.canvas.label")}
+                      dbFloorDb={dbFloorDb}
+                      ariaLabel={t("spectrogram.compare.processedAria")}
+                      testId="spectrogram.canvas.processed"
+                      errorTestId="spectrogram.compare.error"
+                      emptyTestId="spectrogram.compare.empty"
                     />
-                  </div>
-                </div>
-
-                <div className="flex justify-between ps-[4.5rem] text-[10px] text-muted tabular-nums">
-                  {timeTicks.map((fraction) => (
-                    <span key={fraction}>{formatS(fraction * durationS)}</span>
-                  ))}
-                </div>
-                <p className="text-xs text-muted">{t("spectrogram.axis.time")}</p>
-              </section>
+                  </figure>
+                ) : null}
+              </div>
             </>
           )}
         </>

@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from avalab_api.codec_jobs import CodecJobManager
 from avalab_api.codecs import available_codecs
 from avalab_api.config import get_settings
 from avalab_api.errors import ApiError, ErrorCode
@@ -23,6 +24,7 @@ from avalab_api.ml.registry import ModelRegistry
 from avalab_api.openapi_utils import server_relative_schema
 from avalab_api.routes.audio import router as audio_router
 from avalab_api.routes.codec import router as codec_router
+from avalab_api.routes.codec_jobs import router as codec_jobs_router
 from avalab_api.routes.ingest import router as ingest_router
 from avalab_api.routes.ml import router as ml_router
 from avalab_api.routes.models import router as models_router
@@ -62,6 +64,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         with contextlib.suppress(asyncio.CancelledError):
             await sweeper
         app.state.ml_jobs.shutdown()
+        app.state.codec_jobs.shutdown()
 
 
 class HealthResponse(BaseModel):
@@ -88,6 +91,12 @@ def create_app() -> FastAPI:
     app.state.ml_jobs = JobManager(
         app.state.storage,
         max_workers=settings.ml_max_concurrency,
+        ttl_seconds=settings.ttl_minutes * 60,
+    )
+    app.state.codec_jobs = CodecJobManager(
+        app.state.storage,
+        max_workers=settings.codec_job_max_concurrency,
+        queue_limit=settings.codec_job_queue_limit,
         ttl_seconds=settings.ttl_minutes * 60,
     )
 
@@ -170,6 +179,7 @@ def create_app() -> FastAPI:
     api_router.include_router(ingest_router)
     api_router.include_router(audio_router)
     api_router.include_router(codec_router)
+    api_router.include_router(codec_jobs_router)
     api_router.include_router(models_router)
     api_router.include_router(ml_router)
 

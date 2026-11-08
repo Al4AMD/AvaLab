@@ -10,11 +10,16 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ToolHeader } from "../../components/ToolHeader";
 
+import type { ChannelLaneId } from "../../lib/channel";
 import { useSessionStore } from "../../session/store";
+import { ChannelPicker } from "../channels/ChannelPicker";
+import { channelLabel } from "../channels/channelLabels";
+import { useChannelMode } from "../channels/useChannelMode";
 import { UploadEmptyState } from "../input/upload";
 import { TheoryPanel } from "../theory/TheoryPanel";
 import { TOOL_THEORY } from "../theory/theoryContent";
 import { formatMetric, type QualityMetrics } from "./metrics";
+import { selectMetricsLanes } from "./metricsLanes";
 import { measureQualityMetrics } from "./qualityMetricsWorker";
 
 function MetricCard({
@@ -36,31 +41,31 @@ function MetricCard({
   );
 }
 
-export function MetricsView(): React.ReactElement {
+function laneSuffix(id: ChannelLaneId): string {
+  return id === "mono" ? "" : `.${id}`;
+}
+
+function MetricsLanePanel({
+  id,
+  reference,
+  test,
+  sampleRateHz,
+}: {
+  readonly id: ChannelLaneId;
+  readonly reference: Float32Array;
+  readonly test: Float32Array;
+  readonly sampleRateHz: number;
+}) {
   const { t } = useTranslation();
-  const original = useSessionStore((state) => state.original);
-  const processed = useSessionStore((state) => state.processed);
   const [metrics, setMetrics] = useState<QualityMetrics | null>(null);
   const [pending, setPending] = useState(false);
-
-  const problem: "missing" | "lengthMismatch" | "rateMismatch" | null =
-    processed === null
-      ? "missing"
-      : original !== null && processed.sampleRateHz !== original.sampleRateHz
-        ? "rateMismatch"
-        : original !== null && processed.samples.length !== original.samples.length
-          ? "lengthMismatch"
-          : null;
+  const suffix = laneSuffix(id);
 
   useEffect(() => {
-    if (original === null || processed === null || problem !== null) {
-      setMetrics(null);
-      setPending(false);
-      return;
-    }
     let cancelled = false;
+    setMetrics(null);
     setPending(true);
-    void measureQualityMetrics(original.samples, processed.samples, original.sampleRateHz).then(
+    void measureQualityMetrics(reference, test, sampleRateHz).then(
       (next) => {
         if (!cancelled) {
           setMetrics(next);
@@ -77,7 +82,56 @@ export function MetricsView(): React.ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [original, processed, problem]);
+  }, [reference, test, sampleRateHz]);
+
+  return (
+    <section data-testid={`metrics.group.${id}`} className="flex flex-col gap-2">
+      <h3 data-testid={`metrics.label.${id}`} className="text-sm font-medium">
+        {channelLabel(t, id)}
+      </h3>
+      {pending ? (
+        <p data-testid={`metrics.pending${suffix}`} className="text-sm text-muted">
+          {t("metrics.pending")}
+        </p>
+      ) : null}
+      {metrics !== null ? (
+        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <MetricCard
+            label={t("metrics.label.mse")}
+            value={formatMetric(metrics.mse, 6)}
+            testId={`metrics.value.mse${suffix}`}
+          />
+          <MetricCard
+            label={t("metrics.label.snr")}
+            value={`${formatMetric(metrics.snrDb)} dB`}
+            testId={`metrics.value.snr${suffix}`}
+          />
+          <MetricCard
+            label={t("metrics.label.segmentalSnr")}
+            value={`${formatMetric(metrics.segmentalSnrDb)} dB`}
+            testId={`metrics.value.segmentalSnr${suffix}`}
+          />
+          <MetricCard
+            label={t("metrics.label.psnr")}
+            value={`${formatMetric(metrics.psnrDb)} dB`}
+            testId={`metrics.value.psnr${suffix}`}
+          />
+          <MetricCard
+            label={t("metrics.label.samples")}
+            value={String(metrics.sampleCount)}
+            testId={`metrics.value.samples${suffix}`}
+          />
+        </dl>
+      ) : null}
+    </section>
+  );
+}
+
+export function MetricsView(): React.ReactElement {
+  const { t } = useTranslation();
+  const original = useSessionStore((state) => state.original);
+  const processed = useSessionStore((state) => state.processed);
+  const channel = useChannelMode(original, "both");
 
   if (original === null) {
     return (
@@ -88,9 +142,14 @@ export function MetricsView(): React.ReactElement {
     );
   }
 
+  const selection = selectMetricsLanes(original, processed, channel.mode);
+  const problem = selection.ok ? null : selection.problem;
+
   return (
     <section className="flex flex-col gap-4">
       <ToolHeader titleKey="tool.metrics.title" descriptionKey="tool.metrics.description" />
+
+      <ChannelPicker mode={channel.mode} modes={channel.modes} onChange={channel.setMode} />
 
       {problem === "missing" ? (
         <p data-testid="metrics.missing" className="text-sm text-muted">
@@ -107,42 +166,23 @@ export function MetricsView(): React.ReactElement {
           {t("metrics.mismatch.rate")}
         </p>
       ) : null}
-
-      {pending ? (
-        <p data-testid="metrics.pending" className="text-sm text-muted">
-          {t("metrics.pending")}
+      {problem === "channelsMismatch" ? (
+        <p data-testid="metrics.mismatch.channels" className="text-sm text-muted">
+          {t("metrics.mismatch.channels")}
         </p>
       ) : null}
 
-      {metrics !== null ? (
+      {selection.ok ? (
         <>
-          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <MetricCard
-              label={t("metrics.label.mse")}
-              value={formatMetric(metrics.mse, 6)}
-              testId="metrics.value.mse"
+          {selection.lanes.map((lane) => (
+            <MetricsLanePanel
+              key={lane.id}
+              id={lane.id}
+              reference={lane.reference}
+              test={lane.test}
+              sampleRateHz={original.sampleRateHz}
             />
-            <MetricCard
-              label={t("metrics.label.snr")}
-              value={`${formatMetric(metrics.snrDb)} dB`}
-              testId="metrics.value.snr"
-            />
-            <MetricCard
-              label={t("metrics.label.segmentalSnr")}
-              value={`${formatMetric(metrics.segmentalSnrDb)} dB`}
-              testId="metrics.value.segmentalSnr"
-            />
-            <MetricCard
-              label={t("metrics.label.psnr")}
-              value={`${formatMetric(metrics.psnrDb)} dB`}
-              testId="metrics.value.psnr"
-            />
-            <MetricCard
-              label={t("metrics.label.samples")}
-              value={String(metrics.sampleCount)}
-              testId="metrics.value.samples"
-            />
-          </dl>
+          ))}
           <p className="text-xs text-muted">{t("metrics.psnrNote")}</p>
           <p className="text-xs text-muted">
             {t("metrics.processedLabel", { label: processed?.label ?? "" })}

@@ -98,26 +98,48 @@ async function stubStereoBackend(page: Page): Promise<void> {
       }),
     }),
   );
+  const result = {
+    result_audio_id: "e2e-stereo-result",
+    size_bytes: 19_244,
+    bitrate_kbps: 1539,
+    encode_ms: 12,
+    codec_delay_samples: 0,
+    reference_start_sample: 0,
+    aligned_sample_count: 4800,
+    duration_s: 0.1,
+    sample_rate_hz: 48_000,
+    channels: 2,
+    bit_exact: false,
+    lossless: true,
+  };
   await page.route("**/api/v1/codec/encode", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({
-        result_audio_id: "e2e-stereo-result",
-        size_bytes: 19_244,
-        bitrate_kbps: 1539,
-        encode_ms: 12,
-        codec_delay_samples: 0,
-        reference_start_sample: 0,
-        aligned_sample_count: 4800,
-        duration_s: 0.1,
-        sample_rate_hz: 48_000,
-        channels: 2,
-        bit_exact: false,
-        lossless: true,
-      }),
+      body: JSON.stringify(result),
     }),
   );
+  await page.route("**/api/v1/codec/jobs**", (route) => {
+    if (route.request().url().endsWith("/events")) {
+      return route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: `data: ${JSON.stringify({ event: "progress", progress: 0.5 })}\n\ndata: ${JSON.stringify({ event: "done", result })}\n\n`,
+      });
+    }
+    if (route.request().method() === "DELETE") {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ cancelled: true }),
+      });
+    }
+    return route.fulfill({
+      status: 202,
+      contentType: "application/json",
+      body: JSON.stringify({ job_id: "e2e-job" }),
+    });
+  });
   await page.route("**/api/v1/audio/**", (route) =>
     route.fulfill({ status: 200, contentType: "audio/wav", body: wav }),
   );
@@ -304,5 +326,22 @@ test("English (LTR): the real stereo codec lane and WAV export stay console-clea
   await page.goto("/tools/codec-lab");
   await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
   await runStereoRealCodec(page, "2 ch", "Stereo");
+  expect(errors).toEqual([]);
+});
+
+test("Persian: whole-file codec job streams, installs, and plays", async ({ page }) => {
+  const errors = watchForErrors(page);
+  await stubStereoBackend(page);
+  await page.goto("/tools/codec-lab");
+  await page.getByTestId("input.demo.load.stereo").click();
+  await expect(page.getByTestId("player.channels")).toHaveText("2 کانال");
+
+  await page.getByTestId("codecLab.real.wholeEncode").click();
+  await expect(page.getByTestId("codecLab.real.channels")).toHaveText("استریو", {
+    timeout: 20_000,
+  });
+  await expect(page.getByTestId("codecLab.real.stat.size")).toBeVisible();
+  await page.getByTestId("codecLab.real.play").click();
+  await expect(page.getByTestId("player.ab.processed")).toHaveAttribute("aria-pressed", "true");
   expect(errors).toEqual([]);
 });

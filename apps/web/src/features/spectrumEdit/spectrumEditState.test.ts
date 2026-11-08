@@ -8,8 +8,14 @@ import { FFT_MAX_LENGTH } from "../../session/ops";
 import {
   binsFromHz,
   defaultSpectrumEditRange,
+  loadSpectrumEditPair,
   presetEdits,
   SPECTRUM_EDIT_DEFAULT_SETTINGS,
+  SPECTRUM_EDIT_STORAGE_KEY,
+  type SpectrumEditPairSettings,
+  saveSpectrumEditPair,
+  spectrumEditPairFromSearch,
+  spectrumEditPairToSearch,
   spectrumEditSettingsFromSearch,
   spectrumEditSettingsToSearch,
   validSpectrumEdit,
@@ -123,5 +129,143 @@ describe("spectrum edit helpers", () => {
     const edits = presetEdits("zeroIm", 5);
     expect(edits).toEqual([{ startBin: 0, endBin: 5, target: "im", mode: "zero", value: 0 }]);
     expect(presetEdits("randomPhase", 4).length).toBe(4);
+  });
+});
+
+function memoryStorage(initial: readonly [string, string][] = []) {
+  const values = new Map(initial);
+  return {
+    getItem: (key: string): string | null => values.get(key) ?? null,
+    setItem: (key: string, value: string): void => {
+      values.set(key, value);
+    },
+  };
+}
+
+describe("spectrum edit pair state codec", () => {
+  const SOURCE = { sampleCount: 4000, sampleRateHz: 8000 };
+  const SELECTION = { startSample: 0, endSample: 0 };
+
+  it("round-trips primary-only pair settings without right or edit-lane keys", () => {
+    const pair: SpectrumEditPairSettings = {
+      lanes: { primary: { hermitian: true, edits: [], curves: [] } },
+      startSample: 100,
+      endSample: 900,
+      editLane: "left",
+    };
+    const search = spectrumEditPairToSearch(pair);
+
+    expect(search).not.toContain("rr");
+    expect(search).not.toContain("el=");
+    expect(spectrumEditPairFromSearch(`?${search}`, SOURCE, SELECTION)).toEqual(pair);
+  });
+
+  it("round-trips independent right Hermitian, edits, and curves", () => {
+    const pair: SpectrumEditPairSettings = {
+      lanes: {
+        primary: {
+          hermitian: true,
+          edits: [{ startBin: 1, endBin: 4, target: "re", mode: "zero", value: 0 }],
+          curves: [],
+        },
+        right: {
+          hermitian: false,
+          edits: [{ startBin: 2, endBin: 8, target: "phase", mode: "set", value: 0.5 }],
+          curves: [
+            {
+              target: "mag",
+              points: [
+                { bin: 0, value: 0.25 },
+                { bin: 100, value: 1 },
+              ],
+            },
+          ],
+        },
+      },
+      startSample: 0,
+      endSample: 1000,
+      editLane: "right",
+    };
+
+    const search = spectrumEditPairToSearch(pair);
+    expect(search).toContain("rrh=0");
+    expect(search).toContain("rred=");
+    expect(search).toContain("rrcv=");
+    expect(spectrumEditPairFromSearch(`?${search}`, SOURCE, SELECTION)).toEqual(pair);
+  });
+
+  it("keeps el=right on a share URL and defaults to left", () => {
+    const right = spectrumEditPairFromSearch("?el=right", SOURCE, SELECTION);
+    expect(right.editLane).toBe("right");
+    const left = spectrumEditPairFromSearch("?el=nope", SOURCE, SELECTION);
+    expect(left.editLane).toBe("left");
+  });
+
+  it("decodes an old single-lane URL to a primary-only left edit lane", () => {
+    const settings = {
+      ...SPECTRUM_EDIT_DEFAULT_SETTINGS,
+      hermitian: false,
+      edits: [{ startBin: 0, endBin: 3, target: "im" as const, mode: "scale" as const, value: 2 }],
+      startSample: 10,
+      endSample: 700,
+    };
+
+    const pair = spectrumEditPairFromSearch(
+      `?${spectrumEditSettingsToSearch(settings)}`,
+      SOURCE,
+      SELECTION,
+    );
+
+    expect(pair.lanes.primary).toEqual({
+      hermitian: settings.hermitian,
+      edits: settings.edits,
+      curves: [],
+    });
+    expect(pair.lanes.right).toBeUndefined();
+    expect(pair.startSample).toBe(10);
+    expect(pair.endSample).toBe(700);
+    expect(pair.editLane).toBe("left");
+  });
+
+  it("drops invalid right edits without touching the primary lane", () => {
+    const primaryEdits = [
+      { startBin: 0, endBin: 3, target: "im" as const, mode: "zero" as const, value: 0 },
+    ];
+    const pair = spectrumEditPairFromSearch(
+      `?ed=${encodeURIComponent(JSON.stringify(primaryEdits))}&rred=not-json`,
+      SOURCE,
+      SELECTION,
+    );
+
+    expect(pair.lanes.primary.edits).toEqual(primaryEdits);
+    expect(pair.lanes.right?.edits).toEqual([]);
+  });
+
+  it("round-trips the pair through storage and loads old single-lane storage", () => {
+    const storage = memoryStorage();
+    const pair: SpectrumEditPairSettings = {
+      lanes: {
+        primary: { hermitian: true, edits: [], curves: [] },
+        right: { hermitian: false, edits: [], curves: [] },
+      },
+      startSample: 0,
+      endSample: 500,
+      editLane: "right",
+    };
+
+    saveSpectrumEditPair(pair, storage);
+    expect(loadSpectrumEditPair(SOURCE, SELECTION, storage)).toEqual(pair);
+
+    const old = spectrumEditSettingsToSearch({
+      ...SPECTRUM_EDIT_DEFAULT_SETTINGS,
+      hermitian: false,
+      startSample: 0,
+      endSample: 300,
+    });
+    storage.setItem(SPECTRUM_EDIT_STORAGE_KEY, old);
+    const loaded = loadSpectrumEditPair(SOURCE, SELECTION, storage);
+    expect(loaded.lanes.right).toBeUndefined();
+    expect(loaded.lanes.primary.hermitian).toBe(false);
+    expect(loaded.editLane).toBe("left");
   });
 });

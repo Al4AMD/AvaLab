@@ -3,6 +3,7 @@
  * field falls back alone so an old share link still opens a working view.
  * Cutoffs are clamped below Nyquist because the design op rejects equality.
  */
+import type { LaneParams } from "../../lib/laneParams";
 import { decodeParams, encodeParams } from "../../lib/url-state";
 import type { FilterBand, FilterDesignKind, FilterWindowKind } from "../../session/ops";
 
@@ -55,6 +56,24 @@ export const FILTER_DEFAULT_SETTINGS: FilterSettings = {
   applyScope: "selection",
 };
 
+export type FilterEditLane = "left" | "right";
+
+export type FilterPairSettings = LaneParams<FilterSettings> & {
+  readonly editLane: FilterEditLane;
+};
+
+const RIGHT_PREFIX = "rr";
+
+function hasRightOverride(search: string): boolean {
+  return Object.keys(decodeParams(search)).some(
+    (key) => key.startsWith(RIGHT_PREFIX) && key.length > RIGHT_PREFIX.length,
+  );
+}
+
+function defaultFilterPair(): FilterPairSettings {
+  return { primary: FILTER_DEFAULT_SETTINGS, editLane: "left" };
+}
+
 export type FilterStorage = Pick<Storage, "getItem" | "setItem">;
 
 function finiteIn(value: number, min: number, max: number, fallback: number): number {
@@ -103,6 +122,79 @@ export function filterSettingsToSearch(settings: FilterSettings): string {
     t: settings.taps,
     w: settings.window,
   });
+}
+
+export function filterPairToSearch(pair: FilterPairSettings): string {
+  const record: Record<string, string | readonly string[]> = {
+    ...decodeParams(filterSettingsToSearch(pair.primary)),
+  };
+  if (pair.right !== undefined) {
+    for (const [key, value] of Object.entries(decodeParams(filterSettingsToSearch(pair.right)))) {
+      record[`${RIGHT_PREFIX}${key}`] = value;
+    }
+  }
+  if (pair.editLane === "right") {
+    record.el = "right";
+  }
+  return encodeParams(record);
+}
+
+export function filterPairFromSearch(search: string): FilterPairSettings {
+  const decoded = decodeParams(search);
+  const primary = filterSettingsFromSearch(search);
+  const rightSearch = new URLSearchParams(filterSettingsToSearch(primary));
+  for (const [key, value] of Object.entries(decoded)) {
+    if (!key.startsWith(RIGHT_PREFIX) || key.length <= RIGHT_PREFIX.length) {
+      continue;
+    }
+    const values = typeof value === "string" ? [value] : value;
+    for (const item of values) {
+      rightSearch.set(key.slice(RIGHT_PREFIX.length), item);
+    }
+  }
+  const right = hasRightOverride(search)
+    ? filterSettingsFromSearch(rightSearch.toString())
+    : undefined;
+  return {
+    primary,
+    ...(right === undefined ? {} : { right }),
+    editLane: decoded.el === "right" ? "right" : "left",
+  };
+}
+
+export function filterPairAtRate(
+  pair: FilterPairSettings,
+  sampleRateHz: number,
+): FilterPairSettings {
+  return {
+    primary: filterSettingsAtRate(pair.primary, sampleRateHz),
+    ...(pair.right === undefined ? {} : { right: filterSettingsAtRate(pair.right, sampleRateHz) }),
+    editLane: pair.editLane,
+  };
+}
+
+export function loadFilterPair(
+  storage: FilterStorage | null = browserStorage(),
+): FilterPairSettings {
+  try {
+    const stored = storage?.getItem(FILTER_STORAGE_KEY);
+    return stored === null || stored === undefined
+      ? defaultFilterPair()
+      : filterPairFromSearch(stored);
+  } catch {
+    return defaultFilterPair();
+  }
+}
+
+export function saveFilterPair(
+  pair: FilterPairSettings,
+  storage: FilterStorage | null = browserStorage(),
+): void {
+  try {
+    storage?.setItem(FILTER_STORAGE_KEY, filterPairToSearch(pair));
+  } catch {
+    // Storage may be unavailable (private mode); the URL still carries state.
+  }
 }
 
 export function filterSettingsFromSearch(search: string): FilterSettings {

@@ -23,7 +23,7 @@ import type {
   HealthResponse,
   IngestResponse,
 } from "../../api/client";
-import { api } from "../../api/client";
+import { api, resolveBaseUrl } from "../../api/client";
 import { isRecordLike } from "../../session/protocol";
 import {
   browserDecodeWav,
@@ -38,6 +38,9 @@ const UPLOAD_CACHE_LIMIT = 8;
 const BITRATE_CODECS = ["mp3", "aac", "opus"] as const;
 
 const KNOWN_BACKEND_CODES = new Set([
+  "job_not_found",
+  "job_cancelled",
+  "job_busy",
   "file_too_large",
   "duration_too_long",
   "decode_failed",
@@ -67,6 +70,45 @@ export type RealCodecInput = {
   readonly endSample: number;
 };
 
+export type CodecJobEvent = {
+  readonly event: "progress" | "done" | "error" | "cancelled";
+  readonly progress?: number;
+  readonly result?: CodecEncodeResponse;
+  readonly code?: string;
+};
+
+const CODEC_JOB_EVENT_NAMES = new Set<CodecJobEvent["event"]>([
+  "progress",
+  "done",
+  "error",
+  "cancelled",
+]);
+
+/** Validate the SSE payload before it reaches UI state. */
+export function parseCodecJobEvent(raw: string): CodecJobEvent | null {
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+  const event = (value as { event?: unknown }).event;
+  if (typeof event !== "string" || !CODEC_JOB_EVENT_NAMES.has(event as CodecJobEvent["event"])) {
+    return null;
+  }
+  return value as CodecJobEvent;
+}
+
+export type CodecJobEventsOptions = {
+  readonly onEvent: (event: CodecJobEvent) => void;
+  readonly signal?: AbortSignal;
+};
+
+export type OpenCodecJobEvents = (jobId: string, options: CodecJobEventsOptions) => Promise<void>;
+
 export type RealCodecClient = {
   POST(
     path: "/ingest",
@@ -76,6 +118,17 @@ export type RealCodecClient = {
     path: "/codec/encode",
     options: { body: CodecEncodeRequest; signal?: AbortSignal },
   ): Promise<IngestCallResult<CodecEncodeResponse>>;
+  POST(
+    path: "/codec/jobs",
+    options: { body: CodecEncodeRequest; signal?: AbortSignal },
+  ): Promise<IngestCallResult<{ job_id: string }>>;
+  DELETE(
+    path: "/codec/jobs/{job_id}",
+    options: {
+      params: { path: { job_id: string } };
+      signal?: AbortSignal;
+    },
+  ): Promise<IngestCallResult<{ cancelled: boolean }>>;
   GET(
     path: "/audio/{audio_id}",
     options: {
@@ -284,19 +337,7 @@ export async function runRealCodec(
   const { client = defaultClient, decodeWav = browserDecodeWav, signal } = options;
   const form = uploadForm(input);
   const audioId = await uploadExcerpt(client, input, form, signal);
-  const codecParams: Record<string, number> = {};
-  if (
-    (BITRATE_CODECS as readonly string[]).includes(params.codec) &&
-    params.bitrateKbps !== undefined
-  ) {
-    codecParams.bitrate_kbps = params.bitrateKbps;
-  }
-  if (params.codec === "vorbis" && params.quality !== undefined) {
-    codecParams.quality = params.quality;
-  }
-  if (params.codec === "flac" && params.compressionLevel !== undefined) {
-    codecParams.compression_level = params.compressionLevel;
-  }
+  const codecParams = codecParamsFor(params);
   const encoded = await request(
     () =>
       client.POST("/codec/encode", {
@@ -314,11 +355,36 @@ export async function runRealCodec(
       }),
     true,
   );
+  return finishRealCodec(encoded.data, bytes.data, input.samples, decodeWav);
+}
 
+function codecParamsFor(params: RealCodecParams): Record<string, number> {
+  const codecParams: Record<string, number> = {};
+  if (
+    (BITRATE_CODECS as readonly string[]).includes(params.codec) &&
+    params.bitrateKbps !== undefined
+  ) {
+    codecParams.bitrate_kbps = params.bitrateKbps;
+  }
+  if (params.codec === "vorbis" && params.quality !== undefined) {
+    codecParams.quality = params.quality;
+  }
+  if (params.codec === "flac" && params.compressionLevel !== undefined) {
+    codecParams.compression_level = params.compressionLevel;
+  }
+  return codecParams;
+}
+
+async function finishRealCodec(
+  encoded: CodecEncodeResponse,
+  bytes: ArrayBuffer,
+  sourceSamples: Float32Array,
+  decodeWav: DecodeWav,
+): Promise<RealCodecRun> {
   let decodedChannels: AudioChannels;
   let decoded: Float32Array;
   try {
-    const decodedAudio = await decodeWav(bytes.data);
+    const decodedAudio = await decodeWav(bytes);
     decodedChannels = channelsFromDecoded(decodedAudio);
     decoded = monoDownmix(decodedAudio);
   } catch (cause) {
@@ -328,8 +394,8 @@ export async function runRealCodec(
     );
   }
 
-  const aligned = encoded.data.aligned_sample_count;
-  const referenceStart = encoded.data.reference_start_sample;
+  const aligned = encoded.aligned_sample_count;
+  const referenceStart = encoded.reference_start_sample;
   if (!Number.isInteger(aligned) || aligned <= 0 || !Number.isInteger(referenceStart)) {
     throw new RealCodecError({
       kind: "alignment_mismatch",
@@ -337,7 +403,7 @@ export async function runRealCodec(
     });
   }
   if (
-    decodedChannels.length !== encoded.data.channels ||
+    decodedChannels.length !== encoded.channels ||
     decodedChannels.some((channel) => channel.length < aligned) ||
     decoded.length < aligned
   ) {
@@ -347,7 +413,7 @@ export async function runRealCodec(
     });
   }
 
-  const reference = int16PcmToFloat(floatToInt16Pcm(input.samples));
+  const reference = int16PcmToFloat(floatToInt16Pcm(sourceSamples));
   if (referenceStart < 0 || referenceStart + aligned > reference.length) {
     throw new RealCodecError({
       kind: "alignment_mismatch",
@@ -360,27 +426,138 @@ export async function runRealCodec(
     reference: reference.subarray(referenceStart, referenceStart + aligned),
     channels: decodedChannels.map((channel) => channel.subarray(0, aligned)),
     stats: {
-      resultAudioId: encoded.data.result_audio_id,
-      sizeBytes: encoded.data.size_bytes,
-      bitrateKbps: encoded.data.bitrate_kbps,
-      encodeMs: encoded.data.encode_ms,
-      codecDelaySamples: encoded.data.codec_delay_samples,
+      resultAudioId: encoded.result_audio_id,
+      sizeBytes: encoded.size_bytes,
+      bitrateKbps: encoded.bitrate_kbps,
+      encodeMs: encoded.encode_ms,
+      codecDelaySamples: encoded.codec_delay_samples,
       referenceStartSample: referenceStart,
       alignedSampleCount: aligned,
-      durationSeconds: encoded.data.duration_s,
-      sampleRateHz: encoded.data.sample_rate_hz,
-      channels: encoded.data.channels,
-      bitExact: encoded.data.bit_exact,
-      lossless: encoded.data.lossless,
+      durationSeconds: encoded.duration_s,
+      sampleRateHz: encoded.sample_rate_hz,
+      channels: encoded.channels,
+      bitExact: encoded.bit_exact,
+      lossless: encoded.lossless,
     },
   };
 }
 
+/** Encode the whole source asynchronously; progress is 0..1 job progress. */
+export async function runWholeFileCodec(
+  input: RealCodecInput,
+  params: RealCodecParams,
+  options: RealCodecOptions & {
+    readonly onProgress?: (progress: number) => void;
+    readonly openEvents?: OpenCodecJobEvents;
+  } = {},
+): Promise<RealCodecRun> {
+  const {
+    client = defaultClient,
+    decodeWav = browserDecodeWav,
+    signal,
+    onProgress,
+    openEvents = openCodecJobEvents,
+  } = options;
+  const form = uploadForm(input);
+  const audioId = await uploadExcerpt(client, input, form, signal);
+  const submitted = await request(
+    () =>
+      client.POST("/codec/jobs", {
+        body: { audio_id: audioId, codec: params.codec, params: codecParamsFor(params) },
+        signal,
+      }),
+    true,
+  );
+  const jobId = submitted.data.job_id;
+  let result: CodecEncodeResponse | null = null;
+  let failure: RealCodecError | null = null;
+  const cancel = (): void => {
+    void client
+      .DELETE("/codec/jobs/{job_id}", { params: { path: { job_id: jobId } } })
+      .catch(() => undefined);
+  };
+  signal?.addEventListener("abort", cancel, { once: true });
+  try {
+    await openEvents(jobId, {
+      signal,
+      onEvent: (event) => {
+        if (event.event === "progress" && event.progress !== undefined) {
+          onProgress?.(event.progress);
+        } else if (event.event === "done" && event.result !== undefined) {
+          result = event.result;
+        } else if (event.event === "error") {
+          failure = backendCodeFailure(event.code ?? "unknown");
+        } else if (event.event === "cancelled") {
+          failure = backendCodeFailure("job_cancelled");
+        }
+      },
+    });
+  } finally {
+    signal?.removeEventListener("abort", cancel);
+  }
+  if (failure !== null) {
+    throw failure;
+  }
+  const finalResult = result as CodecEncodeResponse | null;
+  if (finalResult === null) {
+    throw backendUnavailable();
+  }
+  const bytes = await request(
+    () =>
+      client.GET("/audio/{audio_id}", {
+        params: { path: { audio_id: finalResult.result_audio_id } },
+        signal,
+      }),
+    true,
+  );
+  return finishRealCodec(finalResult, bytes.data, input.samples, decodeWav);
+}
+
+async function openCodecJobEvents(jobId: string, options: CodecJobEventsOptions): Promise<void> {
+  const response = await fetch(`${resolveBaseUrl()}/codec/jobs/${jobId}/events`, {
+    signal: options.signal,
+    headers: { Accept: "text/event-stream" },
+  });
+  if (!response.ok || response.body === null) {
+    throw new RealCodecError(
+      { kind: "backendCode", code: "job_not_found", messageKey: "codecLab.error.job_not_found" },
+      { cause: response },
+    );
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const chunk = await reader.read();
+    if (chunk.done) {
+      return;
+    }
+    buffer += decoder.decode(chunk.value, { stream: true });
+    let boundary = buffer.indexOf("\n\n");
+    while (boundary >= 0) {
+      const frame = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      const line = frame.split("\n").find((value) => value.startsWith("data: "));
+      if (line !== undefined) {
+        const event = parseCodecJobEvent(line.slice(6));
+        if (event === null) {
+          continue;
+        }
+        options.onEvent(event);
+        if (event.event !== "progress") {
+          return;
+        }
+      }
+      boundary = buffer.indexOf("\n\n");
+    }
+  }
+}
+
 const defaultClient = {
   async POST(
-    path: "/ingest" | "/codec/encode",
+    path: "/ingest" | "/codec/encode" | "/codec/jobs",
     options: { body: FormData | CodecEncodeRequest; signal?: AbortSignal },
-  ): Promise<IngestCallResult<IngestResponse | CodecEncodeResponse>> {
+  ): Promise<IngestCallResult<IngestResponse | CodecEncodeResponse | { job_id: string }>> {
     if (path === "/ingest") {
       const { data, error, response } = await api.POST(path, {
         body: { file: options.body } as unknown as { file: string },
@@ -388,8 +565,28 @@ const defaultClient = {
       });
       return { data, error, response };
     }
+    if (path === "/codec/jobs") {
+      const { data, error, response } = await api.POST(path, {
+        body: options.body as CodecEncodeRequest,
+        signal: options.signal,
+      });
+      return { data, error, response };
+    }
     const { data, error, response } = await api.POST(path, {
       body: options.body as CodecEncodeRequest,
+      signal: options.signal,
+    });
+    return { data, error, response };
+  },
+  async DELETE(
+    path: "/codec/jobs/{job_id}",
+    options: {
+      params: { path: { job_id: string } };
+      signal?: AbortSignal;
+    },
+  ): Promise<IngestCallResult<{ cancelled: boolean }>> {
+    const { data, error, response } = await api.DELETE(path, {
+      params: options.params,
       signal: options.signal,
     });
     return { data, error, response };

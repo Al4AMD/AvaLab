@@ -14,8 +14,10 @@ import type { HealthResponse } from "../../api/client";
 import { api } from "../../api/client";
 import { ToolHeader } from "../../components/ToolHeader";
 import { Button } from "../../components/ui/button";
+import type { ChannelMode } from "../../lib/channel";
 import { downloadWav } from "../../lib/download";
 import { formatS } from "../../lib/format";
+import { combineLaneResults } from "../../lib/laneCombine";
 import { writeLastUsed } from "../../lib/lastUsed";
 import type {
   CodecLabCodec,
@@ -24,6 +26,8 @@ import type {
   CodecLabResult,
 } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
+import { ChannelPicker } from "../channels/ChannelPicker";
+import { useChannelMode } from "../channels/useChannelMode";
 import { UploadEmptyState } from "../input/upload";
 import { formatMetric, type QualityMetrics } from "../metrics/metrics";
 import { measureQualityMetrics } from "../metrics/qualityMetricsWorker";
@@ -36,7 +40,9 @@ import {
   type RealCodecName,
   type RealCodecRun,
   runRealCodec,
+  runWholeFileCodec,
 } from "./backendCodecs";
+import { aggregateCodecLanes } from "./codecLabLanes";
 import {
   CODEC_LAB_CODECS,
   CODEC_LAB_MDCT_KBPS,
@@ -48,7 +54,9 @@ import {
   CODEC_LAB_REFERENCE_SPL_MAX,
   CODEC_LAB_REFERENCE_SPL_MIN,
   CODEC_LAB_STORAGE_KEY,
+  type CodecLabLaneSettings,
   type CodecLabSettings,
+  codecLabLanes,
   codecLabRangeFromSelection,
   codecLabSettingsFromSearch,
   codecLabSettingsToSearch,
@@ -77,10 +85,17 @@ const INPUT_CLASSES = `rounded border border-surface bg-bg px-2 py-1 text-sm ${C
 const HISTOGRAM_HEIGHT_PX = 96;
 const MAX_DEVICE_PIXEL_RATIO = 2;
 
-type CodecLabViewResult = {
+type LaneCodecResult = {
+  readonly id: "mono" | "left" | "right";
   readonly meta: CodecLabMeta;
   readonly samples: Float32Array;
+};
+
+type CodecLabViewResult = {
+  readonly perLane: readonly LaneCodecResult[];
+  readonly playback: readonly Float32Array[];
   readonly settings: CodecLabSettings;
+  readonly mode: ChannelMode;
 };
 
 type CodecLabStatus = "idle" | "running" | "ready" | "error";
@@ -104,6 +119,19 @@ export function realPlayback(
 
 type RealCodecStatus = "idle" | "running" | "ready" | "error";
 
+function wholeStageLabel(t: TFunction, progress: number): string {
+  if (progress < 0.6) {
+    return t("codecLab.real.stage.encode");
+  }
+  if (progress < 0.75) {
+    return t("codecLab.real.stage.decode");
+  }
+  if (progress < 0.9) {
+    return t("codecLab.real.stage.align");
+  }
+  return t("codecLab.real.stage.store");
+}
+
 function realErrorText(t: TFunction, key: string | null): string {
   switch (key) {
     case "codecLab.error.codec_unavailable":
@@ -124,6 +152,12 @@ function realErrorText(t: TFunction, key: string | null): string {
       return t("codecLab.error.alignment_mismatch");
     case "codecLab.error.backend_unavailable":
       return t("codecLab.error.backend_unavailable");
+    case "codecLab.error.job_busy":
+      return t("codecLab.error.job_busy");
+    case "codecLab.error.job_cancelled":
+      return t("codecLab.error.job_cancelled");
+    case "codecLab.error.job_not_found":
+      return t("codecLab.error.job_not_found");
     case "codecLab.error.unknown":
       return t("codecLab.error.unknown");
     default:
@@ -309,8 +343,8 @@ export function CodecLabPsychoControls({
   settings,
   onChange,
 }: {
-  readonly settings: CodecLabSettings;
-  readonly onChange: (patch: Partial<CodecLabSettings>) => void;
+  readonly settings: CodecLabLaneSettings;
+  readonly onChange: (patch: Partial<CodecLabLaneSettings>) => void;
 }): React.ReactElement {
   const { t } = useTranslation();
   return (
@@ -386,6 +420,7 @@ export function CodecLabView(): React.ReactElement {
   const selection = useSessionStore((state) => state.selection);
   const backendOnline = useSessionStore((state) => state.backendOnline);
   const [searchParams, setSearchParams] = useSearchParams();
+  const channel = useChannelMode(original, "both");
   const settings = useMemo(() => {
     const source = {
       sampleCount: original?.samples.length ?? 0,
@@ -396,6 +431,11 @@ export function CodecLabView(): React.ReactElement {
     }
     return codecLabSettingsFromSearch(`?${searchParams.toString()}`, source, selection);
   }, [searchParams, original, selection]);
+  const resolvedLanes = useMemo(() => codecLabLanes(settings), [settings]);
+  const effectiveLane: "left" | "right" =
+    channel.mode === "both" ? settings.editLane : channel.mode === "right" ? "right" : "left";
+  const laneSettings = effectiveLane === "right" ? resolvedLanes.right : resolvedLanes.left;
+  const linked = settings.right === undefined;
 
   useEffect(() => {
     writeLastUsed(CODEC_LAB_STORAGE_KEY, codecLabSettingsToSearch(settings));
@@ -409,6 +449,10 @@ export function CodecLabView(): React.ReactElement {
   const [realResult, setRealResult] = useState<RealCodecViewResult | null>(null);
   const [realMetrics, setRealMetrics] = useState<QualityMetrics | null>(null);
   const [realErrorKey, setRealErrorKey] = useState<string | null>(null);
+  const [realIsWhole, setRealIsWhole] = useState(false);
+  const [wholeStatus, setWholeStatus] = useState<"idle" | "running">("idle");
+  const [wholeProgress, setWholeProgress] = useState(0);
+  const [wholeErrorKey, setWholeErrorKey] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "ok" | "error">("idle");
   const [batchRows, setBatchRows] = useState<ComparisonRow[] | null>(null);
   const [batchStatus, setBatchStatus] = useState<"idle" | "running">("idle");
@@ -418,6 +462,8 @@ export function CodecLabView(): React.ReactElement {
   const batchAbortRef = useRef<AbortController | null>(null);
   const realRunIdRef = useRef(0);
   const realAbortRef = useRef<AbortController | null>(null);
+  const wholeRunIdRef = useRef(0);
+  const wholeAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     runIdRef.current += 1;
@@ -429,6 +475,12 @@ export function CodecLabView(): React.ReactElement {
     setRealStatus("idle");
     setRealResult(null);
     setRealErrorKey(null);
+    setRealIsWhole(false);
+    wholeRunIdRef.current += 1;
+    wholeAbortRef.current?.abort();
+    setWholeStatus("idle");
+    setWholeProgress(0);
+    setWholeErrorKey(null);
     setCopyStatus("idle");
     batchAbortRef.current?.abort();
     batchAbortRef.current = null;
@@ -467,6 +519,7 @@ export function CodecLabView(): React.ReactElement {
   useEffect(
     () => () => {
       realAbortRef.current?.abort();
+      wholeAbortRef.current?.abort();
       batchAbortRef.current?.abort();
     },
     [],
@@ -474,8 +527,9 @@ export function CodecLabView(): React.ReactElement {
 
   const singleComparisonRows = useMemo<ComparisonRow[]>(() => {
     const rows: ComparisonRow[] = [];
-    if (result !== null) {
-      rows.push(handwrittenRow(result.meta, `codecLab.codec.${result.meta.codec}`));
+    const meta = result?.mode === "both" ? undefined : result?.perLane[0]?.meta;
+    if (meta !== undefined) {
+      rows.push(handwrittenRow(meta, `codecLab.codec.${meta.codec}`));
     }
     if (realResult !== null) {
       rows.push(
@@ -526,13 +580,39 @@ export function CodecLabView(): React.ReactElement {
     };
   }, [realResult]);
 
-  function updateSettings(patch: Partial<CodecLabSettings>): void {
-    const next = { ...settings, ...patch };
+  function writeSettings(next: CodecLabSettings): void {
     const params = new URLSearchParams(searchParams);
+    for (const key of Array.from(params.keys())) {
+      if (key === "el" || (key.startsWith("rr") && key.length > 2)) {
+        params.delete(key);
+      }
+    }
     for (const [key, entry] of new URLSearchParams(codecLabSettingsToSearch(next))) {
       params.set(key, entry);
     }
     setSearchParams(params, { replace: true });
+  }
+
+  function updateSettings(patch: Partial<CodecLabSettings>): void {
+    writeSettings({ ...settings, ...patch });
+  }
+
+  function updateLaneSettings(patch: Partial<CodecLabLaneSettings>): void {
+    const nextLane = { ...laneSettings, ...patch };
+    writeSettings(
+      effectiveLane === "right" ? { ...settings, right: nextLane } : { ...settings, ...nextLane },
+    );
+  }
+
+  function selectEditLane(lane: "left" | "right"): void {
+    updateSettings({ ...settings, editLane: lane });
+  }
+
+  function setLinked(nextLinked: boolean): void {
+    writeSettings({
+      ...settings,
+      ...(nextLinked ? { right: undefined } : { right: resolvedLanes.right }),
+    });
   }
 
   function updateRange(startSample: number, endSample: number): void {
@@ -553,34 +633,92 @@ export function CodecLabView(): React.ReactElement {
     const runId = runIdRef.current + 1;
     runIdRef.current = runId;
     const runSettings = settings;
-    setStatus("running");
-    setErrorKey(null);
-    const ticket = useSessionStore.getState().deriveWithSourceSlice(
-      "codecLabProcess",
-      {
-        codec: runSettings.codec,
+    const runMode = channel.mode;
+    const lanes = codecLabLanes(runSettings);
+    const targets: readonly {
+      readonly id: "mono" | "left" | "right";
+      readonly index: 0 | 1;
+      readonly settings: CodecLabLaneSettings;
+    }[] =
+      runMode === "both"
+        ? [
+            { id: "left", index: 0, settings: lanes.left },
+            { id: "right", index: 1, settings: lanes.right },
+          ]
+        : runMode === "right"
+          ? [{ id: "right", index: 1, settings: lanes.right }]
+          : runMode === "left"
+            ? [{ id: "left", index: 0, settings: lanes.left }]
+            : [{ id: "mono", index: 0, settings: lanes.left }];
+
+    const encodeLane = (target: (typeof targets)[number]): Promise<LaneCodecResult> => {
+      const params = {
+        codec: target.settings.codec,
         sampleRateHz: original.sampleRateHz,
         startSample: runSettings.startSample,
         endSample: runSettings.endSample,
-        mdctBitsPerSecond: runSettings.mdctBitsPerSecond,
-        mdctPsychoacoustic: runSettings.mdctPsychoacoustic,
-        mdctReferenceSplDb: runSettings.mdctReferenceSplDb,
-      },
-      runSettings.startSample,
-      runSettings.endSample,
-    );
-    ticket.outcome.then(
-      (outcome) => {
-        if (runIdRef.current !== runId || "cancelled" in outcome) {
-          return;
+        mdctBitsPerSecond: target.settings.mdctBitsPerSecond,
+        mdctPsychoacoustic: target.settings.mdctPsychoacoustic,
+        mdctReferenceSplDb: target.settings.mdctReferenceSplDb,
+      };
+      const ticket =
+        target.id === "mono"
+          ? useSessionStore
+              .getState()
+              .deriveWithSourceSlice(
+                "codecLabProcess",
+                params,
+                runSettings.startSample,
+                runSettings.endSample,
+              )
+          : useSessionStore
+              .getState()
+              .deriveWithSourceSliceLane(
+                "codecLabProcess",
+                params,
+                runSettings.startSample,
+                runSettings.endSample,
+                target.index,
+              );
+      return ticket.outcome.then((outcome) => {
+        if ("cancelled" in outcome) {
+          throw new Error("codecLabProcess cancelled");
         }
         const samples = unpackResult(outcome);
         if (samples === null) {
+          throw new Error("codecLabProcess returned no payload");
+        }
+        return { id: target.id, meta: outcome.meta, samples };
+      });
+    };
+
+    setStatus("running");
+    setErrorKey(null);
+    void Promise.all(targets.map(encodeLane)).then(
+      (perLane) => {
+        if (runIdRef.current !== runId) {
+          return;
+        }
+        const resultLength = perLane[0]?.samples.length ?? 0;
+        const laneSamples = (id: LaneCodecResult["id"]): Float32Array | undefined =>
+          perLane.find((lane) => lane.id === id)?.samples;
+        const playback = combineLaneResults(
+          runMode,
+          original.channels,
+          runSettings.startSample,
+          resultLength,
+          {
+            mono: laneSamples("mono"),
+            left: laneSamples("left"),
+            right: laneSamples("right"),
+          },
+        );
+        if (playback === null) {
           setStatus("error");
           setErrorKey("codecLab.error.failed");
           return;
         }
-        setResult({ meta: outcome.meta, samples, settings: runSettings });
+        setResult({ perLane, playback, settings: runSettings, mode: runMode });
         setBatchRows(null);
         setStatus("ready");
       },
@@ -597,9 +735,9 @@ export function CodecLabView(): React.ReactElement {
     if (result === null) {
       return;
     }
-    const installed = useSessionStore
-      .getState()
-      .setProcessed(result.samples.slice(), result.meta.sampleRateHz, "codecLab");
+    const sampleRate = result.perLane[0]?.meta.sampleRateHz ?? sampleRateHz;
+    const playback = result.playback.map((channel) => channel.slice());
+    const installed = useSessionStore.getState().setProcessed(playback, sampleRate, "codecLab");
     if (!installed.ok) {
       setErrorKey("codecLab.error.playback");
     }
@@ -607,6 +745,84 @@ export function CodecLabView(): React.ReactElement {
 
   const realAvailable = availableRealCodecs(health);
   const realCodecAvailable = realAvailable.includes(settings.realCodec);
+
+  function runWholeFile(): void {
+    if (
+      original === null ||
+      wholeStatus === "running" ||
+      realStatus === "running" ||
+      !backendOnline ||
+      !realCodecAvailable
+    ) {
+      return;
+    }
+    const runId = wholeRunIdRef.current + 1;
+    wholeRunIdRef.current = runId;
+    wholeAbortRef.current?.abort();
+    const controller = new AbortController();
+    wholeAbortRef.current = controller;
+    const wholeSettings: CodecLabSettings = {
+      ...settings,
+      startSample: 0,
+      endSample: original.samples.length,
+    };
+    setWholeStatus("running");
+    setWholeProgress(0);
+    setWholeErrorKey(null);
+    runWholeFileCodec(
+      {
+        samples: original.samples,
+        channels: original.channels,
+        sampleRateHz: original.sampleRateHz,
+        startSample: 0,
+        endSample: original.samples.length,
+      },
+      {
+        codec: settings.realCodec,
+        bitrateKbps: settings.realBitrateKbps,
+        quality: settings.realQuality,
+        compressionLevel: settings.realCompressionLevel,
+      },
+      {
+        signal: controller.signal,
+        onProgress: (progress) => {
+          if (wholeRunIdRef.current === runId) {
+            setWholeProgress(progress);
+          }
+        },
+      },
+    ).then(
+      (run) => {
+        if (wholeRunIdRef.current !== runId || controller.signal.aborted) {
+          return;
+        }
+        setWholeStatus("idle");
+        setWholeProgress(1);
+        setRealResult({ run, settings: wholeSettings });
+        setRealIsWhole(true);
+        setBatchRows(null);
+        setRealStatus("ready");
+      },
+      (error: unknown) => {
+        if (wholeRunIdRef.current !== runId || controller.signal.aborted) {
+          return;
+        }
+        setWholeStatus("idle");
+        setWholeErrorKey(
+          error instanceof RealCodecError ? error.messageKey : "codecLab.error.failed",
+        );
+      },
+    );
+  }
+
+  function cancelWholeFile(): void {
+    if (wholeStatus !== "running") {
+      return;
+    }
+    wholeAbortRef.current?.abort();
+    setWholeStatus("idle");
+    setWholeProgress(0);
+  }
 
   function runReal(): void {
     if (
@@ -649,6 +865,7 @@ export function CodecLabView(): React.ReactElement {
           return;
         }
         setRealResult({ run, settings: runSettings });
+        setRealIsWhole(false);
         setBatchRows(null);
         setRealStatus("ready");
       },
@@ -827,16 +1044,77 @@ export function CodecLabView(): React.ReactElement {
     );
   }
 
-  const stale = result !== null && isCodecLabStale(settings, result.settings);
-  const realStale = realResult !== null && isRealCodecStale(settings, realResult.settings);
-  const codeLengths = result?.meta.codeLengths ?? [];
+  const stale =
+    result !== null && (isCodecLabStale(settings, result.settings) || result.mode !== channel.mode);
+  const realStale =
+    realResult !== null && !realIsWhole && isRealCodecStale(settings, realResult.settings);
+  const diagnosticLane =
+    result?.mode === "both"
+      ? effectiveLane
+      : result?.mode === "right"
+        ? "right"
+        : result?.mode === "left"
+          ? "left"
+          : "mono";
+  const displayLane =
+    result?.perLane.find((lane) => lane.id === diagnosticLane) ?? result?.perLane[0] ?? null;
+  const displayMeta = displayLane?.meta ?? null;
+  const aggregate =
+    result?.mode === "both" ? aggregateCodecLanes(result.perLane.map((lane) => lane.meta)) : null;
+  const codeLengths = displayMeta?.codeLengths ?? [];
   const nonZeroCodeLengths = codeLengths
     .map((length, symbol) => ({ length, symbol }))
     .filter((entry) => entry.length > 0);
+  const laneLabels = {
+    left: t("codecLab.stats.lane.left"),
+    right: t("codecLab.stats.lane.right"),
+  } as const;
+  const toyLaneLabels = {
+    left: t("codecLab.lane.left"),
+    right: t("codecLab.lane.right"),
+  } as const;
 
   return (
     <section className="flex flex-col gap-4">
       <ToolHeader titleKey="tool.codecLab.title" descriptionKey="tool.codecLab.description" />
+
+      <div className="flex flex-col gap-3 rounded border border-surface p-3">
+        <ChannelPicker mode={channel.mode} modes={channel.modes} onChange={channel.setMode} />
+        {channel.mode === "both" ? (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              {(["left", "right"] as const).map((lane) => (
+                <Button
+                  key={lane}
+                  size="sm"
+                  variant={effectiveLane === lane ? "default" : "outline"}
+                  aria-pressed={effectiveLane === lane}
+                  data-testid={`codecLab.lane.${lane}`}
+                  onClick={() => {
+                    selectEditLane(lane);
+                  }}
+                >
+                  {toyLaneLabels[lane]}
+                </Button>
+              ))}
+            </div>
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                data-testid="codecLab.linkRight"
+                checked={linked}
+                onChange={(event) => {
+                  setLinked(event.currentTarget.checked);
+                }}
+              />
+              <span>{t("codecLab.lane.link")}</span>
+            </label>
+            <p data-testid="codecLab.lane.status" className="text-xs text-muted">
+              {linked ? t("codecLab.lane.linked") : t("codecLab.lane.separate")}
+            </p>
+          </>
+        ) : null}
+      </div>
 
       <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-xs">
@@ -899,12 +1177,12 @@ export function CodecLabView(): React.ReactElement {
         <label className="flex flex-col gap-1 text-xs">
           <span className="font-medium">{t("codecLab.codec.label")}</span>
           <select
-            value={settings.codec}
+            value={laneSettings.codec}
             data-testid="codecLab.control.codec"
             onChange={(event) => {
               const next = event.currentTarget.value;
               if ((CODEC_LAB_CODECS as readonly string[]).includes(next)) {
-                updateSettings({ codec: next as CodecLabCodec });
+                updateLaneSettings({ codec: next as CodecLabCodec });
               }
             }}
             className={INPUT_CLASSES}
@@ -916,16 +1194,16 @@ export function CodecLabView(): React.ReactElement {
             ))}
           </select>
         </label>
-        {settings.codec === "mdct" ? (
+        {laneSettings.codec === "mdct" ? (
           <label className="flex flex-col gap-1 text-xs">
             <span className="font-medium">{t("codecLab.bitrate.label")}</span>
             <select
-              value={settings.mdctBitsPerSecond / 1000}
+              value={laneSettings.mdctBitsPerSecond / 1000}
               data-testid="codecLab.control.bitrate"
               onChange={(event) => {
                 const kbps = Number(event.currentTarget.value);
                 if (Number.isFinite(kbps)) {
-                  updateSettings({ mdctBitsPerSecond: kbps * 1000 });
+                  updateLaneSettings({ mdctBitsPerSecond: kbps * 1000 });
                 }
               }}
               className={INPUT_CLASSES}
@@ -938,8 +1216,8 @@ export function CodecLabView(): React.ReactElement {
             </select>
           </label>
         ) : null}
-        {settings.codec === "mdct" ? (
-          <CodecLabPsychoControls settings={settings} onChange={updateSettings} />
+        {laneSettings.codec === "mdct" ? (
+          <CodecLabPsychoControls settings={laneSettings} onChange={updateLaneSettings} />
         ) : null}
       </div>
 
@@ -977,132 +1255,240 @@ export function CodecLabView(): React.ReactElement {
         <p className="text-sm text-muted">{t("codecLab.status.idle")}</p>
       ) : null}
 
-      {result !== null ? (
+      {result !== null && displayMeta !== null ? (
         <>
           <div className="rounded border border-surface p-3">
             <h3 className="mb-2 text-sm font-semibold">{t("codecLab.stats.title")}</h3>
-            <p data-testid="codecLab.toy.mono" className="mb-2 text-xs text-muted">
-              {t("codecLab.toy.mono")}
+            <p
+              data-testid={result.mode === "mono" ? "codecLab.toy.mono" : "codecLab.toy.mode"}
+              className="mb-2 text-xs text-muted"
+            >
+              {result.mode === "mono"
+                ? t("codecLab.toy.mono")
+                : result.mode === "both"
+                  ? t("codecLab.toy.stereo")
+                  : t("codecLab.toy.lane")}
             </p>
-            <dl className="grid grid-cols-1 gap-x-6 text-xs sm:grid-cols-2">
-              <StatRow
-                label={t("codecLab.stats.originalBytes")}
-                value={formatBytes(result.meta.originalBytes)}
-                testId="codecLab.stat.originalBytes"
-              />
-              <StatRow
-                label={t("codecLab.stats.compressedBytes")}
-                value={formatBytes(result.meta.compressedSizeBytes)}
-                testId="codecLab.stat.compressedBytes"
-              />
-              <StatRow
-                label={t("codecLab.stats.ratio")}
-                value={`${formatNumber(result.meta.compressionRatio)}×`}
-                testId="codecLab.stat.ratio"
-              />
-              <StatRow
-                label={t("codecLab.stats.bitsPerSample")}
-                value={formatNumber(result.meta.bitsPerSample)}
-                testId="codecLab.stat.bitsPerSample"
-              />
-              <StatRow
-                label={t("codecLab.stats.bitrate")}
-                value={`${formatNumber(result.meta.bitrateKbps)} kbps`}
-                testId="codecLab.stat.bitrate"
-              />
-              <StatRow
-                label={t("codecLab.stats.entropy")}
-                value={`${formatNumber(result.meta.entropyBitsPerSymbol)} bit/symbol`}
-                testId="codecLab.stat.entropy"
-              />
-              <StatRow
-                label={t("codecLab.stats.encodeMs")}
-                value={`${formatNumber(result.meta.encodeMs)} ms`}
-                testId="codecLab.stat.encodeMs"
-              />
-              <StatRow
-                label={t("codecLab.stats.decodeMs")}
-                value={`${formatNumber(result.meta.decodeMs)} ms`}
-                testId="codecLab.stat.decodeMs"
-              />
-              <StatRow
-                label={t("codecLab.stats.bitExact")}
-                value={result.meta.bitExact ? t("codecLab.stats.yes") : t("codecLab.stats.no")}
-                testId="codecLab.stat.bitExact"
-              />
-              <StatRow
-                label={t("codecLab.stats.snr")}
-                value={`${formatNumber(result.meta.snrDb)} dB`}
-                testId="codecLab.stat.snr"
-              />
-              <StatRow
-                label={t("codecLab.stats.segmentalSnr")}
-                value={`${formatNumber(result.meta.segmentalSnrDb)} dB`}
-                testId="codecLab.stat.segmentalSnr"
-              />
-              <StatRow
-                label={t("codecLab.stats.psnr")}
-                value={`${formatNumber(result.meta.psnrDb)} dB`}
-                testId="codecLab.stat.psnr"
-              />
-              <StatRow
-                label={t("codecLab.stats.mse")}
-                value={formatNumber(result.meta.mse, 6)}
-                testId="codecLab.stat.mse"
-              />
-            </dl>
+            {result.mode === "both" && aggregate !== null ? (
+              <>
+                <h4 className="mb-1 text-xs font-semibold">{t("codecLab.stats.aggregate")}</h4>
+                <dl
+                  data-testid="codecLab.stats.aggregate"
+                  className="grid grid-cols-1 gap-x-6 text-xs sm:grid-cols-2"
+                >
+                  <StatRow
+                    label={t("codecLab.stats.originalBytes")}
+                    value={formatBytes(aggregate.originalBytes)}
+                    testId="codecLab.aggregate.originalBytes"
+                  />
+                  <StatRow
+                    label={t("codecLab.stats.compressedBytes")}
+                    value={formatBytes(aggregate.compressedSizeBytes)}
+                    testId="codecLab.aggregate.compressedBytes"
+                  />
+                  <StatRow
+                    label={t("codecLab.stats.ratio")}
+                    value={`${formatNumber(aggregate.compressionRatio)}×`}
+                    testId="codecLab.aggregate.ratio"
+                  />
+                  <StatRow
+                    label={t("codecLab.stats.bitsPerSample")}
+                    value={formatNumber(aggregate.bitsPerSample)}
+                    testId="codecLab.aggregate.bitsPerSample"
+                  />
+                  <StatRow
+                    label={t("codecLab.stats.bitrate")}
+                    value={`${formatNumber(aggregate.bitrateKbps)} kbps`}
+                    testId="codecLab.aggregate.bitrate"
+                  />
+                  <StatRow
+                    label={t("codecLab.stats.entropy")}
+                    value={`${formatNumber(aggregate.entropyBitsPerSymbol)} bit/symbol`}
+                    testId="codecLab.aggregate.entropy"
+                  />
+                  <StatRow
+                    label={t("codecLab.stats.encodeMs")}
+                    value={`${formatNumber(aggregate.encodeMs)} ms`}
+                    testId="codecLab.aggregate.encodeMs"
+                  />
+                  <StatRow
+                    label={t("codecLab.stats.decodeMs")}
+                    value={`${formatNumber(aggregate.decodeMs)} ms`}
+                    testId="codecLab.aggregate.decodeMs"
+                  />
+                  <StatRow
+                    label={t("codecLab.stats.bitExact")}
+                    value={aggregate.bitExact ? t("codecLab.stats.yes") : t("codecLab.stats.no")}
+                    testId="codecLab.aggregate.bitExact"
+                  />
+                </dl>
+              </>
+            ) : (
+              <dl className="grid grid-cols-1 gap-x-6 text-xs sm:grid-cols-2">
+                <StatRow
+                  label={t("codecLab.stats.originalBytes")}
+                  value={formatBytes(displayMeta.originalBytes)}
+                  testId="codecLab.stat.originalBytes"
+                />
+                <StatRow
+                  label={t("codecLab.stats.compressedBytes")}
+                  value={formatBytes(displayMeta.compressedSizeBytes)}
+                  testId="codecLab.stat.compressedBytes"
+                />
+                <StatRow
+                  label={t("codecLab.stats.ratio")}
+                  value={`${formatNumber(displayMeta.compressionRatio)}×`}
+                  testId="codecLab.stat.ratio"
+                />
+                <StatRow
+                  label={t("codecLab.stats.bitsPerSample")}
+                  value={formatNumber(displayMeta.bitsPerSample)}
+                  testId="codecLab.stat.bitsPerSample"
+                />
+                <StatRow
+                  label={t("codecLab.stats.bitrate")}
+                  value={`${formatNumber(displayMeta.bitrateKbps)} kbps`}
+                  testId="codecLab.stat.bitrate"
+                />
+                <StatRow
+                  label={t("codecLab.stats.entropy")}
+                  value={`${formatNumber(displayMeta.entropyBitsPerSymbol)} bit/symbol`}
+                  testId="codecLab.stat.entropy"
+                />
+                <StatRow
+                  label={t("codecLab.stats.encodeMs")}
+                  value={`${formatNumber(displayMeta.encodeMs)} ms`}
+                  testId="codecLab.stat.encodeMs"
+                />
+                <StatRow
+                  label={t("codecLab.stats.decodeMs")}
+                  value={`${formatNumber(displayMeta.decodeMs)} ms`}
+                  testId="codecLab.stat.decodeMs"
+                />
+                <StatRow
+                  label={t("codecLab.stats.bitExact")}
+                  value={displayMeta.bitExact ? t("codecLab.stats.yes") : t("codecLab.stats.no")}
+                  testId="codecLab.stat.bitExact"
+                />
+                <StatRow
+                  label={t("codecLab.stats.snr")}
+                  value={`${formatNumber(displayMeta.snrDb)} dB`}
+                  testId="codecLab.stat.snr"
+                />
+                <StatRow
+                  label={t("codecLab.stats.segmentalSnr")}
+                  value={`${formatNumber(displayMeta.segmentalSnrDb)} dB`}
+                  testId="codecLab.stat.segmentalSnr"
+                />
+                <StatRow
+                  label={t("codecLab.stats.psnr")}
+                  value={`${formatNumber(displayMeta.psnrDb)} dB`}
+                  testId="codecLab.stat.psnr"
+                />
+                <StatRow
+                  label={t("codecLab.stats.mse")}
+                  value={formatNumber(displayMeta.mse, 6)}
+                  testId="codecLab.stat.mse"
+                />
+              </dl>
+            )}
+            {result.mode === "both" ? (
+              <div className="mt-3 overflow-x-auto">
+                <table data-testid="codecLab.stats.lanes" className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-surface text-muted">
+                      <th className="py-1 pe-3 text-start font-medium">{t("channel.label")}</th>
+                      <th className="py-1 pe-3 text-start font-medium">
+                        {t("codecLab.stats.mse")}
+                      </th>
+                      <th className="py-1 pe-3 text-start font-medium">
+                        {t("codecLab.stats.snr")}
+                      </th>
+                      <th className="py-1 pe-3 text-start font-medium">
+                        {t("codecLab.stats.segmentalSnr")}
+                      </th>
+                      <th className="py-1 text-start font-medium">{t("codecLab.stats.psnr")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.perLane.map((lane) => (
+                      <tr key={lane.id} data-testid={`codecLab.stats.lane.${lane.id}`}>
+                        <td className="py-1 pe-3">
+                          {lane.id === "right" ? laneLabels.right : laneLabels.left}
+                        </td>
+                        <td dir="ltr" className="py-1 pe-3 tabular-nums">
+                          {formatNumber(lane.meta.mse, 6)}
+                        </td>
+                        <td dir="ltr" className="py-1 pe-3 tabular-nums">
+                          {formatNumber(lane.meta.snrDb)} dB
+                        </td>
+                        <td dir="ltr" className="py-1 pe-3 tabular-nums">
+                          {formatNumber(lane.meta.segmentalSnrDb)} dB
+                        </td>
+                        <td dir="ltr" className="py-1 tabular-nums">
+                          {formatNumber(lane.meta.psnrDb)} dB
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
             <p className="mt-2 text-xs text-muted">{t("codecLab.stats.psnrNote")}</p>
           </div>
 
-          {result.meta.frameCount !== null ? (
+          {displayMeta.frameCount !== null ? (
             <div className="rounded border border-surface p-3 text-xs">
-              <h3 className="mb-2 text-sm font-semibold">{t("codecLab.mdct.title")}</h3>
+              <h3 className="mb-2 text-sm font-semibold">
+                {t("codecLab.mdct.title")}
+                {result.mode === "both" ? ` — ${laneLabels[effectiveLane]}` : ""}
+              </h3>
               <dl className="grid grid-cols-1 gap-x-6 sm:grid-cols-3">
                 <StatRow
                   label={t("codecLab.mdct.sparsity")}
-                  value={`${formatNumber((result.meta.coefficientSparsity ?? 0) * 100)}%`}
+                  value={`${formatNumber((displayMeta.coefficientSparsity ?? 0) * 100)}%`}
                   testId="codecLab.mdct.sparsity"
                 />
                 <StatRow
                   label={t("codecLab.mdct.frames")}
-                  value={String(result.meta.frameCount)}
+                  value={String(displayMeta.frameCount)}
                   testId="codecLab.mdct.frames"
                 />
-                {result.meta.psychoacoustic ? (
+                {displayMeta.psychoacoustic ? (
                   <>
                     <StatRow
                       label={t("codecLab.mdct.entropyBits")}
-                      value={String(result.meta.mdctEntropyBits ?? 0)}
+                      value={String(displayMeta.mdctEntropyBits ?? 0)}
                       testId="codecLab.mdct.entropyBits"
                     />
                     <StatRow
                       label={t("codecLab.mdct.sideInfoBits")}
-                      value={String(result.meta.mdctSideInfoBits ?? 0)}
+                      value={String(displayMeta.mdctSideInfoBits ?? 0)}
                       testId="codecLab.mdct.sideInfoBits"
                     />
                     <StatRow
                       label={t("codecLab.mdct.totalBitrate")}
-                      value={`${formatNumber(result.meta.bitrateKbps)} kbps`}
+                      value={`${formatNumber(displayMeta.bitrateKbps)} kbps`}
                       testId="codecLab.mdct.totalBitrate"
                     />
                     <StatRow
                       label={t("codecLab.mdct.maskedShare")}
-                      value={`${formatNumber((result.meta.mdctMaskedFraction ?? 0) * 100)}%`}
+                      value={`${formatNumber((displayMeta.mdctMaskedFraction ?? 0) * 100)}%`}
                       testId="codecLab.mdct.maskedShare"
                     />
                   </>
                 ) : (
                   <StatRow
                     label={t("codecLab.mdct.totalBits")}
-                    value={String(result.meta.bitsTotal ?? 0)}
+                    value={String(displayMeta.bitsTotal ?? 0)}
                     testId="codecLab.mdct.totalBits"
                   />
                 )}
               </dl>
-              {result.meta.mdctBands !== null ? (
-                <MdctBandChart bands={result.meta.mdctBands} />
+              {displayMeta.mdctBands !== null ? (
+                <MdctBandChart bands={displayMeta.mdctBands} />
               ) : null}
-              {result.meta.psychoacoustic ? (
+              {displayMeta.psychoacoustic ? (
                 <p className="mt-2 text-xs text-muted">{t("codecLab.mdct.psychoNote")}</p>
               ) : null}
             </div>
@@ -1111,13 +1497,17 @@ export function CodecLabView(): React.ReactElement {
           <figure className="flex flex-col gap-1 rounded border border-surface p-3">
             <figcaption className="text-sm font-semibold">
               {t("codecLab.histogram.title")}
+              {result.mode === "both" ? ` — ${laneLabels[effectiveLane]}` : ""}
             </figcaption>
-            <Histogram histogram={result.meta.histogram} ariaLabel={t("codecLab.histogram.aria")} />
+            <Histogram histogram={displayMeta.histogram} ariaLabel={t("codecLab.histogram.aria")} />
           </figure>
 
           {nonZeroCodeLengths.length > 0 ? (
             <div className="rounded border border-surface p-3">
-              <h3 className="mb-2 text-sm font-semibold">{t("codecLab.codeLengths.title")}</h3>
+              <h3 className="mb-2 text-sm font-semibold">
+                {t("codecLab.codeLengths.title")}
+                {result.mode === "both" ? ` — ${laneLabels[effectiveLane]}` : ""}
+              </h3>
               <div className="max-h-64 overflow-auto">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-bg text-muted">
@@ -1262,12 +1652,41 @@ export function CodecLabView(): React.ReactElement {
           <Button
             data-testid="codecLab.real.encode"
             disabled={
-              !backendOnline || !realCodecAvailable || realStatus === "running" || rangeEmpty
+              !backendOnline ||
+              !realCodecAvailable ||
+              realStatus === "running" ||
+              wholeStatus === "running" ||
+              rangeEmpty
             }
             onClick={runReal}
           >
             {realStatus === "running" ? t("codecLab.real.running") : t("codecLab.real.encode")}
           </Button>
+          <Button
+            data-testid="codecLab.real.wholeEncode"
+            variant="outline"
+            disabled={
+              !backendOnline ||
+              !realCodecAvailable ||
+              realStatus === "running" ||
+              wholeStatus === "running"
+            }
+            onClick={runWholeFile}
+          >
+            {wholeStatus === "running"
+              ? t("codecLab.real.wholeRunning")
+              : t("codecLab.real.wholeEncode")}
+          </Button>
+          {wholeStatus === "running" ? (
+            <Button
+              size="sm"
+              variant="outline"
+              data-testid="codecLab.real.wholeCancel"
+              onClick={cancelWholeFile}
+            >
+              {t("codecLab.real.wholeCancel")}
+            </Button>
+          ) : null}
           <Button
             size="sm"
             variant="outline"
@@ -1304,13 +1723,36 @@ export function CodecLabView(): React.ReactElement {
             <p className="text-xs text-muted">{t("codecLab.real.codecUnavailable")}</p>
           ) : null}
         </div>
+        {wholeStatus === "running" ? (
+          <p
+            data-testid="codecLab.real.wholeProgress"
+            role="status"
+            dir="ltr"
+            className="mt-2 text-xs tabular-nums text-muted"
+          >
+            {t("codecLab.real.wholeProgress", {
+              percent: Math.round(wholeProgress * 100),
+              stage: wholeStageLabel(t, wholeProgress),
+            })}
+          </p>
+        ) : null}
+        {wholeErrorKey !== null ? (
+          <p
+            data-testid="codecLab.real.wholeError"
+            role="alert"
+            className="mt-2 text-sm text-danger"
+          >
+            {realErrorText(t, wholeErrorKey)}
+          </p>
+        ) : null}
         {realErrorKey !== null ? (
           <p data-testid="codecLab.real.error" role="alert" className="mt-2 text-sm text-danger">
             {realErrorText(t, realErrorKey)}
           </p>
-        ) : realStatus === "idle" ? (
+        ) : realStatus === "idle" && wholeStatus === "idle" ? (
           <p className="mt-2 text-xs text-muted">{t("codecLab.real.idle")}</p>
         ) : null}
+        <p className="mt-2 text-xs text-muted">{t("codecLab.real.wholeHint")}</p>
         {realResult !== null ? (
           <>
             <p
@@ -1418,7 +1860,8 @@ export function CodecLabView(): React.ReactElement {
                 batchStatus === "running" ||
                 rangeEmpty ||
                 status === "running" ||
-                realStatus === "running"
+                realStatus === "running" ||
+                wholeStatus === "running"
               }
               onClick={runBatch}
             >
@@ -1570,6 +2013,11 @@ export function CodecLabView(): React.ReactElement {
             </table>
           </div>
         )}
+        {result?.mode === "both" ? (
+          <p data-testid="codecLab.comparison.stereoNote" className="mt-2 text-xs text-muted">
+            {t("codecLab.comparison.stereoNote")}
+          </p>
+        ) : null}
         {comparisonRows.length > 0 ? (
           <div className="mt-3 border-t border-surface pt-3">
             <div className="flex flex-wrap items-center justify-between gap-2">

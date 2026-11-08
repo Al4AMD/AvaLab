@@ -3,6 +3,21 @@
 > Every deviation from AGENTS.md and every owner decision from AGENTS.md §16 is recorded here.
 > Format: ID, date, status, context, decision, consequences.
 
+## D-057 — AudioSet classification model and windowing
+
+Date: 2026-11-08. Wave 7 F14.
+
+- Use `MIT/ast-finetuned-audioset-10-10-0.4593` pinned at
+  `f826b80d28226b62986cc218e5cec390b1096902`, license BSD-3-Clause. The
+  safetensors weights are 346 MB, under the 400 MB per-model budget and the
+  2 GB total budget.
+- AST is multi-label: each AudioSet class has an independent sigmoid score.
+  The adapter resamples to 16 kHz and averages scores over non-overlapping
+  10 s windows (AST's fixed input is 10.24 s). It returns top-k ranked labels,
+  never a softmax distribution.
+- Labels stay in AudioSet's English taxonomy; translating class names would
+  change the classes and weaken the teaching value.
+
 ## D-001 — Open-source license: GPL-3.0
 
 - Date: 2026-10-19
@@ -452,7 +467,13 @@
 ## D-056 — Stereo playback and real codecs only; per-channel DSP deferred
 
 - Date: 2026-11-07
-- Status: accepted (owner, Wave 7 Plan 01)
+- Status: accepted (owner, Wave 7 Plan 01); Phase 1 implemented 2026-11-07; Phase 2 (grid-safe processors) implemented 2026-11-07; Phase 3 (grid-changing processors) implemented 2026-11-07; Phase 4 (true-stereo reverb) implemented 2026-11-07; Phase 5 (stereo pipeline) implemented 2026-11-07; Phase 6 (async full-file codecs) implemented 2026-11-07
 - Context: F01 promises stereo playback while analysis remains mono for comparability. Extending every DSP tool, metric, AI task, and hand-written codec per channel would multiply scope and risk without changing the teaching goals.
 - Decision: preserve 1–2 source channels in the session store and use them for original playback, real-codec processed playback, and real-codec WAV export. Keep a mean mono downmix as the canonical analysis lane for waveform, spectrogram, FFT, filters, sampling, extent, speed, reverb, spectrum edit, metrics, pipeline, AI, and hand-written toy codecs. Real codecs encode/decode the preserved channels; alignment is estimated once on the mono downmix and applied to every channel; `bit_exact` requires every channel to match. More than two channels fold to mono. No worker protocol change and no per-channel processing in this wave.
-- Consequences: stereo files sound correct and round-trip through ffmpeg without silent downmixing, while existing mono results, formulas, and tests stay authoritative. Mono files behave exactly as before. Per-channel analysis, metrics, AI, toy codecs, true-stereo convolution, and full-file stereo codec jobs remain future work.
+- Phase 1 (channel foundation, 2026-11-07): waveform, spectrogram, FFT, and metrics select `mono` (mean downmix, default), `left`, or `right`; waveform and metrics also offer `both`. The choice is URL-backed as `ch=left|right|both`; mono removes the key. Lane derives append `\u0000lane:<0|1>` to the existing three-part cache key and process a stored playback lane; mono keys, DOM, and test IDs are unchanged. Phase 1 adds no independent per-lane parameters, and `both` is deliberately restricted to waveform and metrics.
+- Phase 2 (grid-safe processors, 2026-11-07): filters (F11), the spectrum editor (F09), and hand-written toy codecs (F04) now offer `mono`, `left`, `right`, and `both`. Each tool keeps the existing primary settings and an optional right lane; the right lane mirrors primary until the user unlinks it, so old URLs/storage stay linked primary-only. Right URL fields use the `rr*` prefix plus `el=right`; mono output shape, DOM, cache keys, and tests are unchanged, while slice-lane cache keys add the clamped range.  Lane derives opt out of RPC supersede (identical params, different payload), so left and right can encode concurrently. One-lane results preserve the untouched source lane; `both` requires equal-length outputs. Codec diagnostics show effective-lane stats in one-lane modes and summed bytes/times, the all-lane bit-exact AND, and histograms-merged entropy in `both`; no mixed-codec comparison row is fabricated. Batch comparison stays mono.
+- Phase 4 (true-stereo reverb, 2026-11-07): F10 reverb offers `mono`, `left`, `right`, and `both`. `both` runs a new worker op, `reverbStereoProcess`, with the four-path matrix `yL = xL*LL + xR*RL` and `yR = xL*LR + xR*RR`. A 2-channel uploaded IR maps to the diagonal (`LL=L`, `RR=R`, cross paths zero); a 4-channel upload uses the documented order `LL, LR, RL, RR`. Built-in presets reuse the requested seed for the diagonal and adjacent seeds for the cross paths, scaled by a fixed 0.5 gain; no extra normalization is applied. Pre-delay and wet/dry are shared because the reverb is one LTI system. Left/right solo still uses the mono op and returns a mono lane; a mono source cannot select `both`. Mono URL/storage, DOM and test IDs are unchanged.
+- Phase 3 (grid-changing processors, 2026-11-07): sampling (F03), speed (F06) and signal extent (F07) now offer `mono`, `left`, `right`, and `both`. Sampling exposes per-lane bit depth/dither and shares the target rate, anti-alias filter, seed, and range because those fix the output grid; speed exposes per-lane reverse and shares mode, speed factor, pitch shift, and range; extent shares every operation parameter because no lane parameter changes the grid. Right fields use `rrbd`/`rrdt`/`rrrv` plus `el=right`, and old links/storage stay linked primary-only. Each lane is derived with `deriveWithSourceSliceLane` and installed through `combineLaneOutputs`; because output rate/length can change, the processed pair is never spliced with an untouched source lane, and `both` requires equal non-zero lengths. Per-lane metrics/durations are shown side by side. Independent phase-vocoder lanes can move the stereo image; theory copy calls this out. Mono output shape, DOM, cache keys, and tests remain unchanged.
+- Consequences: stereo files sound correct and round-trip through ffmpeg without silent downmixing, while existing mono results, formulas, and tests stay authoritative. Mono files behave exactly as before. True-stereo convolution and pipeline are implemented; AI remains mono.
+- Phase 5 (stereo pipeline, 2026-11-07): F15 runs the same validated graph per selected lane, combines corresponding outputs only when rate and length match, reports per-lane output stats, and keeps the pipeline URL schema unchanged. No per-node channel overrides.
+- Phase 6 (async full-file codecs, 2026-11-07): the 30 s synchronous excerpt path remains. A new `CodecJobManager` runs full-file codec jobs with concurrency 1 and queue cap 8, publishes progress over SSE, accepts cancellation, kills running ffmpeg, and deletes persisted results on cancel or TTL expiry. Jobs reuse the synchronous encode/decode/align/store implementation, so alignment is still estimated once from the mono downmix and `bit_exact` requires every channel. `AVALAB_MAX_UPLOAD_BYTES` defaults to 200 MB, enough for five minutes of 96 kHz 16-bit stereo; duration, channel, rate, and size checks still run before heavy work. The Codec Lab exposes an explicit whole-file action with progress, cancel, playback, export, and a TTL privacy hint. No new dependencies.

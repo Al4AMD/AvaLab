@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="AVALAB_", env_file=".env")
 
-    max_upload_bytes: int = 104857600
+    max_upload_bytes: int = 209715200
     max_duration_seconds: int = 300
     max_sample_rate_hz: int = 96000
     max_channels: int = 2
@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     ml_enabled: bool = True
     ml_max_concurrency: int = Field(default=1, ge=1)
     ml_max_excerpt_seconds: int = Field(default=30, gt=0)
+    codec_job_max_concurrency: int = Field(default=1, ge=1)
+    codec_job_queue_limit: int = Field(default=8, ge=0)
     ml_model_cache_dir: Path = Path.home() / ".cache" / "avalab" / "models"
     ml_device: str = "cpu"
 

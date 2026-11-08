@@ -25,6 +25,7 @@ EXPECTED_ERROR_CODES = {
     "model_unavailable",
     "job_not_found",
     "job_cancelled",
+    "job_busy",
     "ml_failed",
     "ml_busy",
 }
@@ -191,7 +192,7 @@ def test_settings_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     ):
         monkeypatch.delenv(key, raising=False)
     settings = Settings(_env_file=None)  # type: ignore[call-arg]  # pydantic-settings keyword
-    assert settings.max_upload_bytes == 104857600
+    assert settings.max_upload_bytes == 209715200
     assert settings.max_duration_seconds == 300
     assert settings.max_sample_rate_hz == 96000
     assert settings.max_channels == 2

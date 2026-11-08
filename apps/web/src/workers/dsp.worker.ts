@@ -45,6 +45,7 @@ import {
   psychoacousticCurves,
   qualityMetrics,
   reverbProcess,
+  reverbStereoProcess,
   samplingProcess,
   sessionPing,
   spectrogramTiles,
@@ -93,6 +94,7 @@ const dspHandlers = {
   psychoacousticCurves,
   qualityMetrics,
   reverbProcess,
+  reverbStereoProcess,
   samplingProcess,
   sessionPing,
   speedTransform,
@@ -253,6 +255,10 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
       }
       case "reverbProcess": {
         const result = dspHandlers.reverbProcess(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "reverbStereoProcess": {
+        const result = dspHandlers.reverbStereoProcess(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       case "convolutionSteps": {

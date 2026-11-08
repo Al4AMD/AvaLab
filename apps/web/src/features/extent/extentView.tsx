@@ -20,6 +20,7 @@ import "uplot/dist/uPlot.min.css";
 
 import { Button } from "../../components/ui/button";
 import { formatHz, formatS } from "../../lib/format";
+import { combineLaneOutputs, type LaneResults } from "../../lib/laneCombine";
 import { writeLastUsed } from "../../lib/lastUsed";
 import {
   type ExtentProcessParams,
@@ -29,6 +30,8 @@ import {
 } from "../../session/ops";
 import { DspRpcError } from "../../session/rpc";
 import { useSessionStore } from "../../session/store";
+import { ChannelPicker } from "../channels/ChannelPicker";
+import { useChannelMode } from "../channels/useChannelMode";
 import { UploadEmptyState } from "../input/upload";
 import { TheoryPanel } from "../theory/TheoryPanel";
 import { TOOL_THEORY } from "../theory/theoryContent";
@@ -59,6 +62,26 @@ type ExtentResult = {
   readonly meta: ExtentProcessResult["meta"];
   readonly samples: Float32Array;
 };
+
+type ExtentLaneKey = "left" | "right";
+
+function readExtentResult(outcome: {
+  readonly meta: ExtentProcessResult["meta"];
+  readonly payload?: {
+    readonly buffer: ArrayBuffer;
+    readonly byteOffset: number;
+    readonly byteLength: number;
+  };
+}): ExtentResult | null {
+  const payload = outcome.payload;
+  if (payload === undefined) {
+    return null;
+  }
+  return {
+    meta: outcome.meta,
+    samples: new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4),
+  };
+}
 
 type Spectrum = {
   readonly frequenciesHz: Float64Array;
@@ -332,8 +355,14 @@ export function ExtentView(): React.ReactElement {
   useEffect(() => {
     writeLastUsed(EXTENT_STORAGE_KEY, extentSettingsToSearch(settings));
   }, [settings]);
-  const [beforeSamples, setBeforeSamples] = useState<Float32Array | null>(null);
-  const [result, setResult] = useState<ExtentResult | null>(null);
+  const channel = useChannelMode(original, "both");
+  const effectiveLane: ExtentLaneKey = channel.mode === "right" ? "right" : "left";
+  const [beforeLaneSamples, setBeforeLaneSamples] = useState<
+    Partial<Record<ExtentLaneKey, Float32Array>>
+  >({});
+  const [laneResults, setLaneResults] = useState<Partial<Record<ExtentLaneKey, ExtentResult>>>({});
+  const beforeSamples = beforeLaneSamples[effectiveLane] ?? null;
+  const result = laneResults[effectiveLane] ?? null;
   const [beforeSpectrum, setBeforeSpectrum] = useState<Spectrum | null>(null);
   const [afterSpectrum, setAfterSpectrum] = useState<Spectrum | null>(null);
   const [busy, setBusy] = useState(false);
@@ -364,36 +393,102 @@ export function ExtentView(): React.ReactElement {
         startSample,
         Math.min(settings.endSample, original.samples.length),
       );
-      const slice = original.samples.slice(startSample, endSample);
-      if (slice.length === 0) {
+      const targets = channel.mode === "both" ? (["left", "right"] as const) : [effectiveLane];
+      const store = useSessionStore.getState();
+      const pending = targets.map((lane) => {
+        if (channel.mode === "mono") {
+          const slice = original.samples.slice(startSample, endSample);
+          if (slice.length === 0) {
+            return { lane, ticket: null, slice };
+          }
+          const transfer = slice.slice();
+          return {
+            lane,
+            ticket: store.deriveStandalone(
+              "extentProcess",
+              operationParams(settings, original.sampleRateHz),
+              { buffer: transfer.buffer, byteOffset: 0, byteLength: transfer.byteLength },
+            ),
+            slice,
+          };
+        }
+        return {
+          lane,
+          ticket: store.deriveWithSourceSliceLane(
+            "extentProcess",
+            operationParams(settings, original.sampleRateHz),
+            startSample,
+            endSample,
+            lane === "right" ? 1 : 0,
+          ),
+          slice: null,
+        };
+      });
+      if (pending.some((entry) => entry.ticket === null)) {
         setBusy(false);
         setErrorCode("failed");
         return;
       }
-      const transfer = slice.slice();
-      const ticket = useSessionStore
-        .getState()
-        .deriveStandalone("extentProcess", operationParams(settings, original.sampleRateHz), {
-          buffer: transfer.buffer,
-          byteOffset: 0,
-          byteLength: transfer.byteLength,
-        });
-      ticket.outcome.then(
-        (outcome) => {
-          if (generationRef.current !== generation || "cancelled" in outcome) {
+      void Promise.all(
+        pending.map(async (entry) => ({
+          lane: entry.lane,
+          slice: entry.slice,
+          outcome: entry.ticket === null ? null : await entry.ticket.outcome,
+        })),
+      ).then(
+        (settled) => {
+          if (generationRef.current !== generation) {
             return;
           }
-          const payload = outcome.payload;
-          if (payload === undefined) {
+          const nextResults: Partial<Record<ExtentLaneKey, ExtentResult>> = {};
+          const nextBefore: Partial<Record<ExtentLaneKey, Float32Array>> = {};
+          for (const entry of settled) {
+            if (entry.outcome === null || "cancelled" in entry.outcome) {
+              return;
+            }
+            const parsed = readExtentResult(entry.outcome);
+            if (parsed === null) {
+              setBusy(false);
+              setErrorCode("failed");
+              return;
+            }
+            nextResults[entry.lane] = parsed;
+            nextBefore[entry.lane] =
+              entry.slice ??
+              (channel.mode === "mono"
+                ? original.samples.slice(startSample, endSample)
+                : (original.channels[entry.lane === "right" ? 1 : 0] ?? original.samples).slice(
+                    startSample,
+                    endSample,
+                  ));
+          }
+          setLaneResults(nextResults);
+          setBeforeLaneSamples(nextBefore);
+          const selected = nextResults[effectiveLane];
+          if (selected === undefined) {
             setBusy(false);
             setErrorCode("failed");
             return;
           }
-          setBeforeSamples(slice);
-          setResult({
-            meta: outcome.meta,
-            samples: new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4),
-          });
+          const outputs: LaneResults =
+            channel.mode === "both"
+              ? { left: nextResults.left?.samples, right: nextResults.right?.samples }
+              : channel.mode === "right"
+                ? { right: selected.samples }
+                : { left: selected.samples };
+          const playback =
+            channel.mode === "mono" ? selected.samples : combineLaneOutputs(channel.mode, outputs);
+          if (playback === null) {
+            setBusy(false);
+            setErrorCode("failed");
+            return;
+          }
+          const installed = store.setProcessed(playback, original.sampleRateHz, "extent");
+          if (!installed.ok) {
+            setBusy(false);
+            setErrorCode(installed.code === "tooLong" ? "tooLong" : "failed");
+            return;
+          }
           setBusy(false);
         },
         (error: unknown) => {
@@ -410,7 +505,7 @@ export function ExtentView(): React.ReactElement {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [original, settings]);
+  }, [original, settings, channel.mode, effectiveLane]);
 
   useEffect(() => {
     if (original === null || result === null || beforeSamples === null) {
@@ -498,6 +593,13 @@ export function ExtentView(): React.ReactElement {
   return (
     <section className="flex flex-col gap-4">
       <ToolHeader titleKey="tool.extent.title" descriptionKey="tool.extent.description" />
+
+      <div className="flex flex-col gap-3 rounded border border-surface p-3">
+        <ChannelPicker mode={channel.mode} modes={channel.modes} onChange={channel.setMode} />
+        <p data-testid="extent.lane.gridNote" className="text-xs text-muted">
+          {t("extent.lane.gridNote")}
+        </p>
+      </div>
 
       <div className="grid grid-cols-1 gap-3 rounded border border-surface p-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-xs">
@@ -761,6 +863,66 @@ export function ExtentView(): React.ReactElement {
               </div>
             </dl>
 
+            {channel.mode === "both" && (
+              <table data-testid="extent.metrics.lanes" className="w-full text-xs">
+                <thead className="text-muted">
+                  <tr>
+                    <th className="text-start font-medium">{t("extent.lane.label")}</th>
+                    <th className="text-start font-medium">{t("extent.metrics.duration")}</th>
+                    <th className="text-start font-medium">{t("extent.metrics.energy")}</th>
+                    <th className="text-start font-medium">{t("extent.metrics.averagePower")}</th>
+                    <th className="text-start font-medium">{t("extent.metrics.support")}</th>
+                    <th className="text-start font-medium">{t("extent.metrics.type")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(["left", "right"] as const).map((lane) => {
+                    const laneResult = laneResults[lane];
+                    const width =
+                      laneResult === undefined ||
+                      laneResult.meta.supportEndSample < laneResult.meta.supportStartSample
+                        ? 0
+                        : laneResult.meta.supportEndSample - laneResult.meta.supportStartSample + 1;
+                    return (
+                      <tr key={lane} data-testid={`extent.metrics.lane.${lane}`}>
+                        <td>{lane === "left" ? t("extent.lane.left") : t("extent.lane.right")}</td>
+                        <td dir="ltr" className="tabular-nums">
+                          {laneResult === undefined
+                            ? "—"
+                            : formatS(laneResult.meta.durationSeconds)}
+                        </td>
+                        <td dir="ltr" className="tabular-nums">
+                          {laneResult === undefined ? "—" : laneResult.meta.energy.toExponential(3)}
+                        </td>
+                        <td dir="ltr" className="tabular-nums">
+                          {laneResult === undefined
+                            ? "—"
+                            : laneResult.meta.averagePower.toExponential(3)}
+                        </td>
+                        <td dir="ltr" className="tabular-nums">
+                          {laneResult === undefined
+                            ? "—"
+                            : width === 0
+                              ? t("extent.metrics.emptySupport")
+                              : t("extent.metrics.supportPattern", {
+                                  start: laneResult.meta.supportStartSample,
+                                  end: laneResult.meta.supportEndSample,
+                                })}
+                        </td>
+                        <td dir="ltr" className="tabular-nums">
+                          {laneResult === undefined
+                            ? "—"
+                            : laneResult.meta.signalType === "energy"
+                              ? t("extent.signalType.energy")
+                              : t("extent.signalType.power")}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
               <figure className="flex flex-col gap-1">
                 <figcaption className="text-xs font-medium text-muted">
@@ -821,9 +983,21 @@ export function ExtentView(): React.ReactElement {
                 variant="outline"
                 data-testid="extent.play"
                 onClick={() => {
-                  useSessionStore
-                    .getState()
-                    .setProcessed(result.samples.slice(), original.sampleRateHz, "extent");
+                  const outputs: LaneResults =
+                    channel.mode === "both"
+                      ? { left: laneResults.left?.samples, right: laneResults.right?.samples }
+                      : channel.mode === "right"
+                        ? { right: result.samples }
+                        : { left: result.samples };
+                  const playback =
+                    channel.mode === "mono"
+                      ? result.samples.slice()
+                      : combineLaneOutputs(channel.mode, outputs);
+                  if (playback !== null) {
+                    useSessionStore
+                      .getState()
+                      .setProcessed(playback, original.sampleRateHz, "extent");
+                  }
                 }}
               >
                 {t("extent.play")}

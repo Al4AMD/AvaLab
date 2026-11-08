@@ -32,6 +32,7 @@ import {
 } from "./aiState";
 import { AI_THEORY } from "./aiTheory";
 import { AsrTab } from "./asrTab";
+import { ClassificationTab } from "./classificationTab";
 import { DenoiseTab } from "./denoiseTab";
 import { NeuralCodecTab } from "./neuralCodecTab";
 import { PitchBeatTab } from "./pitchBeatTab";
@@ -54,6 +55,8 @@ function tabLabel(t: TFunction, tab: AiTab): string {
       return t("ai.tab.asr");
     case "neural-codec":
       return t("ai.tab.neuralCodec");
+    case "classification":
+      return t("ai.tab.classification");
     case "pitchBeat":
       return t("ai.tab.pitchBeat");
   }
@@ -326,6 +329,8 @@ export function AiLabView(): React.ReactElement {
         <AsrTab backendOnline={backendOnline} model={model} />
       ) : task === "neural-codec" ? (
         <NeuralCodecTab backendOnline={backendOnline} model={model} />
+      ) : task === "classification" ? (
+        <ClassificationTab backendOnline={backendOnline} model={model} />
       ) : original === null ? (
         <UploadEmptyState />
       ) : (

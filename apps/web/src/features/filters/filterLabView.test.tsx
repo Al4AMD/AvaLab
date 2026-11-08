@@ -140,6 +140,44 @@ describe("filter lab view", () => {
     expect(markup).not.toContain("Infinity");
   });
 
+  it("renders optional channel controls above the panel grid", () => {
+    const markup = renderToStaticMarkup(
+      <modules.FilterLabPanel
+        {...panelProps({
+          channelControls: <span data-testid="filters.channelControls">channels</span>,
+        })}
+      />,
+    );
+
+    expect(markup).toContain('data-testid="filters.channelControls"');
+  });
+
+  it("renders the right-lane delay only when both lanes were processed", () => {
+    const single = renderToStaticMarkup(
+      <modules.FilterLabPanel
+        {...panelProps({
+          applied: { startSample: 0, endSample: 100, delaySamples: 4 },
+        })}
+      />,
+    );
+    expect(single).not.toContain('data-testid="filters.result.delayRight"');
+
+    const both = renderToStaticMarkup(
+      <modules.FilterLabPanel
+        {...panelProps({
+          applied: {
+            startSample: 0,
+            endSample: 100,
+            delaySamples: 4,
+            rightDelaySamples: 9,
+          },
+        })}
+      />,
+    );
+    expect(both).toContain('data-testid="filters.result.delayRight"');
+    expect(both).toContain("9");
+  });
+
   it("builds the exact design, apply, and range parameters", () => {
     const design = designFixture();
     expect(modules.filterDesignParams(SETTINGS)).toEqual({

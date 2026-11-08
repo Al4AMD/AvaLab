@@ -7,9 +7,10 @@
  * `deriveStandalone`; the view only maps params, paints returned buffers and
  * installs the settled result into the processed-playback lane.
  *
- * Uploaded IRs reuse the F01 browser decode seam (`browserDecodeWav` +
- * `monoDownmix`), are capped at 10 s, and are resampled to the source rate by
- * the worker op. Synthetic IRs are deterministic for a seed.
+ * Uploaded IRs reuse the F01 browser decode seam (`browserDecodeWav`), are
+ * capped at 10 s, and are resampled to the source rate by the worker op.
+ * Synthetic IRs are deterministic for a seed. The stereo mode runs the
+ * four-path matrix `yL = xL*LL + xR*RL`, `yR = xL*LR + xR*RR` in the worker.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -28,9 +29,13 @@ import {
   type ReverbIrParams,
   type ReverbProcessParams,
   type ReverbProcessResult,
+  type ReverbStereoProcessParams,
+  type ReverbStereoProcessResult,
 } from "../../session/ops";
 import { DspRpcError } from "../../session/rpc";
 import { useSessionStore } from "../../session/store";
+import { ChannelPicker } from "../channels/ChannelPicker";
+import { useChannelMode } from "../channels/useChannelMode";
 import { browserDecodeWav, monoDownmix } from "../input/ingest";
 import { UploadEmptyState } from "../input/upload";
 import { paintSpectrogramChunk } from "../spectrogram/paintSpectrogram";
@@ -78,13 +83,18 @@ type SpectrumData = {
   readonly fftLengthSamples: number;
 };
 
+type ReverbMeta = ReverbProcessResult["meta"] | ReverbStereoProcessResult["meta"];
+
 type ReverbResult = {
-  readonly meta: ReverbProcessResult["meta"];
-  readonly samples: Float32Array;
+  readonly meta: ReverbMeta;
+  readonly channels: Float32Array[];
 };
 
 type UploadedIr = {
+  /** Mono downmix kept for the IR display and timing panels. */
   readonly samples: Float32Array;
+  /** Decoded IR lanes: 1 (mono), 2 (L/R) or 4 (LL, LR, RL, RR). */
+  readonly channels: readonly Float32Array[];
   readonly sampleRateHz: number;
   readonly name: string;
 };
@@ -96,6 +106,7 @@ type ReverbErrorCode =
   | "irMissing"
   | "irTooLong"
   | "irInvalid"
+  | "irChannels"
   | "irDecode";
 
 function useCanvasWidth(): {
@@ -455,6 +466,25 @@ function mainParams(
   return uploadedIrSampleRateHz === undefined ? base : { ...base, uploadedIrSampleRateHz };
 }
 
+function stereoParams(
+  settings: ReverbSettings,
+  sampleRateHz: number,
+  uploadedIrChannelCount: 0 | 2 | 4,
+  uploadedIrLaneCount: number,
+  uploadedIrSampleRateHz: number | undefined,
+): ReverbStereoProcessParams {
+  const base: ReverbStereoProcessParams = {
+    sampleRateHz,
+    ir: irParams(settings),
+    uploadedIrChannelCount,
+    uploadedIrSampleCount: uploadedIrLaneCount,
+    preDelayMs: settings.preDelayMs,
+    wetMix: settings.wetMix,
+    method: settings.method,
+  };
+  return uploadedIrSampleRateHz === undefined ? base : { ...base, uploadedIrSampleRateHz };
+}
+
 function payloadOf(samples: Float32Array): {
   buffer: ArrayBuffer;
   byteOffset: number;
@@ -467,6 +497,7 @@ export function ReverbView(): React.ReactElement {
   const { t } = useTranslation();
   const original = useSessionStore((state) => state.original);
   const selection = useSessionStore((state) => state.selection);
+  const channel = useChannelMode(original, "both");
   const [searchParams, setSearchParams] = useSearchParams();
   const settings = useMemo(() => {
     const source = {
@@ -528,6 +559,18 @@ export function ReverbView(): React.ReactElement {
       setErrorCode("irMissing");
       return;
     }
+    if (
+      channel.mode === "both" &&
+      uploadedIr !== null &&
+      settings.irKind === "upload" &&
+      uploadedIr.channels.length !== 2 &&
+      uploadedIr.channels.length !== 4
+    ) {
+      setResult(null);
+      setBusy(false);
+      setErrorCode("irChannels");
+      return;
+    }
     const generation = generationRef.current + 1;
     generationRef.current = generation;
     setErrorCode(null);
@@ -538,19 +581,86 @@ export function ReverbView(): React.ReactElement {
         startSample,
         Math.min(settings.endSample, original.samples.length),
       );
-      const source = original.samples.slice(startSample, endSample);
-      if (source.length === 0) {
+      const sourceLane = (index: number): Float32Array =>
+        (original.channels[index] ?? original.samples).slice(startSample, endSample);
+      const lanes: Float32Array[] =
+        channel.mode === "both"
+          ? [sourceLane(0), sourceLane(1)]
+          : channel.mode === "mono"
+            ? [original.samples.slice(startSample, endSample)]
+            : [sourceLane(channel.mode === "right" ? 1 : 0)];
+      if (lanes.some((lane) => lane.length === 0)) {
         setBusy(false);
         setErrorCode("failed");
         return;
       }
-      if (settings.method === "direct" && source.length / original.sampleRateHz > 2) {
+      const longest = Math.max(...lanes.map((lane) => lane.length));
+      if (settings.method === "direct" && longest / original.sampleRateHz > 2) {
         setResult(null);
         setBusy(false);
         setErrorCode("directTooLong");
         return;
       }
       const uploaded = settings.irKind === "upload" ? uploadedIr : null;
+      if (channel.mode === "both") {
+        const irChannels = uploaded?.channels ?? [];
+        const laneCount = irChannels[0]?.length ?? 0;
+        const payloadValues = [
+          ...(lanes[0] ?? new Float32Array(0)),
+          ...(lanes[1] ?? new Float32Array(0)),
+          ...irChannels.flatMap((lane) => Array.from(lane)),
+        ];
+        const combined = Float32Array.from(payloadValues);
+        const ticket = useSessionStore
+          .getState()
+          .deriveStandalone(
+            "reverbStereoProcess",
+            stereoParams(
+              settings,
+              original.sampleRateHz,
+              uploaded === null ? 0 : (uploaded.channels.length as 2 | 4),
+              laneCount,
+              uploaded?.sampleRateHz,
+            ),
+            payloadOf(combined.slice()),
+          );
+        ticket.outcome.then(
+          (outcome) => {
+            if (generationRef.current !== generation || "cancelled" in outcome) {
+              return;
+            }
+            const payload = outcome.payload;
+            if (payload === undefined) {
+              setBusy(false);
+              setErrorCode("failed");
+              return;
+            }
+            const output = new Float32Array(
+              payload.buffer,
+              payload.byteOffset,
+              payload.byteLength / 4,
+            );
+            const outputLength = outcome.meta.outputSampleCount;
+            setResult({
+              meta: outcome.meta,
+              channels: [output.slice(0, outputLength), output.slice(outputLength)],
+            });
+            setBusy(false);
+          },
+          (error: unknown) => {
+            if (generationRef.current !== generation) {
+              return;
+            }
+            setBusy(false);
+            const code = error instanceof DspRpcError ? error.code : "failed";
+            setErrorCode(
+              code === "tooLong" ? "tooLong" : code === "badParams" ? "directTooLong" : "failed",
+            );
+          },
+        );
+        return;
+      }
+      const source = lanes[0] ?? new Float32Array(0);
       const combined = new Float32Array(source.length + (uploaded?.samples.length ?? 0));
       combined.set(source, 0);
       if (uploaded !== null) {
@@ -584,7 +694,9 @@ export function ReverbView(): React.ReactElement {
           }
           setResult({
             meta: outcome.meta,
-            samples: new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4),
+            channels: [
+              new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4),
+            ],
           });
           setBusy(false);
         },
@@ -603,7 +715,7 @@ export function ReverbView(): React.ReactElement {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [original, settings, uploadedIr]);
+  }, [original, settings, uploadedIr, channel.mode]);
 
   useEffect(() => {
     if (original === null) {
@@ -619,13 +731,16 @@ export function ReverbView(): React.ReactElement {
         setIrSpectrum(null);
         return;
       }
-      setIrSamples(uploadedIr.samples);
-      const analysisLength = Math.min(uploadedIr.samples.length, FFT_MAX_LENGTH);
+      // Plot one IR lane (LL / left) instead of the mono downmix; the matrix
+      // below names all four paths.
+      const displayIr = uploadedIr.channels[0] ?? uploadedIr.samples;
+      setIrSamples(displayIr);
+      const analysisLength = Math.min(displayIr.length, FFT_MAX_LENGTH);
       if (analysisLength < 2) {
         setIrSpectrum(null);
         return;
       }
-      const copy = uploadedIr.samples.slice(0, analysisLength);
+      const copy = displayIr.slice(0, analysisLength);
       const ticket = useSessionStore
         .getState()
         .deriveStandalone(
@@ -830,9 +945,20 @@ export function ReverbView(): React.ReactElement {
       const bytes = await file.arrayBuffer();
       const decoded = await browserDecodeWav(bytes);
       const samples = monoDownmix(decoded);
+      const channels = Array.from({ length: decoded.numberOfChannels }, (_, index) =>
+        decoded.getChannelData(index).slice(),
+      );
       const durationSeconds = samples.length / decoded.sampleRate;
       if (samples.length === 0 || durationSeconds > REVERB_MAX_UPLOADED_IR_SECONDS + 1e-6) {
         setErrorCode("irTooLong");
+        return;
+      }
+      if (
+        decoded.numberOfChannels !== 1 &&
+        decoded.numberOfChannels !== 2 &&
+        decoded.numberOfChannels !== 4
+      ) {
+        setErrorCode("irChannels");
         return;
       }
       for (const sample of samples) {
@@ -841,7 +967,12 @@ export function ReverbView(): React.ReactElement {
           return;
         }
       }
-      setUploadedIr({ samples, sampleRateHz: decoded.sampleRate, name: file.name });
+      setUploadedIr({
+        samples,
+        channels,
+        sampleRateHz: decoded.sampleRate,
+        name: file.name,
+      });
       updateSettings({ irKind: "upload" });
     } catch {
       setErrorCode("irDecode");
@@ -1088,6 +1219,45 @@ export function ReverbView(): React.ReactElement {
         </div>
       </div>
 
+      <ChannelPicker
+        mode={channel.mode}
+        modes={channel.modes}
+        onChange={channel.setMode}
+        labelOverrides={{ both: t("channel.stereo") }}
+      />
+      {channel.mode === "both" ? (
+        <>
+          <p className="text-xs text-muted" data-testid="reverb.stereo.note">
+            {t("reverb.stereo.note")}
+          </p>
+          <div className="rounded border border-surface p-3">
+            <p className="mb-2 text-xs font-medium">{t("reverb.matrix.title")}</p>
+            <table data-testid="reverb.matrix" className="w-full text-xs">
+              <thead className="text-muted">
+                <tr>
+                  <th className="text-start font-medium">{t("reverb.matrix.output")}</th>
+                  <th className="text-start font-medium">{t("reverb.matrix.fromLeft")}</th>
+                  <th className="text-start font-medium">{t("reverb.matrix.fromRight")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>{t("reverb.matrix.outLeft")}</td>
+                  <td dir="ltr">xL * LL</td>
+                  <td dir="ltr">xR * RL</td>
+                </tr>
+                <tr>
+                  <td>{t("reverb.matrix.outRight")}</td>
+                  <td dir="ltr">xL * LR</td>
+                  <td dir="ltr">xR * RR</td>
+                </tr>
+              </tbody>
+            </table>
+            <p className="mt-2 text-xs text-muted">{t("reverb.matrix.order")}</p>
+          </div>
+        </>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
         <span dir="ltr">
           {t("reverb.range.pattern", {
@@ -1177,9 +1347,11 @@ export function ReverbView(): React.ReactElement {
                     ? t("reverb.error.irTooLong")
                     : errorCode === "irInvalid"
                       ? t("reverb.error.irInvalid")
-                      : errorCode === "irDecode"
-                        ? t("reverb.error.irDecode")
-                        : t("reverb.error.failed")}
+                      : errorCode === "irChannels"
+                        ? t("reverb.error.irChannels")
+                        : errorCode === "irDecode"
+                          ? t("reverb.error.irDecode")
+                          : t("reverb.error.failed")}
           </p>
         ) : busy ? (
           <p data-testid="reverb.status" className="text-sm text-muted">
@@ -1192,6 +1364,12 @@ export function ReverbView(): React.ReactElement {
                 <dt>{t("reverb.result.duration")}</dt>
                 <dd dir="ltr" data-testid="reverb.metric.duration" className="tabular-nums">
                   {formatS(result.meta.outputSampleCount / original.sampleRateHz)}
+                </dd>
+              </div>
+              <div className="flex items-center gap-1">
+                <dt>{t("reverb.result.channels")}</dt>
+                <dd dir="ltr" data-testid="reverb.metric.channels" className="tabular-nums">
+                  {result.channels.length}
                 </dd>
               </div>
               <div className="flex items-center gap-1">
@@ -1227,17 +1405,22 @@ export function ReverbView(): React.ReactElement {
                   {t("reverb.result.waveform")}
                 </figcaption>
                 <WaveformPanel
-                  samples={result.samples}
+                  samples={result.channels[0] ?? new Float32Array(0)}
                   ariaLabel={t("reverb.result.waveformAria")}
                   testId="reverb.result.waveform"
                 />
+                {result.channels.length > 1 ? (
+                  <span className="text-xs text-muted" data-testid="reverb.result.stereoNote">
+                    {t("reverb.result.stereoNote")}
+                  </span>
+                ) : null}
               </figure>
               <figure className="flex min-w-0 flex-col gap-1">
                 <figcaption className="text-xs font-medium text-muted">
                   {t("reverb.result.spectrogram")}
                 </figcaption>
                 <SpectrogramPanel
-                  samples={result.samples}
+                  samples={result.channels[0] ?? new Float32Array(0)}
                   sampleRateHz={original.sampleRateHz}
                   ariaLabel={t("reverb.result.spectrogramAria")}
                   testId="reverb.result.spectrogram"
@@ -1253,7 +1436,13 @@ export function ReverbView(): React.ReactElement {
                 onClick={() => {
                   useSessionStore
                     .getState()
-                    .setProcessed(result.samples.slice(), original.sampleRateHz, "reverb");
+                    .setProcessed(
+                      result.channels.length > 1
+                        ? result.channels.map((lane) => lane.slice())
+                        : (result.channels[0] ?? new Float32Array(0)).slice(),
+                      original.sampleRateHz,
+                      "reverb",
+                    );
                 }}
               >
                 {t("reverb.play")}
@@ -1407,6 +1596,7 @@ export function ReverbView(): React.ReactElement {
           <li>{t("reverb.observe.tail")}</li>
           <li>{t("reverb.observe.direct")}</li>
           <li>{t("reverb.observe.ir")}</li>
+          <li>{t("reverb.observe.stereo")}</li>
         </ul>
       </div>
 

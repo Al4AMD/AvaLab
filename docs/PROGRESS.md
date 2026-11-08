@@ -2,6 +2,63 @@
 
 > Living log. Agents update every session: what changed, what is next, known issues, items needing owner review.
 
+## 2026-11-08 — Whole-branch review and fixes
+
+- Ran the `code-review` skill at fixed point `2f76da4` (previous branch tip) with parallel Standards and Spec reviews over the committed Phase 1–2 work plus the Phase 3–6 and Wave 7 worktree.
+- Fixed the substantive findings:
+  - Mono analysis now uses the downmix again. Waveform overview/detail, FFT selection, and original/processed spectrograms branch to `deriveWithSource`/`deriveWithSourceSlice` for mono instead of reading `channels[0]`; left/right/both still use lane APIs. Added `singleAnalysisLane` plus a store test proving mono posts the downmix while lane 0 posts the left channel.
+  - Classification `analyzed_s` now reports the full analysed duration, not the first window; the 25 s averaging test expects 25.0.
+  - Lab report maps `/tools/filters` to its title/theory, translates the figure fallback label, renders checked controls as `✓`, and logs export failures instead of swallowing them.
+  - Codec jobs: the cancellable encoder path now enforces the 120 s deadline, the TTL sweeper starts under the manager lock, and the redundant `_result_payload` wrapper is gone. SSE frames are parsed through `parseCodecJobEvent` instead of an unchecked cast.
+  - Extent both-mode lane table adds average power and energy/power classification per lane.
+  - Reverb adds the 4-path matrix view, labels the both mode "Stereo", and plots the first IR lane (LL/left) instead of the downmix.
+  - Reordered `docs/DECISIONS.md` and `docs/PROGRESS.md` so the H1 and intro stay first; joined the split `reverbStereoProcess` table row in `docs/ALGORITHMS.md`.
+- Accepted as-is after review: channel mode follows the URL (`absent → mono`) while each tool already persists its lane settings; shared grid controls stay enabled with the shared-grid note because disabling them would break preview workflows; the codec-job manager and report metric rows reuse existing structures rather than adding new abstractions.
+- Gates on 2026-11-08 after the fixes: `pnpm check` exit 0 (web 85 files / 734 tests, dsp 46 / 1066, scripts 13); web build exit 0; full Playwright suite 106/106 in 2.7 min; backend 252 passed / 6 skipped, ruff and mypy clean; gated AST smoke passed in 7.2 s; `docker/smoke.sh` passed with six models available offline (health ok, FLAC bit-exact, 6 incremental SSE events, fa/en zero console errors, offline denoise done, volumes persistent).
+- Committed as `7aaeaa9` and opened PR [#14](https://github.com/Al4AMD/AvaLab/pull/14) against `main` (`wave-07`, mergeable clean).
+
+## 2026-11-08 — Wave 7 F14 complete (AudioSet classification)
+
+- Backend adds the `classification` ML task. `MIT/ast-finetuned-audioset-10-10-0.4593` is pinned at `f826b80d28226b62986cc218e5cec390b1096902` (BSD-3-Clause, 346.4 MB). The adapter resamples to 16 kHz, averages independent sigmoid scores over non-overlapping 10 s windows, and returns top-k AudioSet labels with window stats.
+- Job manager persists `kind: "classification"` labels as JSON without an audio result. The registry/download manifest and `/models` now include the sixth task.
+- AI lab adds the classification tab with a music-demo shortcut, ranked label bars, window summary, missing-model state and the approximation/taxonomy notices. Theory sections explain multi-label scores, window averaging and taxonomy limits.
+- Backend tests cover rate conversion, window averaging, top-k clamp, malformed probabilities, empty/silent/non-finite input and JSON persistence; the real-AST smoke is gated by `AVALAB_RUN_ML_TESTS=1`. Frontend unit tests cover parsing, disabled states and rendered results.
+- `docs/MODELS.md`, `docs/DECISIONS.md` (D-057) and the Wave 7 README are updated. No commit: awaiting owner request.
+- Gates on 2026-11-08: `pnpm check` exit 0 (web 85 files / 731 tests, dsp 46 / 1066, scripts 13); web build exit 0; full Playwright suite 106/106 in 2.7 min; backend 251 passed / 6 skipped, ruff and mypy clean. AST weights were downloaded (346,432,008 bytes) and the offline real-model smoke passed in 7.4 s; the 15 s music demo returned Music 0.60, Rock music 0.15.
+
+## 2026-11-08 — Wave 7 F16 complete (student lab-report export)
+
+- App header adds a **Lab report** action. It downloads a self-contained, printable HTML report (the in-file print button saves PDF). Reports include source metadata, the current tool, visible control values, the URL (never user audio), measured MSE/SNR/segmental SNR/PSNR/sample count per lane, visible canvas snapshots, and the current tool's theory citations.
+- Metrics use the existing worker path and alignment preconditions; unmatched length/rate shows a translated note instead of a number. No audio samples are embedded in the HTML.
+- Pure report builder escapes every interpolation. Unit tests cover escaping and optional sections; Playwright downloads the real file from the Speed lab and checks source, URL params, metrics section, figures and print action.
+- Web unit count is now 726; `e2e/report.spec.ts` passes. No commit: awaiting owner request.
+
+## 2026-11-08 — Wave 7 F02 complete (general original/processed spectrogram comparison)
+
+- Spectrogram tool now renders the current processed lane beside the original with the same window, hop, dB-floor, axis and colormap controls. A checkbox toggles the processed pane; without a processed lane it shows a bilingual hint.
+- Reuses `useSpectrogramJob` with a buffer override and the existing painter. Standalone chunks are cached by buffer identity and analysis params in a `WeakMap`, so hiding/showing or re-entering the route repaints from cache instead of re-running the STFT. Hidden panes stop requesting chunks.
+- Channel selection maps to the processed lane when present and falls back to lane 0 for mono results. Each pane keeps its own sample rate and duration readout.
+- Tests: Persian Playwright flow loads a clip, runs speed, navigates in-app to the spectrogram, paints both canvases, and toggles the processed pane off/on without console errors. `pnpm check` and the web build were green before the targeted e2e rerun.
+- No commit: awaiting owner request.
+
+## 2026-11-07 — Wave 7 D-056 stereo program, Phase 6 complete (async full-file codecs)
+
+- F01 whole-file real codecs now use `CodecJobManager`: `POST /api/v1/codec/jobs`, SSE progress, and `DELETE /api/v1/codec/jobs/{job_id}`. Concurrency is 1 with a queue cap of 8; terminal jobs and persisted results expire with the storage TTL.
+- The synchronous excerpt route and the job runner share `encode_and_store`; alignment stays mono-reference with every lane trimmed and all-channel `bit_exact`. Cancellation kills running ffmpeg; a result written during cancellation is deleted.
+- `AVALAB_MAX_UPLOAD_BYTES` now defaults to 200 MB in the API, browser mirror, `.env.example`, Compose, and deployment docs.
+- Codec Lab adds a whole-file action, phase-labelled progress, cancel, translated `job_*` errors, playback/export through the existing result panel, and a TTL privacy hint. Excerpt controls and URLs are unchanged.
+- Tests: backend job lifecycle/queue/cancel/TTL/SSE/validation; web job success/cancel/queue-full mapping; Playwright whole-file flow. Gates: `pnpm check`, web build, pytest/ruff/mypy, targeted Codec Lab e2e.
+- No commit: awaiting owner request.
+
+## 2026-11-07 — Wave 7 D-056 stereo program, Phase 5 complete (stereo pipeline)
+
+- F15 pipeline gained a shared `ChannelPicker`. `both` runs the same validated graph once per lane; `left`/`right` run a single lane; mono is unchanged.
+- Results combine only when every matching output has the same node id, sample rate and length. A mismatch reports `pipeline.error.gridMismatch` instead of installing misaligned lanes.
+- Both-lane installation sends two processed channels to playback. The result panel adds a per-lane output stats table (rate, duration, peak, RMS) for every output.
+- Pipeline theory now explains per-lane execution in both locales.
+- Verified: `pnpm check`, web build, `e2e/pipeline.spec.ts` + `e2e/stereo-processors.spec.ts` 10/10.
+- No commit: awaiting owner request.
+
 ## Wave 0 (M0 Foundation) — **done**, 2026-10-19
 
 13/13 tasks complete. Commit range `c56fbe2..ea68089` (T13) plus follow-up docs fixes and M0 close-out fixes (see git log), on `feat/wave-0-foundation`. Per-task ledger: `.superpowers/sdd/foundation/progress.md` (scratch, not committed).
@@ -648,5 +705,49 @@ classification, F16 student report) are unchanged.
 - E2E: added a Persian test that loads the stereo demo, runs the default mono RLE toy codec, and asserts the processed lane shows 1 channel + the mono-result badge with no mono-analysis notice; full `pnpm e2e` now passes 92/92 in 2.7 min, including the reverb performance gate at 1,395.9 ms (worker 652.9 ms; limit 2,000 ms).
 - Final gates: `pnpm check` exit 0 (biome 353 files; dsp 1,066/1,066; web 634/634 across 76 files; scripts 13/13; i18n OK); `pnpm gen:api` idempotent (same SHA-256 before/after); `git diff --check` clean; API `pytest -q` 236 passed / 5 skipped, `ruff` clean, `mypy` clean (53 source files); demo generator rewrote all four self-generated clips byte-identically (asset diff unchanged), `test_generate.py` 3/3 and `test_f14_assets.py` 6/6; `docker/smoke.sh` passed (health ok, 5 models, FLAC `bit_exact=true` 73,627 bytes, 6 incremental SSE events, fa/en zero console errors, offline denoise done, volumes persistent).
 - Manual evidence still owned by the owner: load the stereo demo, confirm left/right tones differ, A/B the stereo FLAC result, inspect the exported WAV with `ffprobe` (`2 channels`, 16-bit), and run one mono tool in fa + en. The API round-trip, WAV header, labels, and console cleanliness are already covered by live/e2e checks.
-- Known limitations: analysis/metrics/waveform/spectrogram/FFT/filters/reverb/speed/extent/sampling/pipeline stay mono; hand-written codecs, AI, and all per-channel DSP remain deferred; >2 channels fold to mono; no full-file stereo codec job.
+- Known limitations at that time (analysis lanes superseded by the 2026-11-07 channel-foundation entry below): filters/reverb/speed/extent/sampling/pipeline stay mono; hand-written codecs, AI, and all per-channel DSP remain deferred; >2 channels fold to mono; no full-file stereo codec job.
 - **Next step:** owner manual listening A/B; no merge or deploy requested.
+
+## 2026-11-07 — Wave 7 D-056 stereo program, Phase 1 complete (channel foundation and analysis)
+
+- Status: Phase 1 Tasks 1–8 complete on `feat/wave-6`, no commit. Scope: one channel model for analysis, URL-backed selection, lane-aware derives, and per-lane metrics; Phase 1 adds no per-lane processing parameters.
+- Channel model: `mono` (mean downmix, default and byte-identical to today), `left`/`right` (stored playback lanes), and `both` (waveform and metrics only). `ch=left|right|both` is URL-backed with `replace` history and survives reload; mono removes the parameter and leaves other query keys untouched.
+- Analysis: waveform shows one lane or two stacked lanes in `both`; spectrogram and FFT select one lane; metrics renders one honest comparison group per selected lane and refuses to compare when the processed result lacks the lane (`metrics.mismatch.channels`). Mono cache keys, DOM structure, and test IDs remain unchanged.
+- Lane identity: `deriveWithSourceLane`/`deriveWithSourceSliceLane` append `\u0000lane:<0|1>` to the existing three-part cache key and post a copy of that stored lane. No resampling between lanes: Phase 1 tools require equal lengths.
+- Shared code: `lib/channel.ts` (pure mode/lane/URL helpers), `features/channels/useChannelMode.ts`, and `ChannelPicker` (segmented control with `aria-pressed`); theory panel note and fa/en copy added.
+- Tests: `channel.test.ts`, `store.lane.test.ts`, `ChannelPicker.test.tsx`, `metricsLanes.test.ts`; new `e2e/channel-analysis.spec.ts` passes 3/3 (waveform both→right, spectrogram right, FFT left) with zero console/page errors. Web unit suite 80 files / 661 tests passed; `pnpm check` exit 0 (biome 363 files; dsp 1,066/1,066 across 46 files; web 661/661 across 80 files; scripts 13/13; i18n OK); typecheck clean; `git diff --check` clean.
+- Known limitations: independent L/R processing parameters start in Phase 2; `both` is not offered by spectrogram/FFT; per-lane metrics require same rate and length; DSP tools, toy codecs, reverb, pipeline, and AI remain mono until later phases.
+- Manual checks pending: owner listening pass on the stereo demo and new Persian copy review.
+- **Next step:** owner review of the Phase 1 diff and e2e evidence; then write the Phase 2 plan (grid-safe per-channel processors).
+
+## 2026-11-07 — Wave 7 D-056 stereo program, Phase 2 complete (grid-safe processors)
+
+- Status: Tasks 1–8 complete on `wave-07`, no commit. Scope: filters (F11), spectrum editor (F09), and hand-written toy codecs (F04) support `mono`, `left`, `right`, and `both`; output length and rate stay unchanged, so later grid-changing tools are not included.
+- Shared lane rules: `lib/laneParams.ts` keeps an optional right lane that mirrors primary while linked; old URLs/storage stay primary-only. `lib/laneCombine.ts` installs processed lanes and slices the untouched source lane; `both` requires equal-length results. Right URL fields use `rr*` and `el=right`; mono URL/DOM/cache keys and test IDs are unchanged.
+- Filters: per-lane designs/settings, link checkbox, effective-lane selector, `filters.result.delayRight`, combined `both` apply. Spectrum editor: per-lane Hermitian/edits/curves, lane controls, `spectrumEdit.meta.channel`; `both` rejects a sample-count mismatch after independent lane derives. Codec lab: independent codec/MDCT/psycho/SPL per lane, aggregate bytes/times/bitrate/bits-per-sample, all-lane `bitExact`, histogram-merged entropy, per-lane MSE/SNR/segmental/PSNR, lane-labelled MDCT diagnostics, and a stereo note instead of a fabricated mixed-codec comparison row. Batch comparison remains mono.
+- Root-cause fix: lane derives now call the RPC with `{supersede: false}`. Identical params with different lane payloads previously cancelled the first `Promise.all` call; `store.lane.test.ts` covers both whole-lane and sliced concurrent derives. `docs/ALGORITHMS.md` pins the resolve/link, combine, aggregate, and concurrent-derive rules; D-056 and the program spec/backlog mark Phase 2 implemented.
+- Validation: `pnpm check` exit 0 (biome 370 files; dsp 1,066/1,066; web 706/706 across 83 files; scripts 13/13; i18n OK); `pnpm --filter @avalab/web typecheck` clean; production build succeeds with the existing chunk-size warning; JSON parses and has no duplicate keys in `en.json`/`fa.json`; new `e2e/stereo-processors.spec.ts` passes 3/3 (filters both-apply, spectrum editor zeroIm/playback, codec RLE aggregate/playback) with zero console/page errors.
+- Known limits: no joint-stereo or mixed-codec comparison row; batch comparison, real-codec jobs, pipeline, AI, and grid-changing processors remain mono; metrics need equal lane lengths/rates; no true-stereo convolution yet.
+- Needs owner review: Phase 2 behavior, stereo listening on the demo, and the new Persian strings (`filters.*.lane*`, `filters.result.delayRight`, `spectrumEdit.lane.*`, `spectrumEdit.meta.channel`, `codecLab.lane.*`, `codecLab.toy.lane/stereo`, `codecLab.stats.aggregate`, `codecLab.stats.lane.*`, `codecLab.comparison.stereoNote`, plus the three theory lane sections) join the Persian review backlog.
+- Final review fixes: filter slice-lane cache keys now include the clamped range, because `filterApply` params carry no range and two selections could otherwise share a cached result; codec-lab lane theory is registered; the mono toy note keeps `codecLab.toy.mono` while stereo/lane modes use `codecLab.toy.mode`. Regression tests: `store.lane.test.ts` different-range key test and `theoryContent.test.ts` codec-lane section test, both RED→GREEN; full web suite 706 tests. Deferred minors: stereo delay readout uses the design delay (can differ from applied by one sample for even taps), spectrum-editor mono meta says “Left lane”, and a malformed `?rrmbr=` falls back to 32 kbps instead of primary. The source diff remains uncommitted pending owner review.
+- **Next step:** owner review of the Phase 2 diff and e2e evidence; then plan Phase 3 — grid-changing processors.
+
+## 2026-11-07 — Wave 7 D-056 stereo program, Phase 4 complete (true-stereo reverb)
+
+- Status: Phase 4 Tasks 1–4 complete on `wave-07`, no commit. F10 reverb supports `mono`, `left`, `right`, and `both`; `both` runs the true-stereo four-path matrix in the worker and installs two processed channels.
+- Added `reverbStereoProcess` with planar `[xL, xR, IR...]` input and planar `[yL, yR]` output. Uploaded stereo IRs map to the diagonal; 4-channel IRs use `LL, LR, RL, RR`. Built-in cross paths use adjacent seeds and a fixed 0.5 gain. Output length, direct-method 2 s guard, uploaded-IR resampling and the 300 s cap match the mono op.
+- Updated `reverbView.tsx`: shared channel picker, per-mode source selection, stereo IR validation (`irChannels`), channel-count metric and a note that the plots show the left result lane. Mono behavior, URL/storage, DOM and test IDs are unchanged.
+- Added fa/en copy (`reverb.stereo.note`, `reverb.error.irChannels`, `reverb.result.channels`, `reverb.result.stereoNote`, `reverb.observe.stereo`) and one theory section (`reverb.theory.stereo`).
+- Tests: new `reverbStereoProcess` unit cases in `ops.test.ts`; new stereo reverb e2e in `stereo-processors.spec.ts`. `pnpm check`, build, and the reverb + stereo-processor e2e suites are green.
+- Needs owner review: stereo listening on the demo and the new Persian strings (`reverb.stereo.note`, `reverb.error.irChannels`, `reverb.result.channels`, `reverb.result.stereoNote`, `reverb.observe.stereo`, `reverb.theory.stereo`).
+- **Next step:** owner review of the Phase 4 diff and e2e evidence; then plan Phase 5 — stereo pipeline.
+
+## 2026-11-07 — Wave 7 D-056 stereo program, Phase 3 complete (grid-changing processors)
+
+- Status: Phase 3 Tasks 1–5 complete on `wave-07`, no commit. Scope: sampling (F03), speed (F06), and signal extent (F07) support `mono`, `left`, `right`, and `both`; output rate or length may change, so untouched source lanes are never spliced into the processed pair.
+- Lane state: sampling exposes per-lane `bits`/`dither` and shares target rate, anti-alias filter, seed, and range; speed exposes per-lane `reverse` and shares mode, speed factor, pitch shift, and range; extent shares every operation parameter because none changes the grid. Right URL fields are `rrbd`, `rrdt`, and `rrrv` plus `el=right`; old links and storage stay linked primary-only.
+- Output: `combineLaneOutputs` installs each processed lane as its own mono lane; `both` requires two present, non-empty, equal-length buffers. Sampling, speed, and extent show per-lane metrics/durations side by side, and theory copy warns that independent phase-vocoder lanes can move the stereo image.
+- Validation: `pnpm check` exit 0 (biome 370 files; dsp 1,066/1,066; web 715/715 across 83 files; scripts 13/13; i18n OK); production build succeeds with the existing chunk-size warning; `e2e/stereo-processors.spec.ts` passes 6/6 after adding sampling/speed/extent both-lane flows; the existing sampling/speed/extent e2e suites pass unchanged (13/13 together) with zero console/page errors.
+- Needs owner review: Phase 3 behavior, stereo listening on the demo, and the new Persian strings (`sampling.lane.*`, `speed.lane.*`, `extent.lane.*`, the per-lane table labels, and the three theory lane sections) join the Persian review backlog.
+- Known limits: no joint stereo; sampling/speed grid parameters remain shared by design; pipeline, AI, and full-file stereo codec jobs remain mono; true-stereo convolution is the next phase.
+- **Next step:** owner review of the Phase 3 diff and e2e evidence; then plan Phase 4 — true-stereo 4-path reverb.

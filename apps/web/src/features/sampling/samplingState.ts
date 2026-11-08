@@ -6,17 +6,25 @@
  * full source range into the URL.
  */
 
+import { type ResolvedLaneParams, resolveLaneParams } from "../../lib/laneParams";
 import { type LastUsedStorage, readLastUsed } from "../../lib/lastUsed";
 import { decodeParams, encodeParams } from "../../lib/url-state";
 
-export type SamplingSettings = {
-  readonly targetRateHz: number;
-  readonly antiAlias: boolean;
+export type SamplingLaneSettings = {
   readonly bits: number;
   readonly dither: boolean;
+};
+
+export type SamplingEditLane = "left" | "right";
+
+export type SamplingSettings = SamplingLaneSettings & {
+  readonly targetRateHz: number;
+  readonly antiAlias: boolean;
   readonly seed: number;
   readonly startSample: number;
   readonly endSample: number;
+  readonly right?: SamplingLaneSettings;
+  readonly editLane: SamplingEditLane;
 };
 
 export type SamplingRange = { readonly startSample: number; readonly endSample: number };
@@ -40,6 +48,7 @@ export const SAMPLING_DEFAULT_SETTINGS: SamplingSettings = {
   seed: 1,
   startSample: 0,
   endSample: 0,
+  editLane: "left",
 };
 
 function clampRange(start: number, end: number, sampleCount: number): SamplingRange {
@@ -75,7 +84,7 @@ function defaultTargetRate(source: SamplingSourceInfo): number {
 }
 
 export function samplingSettingsToSearch(settings: SamplingSettings): string {
-  return encodeParams({
+  const params: Record<string, string | number> = {
     aa: settings.antiAlias ? 1 : 0,
     bd: settings.bits,
     dt: settings.dither ? 1 : 0,
@@ -83,7 +92,40 @@ export function samplingSettingsToSearch(settings: SamplingSettings): string {
     seed: settings.seed,
     to: settings.endSample,
     tr: settings.targetRateHz,
+  };
+  if (settings.editLane === "right") {
+    params.el = "right";
+  }
+  if (settings.right !== undefined) {
+    params.rrbd = settings.right.bits;
+    params.rrdt = settings.right.dither ? 1 : 0;
+  }
+  return encodeParams(params);
+}
+
+export function samplingLanes(
+  settings: SamplingSettings,
+): ResolvedLaneParams<SamplingLaneSettings> {
+  return resolveLaneParams({
+    primary: { bits: settings.bits, dither: settings.dither },
+    ...(settings.right === undefined ? {} : { right: settings.right }),
   });
+}
+
+function clampBits(raw: number, fallback: number): number {
+  return Number.isInteger(raw)
+    ? Math.max(SAMPLING_MIN_BITS, Math.min(SAMPLING_MAX_BITS, raw))
+    : fallback;
+}
+
+function laneDither(raw: string | undefined, fallback: boolean): boolean {
+  if (raw === "1") {
+    return true;
+  }
+  if (raw === "0") {
+    return false;
+  }
+  return fallback;
 }
 
 export function samplingSettingsFromSearch(
@@ -110,6 +152,17 @@ export function samplingSettingsFromSearch(
     explicitRange !== null && explicitRange.endSample > explicitRange.startSample
       ? explicitRange
       : fallbackRange;
+  const primaryBits = clampBits(bits, SAMPLING_DEFAULT_SETTINGS.bits);
+  const primaryDither = laneDither(scalar("dt"), SAMPLING_DEFAULT_SETTINGS.dither);
+  const hasRight = Object.keys(decoded).some(
+    (key) => key.startsWith("rr") && key.length > "rr".length,
+  );
+  const right = hasRight
+    ? {
+        bits: clampBits(Number(scalar("rrbd")), primaryBits),
+        dither: laneDither(scalar("rrdt"), primaryDither),
+      }
+    : undefined;
   return {
     targetRateHz:
       Number.isSafeInteger(targetRate) &&
@@ -118,13 +171,13 @@ export function samplingSettingsFromSearch(
         ? targetRate
         : defaultTargetRate(source),
     antiAlias: scalar("aa") === "0" ? false : SAMPLING_DEFAULT_SETTINGS.antiAlias,
-    bits: Number.isInteger(bits)
-      ? Math.max(SAMPLING_MIN_BITS, Math.min(SAMPLING_MAX_BITS, bits))
-      : SAMPLING_DEFAULT_SETTINGS.bits,
-    dither: scalar("dt") === "1",
+    bits: primaryBits,
+    dither: primaryDither,
     seed: Number.isSafeInteger(seed) && seed >= 0 ? seed : SAMPLING_DEFAULT_SETTINGS.seed,
     startSample: range.startSample,
     endSample: range.endSample,
+    ...(right === undefined ? {} : { right }),
+    editLane: scalar("el") === "right" ? "right" : "left",
   };
 }
 

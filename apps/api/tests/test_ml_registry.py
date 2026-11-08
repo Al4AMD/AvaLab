@@ -20,6 +20,7 @@ def test_all_tasks_have_pinned_specs() -> None:
         "separation",
         "asr",
         "neural_codec",
+        "classification",
     }
     for spec in MODEL_SPECS.values():
         assert spec.model_id

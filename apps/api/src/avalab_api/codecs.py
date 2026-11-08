@@ -8,7 +8,8 @@ argument array, a bounded timeout, captured output, and no shell.
 
 import re
 import subprocess
-from collections.abc import Mapping
+import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -143,6 +144,7 @@ def encode_audio(
     params: dict[str, int],
     *,
     channels: int,
+    cancel: Callable[[], bool] | None = None,
 ) -> None:
     """Encode ``src`` into ``dst`` with the resolved ffmpeg encoder.
 
@@ -187,14 +189,44 @@ def encode_audio(
     args.extend(["-f", spec.format, str(dst)])
 
     try:
-        subprocess.run(
-            args,
-            check=True,
-            capture_output=True,
-            timeout=ENCODE_TIMEOUT_SECONDS,
-        )
+        if cancel is None:
+            subprocess.run(
+                args,
+                check=True,
+                capture_output=True,
+                timeout=ENCODE_TIMEOUT_SECONDS,
+            )
+        else:
+            _run_cancellable(args, cancel)
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
         raise ApiError(ErrorCode.encode_failed, "Audio encoding failed", 422) from exc
+
+
+def _run_cancellable(args: list[str], cancel: Callable[[], bool]) -> None:
+    """Run ffmpeg and terminate it when cancelled or over the encode budget."""
+    process = subprocess.Popen(
+        args,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    deadline = time.monotonic() + ENCODE_TIMEOUT_SECONDS
+    try:
+        while True:
+            try:
+                return_code = process.wait(timeout=0.1)
+            except subprocess.TimeoutExpired:
+                if cancel() or time.monotonic() >= deadline:
+                    process.kill()
+                    process.wait(timeout=5)
+                    raise subprocess.CalledProcessError(-9, args)
+                continue
+            if return_code != 0:
+                raise subprocess.CalledProcessError(return_code, args)
+            return
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=5)
 
 
 def _reject_other_fields(params: Mapping[str, int], allowed: set[str]) -> None:

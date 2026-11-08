@@ -45,6 +45,10 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
         headingKey: "waveform.theory.pitfalls.heading",
         bodyKey: "waveform.theory.pitfalls.body",
       },
+      {
+        headingKey: "channel.theory.heading",
+        bodyKey: "channel.theory.body",
+      },
     ],
   },
   spectrogram: {
@@ -60,6 +64,10 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
         bodyKey: "spectrogram.theory.resolution.body",
         formula:
           "\\Delta t=\\frac{N_{\\mathrm{hop}}}{f_s},\\qquad \\Delta f=\\frac{f_s}{N_{\\mathrm{FFT}}}",
+      },
+      {
+        headingKey: "channel.theory.heading",
+        bodyKey: "channel.theory.body",
       },
     ],
   },
@@ -79,6 +87,10 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
       {
         headingKey: "fftview.theory.phase.heading",
         bodyKey: "fftview.theory.phase.body",
+      },
+      {
+        headingKey: "channel.theory.heading",
+        bodyKey: "channel.theory.body",
       },
     ],
   },
@@ -125,6 +137,10 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
         bodyKey: "speed.theory.reverse.body",
         formula: "x_{\\mathrm{rev}}[n]=x[N-1-n]",
       },
+      {
+        headingKey: "speed.theory.lanes.heading",
+        bodyKey: "speed.theory.lanes.body",
+      },
     ],
   },
   sampling: {
@@ -146,6 +162,10 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
         formula:
           "\\Delta=\\frac{2A}{2^N},\\qquad \\mathrm{SNR}_{\\text{ideal}}\\approx 6.02N+1.76\\ \\mathrm{dB}",
       },
+      {
+        headingKey: "sampling.theory.lanes.heading",
+        bodyKey: "sampling.theory.lanes.body",
+      },
     ],
   },
   extent: {
@@ -166,6 +186,10 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
         bodyKey: "extent.theory.timeScale.body",
         formula: "x(at)\\;\\longleftrightarrow\\;\\frac{1}{|a|}X\\!\\left(\\frac{f}{a}\\right)",
       },
+      {
+        headingKey: "extent.theory.lanes.heading",
+        bodyKey: "extent.theory.lanes.body",
+      },
     ],
   },
   reverb: {
@@ -185,6 +209,12 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
         headingKey: "reverb.theory.direct.heading",
         bodyKey: "reverb.theory.direct.body",
       },
+      {
+        headingKey: "reverb.theory.stereo.heading",
+        bodyKey: "reverb.theory.stereo.body",
+        formula:
+          "\\begin{bmatrix}y_L\\\\y_R\\end{bmatrix}=\\begin{bmatrix}LL&RL\\\\LR&RR\\end{bmatrix}\\begin{bmatrix}x_L\\\\x_R\\end{bmatrix}",
+      },
     ],
   },
   "spectrum-edit": {
@@ -199,6 +229,10 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
         headingKey: "spectrumEdit.theory.hermitian.heading",
         bodyKey: "spectrumEdit.theory.hermitian.body",
         formula: "X[N-k]=X^{*}[k]",
+      },
+      {
+        headingKey: "spectrumEdit.theory.lanes.heading",
+        bodyKey: "spectrumEdit.theory.lanes.body",
       },
       {
         headingKey: "spectrumEdit.theory.gibbs.heading",
@@ -223,6 +257,10 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
         headingKey: "codecLab.theory.headings.mdct",
         bodyKey: "codecLab.theory.mdct",
         formula: "R=\\frac{\\text{bits per second}}{1000}\\ \\mathrm{kbps}",
+      },
+      {
+        headingKey: "codecLab.theory.lanes.heading",
+        bodyKey: "codecLab.theory.lanes.body",
       },
       {
         headingKey: "codecLab.theory.observe.title",
@@ -264,6 +302,10 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
           "metrics.observe.lossy",
           "metrics.observe.bitrate",
         ],
+      },
+      {
+        headingKey: "channel.theory.heading",
+        bodyKey: "channel.theory.body",
       },
     ],
   },

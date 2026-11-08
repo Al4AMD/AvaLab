@@ -11,7 +11,7 @@ from typing import Literal, Protocol
 
 import numpy as np
 
-MlTask = Literal["denoise", "superres", "separation", "asr", "neural_codec"]
+MlTask = Literal["denoise", "superres", "separation", "asr", "neural_codec", "classification"]
 AnalysisTask = Literal["pitch", "beat"]
 JobTask = MlTask | AnalysisTask
 ModelState = Literal["available", "missing", "loading", "error"]
@@ -112,5 +112,14 @@ MODEL_SPECS: dict[MlTask, ModelSpec] = {
         size_bytes=76_292_186,
         files=("config.json", "model.safetensors", "preprocessor_config.json"),
         loader_name="transformers_encodec",
+    ),
+    "classification": ModelSpec(
+        task="classification",
+        model_id="MIT/ast-finetuned-audioset-10-10-0.4593",
+        revision="f826b80d28226b62986cc218e5cec390b1096902",
+        license="BSD-3-Clause",
+        size_bytes=346_432_008,
+        files=("config.json", "model.safetensors", "preprocessor_config.json"),
+        loader_name="transformers_ast",
     ),
 }
