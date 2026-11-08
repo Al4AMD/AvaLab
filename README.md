@@ -70,6 +70,8 @@ uv run --directory tools/demo_clips python generate.py   # bundled demo WAVs (de
 ```sh
 cp .env.example .env
 docker compose build
+# Only for a model volume created by an older/root-running image:
+docker compose run --rm --no-deps --user root api chown -R avalab:avalab /models
 docker compose run --rm --no-deps \
   -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 \
   api python scripts/download_models.py --all

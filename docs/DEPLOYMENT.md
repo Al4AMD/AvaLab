@@ -60,6 +60,13 @@ docker compose run --rm --no-deps \
   api python scripts/download_models.py --check
 ```
 
+If the volume was created by an older root-running image, fix ownership once
+before prefetching:
+
+```bash
+docker compose run --rm --no-deps --user root api chown -R avalab:avalab /models
+```
+
 `--all` downloads roughly 696 MiB / 730 MB (the project budget allows up to 2 GB).
 Pinned sizes:
 

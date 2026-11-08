@@ -17,6 +17,11 @@
 - Gates on 2026-11-08 after the fixes: `pnpm check` exit 0 (web 85 files / 734 tests, dsp 46 / 1066, scripts 13); web build exit 0; full Playwright suite 106/106 in 2.7 min; backend 252 passed / 6 skipped, ruff and mypy clean; gated AST smoke passed in 7.2 s; `docker/smoke.sh` passed with six models available offline (health ok, FLAC bit-exact, 6 incremental SSE events, fa/en zero console errors, offline denoise done, volumes persistent).
 - Committed as `7aaeaa9` and opened PR [#14](https://github.com/Al4AMD/AvaLab/pull/14) against `main` (`wave-07`, mergeable clean).
 
+## 2026-11-08 — model volume permission fix
+
+- The classification prefetch failed with `PermissionError: '/models/classification/config.json'` because the named model volume was root-owned from an earlier root-populated cache while the API runs as uid `10001`. Fixed the local volume with a one-time `chown -R avalab:avalab /models`; all six tasks now report `available` and the volume is 696.1 MB.
+- README and deployment docs now include the one-time chown command for volumes created by older/root-running images.
+
 ## 2026-11-08 — Wave 7 F14 complete (AudioSet classification)
 
 - Backend adds the `classification` ML task. `MIT/ast-finetuned-audioset-10-10-0.4593` is pinned at `f826b80d28226b62986cc218e5cec390b1096902` (BSD-3-Clause, 346.4 MB). The adapter resamples to 16 kHz, averages independent sigmoid scores over non-overlapping 10 s windows, and returns top-k AudioSet labels with window stats.
