@@ -245,7 +245,7 @@ export function createDefaultIngestClient(): IngestClient {
   return {
     async POST(path, options) {
       const { data, error, response } = await api.POST(path, {
-        body: { file: options.body } as unknown as { file: string },
+        body: options.body as unknown as { file: string },
       });
       return { data, error, response };
     },

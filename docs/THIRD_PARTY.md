@@ -114,6 +114,9 @@ Wave 6 added `librosa` 0.11.0 (ISC) to the API base for non-neural F14 pitch/bea
 | torch | 2.15.0 (Linux/Docker, `+cpu` wheel), 2.2.2 (Intel macOS) | BSD-3-Clause |
 | torchaudio | 2.11.1 (Linux/Docker, `+cpu` wheel), 2.2.2 (Intel macOS) | BSD-2-Clause |
 | transformers | 4.57.6 | Apache-2.0 |
+| faster-whisper | 1.2.1 | MIT |
+| ctranslate2 | 4.8.5 | MIT |
+| av | 19.0.2 | BSD-3-Clause |
 | demucs | 4.1.0 | MIT |
 | sherpa-onnx | 2.0.1 | Apache-2.0 |
 | audiosronnx | 0.0.1 | Apache-2.0 |

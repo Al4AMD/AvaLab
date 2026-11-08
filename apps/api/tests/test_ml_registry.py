@@ -28,6 +28,16 @@ def test_all_tasks_have_pinned_specs() -> None:
         assert spec.files
 
 
+def test_asr_spec_is_faster_whisper_medium() -> None:
+    spec = MODEL_SPECS["asr"]
+    assert spec.model_id == "Systran/faster-whisper-medium"
+    assert spec.revision == "08e178d48790749d25932bbc082711ddcfdfbc4f"
+    assert spec.license == "MIT"
+    assert spec.size_bytes == 1_530_571_735
+    assert spec.files == ("model.bin", "config.json", "tokenizer.json", "vocabulary.txt")
+    assert spec.loader_name == "faster_whisper"
+
+
 def test_missing_models_report_missing(tmp_path: Path) -> None:
     registry = ModelRegistry(tmp_path)
     for task in MODEL_SPECS:

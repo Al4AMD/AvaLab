@@ -560,7 +560,7 @@ const defaultClient = {
   ): Promise<IngestCallResult<IngestResponse | CodecEncodeResponse | { job_id: string }>> {
     if (path === "/ingest") {
       const { data, error, response } = await api.POST(path, {
-        body: { file: options.body } as unknown as { file: string },
+        body: options.body as unknown as { file: string },
         signal: options.signal,
       });
       return { data, error, response };

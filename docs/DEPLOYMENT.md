@@ -15,8 +15,9 @@ or certificate.
 ## Prerequisites
 
 - Docker Engine with Compose v2 (this session used Docker 29.7 and Compose 5.3).
-- About 8 GB free disk: the API image carries PyTorch and ffmpeg (about 5 GB),
-  while the pinned model weights total about 696 MiB (730 MB).
+- About 10 GB free disk: the API image with PyTorch, ffmpeg and faster-whisper
+  is about 6.5 GB on disk, while the pinned model weights total about
+  1.96 GiB (2.1 GB).
 - Port 80 inside the `web` container; publish it on any free host port.
 - For `docker/smoke.sh`: host `curl`, Python 3, and Playwright Chromium
   (`pnpm --filter @avalab/web exec playwright install chromium`).
@@ -60,7 +61,15 @@ docker compose run --rm --no-deps \
   api python scripts/download_models.py --check
 ```
 
-`--all` downloads roughly 696 MiB / 730 MB (the project budget allows up to 2 GB).
+If the volume was created by an older root-running image, fix ownership once
+before prefetching:
+
+```bash
+docker compose run --rm --no-deps --user root api chown -R avalab:avalab /models
+```
+
+`--all` downloads roughly 1.96 GiB / 2.1 GB. The ASR medium model is an
+owner-approved override of the 2 GB budget (D-058).
 Pinned sizes:
 
 | Task | Model | Bytes |
@@ -68,9 +77,12 @@ Pinned sizes:
 | denoise | `Ceva-IP/DPDFNet` | 10,493,337 |
 | superres | `TigreGotico/audiosronnx-lavasr` | 57,143,745 |
 | separation | `adefossez/HTDemucs` | 84,025,461 |
-| asr | `openai/whisper-tiny` | 155,434,424 |
+| asr | `Systran/faster-whisper-medium` | 1,530,571,735 |
 | neural_codec | `facebook/encodec_48khz` | 76,292,186 |
 | classification | `MIT/ast-finetuned-audioset-10-10-0.4593` | 346,432,008 |
+
+Pinned total: 2,104,958,472 bytes (about 1.96 GiB). The ASR change raises
+the old 696 MiB cache to this total; see D-058.
 
 The cache is `avalab-models`, mounted at `/models`, owned by UID 10001. It is
 independent of container lifetime. `docker compose down` keeps it; only
@@ -191,7 +203,8 @@ Verification results from the latest session:
   bytes; web image 31,842,520 bytes. Observed memory during the smoke: API
   177.1 MiB, web 25.21 MiB.
 - `/api/v1/health` returned `status=ok`, `ffmpeg=true`; all six models were
-  `available`; model volume size about 696 MiB.
+  `available`; model volume size about 696 MiB at that time. The ASR medium
+  update raises the expected total to about 1.96 GiB (D-058).
 - 10 s mono 16 kHz WAV upload succeeded; FLAC encode returned `lossless=true`,
   `bit_exact=true`, `size_bytes=73627`.
 - Denoise SSE produced 6 events, first at 0.008 s and terminal `done` at
@@ -204,6 +217,22 @@ Verification results from the latest session:
 - After reconnect, `docker compose down` and `up`, all six models remained
   available and a previously ingested audio id still served RIFF audio.
 - The smoke script exited 0: `docker/smoke.sh` with `AVALAB_HTTP_PORT=18080`.
+
+ASR medium update (2026-11-09, host port 8081):
+
+- `docker compose build api web` succeeded; `avalab-api:latest` reports
+  6.45 GB on disk. The API image now contains `faster-whisper` 1.2.1,
+  CTranslate2 4.8.5 and PyAV 19.0.2.
+- Network-enabled prefetch fetched the pinned medium files and
+  `download_models.py --check` reported all six tasks `available` offline.
+  A fresh model volume is 2,104,958,472 bytes (1.96 GiB). This development
+  volume is 2,257,912,560 bytes because it still contains 155 MB of stale
+  Whisper-tiny files; they are unused.
+- `/api/v1/models` returned the medium `model_id`, revision and MIT license.
+- A live 19.6 s speech upload → `POST /api/v1/ml/asr` → SSE job produced
+  incremental progress and `done` after 20.8 s, with English text, three
+  segments, `language: "en"`, and
+  `stats.model_id: "Systran/faster-whisper-medium"`. The job ran offline.
 
 ## Backup and cleanup
 

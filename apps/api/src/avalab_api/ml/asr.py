@@ -1,11 +1,11 @@
-"""Whisper ASR adapter (Wave-5 Plan 03 Task 3).
+"""faster-whisper ASR adapter.
 
-Whisper tiny is loaded from the pinned flat cache through Transformers. The
-job manager hands over mono audio at the source rate; this adapter resamples
-to the model's fixed 16 kHz, runs one transcription pass, and normalizes the
-pipeline's chunk timestamps into ``{start_s, end_s, text}`` segments. Empty or
-silent excerpts are rejected instead of being reported as a successful empty
-transcript.
+Whisper medium is loaded as a pinned CTranslate2 model from the flat cache.
+The job manager hands over mono audio at the source rate; this adapter
+resamples to the model's fixed 16 kHz, runs one transcription pass, and
+normalizes the segments into ``{start_s, end_s, text}``. Empty or silent
+excerpts are rejected instead of being reported as a successful empty
+transcript. CPU uses int8; CUDA uses float16.
 """
 
 import math
@@ -23,7 +23,7 @@ from avalab_api.ml.jobs import MlResult
 from avalab_api.ml.registry import register_runner
 from avalab_api.ml.runtime import torch_device
 
-MODEL_ID = "openai/whisper-tiny"
+MODEL_ID = "Systran/faster-whisper-medium"
 MODEL_RATE_HZ = 16_000
 SILENT_PEAK = 1e-7
 
@@ -35,12 +35,16 @@ class AsrParams(BaseModel):
 
 
 class AsrBackend(Protocol):
-    """Minimal seam over a Transformers ASR pipeline."""
+    """Minimal seam over a speech-recognition model."""
 
     def transcribe(
-        self, samples: np.ndarray, sample_rate_hz: int, language: str | None
+        self,
+        samples: np.ndarray,
+        sample_rate_hz: int,
+        language: str | None,
+        progress: Callable[[float], None] | None = None,
     ) -> dict[str, Any]:
-        """Return a pipeline-shaped dict with ``text`` and optional ``chunks``."""
+        """Return a dict with ``text``, optional ``chunks`` and ``language``."""
 
 
 def _segments(output: dict[str, Any], text: str, duration_s: float) -> list[dict[str, object]]:
@@ -104,7 +108,10 @@ class AsrRunner:
         progress(0.05)
         model_audio = resample_to(audio, sample_rate_hz, MODEL_RATE_HZ)
         progress(0.15)
-        output = self._backend.transcribe(model_audio, MODEL_RATE_HZ, language)
+        def report(fraction: float) -> None:
+            progress(0.15 + 0.75 * min(max(fraction, 0.0), 1.0))
+
+        output = self._backend.transcribe(model_audio, MODEL_RATE_HZ, language, report)
         if not isinstance(output, dict):
             raise TypeError("ASR backend returned an unexpected payload")
         progress(0.9)
@@ -129,58 +136,76 @@ class AsrRunner:
         )
 
 
-class WhisperBackend:
-    """Thin typed wrapper over a Transformers ASR pipeline."""
+class FasterWhisperBackend:
+    """Translate faster-whisper segments into the adapter's dict shape."""
 
-    def __init__(self, pipeline: Any) -> None:
-        self._pipeline = pipeline
+    def __init__(self, model: Any) -> None:
+        self._model = model
 
     def transcribe(
-        self, samples: np.ndarray, sample_rate_hz: int, language: str | None
+        self,
+        samples: np.ndarray,
+        sample_rate_hz: int,
+        language: str | None,
+        progress: Callable[[float], None] | None = None,
     ) -> dict[str, Any]:
-        del sample_rate_hz
-        options: dict[str, Any] = {
-            "return_timestamps": True,
-            "chunk_length_s": 30,
+        segments, info = self._model.transcribe(
+            np.ascontiguousarray(samples, dtype=np.float32),
+            language=language,
+            beam_size=5,
+            vad_filter=True,
+        )
+        duration_s = max(samples.size / sample_rate_hz, 1e-9)
+        chunks: list[dict[str, object]] = []
+        texts: list[str] = []
+        for segment in segments:
+            start = float(segment.start)
+            end = float(segment.end)
+            text = segment.text
+            if (
+                not isinstance(text, str)
+                or not math.isfinite(start)
+                or not math.isfinite(end)
+                or end < start
+            ):
+                continue
+            chunks.append({"timestamp": (start, end), "text": text})
+            texts.append(text.strip())
+            if progress is not None:
+                progress(min(max(end / duration_s, 0.0), 1.0))
+        detected = getattr(info, "language", None)
+        return {
+            "text": " ".join(text for text in texts if text),
+            "chunks": chunks,
+            "language": detected if isinstance(detected, str) else None,
         }
-        if language is not None:
-            options["generate_kwargs"] = {"language": language}
-        output = self._pipeline(np.ascontiguousarray(samples, dtype=np.float32), **options)
-        if isinstance(output, list):
-            output = output[0] if output else {}
-        if not isinstance(output, dict):
-            raise TypeError("Whisper pipeline returned an unexpected payload")
-        return cast(dict[str, Any], output)
 
 
 def load_asr(model_dir: Path) -> AsrRunner:
-    """Load the pinned Whisper tiny files with a lazy Transformers import."""
+    """Load the pinned CTranslate2 Whisper model with a lazy import."""
     try:
-        transformers = cast(Any, import_module("transformers"))
+        faster_whisper = cast(Any, import_module("faster_whisper"))
     except ImportError as exc:
         raise ApiError(
             ErrorCode.model_unavailable,
-            "transformers is not installed; install the ml extra",
+            "faster-whisper is not installed; install the ml extra",
             503,
         ) from exc
 
+    device = torch_device()
+    compute_type = "float16" if device == "cuda" else "int8"
     try:
-        processor = transformers.WhisperProcessor.from_pretrained(
-            str(model_dir), local_files_only=True
-        )
-        model = transformers.WhisperForConditionalGeneration.from_pretrained(
-            str(model_dir), local_files_only=True
-        )
-        pipeline = transformers.pipeline(
-            "automatic-speech-recognition",
-            model=model,
-            tokenizer=processor.tokenizer,
-            feature_extractor=processor.feature_extractor,
-            device=0 if torch_device() == "cuda" else -1,
+        model = faster_whisper.WhisperModel(
+            str(model_dir),
+            device=device,
+            compute_type=compute_type,
+            local_files_only=True,
         )
     except Exception as exc:
-        raise ApiError(ErrorCode.model_unavailable, f"Could not load Whisper: {exc}", 503) from exc
-    return AsrRunner(WhisperBackend(pipeline))
+        raise ApiError(
+            ErrorCode.model_unavailable, f"Could not load faster-whisper: {exc}", 503
+        ) from exc
+    return AsrRunner(FasterWhisperBackend(model))
 
 
 register_runner("asr", load_asr)

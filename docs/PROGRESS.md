@@ -2,6 +2,27 @@
 
 > Living log. Agents update every session: what changed, what is next, known issues, items needing owner review.
 
+## 2026-11-09 — ASR replaced with faster-whisper medium
+
+- Replaced `openai/whisper-tiny` with `Systran/faster-whisper-medium` pinned at `08e178d48790749d25932bbc082711ddcfdfbc4f` (MIT). The adapter now loads the pinned CTranslate2 model through `faster-whisper` 1.2.1, uses int8 on CPU and float16 on CUDA, and keeps the 30 s excerpt, job, SSE and UI contracts. No model selector; this is a replacement. Recorded as D-058.
+- Added segment-level progress mapping into the existing job progress range, so medium CPU runs show movement instead of a long silent wait. `AsrRunner` still rejects empty, silent, non-finite and empty-transcript results.
+- Added `faster-whisper==1.2.1` to the `ml` extra; the lockfile adds `ctranslate2 4.8.5` (MIT) and `av 19.0.2` (BSD-3-Clause). `transformers` stays for EnCodec and classification.
+- Updated the ASR model spec, registry test, fake-backend test, real-medium smoke, ASR tab comment, model-id fixtures and Persian/English ASR intro/theory copy. The English speech demo still drives WER; a Persian excerpt transcribes without a reference.
+- Docs: `MODELS.md`, `DEPLOYMENT.md`, `THIRD_PARTY.md`, `DECISIONS.md` D-058 and the prefetch size text. The pinned total is 2,104,958,472 bytes (1.96 GiB); the owner explicitly approved exceeding the 400 MB/model and 2 GB total budgets.
+- Evidence: host real-medium smoke passed offline (`1 passed`, 12.43 s including load). Adapter measurement on the 19.6 s English demo: 4.51 s load, 10.35 s run (RTF 0.53). A 30 s Persian excerpt: 3.86 s load, 18.6 s run (RTF 0.62), auto-detected `fa`.
+- Docker: rebuilt API and web; prefetched into the named volume; `download_models.py --check` reported all six `available` offline. Live upload → `POST /api/v1/ml/asr` → SSE returned incremental progress and `done` after 20.8 s with English text, three segments, `language: "en"`, and the medium `model_id`. The development volume is 2,257,912,560 bytes because it still contains unused Whisper-tiny files; a fresh volume is 2,104,958,472 bytes.
+- Gates: backend 254 passed / 6 skipped; ruff and mypy clean; `pnpm check` green (web 85 files / 734 tests, dsp 46 / 1,066, scripts 13, i18n OK); web build green; full Playwright 106/106 in 2.8 min.
+- Uncommitted on `wave-07` (PR [#15](https://github.com/Al4AMD/AvaLab/pull/15)).
+- **Next step:** owner listens to medium on a Persian and an English clip, then request the commit/push.
+
+## 2026-11-09 — Compression Lab ingest 422 fixed
+
+- Root cause: both browser ingest adapters wrapped the multipart body as `{ file: FormData }`. `openapi-fetch` only passes a body through untouched when it is a `FormData` instance; the wrapper was serialized as JSON (`{"file":{}}`) with `Content-Type: application/json`, while `POST /api/v1/ingest` requires `multipart/form-data`, so FastAPI answered 422 `invalid_request`. The same bug affected normal file uploads, not only real codecs.
+- Fix: `createDefaultIngestClient` and the real-codec default client now pass the `FormData` body directly (the cast only satisfies the generated `{ file: string }` schema). Added Playwright assertions that both upload paths send `multipart/form-data` with a `file` part, so a JSON regression fails the e2e suite.
+- Evidence: live Docker stack on port 8081 — demo stereo → Compression Lab real-codec FLAC returned `200` for health, ingest, encode, and audio fetch, showed `استریو` (stereo), and logged zero console/page errors. Targeted Playwright upload + codec suites pass 15/15; `pnpm check` green (web 85 files / 734 tests, dsp 46 / 1,066, scripts 13, i18n OK).
+- Committed as `9a5bc2c` (docs `4ac4a6e`); branch `wave-07` pushed and new PR [#15](https://github.com/Al4AMD/AvaLab/pull/15) opened because PR #14 had already been merged before this fix.
+- **Next step:** owner re-check of the Compression Lab real-codec flow in the browser.
+
 ## 2026-11-08 — Whole-branch review and fixes
 
 - Ran the `code-review` skill at fixed point `2f76da4` (previous branch tip) with parallel Standards and Spec reviews over the committed Phase 1–2 work plus the Phase 3–6 and Wave 7 worktree.
@@ -16,6 +37,11 @@
 - Accepted as-is after review: channel mode follows the URL (`absent → mono`) while each tool already persists its lane settings; shared grid controls stay enabled with the shared-grid note because disabling them would break preview workflows; the codec-job manager and report metric rows reuse existing structures rather than adding new abstractions.
 - Gates on 2026-11-08 after the fixes: `pnpm check` exit 0 (web 85 files / 734 tests, dsp 46 / 1066, scripts 13); web build exit 0; full Playwright suite 106/106 in 2.7 min; backend 252 passed / 6 skipped, ruff and mypy clean; gated AST smoke passed in 7.2 s; `docker/smoke.sh` passed with six models available offline (health ok, FLAC bit-exact, 6 incremental SSE events, fa/en zero console errors, offline denoise done, volumes persistent).
 - Committed as `7aaeaa9` and opened PR [#14](https://github.com/Al4AMD/AvaLab/pull/14) against `main` (`wave-07`, mergeable clean).
+
+## 2026-11-08 — model volume permission fix
+
+- The classification prefetch failed with `PermissionError: '/models/classification/config.json'` because the named model volume was root-owned from an earlier root-populated cache while the API runs as uid `10001`. Fixed the local volume with a one-time `chown -R avalab:avalab /models`; all six tasks now report `available` and the volume is 696.1 MB.
+- README and deployment docs now include the one-time chown command for volumes created by older/root-running images.
 
 ## 2026-11-08 — Wave 7 F14 complete (AudioSet classification)
 
