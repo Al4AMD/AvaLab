@@ -68,8 +68,10 @@ before prefetching:
 docker compose run --rm --no-deps --user root api chown -R avalab:avalab /models
 ```
 
-`--all` downloads roughly 1.96 GiB / 2.1 GB. The ASR medium model is an
-owner-approved override of the 2 GB budget (D-058).
+`--all` downloads roughly 1.96 GiB / 2.1 GB on a cold cache. It checks each
+task first and skips models whose pinned files already exist, so rerunning the
+command after a partial or complete prefetch downloads only what is missing.
+The ASR medium model is an owner-approved override of the 2 GB budget (D-058).
 Pinned sizes:
 
 | Task | Model | Bytes |

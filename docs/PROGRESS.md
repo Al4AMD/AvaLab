@@ -20,6 +20,16 @@
 - Gates: `pnpm check` green (web 85 files / 741 tests, dsp 46 / 1,074, scripts 13, i18n OK); `e2e/fft.spec.ts` 2/2 with zero console errors. Visual check: five window curves now render in their legend colors.
 - **Next step:** owner reruns the FFT view; no backend change.
 
+## 2026-11-10 — Model prefetch skips cached tasks
+
+- Root cause: `apps/api/scripts/download_models.py --all` unconditionally called `hf_hub_download` and recopied every pinned file, even when `ModelRegistry.status()` already reported the task `available`. A rerun therefore re-downloaded the full cache.
+- Fix: `--all` checks each task first and prints `up to date` instead of downloading when all pinned files exist. Partial or missing tasks still download normally, and the manifest is rewritten after every run. The Docker command is unchanged.
+- Tests: added `test_download_all_skips_available_models` (seeded cache, zero download calls, `up to date` output) and `test_download_all_fetches_missing_models` in `apps/api/tests/test_deploy_config.py`.
+- Evidence: `HF_HUB_OFFLINE=1 ... download_models.py --all` printed `up to date` for all six tasks and exited 0 against the host cache; no network needed.
+- Gates: backend 256 passed / 6 skipped; `ruff` and `mypy` clean; `git diff --check` clean.
+- Docs: `DEPLOYMENT.md`, `MODELS.md`, and the script docstring now state that `--all` is idempotent.
+- **Next step:** owner reruns the Docker prefetch command; it should only fetch missing files.
+
 ## 2026-11-10 — Owner review fixes (F02/F03/F06/F08/F12)
 
 - Waveform: the selection now paints as a band with clear borders, the detail pane follows the zoom viewport, exact-sample rendering uses a polyline plus Y auto-fit, and the hover readout carries the sample value label. The original/processed comparison shows two real waveform panes and reuses the cached 1200-bucket overview instead of a second decode.

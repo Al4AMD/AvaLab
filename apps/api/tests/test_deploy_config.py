@@ -181,6 +181,54 @@ def test_download_models_uses_configured_cache_dir(
     assert args.cache_dir == tmp_path
 
 
+def _seed_model_files(cache_dir: Path) -> None:
+    from avalab_api.ml.models import MODEL_SPECS
+
+    for spec in MODEL_SPECS.values():
+        directory = cache_dir / spec.task
+        directory.mkdir(parents=True, exist_ok=True)
+        for name in spec.files:
+            target = directory / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b"cached")
+
+
+def test_download_all_skips_available_models(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = _download_models_module()
+    _seed_model_files(tmp_path)
+    calls: list[str] = []
+    monkeypatch.setattr(
+        module,
+        "_copy_from_hub",
+        lambda spec, _destination: calls.append(spec.task),
+    )
+
+    assert module.main(["--all", "--cache-dir", str(tmp_path)]) == 0
+    assert calls == []
+    assert "up to date" in capsys.readouterr().out
+
+
+def test_download_all_fetches_missing_models(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _download_models_module()
+    from avalab_api.ml.models import MODEL_SPECS
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        module,
+        "_copy_from_hub",
+        lambda spec, _destination: calls.append(spec.task),
+    )
+
+    assert module.main(["--all", "--cache-dir", str(tmp_path)]) == 0
+    assert calls == list(MODEL_SPECS)
+
+
 def test_torch_device_uses_cpu_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("AVALAB_ML_DEVICE", raising=False)
     get_settings.cache_clear()

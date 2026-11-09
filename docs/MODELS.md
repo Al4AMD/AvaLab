@@ -2,7 +2,8 @@
 
 All models are pinned by commit. We never train models and never download
 weights during a request. `apps/api/scripts/download_models.py --all` prefetches
-the flat per-task cache; after that the API runs with `HF_HUB_OFFLINE=1`.
+the flat per-task cache and skips tasks that are already complete; after that
+the API runs with `HF_HUB_OFFLINE=1`.
 
 | Task | Model | Revision | Files | Size | License | Loader |
 |---|---|---|---|---|---|---|
