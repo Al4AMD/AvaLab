@@ -65,8 +65,9 @@ function synthParams(settings: GeneratorSettings, previewBucketCount: number): G
     amplitude: settings.amplitude,
     frequencyHz: settings.frequencyHz,
     dutyCycle: settings.dutyCycle,
-    impulseIndex: settings.impulseIndex,
-    stepIndex: settings.stepIndex,
+    eventStartSeconds: settings.eventStartSeconds,
+    eventCount: settings.eventCount,
+    eventIntervalSeconds: settings.eventIntervalSeconds,
     chirpFromHz: settings.chirpFromHz,
     chirpToHz: settings.chirpToHz,
     chirpLog: settings.chirpLog,
@@ -200,6 +201,7 @@ export function GeneratorView() {
     settings.waveform === "twoTone" ||
     settings.waveform === "am" ||
     settings.waveform === "fm";
+  const isEventWaveform = settings.waveform === "impulse" || settings.waveform === "step";
 
   return (
     <section className="flex flex-col gap-4">
@@ -356,40 +358,63 @@ export function GeneratorView() {
             </label>
           ) : null}
 
-          {settings.waveform === "impulse" ? (
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="font-medium">{t("generator.controls.impulseIndex")}</span>
-              <input
-                type="number"
-                min={0}
-                max={Math.max(0, sampleCount - 1)}
-                step={1}
-                value={settings.impulseIndex}
-                data-testid="generator.control.impulseIndex"
-                onChange={(event) =>
-                  updateSettings({ impulseIndex: Number(event.currentTarget.value) })
-                }
-                className={`${INPUT_CLASSES} tabular-nums`}
-              />
-            </label>
-          ) : null}
-
-          {settings.waveform === "step" ? (
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="font-medium">{t("generator.controls.stepIndex")}</span>
-              <input
-                type="number"
-                min={0}
-                max={Math.max(0, sampleCount - 1)}
-                step={1}
-                value={settings.stepIndex}
-                data-testid="generator.control.stepIndex"
-                onChange={(event) =>
-                  updateSettings({ stepIndex: Number(event.currentTarget.value) })
-                }
-                className={`${INPUT_CLASSES} tabular-nums`}
-              />
-            </label>
+          {isEventWaveform ? (
+            <>
+              <label className="flex flex-col gap-1 text-xs">
+                <span className="font-medium">{t("generator.controls.eventStart")}</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={settings.durationSeconds}
+                  step={0.001}
+                  value={settings.eventStartSeconds}
+                  data-testid="generator.control.eventStart"
+                  onChange={(event) => {
+                    const value = Number(event.currentTarget.value);
+                    if (Number.isFinite(value) && value >= 0) {
+                      updateSettings({ eventStartSeconds: value });
+                    }
+                  }}
+                  className={`${INPUT_CLASSES} tabular-nums`}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs">
+                <span className="font-medium">{t("generator.controls.eventCount")}</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={1000}
+                  step={1}
+                  value={settings.eventCount}
+                  data-testid="generator.control.eventCount"
+                  onChange={(event) => {
+                    const value = Number(event.currentTarget.value);
+                    if (Number.isInteger(value) && value >= 1 && value <= 1000) {
+                      updateSettings({ eventCount: value });
+                    }
+                  }}
+                  className={`${INPUT_CLASSES} tabular-nums`}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs">
+                <span className="font-medium">{t("generator.controls.eventInterval")}</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={settings.durationSeconds}
+                  step={0.001}
+                  value={settings.eventIntervalSeconds}
+                  data-testid="generator.control.eventInterval"
+                  onChange={(event) => {
+                    const value = Number(event.currentTarget.value);
+                    if (Number.isFinite(value) && value >= 0) {
+                      updateSettings({ eventIntervalSeconds: value });
+                    }
+                  }}
+                  className={`${INPUT_CLASSES} tabular-nums`}
+                />
+              </label>
+            </>
           ) : null}
 
           {settings.waveform === "chirp" ? (

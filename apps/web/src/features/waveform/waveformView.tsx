@@ -141,6 +141,7 @@ export function WaveformView() {
   const sampleCount = original?.samples.length ?? 0;
   const [searchParams, setSearchParams] = useSearchParams();
   const [cursorTime, setCursorTime] = useState<number | null>(null);
+  const [cursorValue, setCursorValue] = useState<number | null>(null);
   const dragAnchor = useRef<number | null>(null);
 
   const window =
@@ -185,9 +186,16 @@ export function WaveformView() {
     setSelection(sample, sample);
   };
 
-  const onDetailPointerMove = (event: PointerEvent<HTMLElement>, range: SampleWindow): void => {
+  const onDetailPointerMove = (
+    event: PointerEvent<HTMLElement>,
+    range: SampleWindow,
+    lane: AnalysisLane,
+  ): void => {
     const sample = sampleAt(event, range);
     setCursorTime(sample / (original?.sampleRateHz ?? 1));
+    const samples =
+      lane === "mono" ? original?.samples : (original?.channels[lane] ?? original?.samples);
+    setCursorValue(samples?.[sample] ?? null);
     if (dragAnchor.current !== null) {
       const anchor = dragAnchor.current;
       setSelection(Math.min(anchor, sample), Math.max(anchor, sample));
@@ -243,6 +251,7 @@ export function WaveformView() {
   }
 
   const stacked = lanes.length > 1;
+  const verticalScale = Math.max(1, peak);
 
   return (
     <section className="flex flex-col gap-4">
@@ -284,6 +293,8 @@ export function WaveformView() {
               minMax={overview.minMax}
               sampleRange={{ startSample: 0, endSample: sampleCount }}
               selectionRange={selection}
+              viewportRange={isFullWindow ? undefined : window}
+              verticalScale={verticalScale}
               heightPx={120}
               testId={`waveform.overview.canvas${suffix}`}
               label={`${t("waveform.overviewAria")} (${channelLabel(t, id)})`}
@@ -336,6 +347,9 @@ export function WaveformView() {
           →
         </button>
         <span className="text-xs text-muted">{t("waveform.hint")}</span>
+        <span dir="ltr" data-testid="waveform.scale" className="font-mono text-xs text-muted">
+          {t("waveform.scale", { peak: verticalScale.toFixed(3) })}
+        </span>
         {cursorTime !== null ? (
           <span
             dir="ltr"
@@ -343,6 +357,14 @@ export function WaveformView() {
             className="ms-auto font-mono text-xs text-muted"
           >
             {formatS(cursorTime)}
+          </span>
+        ) : null}
+        {cursorValue !== null ? (
+          <span data-testid="waveform.hover.value" className="text-xs text-muted">
+            {t("waveform.hoverValue")}{" "}
+            <span dir="ltr" className="font-mono">
+              {cursorValue.toFixed(4)}
+            </span>
           </span>
         ) : null}
       </div>
@@ -372,12 +394,13 @@ export function WaveformView() {
               minMax={slice?.minMax ?? overview.minMax}
               sampleRange={range}
               selectionRange={selection}
+              verticalScale={verticalScale}
               heightPx={220}
               testId={`waveform.detail.canvas${suffix}`}
               label={`${t("waveform.detailAria")} (${channelLabel(t, id)})`}
               interactive
               onPointerDown={(event) => onDetailPointerDown(event, range)}
-              onPointerMove={(event) => onDetailPointerMove(event, range)}
+              onPointerMove={(event) => onDetailPointerMove(event, range, mono ? "mono" : lane)}
               onPointerUp={onDetailPointerUp}
               onKeyDown={onDetailKeyDown}
             />

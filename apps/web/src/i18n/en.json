@@ -163,6 +163,8 @@
     "panRight": "Pan right",
     "hint": "Drag to select · [ / ] zoom · arrows move selection",
     "selectionReadout": "Selection {{start}} – {{end}}",
+    "hoverValue": "Sample value",
+    "scale": "Scale ±{{peak}}",
     "theory": {
       "title": "Waveform reading and sampling",
       "sampling": {
@@ -676,8 +678,9 @@
       "amplitude": "Amplitude",
       "frequency": "Frequency (Hz)",
       "dutyCycle": "Duty cycle",
-      "impulseIndex": "Impulse index (sample)",
-      "stepIndex": "Step index (sample)",
+      "eventStart": "Event time (s)",
+      "eventCount": "Repeat count",
+      "eventInterval": "Repeat interval (s)",
       "chirpFrom": "Start frequency (Hz)",
       "chirpTo": "End frequency (Hz)",
       "chirpLog": "Logarithmic sweep",
@@ -893,6 +896,8 @@
       "mode": "Speed mode",
       "customSpeed": "Speed factor",
       "semitones": "Pitch shift (semitones)",
+      "direction": "Direction",
+      "forward": "Forward",
       "reverse": "Reverse"
     },
     "lane": {

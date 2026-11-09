@@ -637,18 +637,36 @@ export function SpeedView(): React.ReactElement {
           />
         </label>
 
-        <label className="flex items-center gap-2 self-end text-sm">
-          <input
-            type="checkbox"
-            checked={laneSettings.reverse}
-            data-testid="speed.control.reverse"
-            onChange={(event) => {
-              updateLaneSettings({ reverse: event.currentTarget.checked });
-            }}
-            className={CONTROL_FOCUS_CLASSES}
-          />
-          <span>{t("speed.controls.reverse")}</span>
-        </label>
+        <div className="flex flex-col gap-1 self-end text-xs">
+          <span className="font-medium">{t("speed.controls.direction")}</span>
+          <fieldset
+            aria-label={t("speed.controls.direction")}
+            className="m-0 flex items-center gap-1 border-0 p-0"
+          >
+            <Button
+              size="sm"
+              variant={laneSettings.reverse ? "outline" : "default"}
+              aria-pressed={!laneSettings.reverse}
+              data-testid="speed.control.direction.forward"
+              onClick={() => {
+                updateLaneSettings({ reverse: false });
+              }}
+            >
+              {t("speed.controls.forward")}
+            </Button>
+            <Button
+              size="sm"
+              variant={laneSettings.reverse ? "default" : "outline"}
+              aria-pressed={laneSettings.reverse}
+              data-testid="speed.control.direction.reverse"
+              onClick={() => {
+                updateLaneSettings({ reverse: true });
+              }}
+            >
+              {t("speed.controls.reverse")}
+            </Button>
+          </fieldset>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

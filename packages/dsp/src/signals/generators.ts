@@ -17,9 +17,13 @@
  *   triangle  x[n] = a * tri(frac(f*n/fs)), where tri(p) =
  *             4p for p < 1/4; 2 - 4p for 1/4 <= p < 3/4; 4p - 4 otherwise.
  *             Starts at 0, rises to +a at p = 1/4, falls to -a at p = 3/4.
- *   impulse   x[n] = a at n = impulseSampleIndex, 0 elsewhere
- *   step      x[n] = amplitudeBefore for n < stepSampleIndex,
- *             amplitudeAfter for n >= stepSampleIndex
+ *   impulse   x[n] = a at n = impulseSampleIndex + k*repeatIntervalSamples
+ *             for k = 0..repeatCount-1 (events outside [0, N) are ignored),
+ *             0 elsewhere
+ *   step      starts at amplitudeBefore; each event at
+ *             n = stepSampleIndex + k*repeatIntervalSamples toggles the level
+ *             between amplitudeBefore and amplitudeAfter, so one event is the
+ *             classic unit step and repeated events form a rectangular train
  *   chirp     phase = 2*pi * integral_0^t f(tau) dtau, closed form below
  *   twoTone   x[n] = (a/2) * (sin(2*pi*f1*n/fs) + sin(2*pi*f2*n/fs)); the two
  *             components are equal halves so |x[n]| <= |a|
@@ -53,7 +57,9 @@
  * 0 < endFrequencyHz and startFrequencyHz != endFrequencyHz; the linear sweep
  * also accepts equal endpoints. impulseSampleIndex and stepSampleIndex must
  * be integers in [0, N); when N = 0 both generators return an empty array
- * without an index check (R7). FM rejects modulationHz = 0 because the
+ * without an index check (R7). repeatCount defaults to 1 and must be a
+ * positive integer no larger than N (when N > 0); repeatIntervalSamples
+ * defaults to 0 and must be a non-negative integer. FM rejects modulationHz = 0 because the
  * modulation index divides by it. Inputs (including the twoTone frequency
  * tuple) are never mutated; every call returns a fresh array.
  */
@@ -101,6 +107,51 @@ function assertSampleIndex(index: number, sampleCount: number, label: string): v
   if (!Number.isInteger(index) || index < 0 || index >= sampleCount) {
     throw new RangeError(`${label} must be an integer in [0, ${sampleCount}) (got ${index})`);
   }
+}
+
+interface RepeatSpec {
+  /** Number of events in the train; defaults to 1 (the single-event case). */
+  repeatCount?: number;
+  /** Gap between events in samples; defaults to 0. */
+  repeatIntervalSamples?: number;
+}
+
+function resolveRepeat(
+  spec: RepeatSpec,
+  sampleCount: number,
+  caller: string,
+): { repeatCount: number; repeatIntervalSamples: number } {
+  const repeatCount = spec.repeatCount ?? 1;
+  const repeatIntervalSamples = spec.repeatIntervalSamples ?? 0;
+  if (!Number.isInteger(repeatCount) || repeatCount < 1) {
+    throw new RangeError(`${caller}: repeatCount must be a positive integer (got ${repeatCount})`);
+  }
+  if (sampleCount > 0 && repeatCount > sampleCount) {
+    throw new RangeError(
+      `${caller}: repeatCount must be <= sampleCount ${sampleCount} (got ${repeatCount})`,
+    );
+  }
+  if (!Number.isInteger(repeatIntervalSamples) || repeatIntervalSamples < 0) {
+    throw new RangeError(
+      `${caller}: repeatIntervalSamples must be a non-negative integer ` +
+        `(got ${repeatIntervalSamples})`,
+    );
+  }
+  return { repeatCount, repeatIntervalSamples };
+}
+
+/** First event position plus one gap; null when the event lies past N. */
+function repeatEventIndex(
+  startIndex: number,
+  event: number,
+  intervalSamples: number,
+  sampleCount: number,
+): number | null {
+  if (event === 0) {
+    return startIndex;
+  }
+  const index = startIndex + event * intervalSamples;
+  return Number.isSafeInteger(index) && index < sampleCount ? index : null;
 }
 
 /** Phase position in [0, 1) for sample `n`; negative frequencies are folded. */
@@ -215,23 +266,37 @@ export function generateTriangle(
  * empty array without an index check (R7).
  */
 export function generateImpulse(
-  spec: SignalSpec & { impulseSampleIndex: number; amplitude: number },
+  spec: SignalSpec & { impulseSampleIndex: number; amplitude: number } & RepeatSpec,
 ): Float64Array {
   const sampleCount = sampleCountOf(spec, "generateImpulse");
   const { impulseSampleIndex, amplitude } = spec;
   assertFiniteParam(amplitude, "generateImpulse: amplitude");
   assertSampleIndex(impulseSampleIndex, sampleCount, "generateImpulse: impulseSampleIndex");
+  const repeat = resolveRepeat(spec, sampleCount, "generateImpulse");
 
   const values = new Float64Array(sampleCount);
-  if (sampleCount > 0) {
-    values[impulseSampleIndex] = amplitude;
+  for (let event = 0; event < repeat.repeatCount; event += 1) {
+    const index = repeatEventIndex(
+      impulseSampleIndex,
+      event,
+      repeat.repeatIntervalSamples,
+      sampleCount,
+    );
+    if (index === null) {
+      break;
+    }
+    if (sampleCount > 0) {
+      values[index] = amplitude;
+    }
   }
   return values;
 }
 
 /**
  * Unit step with independent levels: amplitudeBefore for n < stepSampleIndex
- * and amplitudeAfter for n >= stepSampleIndex. The index uses the same
+ * and amplitudeAfter for n >= stepSampleIndex. Repeating the event toggles
+ * the level at each repeatIntervalSamples, so repeatCount = 1 is the classic
+ * step and larger counts form a rectangular train. The index uses the same
  * integer-in-[0, N) contract as the impulse; N = 0 returns empty.
  */
 export function generateStep(
@@ -239,19 +304,33 @@ export function generateStep(
     stepSampleIndex: number;
     amplitudeBefore: number;
     amplitudeAfter: number;
-  },
+  } & RepeatSpec,
 ): Float64Array {
   const sampleCount = sampleCountOf(spec, "generateStep");
   const { stepSampleIndex, amplitudeBefore, amplitudeAfter } = spec;
   assertFiniteParam(amplitudeBefore, "generateStep: amplitudeBefore");
   assertFiniteParam(amplitudeAfter, "generateStep: amplitudeAfter");
   assertSampleIndex(stepSampleIndex, sampleCount, "generateStep: stepSampleIndex");
+  const repeat = resolveRepeat(spec, sampleCount, "generateStep");
 
   const values = new Float64Array(sampleCount);
-  if (sampleCount > 0) {
-    values.fill(amplitudeBefore, 0, stepSampleIndex);
-    values.fill(amplitudeAfter, stepSampleIndex);
+  let level = amplitudeBefore;
+  let cursor = 0;
+  for (let event = 0; event < repeat.repeatCount; event += 1) {
+    const index = repeatEventIndex(
+      stepSampleIndex,
+      event,
+      repeat.repeatIntervalSamples,
+      sampleCount,
+    );
+    if (index === null) {
+      break;
+    }
+    values.fill(level, cursor, index);
+    cursor = index;
+    level = level === amplitudeBefore ? amplitudeAfter : amplitudeBefore;
   }
+  values.fill(level, cursor);
   return values;
 }
 

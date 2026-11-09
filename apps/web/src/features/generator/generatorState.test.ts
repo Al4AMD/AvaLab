@@ -17,8 +17,9 @@ describe("generator URL codec", () => {
       amplitude: 0.25,
       frequencyHz: 300,
       dutyCycle: 0.3,
-      impulseIndex: 77,
-      stepIndex: 1200,
+      eventStartSeconds: 0.75,
+      eventCount: 4,
+      eventIntervalSeconds: 0.125,
       chirpFromHz: 50,
       chirpToHz: 5000,
       chirpLog: false,
@@ -51,9 +52,16 @@ describe("generator URL codec", () => {
     expect(settings.fourierHarmonics).toBe(GENERATOR_DEFAULT_SETTINGS.fourierHarmonics);
   });
 
+  it("falls back invalid event timing independently", () => {
+    const settings = generatorSettingsFromSearch("?evt=-1&evn=0&evg=999");
+    expect(settings.eventStartSeconds).toBe(GENERATOR_DEFAULT_SETTINGS.eventStartSeconds);
+    expect(settings.eventCount).toBe(GENERATOR_DEFAULT_SETTINGS.eventCount);
+    expect(settings.eventIntervalSeconds).toBe(GENERATOR_DEFAULT_SETTINGS.eventIntervalSeconds);
+  });
+
   it("emits a stable key order", () => {
     expect(generatorSettingsToSearch(GENERATOR_DEFAULT_SETTINGS)).toBe(
-      "a=0.8&cf=100&cl=1&ct=8000&d=2&dev=1000&duty=0.5&f=440&f2=880&fh=10&fk=square&imp=0&mh=5&mi=0.5&seed=1&sr=48000&step=0&w=sine",
+      "a=0.8&cf=100&cl=1&ct=8000&d=2&dev=1000&duty=0.5&evg=0.5&evn=1&evt=0&f=440&f2=880&fh=10&fk=square&mh=5&mi=0.5&seed=1&sr=48000&w=sine",
     );
   });
 });

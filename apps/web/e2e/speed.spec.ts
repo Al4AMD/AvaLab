@@ -54,8 +54,15 @@ test("Persian (default): 2x resample processes, paints, and activates the A/B la
   await expect(page.getByTestId("speed.result.duration")).toHaveText("2.500 s");
   await expect(page.getByTestId("speed.control.semitones")).toBeDisabled();
 
-  await page.getByTestId("speed.control.reverse").click();
-  await expect(page.getByTestId("speed.control.reverse")).toBeChecked();
+  await page.getByTestId("speed.control.direction.reverse").click();
+  await expect(page.getByTestId("speed.control.direction.reverse")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByTestId("speed.control.direction.forward")).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
   await expect(page).toHaveURL(/rv=1/);
   await expect(page.getByTestId("speed.result.waveform")).toBeVisible();
   expect(errors).toEqual([]);

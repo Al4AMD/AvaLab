@@ -68,6 +68,13 @@ test("Persian (default): aliasing is source-free, then 8 kHz with the filter off
   await expect(page.getByTestId("sampling.metric.psnr")).toHaveText(/dB/);
   await expect(page.getByTestId("sampling.metric.theorySnr")).toHaveText(/dB/);
 
+  await page.getByTestId("sampling.control.bits").fill("8");
+  await expect(page).toHaveURL(/bd=8/);
+  await expect(page.getByTestId("sampling.metric.theorySnr")).toHaveText("49.9 dB");
+  await page.getByTestId("sampling.control.dither").click();
+  await expect(page.getByTestId("sampling.control.dither")).toBeChecked();
+  await expect(page).toHaveURL(/dt=1/);
+
   await page.getByTestId("sampling.play.residual").click();
   await expect(page.getByTestId("player.ab.processed")).toHaveAttribute("aria-pressed", "true");
 

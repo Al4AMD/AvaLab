@@ -368,6 +368,17 @@ describe("samplingProcess handler", () => {
     expect(zeroCrossingHz(quantized, 8000)).toBeLessThan(460);
   });
 
+  it("rejects a selection too short to produce one output sample", () => {
+    try {
+      run({ targetRateHz: 1000 }, sinePayload(440, 10 / SAMPLE_RATE));
+      expect.unreachable("samplingProcess accepted an empty resampled selection");
+    } catch (error) {
+      expect(error).toBeInstanceOf(DspOpError);
+      expect((error as DspOpError).code).toBe("badParams");
+      expect((error as Error).message).toContain("shorter than one output sample");
+    }
+  });
+
   it("shows the 3 kHz fold-back without the filter and removes it with it", () => {
     const unfiltered = run({ antiAlias: false }, sinePayload(5000));
     const filtered = run({ antiAlias: true }, sinePayload(5000));
@@ -1441,6 +1452,63 @@ describe("generateSynth handler", () => {
       throw new Error("missing payload");
     }
     expect(float32ValuesOf(payload)).toHaveLength(128);
+  });
+
+  it("places repeated impulse and toggling step events at the requested seconds", () => {
+    const impulse = generateSynth({
+      waveform: "impulse",
+      sampleRateHz: 1000,
+      durationSeconds: 0.01,
+      amplitude: 0.75,
+      eventStartSeconds: 0.001,
+      eventCount: 3,
+      eventIntervalSeconds: 0.003,
+      previewBucketCount: 0,
+    });
+    const impulsePayload = impulse.payload;
+    if (impulsePayload === undefined) {
+      throw new Error("missing impulse payload");
+    }
+    expect(float32ValuesOf(impulsePayload)).toEqual([0, 0.75, 0, 0, 0.75, 0, 0, 0.75, 0, 0]);
+
+    const step = generateSynth({
+      waveform: "step",
+      sampleRateHz: 1000,
+      durationSeconds: 0.01,
+      amplitude: 0.5,
+      eventStartSeconds: 0.001,
+      eventCount: 3,
+      eventIntervalSeconds: 0.003,
+      previewBucketCount: 0,
+    });
+    const stepPayload = step.payload;
+    if (stepPayload === undefined) {
+      throw new Error("missing step payload");
+    }
+    expect(float32ValuesOf(stepPayload)).toEqual([0, 0.5, 0.5, 0.5, 0, 0, 0, 0.5, 0.5, 0.5]);
+  });
+
+  it("rejects invalid event timing", () => {
+    expect(() =>
+      generateSynth({
+        waveform: "impulse",
+        sampleRateHz: 1000,
+        durationSeconds: 0.01,
+        amplitude: 1,
+        eventStartSeconds: -1,
+        previewBucketCount: 0,
+      }),
+    ).toThrowError(DspOpError);
+    expect(() =>
+      generateSynth({
+        waveform: "step",
+        sampleRateHz: 1000,
+        durationSeconds: 0.01,
+        amplitude: 1,
+        eventCount: 0,
+        previewBucketCount: 0,
+      }),
+    ).toThrowError(DspOpError);
   });
 });
 

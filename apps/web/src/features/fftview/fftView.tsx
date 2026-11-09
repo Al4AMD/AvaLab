@@ -684,14 +684,11 @@ export function FftView() {
                 </p>
               ) : (
                 <>
-                  <WindowProfilesChart
-                    profiles={profiles}
-                    ariaLabel={t("fftview.windowCompare.label")}
-                    xLabel={t("fftview.axis.frequency")}
-                    yLabel={t("fftview.axis.level")}
-                    familyLabels={profiles.meta.families.map((family) => windowLabels[family])}
-                  />
-                  <table className="w-full max-w-lg text-xs tabular-nums">
+                  <table
+                    className="w-full max-w-lg text-xs tabular-nums"
+                    data-testid="fftview.windowCompare.table"
+                  >
+                    <caption className="sr-only">{t("fftview.windowCompare.label")}</caption>
                     <thead>
                       <tr className="text-muted">
                         <th className="text-start font-medium">
@@ -708,7 +705,16 @@ export function FftView() {
                     <tbody>
                       {profiles.meta.families.map((family, familyIndex) => (
                         <tr key={family} data-testid={`fftview.windowCompare.${family}`}>
-                          <td>{windowLabels[family]}</td>
+                          <td>
+                            <span
+                              aria-hidden="true"
+                              className="me-1 inline-block h-2 w-2 rounded-full align-middle"
+                              style={{
+                                backgroundColor: WINDOW_COLORS[familyIndex % WINDOW_COLORS.length],
+                              }}
+                            />
+                            {windowLabels[family]}
+                          </td>
                           <td dir="ltr">
                             {formatHz(profiles.meta.mainLobeWidthsHz[familyIndex] ?? 0)}
                           </td>
@@ -719,6 +725,13 @@ export function FftView() {
                       ))}
                     </tbody>
                   </table>
+                  <WindowProfilesChart
+                    profiles={profiles}
+                    ariaLabel={t("fftview.windowCompare.label")}
+                    xLabel={t("fftview.axis.frequency")}
+                    yLabel={t("fftview.axis.level")}
+                    familyLabels={profiles.meta.families.map((family) => windowLabels[family])}
+                  />
                 </>
               )}
 

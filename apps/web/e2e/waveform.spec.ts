@@ -76,8 +76,10 @@ test("Persian (default): a demo clip paints both canvases and the hover readout 
 
   // The hover readout starts empty, then reports a time in seconds.
   await expect(page.getByTestId("waveform.hover.time")).toHaveCount(0);
+  await expect(page.getByTestId("waveform.scale")).toBeVisible();
   await page.getByTestId(DETAIL).hover({ position: { x: 10, y: 10 } });
   await expect(page.getByTestId("waveform.hover.time")).toHaveText(/^[0-9]+\.[0-9]+ (?:ms|s)$/);
+  await expect(page.getByTestId("waveform.hover.value")).toContainText(/-?[0-9]+\.[0-9]{4}$/);
 
   expect(errors).toEqual([]);
 });
