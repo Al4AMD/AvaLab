@@ -777,3 +777,12 @@ classification, F16 student report) are unchanged.
 - Needs owner review: Phase 3 behavior, stereo listening on the demo, and the new Persian strings (`sampling.lane.*`, `speed.lane.*`, `extent.lane.*`, the per-lane table labels, and the three theory lane sections) join the Persian review backlog.
 - Known limits: no joint stereo; sampling/speed grid parameters remain shared by design; pipeline, AI, and full-file stereo codec jobs remain mono; true-stereo convolution is the next phase.
 - **Next step:** owner review of the Phase 3 diff and e2e evidence; then plan Phase 4 — true-stereo 4-path reverb.
+
+## 2026-11-09 — Presentation deck polish (`docs/presentation`)
+
+- Status: 32-slide Persian RTL deck built; sparse-slide content pass added. No commit requested.
+- Added: feature-map descriptions and three curriculum tracks; architecture request lifecycle; separation limitations; ASR evidence band; conceptual rate–distortion chart with legend; pipeline JSON schematic; guided aliasing experiment; Persian/English term matrix; playback-only loudness gauge; D-056 channel table; property-test code sample; env-limit band; delivered/optional/out-of-scope status cards; ingest and denoise/super-resolution limitation bands.
+- Fixed: architecture 8 px overflow; rate–distortion SVG label clipping caused by inherited RTL direction; RTL flow order for A/B insights; spacing on sparse slides via centered `slide-grid` rows.
+- Validation: `node --check docs/presentation/app.js`; `deck-check.mjs` reports 32 slides, zero overflow and zero console errors; interaction smoke covers deep links, arrow navigation, overview (32 items), help, and Escape; mobile 390×844 has no horizontal overflow; print media reports all 32 slides visible and deck height 25,920 px (32 × 810).
+- Known gaps: final human Persian proofread; slides 5/19/26 still carry deliberate lower whitespace above their insight bands; demo canvases were not re-timed during this pass.
+- **Next step:** owner reviews the deck and confirms final Persian copy; then commit `docs/presentation` if requested.
