@@ -51,6 +51,7 @@ const CONTROL_FOCUS_CLASSES =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const MAGNITUDE_COLOR = "#38bdf8";
 const PHASE_COLOR = "#f59e0b";
+const WRAPPED_PHASE_RANGE = [-Math.PI, Math.PI] as const;
 
 type Spectrum = {
   readonly meta: FftSelectionResult["meta"];
@@ -209,9 +210,18 @@ type ChartProps = {
   readonly yLabel: string;
   readonly yFormatter: (value: number) => string;
   readonly stroke: string;
+  readonly yRange?: readonly [number, number];
 };
 
-function SpectrumChart({ data, ariaLabel, testId, yLabel, yFormatter, stroke }: ChartProps) {
+function SpectrumChart({
+  data,
+  ariaLabel,
+  testId,
+  yLabel,
+  yFormatter,
+  stroke,
+  yRange,
+}: ChartProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [widthPx, setWidthPx] = useState(640);
 
@@ -244,7 +254,12 @@ function SpectrumChart({ data, ariaLabel, testId, yLabel, yFormatter, stroke }: 
       padding: [8, 12, 8, 8],
       cursor: { drag: { x: true, y: false } },
       legend: { show: false },
-      scales: { x: { time: false } },
+      scales: {
+        x: { time: false },
+        ...(yRange === undefined
+          ? {}
+          : { y: { range: [yRange[0], yRange[1]] as [number, number] } }),
+      },
       axes: [
         {
           label: yLabel,
@@ -269,7 +284,7 @@ function SpectrumChart({ data, ariaLabel, testId, yLabel, yFormatter, stroke }: 
     return () => {
       plot.destroy();
     };
-  }, [data, widthPx, yLabel, yFormatter, stroke]);
+  }, [data, widthPx, yLabel, yFormatter, stroke, yRange]);
 
   return (
     <div className="min-w-0">
@@ -450,23 +465,26 @@ export function FftView() {
   const chartData = useMemo<{
     magnitude: uPlot.AlignedData;
     phase: uPlot.AlignedData;
+    visiblePhaseBins: number;
   } | null>(() => {
     if (spectrum === null) {
       return null;
     }
     const frequencies = Array.from(spectrum.frequenciesHz);
     const magnitude = Array.from(spectrum.magnitude);
+    const phase = phaseMaskBins(
+      spectrum.magnitude,
+      spectrum.phase,
+      settings.magnitudeMode,
+      settings.phaseMaskDb,
+    );
     return {
       magnitude: [frequencies, magnitude],
-      phase: [
-        frequencies,
-        phaseMaskBins(
-          spectrum.magnitude,
-          spectrum.phase,
-          settings.magnitudeMode,
-          settings.phaseMaskDb,
-        ),
-      ],
+      phase: [frequencies, phase],
+      visiblePhaseBins: phase.reduce<number>(
+        (count, value) => (value === null ? count : count + 1),
+        0,
+      ),
     };
   }, [spectrum, settings.phaseMaskDb, settings.magnitudeMode]);
 
@@ -665,6 +683,15 @@ export function FftView() {
                 stroke={MAGNITUDE_COLOR}
               />
               <p className="text-xs text-muted">{t("fftview.axis.frequency")}</p>
+              <p role="status" data-testid="fftview.phase.visible" className="text-xs text-muted">
+                {chartData.visiblePhaseBins === 0
+                  ? t("fftview.phaseEmpty", { threshold: formatDb(settings.phaseMaskDb) })
+                  : t("fftview.phaseVisible", {
+                      visible: chartData.visiblePhaseBins,
+                      total: spectrum.meta.binCount,
+                      threshold: formatDb(settings.phaseMaskDb),
+                    })}
+              </p>
               <SpectrumChart
                 data={chartData.phase}
                 ariaLabel={t("fftview.chart.phaseLabel")}
@@ -672,6 +699,7 @@ export function FftView() {
                 yLabel={t("fftview.axis.phase")}
                 yFormatter={phaseFormatter}
                 stroke={PHASE_COLOR}
+                yRange={settings.phaseMode === "wrapped" ? WRAPPED_PHASE_RANGE : undefined}
               />
               <p className="text-xs text-muted">
                 {t("fftview.axis.phaseNote", { threshold: formatDb(settings.phaseMaskDb) })}

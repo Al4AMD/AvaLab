@@ -962,6 +962,11 @@ export const WINDOW_PROFILE_FAMILIES: readonly WindowProfileFamily[] = [
   "blackman",
   "kaiser",
 ];
+// Exact-zero FFT bins produce -Infinity dB, which leaves uPlot with no
+// finite y-range and therefore a blank chart. Floor the display curve well
+// below every real side lobe; the measured side-lobe metadata keeps the raw
+// value.
+const WINDOW_PROFILE_DISPLAY_FLOOR_DB = -200;
 export type WindowProfilesResult = {
   meta: {
     families: WindowProfileFamily[];
@@ -1017,7 +1022,12 @@ export function windowProfiles(
       magnitudes[bin] = Math.hypot(spectrum.re[bin] ?? 0, spectrum.im[bin] ?? 0) / windowSum;
     }
     const decibels = magnitudeDb(magnitudes);
-    packed.set(decibels, familyIndex * binCount);
+    for (let bin = 0; bin < binCount; bin += 1) {
+      packed[familyIndex * binCount + bin] = Math.max(
+        WINDOW_PROFILE_DISPLAY_FLOOR_DB,
+        decibels[bin] ?? WINDOW_PROFILE_DISPLAY_FLOOR_DB,
+      );
+    }
     let firstNull = binCount - 1;
     for (let bin = 1; bin < binCount - 1; bin += 1) {
       const previous = decibels[bin - 1] ?? 0;
