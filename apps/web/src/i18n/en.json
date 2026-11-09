@@ -600,6 +600,8 @@
     "capNotice": "Analysis is capped at {{samples}} samples; shrink the selection to cover it all.",
     "error": "The spectrum could not be computed.",
     "empty": "A non-empty analysis frame is required.",
+    "phaseVisible": "{{visible}} of {{total}} bins pass the {{threshold}} threshold; the rest are masked.",
+    "phaseEmpty": "No bins pass the {{threshold}} threshold; lower it to see phase.",
     "axis": {
       "frequency": "Frequency (Hz)",
       "magnitude": "Magnitude",

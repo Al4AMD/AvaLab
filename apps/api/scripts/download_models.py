@@ -7,9 +7,10 @@ Run with the ML extra::
     uv run --directory apps/api --extra ml python scripts/download_models.py --all
 
 ``--check`` never downloads and exits 1 when a task is incomplete. ``--all`` is
-explicit because it fetches roughly 2.1 GB. Files are copied out of the
-HuggingFace cache into ``<cache>/<task>/`` so runtime loaders can stay offline
-without depending on HuggingFace cache internals.
+explicit because it fetches roughly 2.1 GB, but it skips tasks whose pinned
+files already exist, so rerunning it is cheap and safe. Files are copied out of
+the HuggingFace cache into ``<cache>/<task>/`` so runtime loaders can stay
+offline without depending on HuggingFace cache internals.
 """
 
 from __future__ import annotations
@@ -84,6 +85,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if missing else 0
 
     for task, spec in MODEL_SPECS.items():
+        if registry.status(task).state == "available":
+            print(f"up to date   {task}: {spec.model_id}@{spec.revision[:12]}")
+            continue
         destination = model_dir(args.cache_dir, task)
         destination.mkdir(parents=True, exist_ok=True)
         print(f"downloading {task}: {spec.model_id}@{spec.revision[:12]}")

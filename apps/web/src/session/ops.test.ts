@@ -1406,6 +1406,17 @@ describe("windowProfiles handler", () => {
     expect(result.meta.binCount).toBe(result.meta.fftLengthSamples / 2 + 1);
     expect(payload.byteLength / 8).toBe(result.meta.families.length * result.meta.binCount);
   });
+
+  it("packs a finite display floor for exact-zero FFT bins", () => {
+    const result = windowProfiles({ sampleRateHz: 48000, windowLengthSamples: 2048 });
+    const payload = result.payload;
+    if (payload === undefined) {
+      throw new Error("missing payload");
+    }
+    const rows = new Float64Array(payload.buffer, payload.byteOffset, payload.byteLength / 8);
+    expect(rows.every(Number.isFinite)).toBe(true);
+    expect(Math.min(...rows)).toBeGreaterThanOrEqual(-200);
+  });
 });
 
 describe("generateSynth handler", () => {
