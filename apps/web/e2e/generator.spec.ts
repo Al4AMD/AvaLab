@@ -36,6 +36,28 @@ test("Persian (default): generate a chirp, load it as the session source", async
   expect(errors).toEqual([]);
 });
 
+test("Persian (default): impulse train controls sync to the URL and load as source", async ({
+  page,
+}) => {
+  const errors = watchForErrors(page);
+  await page.goto("/tools/generator");
+  await expect(page.getByTestId("generator.preview.canvas")).toBeVisible({ timeout: 15_000 });
+
+  await page.getByTestId("generator.control.waveform").selectOption("impulse");
+  await page.getByTestId("generator.control.eventStart").fill("0.25");
+  await page.getByTestId("generator.control.eventCount").fill("4");
+  await page.getByTestId("generator.control.eventInterval").fill("0.5");
+  await expect(page).toHaveURL(/w=impulse/);
+  await expect(page).toHaveURL(/evt=0.25/);
+  await expect(page).toHaveURL(/evn=4/);
+  await expect(page).toHaveURL(/evg=0.5/);
+
+  await page.getByTestId("generator.load").click();
+  await expect(page).toHaveURL(/\/tools\/waveform$/);
+  await expect(page.getByTestId("waveform.readout")).toContainText("2.000 s");
+  expect(errors).toEqual([]);
+});
+
 test("English (LTR): the generator preview paints with zero console errors", async ({ page }) => {
   const errors = watchForErrors(page);
   await page.addInitScript(() => {

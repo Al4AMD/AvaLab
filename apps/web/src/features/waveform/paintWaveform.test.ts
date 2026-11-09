@@ -45,6 +45,13 @@ describe("waveformY", () => {
     expect(waveformY(-1, 200)).toBe(200);
     expect(waveformY(0, 200)).toBe(100);
   });
+
+  it("uses the explicit vertical scale for samples beyond full scale", () => {
+    expect(waveformY(2, 200, 2)).toBe(0);
+    expect(waveformY(-2, 200, 2)).toBe(200);
+    expect(waveformY(1, 200, 2)).toBe(50);
+    expect(waveformY(3, 200, 2)).toBe(0);
+  });
 });
 
 describe("paintWaveform", () => {
@@ -94,6 +101,26 @@ describe("paintWaveform", () => {
         expect(Number.isFinite(value)).toBe(true);
       }
     }
+  });
+
+  it("connects one exact sample per bucket instead of painting envelope bars", () => {
+    const calls: DrawCall[] = [];
+    paintWaveform(fakeContext(calls), new Float32Array([-2, 2, -1, 1]), {
+      widthPx: 2,
+      heightPx: 20,
+      dpr: 1,
+      background: "#000",
+      wave: "#0ff",
+      center: "#333",
+      playhead: "#fff",
+      selection: "rgba(255,255,255,0.2)",
+      sampleRange: { startSample: 0, endSample: 2 },
+      verticalScale: 2,
+    });
+    const firstLine = calls.find((call) => call.kind === "lineTo");
+    expect(firstLine?.args[1]).toBe(5);
+    const exactFill = calls.filter((call) => call.kind === "fillRect" && call.args[1] !== 0);
+    expect(exactFill).toHaveLength(0);
   });
 
   it("draws a playhead only when its sample lies inside the painted range", () => {

@@ -24,9 +24,14 @@ export type WaveformPaintOptions = {
   readonly center: string;
   readonly playhead: string;
   readonly selection: string;
+  readonly selectionBorder?: string;
   readonly sampleRange?: SampleRange;
   readonly playheadSample?: number;
   readonly selectionRange?: SampleRange;
+  /** Detail window currently shown below the overview; drawn as a band. */
+  readonly viewportRange?: SampleRange;
+  /** Absolute sample value mapped to the top/bottom edge (default 1). */
+  readonly verticalScale?: number;
 };
 
 /** Horizontal device-pixel position of a bucket's start. */
@@ -42,10 +47,11 @@ export function bucketToX(
   return (bucketIndex / bucketCount) * widthPx * dpr;
 }
 
-/** Vertical CSS-pixel position for a sample in [-1, 1]. */
-export function waveformY(value: number, heightPx: number): number {
-  const clamped = Math.max(-1, Math.min(1, Number.isFinite(value) ? value : 0));
-  return ((1 - clamped) / 2) * heightPx;
+/** Vertical CSS-pixel position for a sample in [-scale, scale]. */
+export function waveformY(value: number, heightPx: number, verticalScale = 1): number {
+  const scale = Number.isFinite(verticalScale) && verticalScale > 0 ? verticalScale : 1;
+  const clamped = Math.max(-scale, Math.min(scale, Number.isFinite(value) ? value : 0));
+  return ((1 - clamped / scale) / 2) * heightPx;
 }
 
 function clampSample(sample: number, range: SampleRange): number {
@@ -79,23 +85,83 @@ export function paintWaveform(
   ctx.fillStyle = options.background;
   ctx.fillRect(0, 0, widthPx, heightPx);
 
+  if (options.sampleRange !== undefined && options.viewportRange !== undefined) {
+    const startX = rangeX(options.viewportRange.startSample, options.sampleRange, widthPx, dpr);
+    const endX = rangeX(options.viewportRange.endSample, options.sampleRange, widthPx, dpr);
+    const left = Math.min(startX, endX);
+    const right = Math.max(startX, endX);
+    ctx.fillStyle = "rgba(241, 238, 228, 0.10)";
+    ctx.fillRect(left, 0, Math.max(1, right - left), heightPx);
+  }
+
   if (options.sampleRange !== undefined && options.selectionRange !== undefined) {
     const startX = rangeX(options.selectionRange.startSample, options.sampleRange, widthPx, dpr);
     const endX = rangeX(options.selectionRange.endSample, options.sampleRange, widthPx, dpr);
+    const left = Math.min(startX, endX);
+    const right = Math.max(startX, endX);
     ctx.fillStyle = options.selection;
-    ctx.fillRect(Math.min(startX, endX), 0, Math.abs(endX - startX), heightPx);
+    ctx.fillRect(left, 0, Math.max(1, right - left), heightPx);
   }
 
   const bucketCount = Math.floor(minMax.length / 2);
+  const scale = options.verticalScale ?? 1;
+  const sampleSpan =
+    options.sampleRange === undefined
+      ? 0
+      : options.sampleRange.endSample - options.sampleRange.startSample;
   ctx.fillStyle = options.wave;
-  for (let bucket = 0; bucket < bucketCount; bucket += 1) {
-    const min = minMax[2 * bucket] ?? 0;
-    const max = minMax[2 * bucket + 1] ?? 0;
-    const x = bucketToX(bucket, bucketCount, widthPx, dpr);
-    const nextX = bucketToX(bucket + 1, bucketCount, widthPx, dpr);
-    const top = waveformY(max, heightPx);
-    const bottom = waveformY(min, heightPx);
-    ctx.fillRect(x, top, Math.max(1, nextX - x), Math.max(1, bottom - top));
+  if (options.sampleRange !== undefined && bucketCount > 0 && bucketCount === sampleSpan) {
+    // One bucket per sample: connect the exact samples instead of painting
+    // the 1-px envelope bars, so a zoomed-in view shows the real values.
+    ctx.strokeStyle = options.wave;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let bucket = 0; bucket < bucketCount; bucket += 1) {
+      const sample = minMax[2 * bucket + 1] ?? 0;
+      const x = rangeX(
+        options.sampleRange.startSample + bucket + 0.5,
+        options.sampleRange,
+        widthPx,
+        dpr,
+      );
+      const y = waveformY(sample, heightPx, scale);
+      if (bucket === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.stroke();
+  } else {
+    for (let bucket = 0; bucket < bucketCount; bucket += 1) {
+      const min = minMax[2 * bucket] ?? 0;
+      const max = minMax[2 * bucket + 1] ?? 0;
+      const x = bucketToX(bucket, bucketCount, widthPx, dpr);
+      const nextX = bucketToX(bucket + 1, bucketCount, widthPx, dpr);
+      const top = waveformY(max, heightPx, scale);
+      const bottom = waveformY(min, heightPx, scale);
+      ctx.fillRect(x, top, Math.max(1, nextX - x), Math.max(1, bottom - top));
+    }
+  }
+
+  if (options.sampleRange !== undefined && options.viewportRange !== undefined) {
+    const startX = rangeX(options.viewportRange.startSample, options.sampleRange, widthPx, dpr);
+    const endX = rangeX(options.viewportRange.endSample, options.sampleRange, widthPx, dpr);
+    const left = Math.min(startX, endX);
+    const right = Math.max(startX, endX);
+    ctx.fillStyle = options.wave;
+    ctx.fillRect(left, 0, 1, heightPx);
+    ctx.fillRect(Math.max(left, right - 1), 0, 1, heightPx);
+  }
+
+  if (options.sampleRange !== undefined && options.selectionRange !== undefined) {
+    const startX = rangeX(options.selectionRange.startSample, options.sampleRange, widthPx, dpr);
+    const endX = rangeX(options.selectionRange.endSample, options.sampleRange, widthPx, dpr);
+    const left = Math.min(startX, endX);
+    const right = Math.max(startX, endX);
+    ctx.fillStyle = options.selectionBorder ?? options.wave;
+    ctx.fillRect(left, 0, 1, heightPx);
+    ctx.fillRect(Math.max(left, right - 1), 0, 1, heightPx);
   }
 
   ctx.strokeStyle = options.center;

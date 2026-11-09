@@ -43,7 +43,7 @@ services:
       context: .
       dockerfile: docker/web.Dockerfile
     ports:
-      - "${AVALAB_HTTP_PORT:-8080}:80"
+      - "${AVALAB_HTTP_PORT:-8081}:80"
     depends_on:
       api:
         condition: service_healthy

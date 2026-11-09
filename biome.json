@@ -10,7 +10,8 @@
       "**",
       "!packages/dsp/test-data/golden",
       "!apps/api/openapi.json",
-      "!apps/web/src/api/schema.d.ts"
+      "!apps/web/src/api/schema.d.ts",
+      "!docs/presentation"
     ]
   },
   "formatter": {

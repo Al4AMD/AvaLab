@@ -2315,6 +2315,12 @@ export function samplingProcess(
     outputRateHz: targetRateHz,
     filter: params.antiAlias ? "kaiserSinc" : "none",
   });
+  if (reference.length === 0) {
+    throw new DspOpError(
+      "badParams",
+      "samplingProcess: the selection is shorter than one output sample at the target rate",
+    );
+  }
   const quantized = params.dither
     ? quantizeWithTpdfDither(reference, { bits: params.bits, seed: params.seed })
     : quantizeUniform(reference, { bits: params.bits });
@@ -3035,8 +3041,12 @@ export type GenerateSynthParams = {
   amplitude: number;
   frequencyHz?: number;
   dutyCycle?: number;
-  impulseIndex?: number;
-  stepIndex?: number;
+  /** Event start for impulse/step waveforms, in seconds. */
+  eventStartSeconds?: number;
+  /** Number of impulse/step events; defaults to 1. */
+  eventCount?: number;
+  /** Gap between impulse/step events, in seconds; defaults to 0. */
+  eventIntervalSeconds?: number;
   chirpFromHz?: number;
   chirpToHz?: number;
   chirpLog?: boolean;
@@ -3107,6 +3117,25 @@ export function generateSynth(
   const sampleCount = Math.round(params.sampleRateHz * params.durationSeconds);
   const clampIndex = (value: number): number =>
     sampleCount === 0 ? 0 : Math.min(sampleCount - 1, Math.max(0, Math.round(value)));
+  const eventStartSeconds = params.eventStartSeconds ?? 0;
+  const eventCount = params.eventCount ?? 1;
+  const eventIntervalSeconds = params.eventIntervalSeconds ?? 0;
+  if (
+    !Number.isFinite(eventStartSeconds) ||
+    eventStartSeconds < 0 ||
+    eventStartSeconds > 300 ||
+    !Number.isInteger(eventCount) ||
+    eventCount < 1 ||
+    eventCount > 1000 ||
+    !Number.isFinite(eventIntervalSeconds) ||
+    eventIntervalSeconds < 0 ||
+    eventIntervalSeconds > 300
+  ) {
+    throw new DspOpError("badParams", `generateSynth: invalid event params ${String(params)}`);
+  }
+  const eventStartIndex = clampIndex(eventStartSeconds * params.sampleRateHz);
+  const eventRepeatCount = sampleCount === 0 ? 1 : Math.max(1, Math.min(eventCount, sampleCount));
+  const eventIntervalSamples = Math.round(eventIntervalSeconds * params.sampleRateHz);
   let values: Float64Array;
   switch (params.waveform) {
     case "sine":
@@ -3128,15 +3157,19 @@ export function generateSynth(
     case "impulse":
       values = generateImpulse({
         ...spec,
-        impulseSampleIndex: clampIndex(params.impulseIndex ?? 0),
+        impulseSampleIndex: eventStartIndex,
+        repeatCount: eventRepeatCount,
+        repeatIntervalSamples: eventIntervalSamples,
       });
       break;
     case "step":
       values = generateStep({
         ...spec,
-        stepSampleIndex: clampIndex(params.stepIndex ?? 0),
+        stepSampleIndex: eventStartIndex,
         amplitudeBefore: 0,
         amplitudeAfter: params.amplitude,
+        repeatCount: eventRepeatCount,
+        repeatIntervalSamples: eventIntervalSamples,
       });
       break;
     case "whiteNoise":

@@ -1,0 +1,1379 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#07090b">
+  <meta name="color-scheme" content="dark">
+  <title>آوالب — آزمایشگاه صوتی تعاملی</title>
+  <meta name="description" content="ارائهٔ فارسی آوالب: آزمایشگاه صوتی تعاملی برای درس سیگنال‌ها و سیستم‌ها و سیستم‌های چندرسانه‌ای.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="ambient" aria-hidden="true">
+    <div class="ambient__grid"></div>
+    <div class="ambient__orb ambient__orb--a"></div>
+    <div class="ambient__orb ambient__orb--b"></div>
+    <div class="ambient__orb ambient__orb--c"></div>
+  </div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <div class="progress" role="progressbar" aria-label="پیشرفت ارائه" aria-valuemin="1" aria-valuemax="32" aria-valuenow="1">
+    <span id="progressBar"></span>
+  </div>
+
+  <main class="deck" id="deck" aria-label="اسلایدهای ارائهٔ آوالب">
+    <section class="slide slide--cover is-active" data-title="آوالب — آزمایشگاه صوتی" data-kicker="شروع" aria-label="اسلاید جلد">
+      <div class="cover">
+        <div class="cover__copy">
+          <div class="eyebrow" data-reveal style="--i:0">
+            <span class="eyebrow__dot"></span>
+            <span>آزمایشگاه صوتی تعاملی</span>
+            <span class="eyebrow__line"></span>
+            <span class="mono ltr">v0.2.0</span>
+          </div>
+          <h1 class="cover__title" data-reveal style="--i:1">آوالب</h1>
+          <div class="cover__latin mono" data-reveal style="--i:2">AVALAB</div>
+          <p class="cover__lead" data-reveal style="--i:3">از فرمول تا صدا؛ از شکل‌موج تا فشرده‌سازی.</p>
+          <p class="cover__sub" data-reveal style="--i:4">هجده قابلیت، دو درس، یک آزمایشگاه قابل‌اجرا روی لپ‌تاپ.</p>
+          <div class="cover__meta" data-reveal style="--i:5">
+            <span>سیگنال‌ها و سیستم‌ها</span>
+            <span class="meta-sep"></span>
+            <span>سیستم‌های چندرسانه‌ای</span>
+            <span class="meta-sep"></span>
+            <span class="mono ltr">2026</span>
+          </div>
+        </div>
+        <div class="cover__visual" data-reveal style="--i:2">
+          <div class="instrument">
+            <div class="instrument__bar">
+              <span class="instrument__dot"></span>
+              <span class="mono ltr">AVALAB / SIGNAL MONITOR</span>
+              <span class="instrument__status">LIVE</span>
+            </div>
+            <canvas id="heroCanvas" width="720" height="420" aria-hidden="true"></canvas>
+            <div class="instrument__labels" aria-hidden="true">
+              <span class="mono ltr">t →</span>
+              <span class="mono ltr">f ↑</span>
+            </div>
+          </div>
+          <div class="cover__caption">
+            <span class="caption-line"></span>
+            <span>یک ورودی، دو نمایش، یک مسیر آموزشی</span>
+          </div>
+        </div>
+      </div>
+      <footer class="slide-foot">
+        <span class="foot-note">برای شروع، کلید <kbd>←</kbd> یا <kbd>Space</kbd> را بزنید.</span>
+        <span class="foot-id mono" dir="ltr">AVALAB · 01 / 32</span>
+      </footer>
+    </section>
+
+    <section class="slide slide--statement" data-title="مسئله: شکاف میان فرمول و صدا" data-kicker="انگیزه">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="eyebrow__dot"></span><span>انگیزه</span><span class="eyebrow__line"></span><span>چرا این ابزار؟</span></div>
+          <h2 data-reveal style="--i:1">دانشجو فرمول را می‌بیند؛<br><em>اثرش را نمی‌شنود.</em></h2>
+          <p class="lead" data-reveal style="--i:2">فاصلهٔ میان تخته‌سیاه و گوش، جایی است که مفاهیم سیگنال و چندرسانه‌ای نیمه‌فهم می‌مانند.</p>
+        </header>
+        <div class="statement-grid">
+          <article class="statement-card" data-reveal style="--i:3">
+            <span class="statement-card__num mono" dir="ltr">01</span>
+            <h3>نمایش</h3>
+            <p>طیف‌نگاره و شکل‌موج، اثر پارامتر را فوری نشان می‌دهند؛ اما فقط دیدن کافی نیست.</p>
+          </article>
+          <article class="statement-card" data-reveal style="--i:4">
+            <span class="statement-card__num mono" dir="ltr">02</span>
+            <h3>شنیدن</h3>
+            <p>دگرسانی، نویز کوانتیزاسیون و آرتیفکت کدک را باید شنید تا «کیفیت» معنا پیدا کند.</p>
+          </article>
+          <article class="statement-card" data-reveal style="--i:5">
+            <span class="statement-card__num mono" dir="ltr">03</span>
+            <h3>فهمیدن</h3>
+            <p>هر عدد باید فرمول، واحد و علت داشته باشد؛ وگرنه دانشجو فقط دکمه می‌زند.</p>
+          </article>
+        </div>
+        <div class="promise" data-reveal style="--i:6">
+          <span class="promise__mark"></span>
+          <p><strong>وعده:</strong> هر پارامتر را عوض کن، اثر را ببین و بشنو، دلیلش را بخوان.</p>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">آزمایشگاه، نه نمایش اسلاید.</span><span class="foot-id mono" dir="ltr">MOTIVATION</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--map" data-title="نقشهٔ هجده قابلیت" data-kicker="قابلیت‌ها">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="eyebrow__dot"></span><span>نقشهٔ محصول</span><span class="eyebrow__line"></span><span class="mono ltr">F01–F18</span></div>
+          <h2 data-reveal style="--i:1">هجده قابلیت، در یک مسیر یادگیری</h2>
+          <p class="lead" data-reveal style="--i:2">هر قابلیت یک پرسش درسی را به یک آزمایش قابل‌مشاهده و قابل‌شنیدن تبدیل می‌کند.</p>
+        </header>
+        <div class="feature-map">
+          <div class="map-group" data-reveal style="--i:3">
+            <div class="map-group__head"><span class="map-group__dot"></span><h3>ورودی و نمایش</h3></div>
+            <p class="map-group__desc">از فایل خام تا شکل‌موج و طیف‌نگارهٔ هم‌زمان؛ یک مرجع برای همهٔ آزمایش‌ها.</p>
+            <div class="map-chips"><span class="map-chip"><b>F01</b> ورودی صدا</span><span class="map-chip"><b>F02</b> شکل‌موج و طیف‌نگاره</span></div>
+          </div>
+          <div class="map-group" data-reveal style="--i:4">
+            <div class="map-group__head"><span class="map-group__dot"></span><h3>زمان و فرکانس</h3></div>
+            <p class="map-group__desc">گستردگی، فوریه، ویرایش طیف و بازسازی؛ ریاضیات را روی همان سیگنال ببین.</p>
+            <div class="map-chips"><span class="map-chip"><b>F07</b> گستردگی سیگنال</span><span class="map-chip"><b>F08</b> فوریه</span><span class="map-chip"><b>F09</b> ویرایش طیف</span><span class="map-chip"><b>F12</b> مولد و سری فوریه</span></div>
+          </div>
+          <div class="map-group" data-reveal style="--i:5">
+            <div class="map-group__head"><span class="map-group__dot"></span><h3>نمونه‌برداری و سیستم‌ها</h3></div>
+            <p class="map-group__desc">نمونه، بیت، سرعت، فیلتر و پژواک؛ پل میان نظریهٔ سیستم‌ها و گوش.</p>
+            <div class="map-chips"><span class="map-chip"><b>F03</b> نمونه و بیت</span><span class="map-chip"><b>F06</b> سرعت و جهت</span><span class="map-chip"><b>F10</b> معکوس و پژواک</span><span class="map-chip"><b>F11</b> طراحی فیلتر</span></div>
+          </div>
+          <div class="map-group" data-reveal style="--i:6">
+            <div class="map-group__head"><span class="map-group__dot"></span><h3>فشرده‌سازی و کیفیت</h3></div>
+            <p class="map-group__desc">کدک واقعی و آموزشی، متریک کیفیت و ماسک ادراکی؛ از بیت تا شنیدن.</p>
+            <div class="map-chips"><span class="map-chip"><b>F04</b> آزمایشگاه کدک</span><span class="map-chip"><b>F05</b> سنجش کیفیت</span><span class="map-chip"><b>F13</b> روان‌آکوستیک</span></div>
+          </div>
+          <div class="map-group map-group--ai" data-reveal style="--i:7">
+            <div class="map-group__head"><span class="map-group__dot"></span><h3>هوش مصنوعی</h3></div>
+            <p class="map-group__desc">شش وظیفه، شش مدل pin‌شده؛ lazy، آفلاین و با برچسب «تقریب».</p>
+            <div class="map-chips"><span class="map-chip"><b>F14</b> شش وظیفه، شش مدل</span></div>
+          </div>
+          <div class="map-group" data-reveal style="--i:8">
+            <div class="map-group__head"><span class="map-group__dot"></span><h3>تجربهٔ آموزشی</h3></div>
+            <p class="map-group__desc">خط لوله، نظریه، دوزبانگی و مقایسهٔ منصفانه؛ ابزار برای کلاس.</p>
+            <div class="map-chips"><span class="map-chip"><b>F15</b> خط لوله</span><span class="map-chip"><b>F16</b> نظریه و آزمایش</span><span class="map-chip"><b>F17</b> دوزبانگی</span><span class="map-chip"><b>F18</b> کیفیت زندگی</span></div>
+          </div>
+        </div>
+        <div class="map-tracks" data-reveal style="--i:9">
+          <article class="map-track"><span class="map-track__k">مسیر درس ۱</span><h3>سیگنال‌ها و سیستم‌ها</h3><p>F03 · F07 · F08 · F09 · F10 · F11</p></article>
+          <article class="map-track"><span class="map-track__k">مسیر درس ۲</span><h3>سیستم‌های چندرسانه‌ای</h3><p>F04 · F05 · F06 · F13 · F14</p></article>
+          <article class="map-track"><span class="map-track__k">مسیر کلاس</span><h3>آزمایش، ارائه، گزارش</h3><p>F15 · F16 · F17 · F18</p></article>
+        </div>
+        <div class="map-foot" data-reveal style="--i:10">
+          <span class="map-foot__num">۱۹</span>
+          <span>آزمایش هدایت‌شده؛ هر کدام با گام‌های مشخص و مشاهدهٔ موردانتظار.</span>
+          <span class="map-foot__sep"></span>
+          <span>۱۴ پنل نظریه برای ابزارهای غیرهوش‌مصنوعی.</span>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">از ورودی تا گزارش: یک چرخهٔ کامل.</span><span class="foot-id mono" dir="ltr">FEATURE MAP</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--architecture" data-title="معماری: مرز محاسبه" data-kicker="معماری">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="eyebrow__dot"></span><span>معماری</span><span class="eyebrow__line"></span><span>مرز محاسبه</span></div>
+          <h2 data-reveal style="--i:1">هر محاسبه، همان‌جا که پاسخ زنده ممکن است</h2>
+          <p class="lead" data-reveal style="--i:2">DSP در مرورگر می‌ماند؛ کدک واقعی و شبکهٔ عصبی به سرور می‌روند.</p>
+        </header>
+        <div class="arch" data-reveal style="--i:3">
+          <div class="arch__side arch__side--browser">
+            <div class="arch__label"><span class="mono ltr">BROWSER</span><span>لبهٔ تعاملی</span></div>
+            <div class="arch__node"><strong>React + TypeScript</strong><span>رابط، وضعیت، مسیرها</span></div>
+            <div class="arch__node"><strong>DSP Worker</strong><span>FFT، فیلتر، کدک آموزشی، متریک</span></div>
+            <div class="arch__node"><strong>Canvas / OffscreenCanvas</strong><span>شکل‌موج، طیف‌نگاره، نمودار</span></div>
+            <div class="arch__node arch__node--soft"><strong>Web Audio</strong><span>پخش، A/B، بلندی</span></div>
+          </div>
+          <div class="arch__bridge" aria-hidden="true">
+            <span class="arch__pulse arch__pulse--a"></span>
+            <span class="arch__pulse arch__pulse--b"></span>
+            <span class="arch__bridge-label mono ltr">/api/v1</span>
+          </div>
+          <div class="arch__side arch__side--server">
+            <div class="arch__label"><span class="mono ltr">FASTAPI</span><span>لبهٔ سنگین</span></div>
+            <div class="arch__node"><strong>Ingest + ffmpeg</strong><span>رمزگشایی، کدک واقعی، WAV</span></div>
+            <div class="arch__node"><strong>ML Adapters</strong><span>شش مدل pin‌شده و lazy</span></div>
+            <div class="arch__node"><strong>Job Manager + SSE</strong><span>صف، پیشرفت، لغو</span></div>
+            <div class="arch__node arch__node--soft"><strong>TTL + UUID</strong><span>بدون دیتابیس، بدون حساب</span></div>
+          </div>
+        </div>
+        <div class="arch-notes">
+          <article class="arch-note" data-reveal style="--i:4"><span class="arch-note__k">قاعده</span><p>اگر باید هنگام حرکت اسلایدر واکنش نشان دهد، در مرورگر؛ اگر کدک واقعی یا شبکهٔ عصبی می‌خواهد، در سرور.</p></article>
+          <article class="arch-note" data-reveal style="--i:5"><span class="arch-note__k">قرارداد</span><p>OpenAPI تنها منبع حقیقت است؛ کلاینت TypeScript تولید می‌شود، نه دست‌نویس.</p></article>
+        </div>
+        <div class="process-band" data-reveal style="--i:6">
+          <div class="process-band__head"><span class="mono ltr">REQUEST / LIFECYCLE</span><span>یک درخواست، از آپلود تا پیشرفت</span></div>
+          <div class="flow flow--h flow--compact">
+            <div class="flow__node"><strong>آپلود</strong><small class="mono ltr">POST /ingest</small></div>
+            <div class="flow__link flow__link--h"><span></span></div>
+            <div class="flow__node"><strong>پروب</strong><small class="mono ltr">ffprobe</small></div>
+            <div class="flow__link flow__link--h"><span></span></div>
+            <div class="flow__node"><strong>PCM متعارف</strong><small class="mono ltr">float32 · WAV</small></div>
+            <div class="flow__link flow__link--h"><span></span></div>
+            <div class="flow__node"><strong>کار</strong><small class="mono ltr">POST /ml/{task}</small></div>
+            <div class="flow__link flow__link--h"><span></span></div>
+            <div class="flow__node flow__node--accent"><strong>پیشرفت</strong><small class="mono ltr">SSE + cancel</small></div>
+          </div>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">هیچ DSP روی رشتهٔ اصلی اجرا نمی‌شود.</span><span class="foot-id mono" dir="ltr">ARCHITECTURE</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F01 — ورودی صدا" data-kicker="F01 · ورودی صدا">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F01</span><span class="eyebrow__line"></span><span>ورودی صدا</span></div>
+          <h2 data-reveal style="--i:1">هر فایل صوتی، یک نمایش متعارف</h2>
+          <p class="lead" data-reveal style="--i:2">پیش از هر تحلیلی، ورودی به یک PCM اعشاری ۳۲ بیتی و قابل‌پیش‌بینی تبدیل می‌شود.</p>
+        </header>
+        <div class="slide-grid">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>مرورگر همهٔ ظرف‌ها و کدک‌ها را رمزگشایی نمی‌کند. یک نمایش واحد، رفتار همهٔ ابزارهای پایین‌دست را یکسان می‌کند.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>فایل با <code>ffprobe</code> از روی محتوا بررسی می‌شود، نه پسوند؛ سپس <code>ffmpeg</code> با آرگومان‌های ثابت آن را به WAV متعارف تبدیل می‌کند.</p>
+            </article>
+            <div class="chip-row" data-reveal style="--i:5">
+              <span class="chip">۵ دقیقه</span><span class="chip">۲۰۰ مگابایت</span><span class="chip">۱–۲ کانال</span><span class="chip">تا ۹۶ کیلوهرتز</span>
+            </div>
+          </div>
+          <div class="visual" data-reveal style="--i:6">
+            <div class="flow flow--v" aria-label="مسیر ورودی صدا">
+              <div class="flow__node"><span class="flow__n mono" dir="ltr">01</span><div><strong>فایل</strong><small>آپلود، میکروفن یا دموی CC0</small></div></div>
+              <div class="flow__link"><span></span></div>
+              <div class="flow__node"><span class="flow__n mono" dir="ltr">02</span><div><strong>ffprobe</strong><small>اعتبارسنجی محتوا، مدت، اندازه و کانال</small></div></div>
+              <div class="flow__link"><span></span></div>
+              <div class="flow__node"><span class="flow__n mono" dir="ltr">03</span><div><strong>ffmpeg</strong><small>رمزگشایی و تبدیل به PCM اعشاری ۳۲ بیتی</small></div></div>
+              <div class="flow__link"><span></span></div>
+              <div class="flow__node flow__node--accent"><span class="flow__n mono" dir="ltr">04</span><div><strong>نشست صوتی</strong><small>UUID، TTL و نمایش متعارف</small></div></div>
+            </div>
+            <div class="note-strip"><span class="dot"></span> فایل اصلی بازنویسی نمی‌شود؛ نام و محتوای صدا لاگ نمی‌شود.</div>
+          </div>
+        </div>
+        <div class="insight-band" data-reveal style="--i:7">
+          <article class="insight"><span class="insight__k">اعتبارسنجی</span><p>نوع فایل با ffprobe تشخیص داده می‌شود، نه با پسوند؛ نام و محتوا در لاگ ثبت نمی‌شوند.</p></article>
+          <article class="insight"><span class="insight__k">حریم</span><p>ذخیره با UUID و حذف خودکار پس از ۶۰ دقیقه؛ هیچ حساب یا تحلیل هویتی وجود ندارد.</p></article>
+          <article class="insight"><span class="insight__k">محدودیت</span><p>۵ دقیقه، ۲۰۰ مگابایت و ۹۶ کیلوهرتز؛ فایل بزرگ‌تر با پیام روشن رد می‌شود، نه بریده.</p></article>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">تحلیل روی downmix مونو؛ پخش استریو حفظ می‌شود.</span><span class="foot-id mono" dir="ltr">F01 · INGEST</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F02 — شکل‌موج و طیف‌نگاره" data-kicker="F02 · نمایش">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F02</span><span class="eyebrow__line"></span><span>شکل‌موج و طیف‌نگاره</span></div>
+          <h2 data-reveal style="--i:1">زمان و فرکانس، هم‌زمان</h2>
+          <p class="lead" data-reveal style="--i:2">یک playhead مشترک، لحظه را به فرکانس و فرکانس را به لحظه گره می‌زند.</p>
+        </header>
+        <div class="slide-grid slide-grid--visual">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>فایل پنج‌دقیقه‌ای را نمی‌توان یک‌جا و با جزئیات دید. نمای کلی برای جهت‌یابی است و نمای جزئی برای قضاوت.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>نمای کلی min/max از پیش محاسبه‌شده؛ STFT تدریجی در Worker؛ انتخاب و playhead مشترک؛ تغییر پنجره، hop، dB و colormap.</p>
+            </article>
+          </div>
+          <div class="visual" data-reveal style="--i:5">
+            <div class="shot-stack">
+              <figure class="shot">
+                <div class="shot__bar"><span class="shot__dot"></span><span class="mono ltr">WAVEFORM / TIME</span><span class="shot__zoom">نمای کلی + جزئی</span></div>
+                <img src="assets/images/waveform.png" alt="نمای شکل‌موج آوالب با انتخاب زمان و playhead" loading="eager" decoding="async">
+              </figure>
+              <figure class="shot">
+                <div class="shot__bar"><span class="shot__dot"></span><span class="mono ltr">SPECTROGRAM / FREQUENCY</span><span class="shot__zoom">Hann · dB · colormap</span></div>
+                <img src="assets/images/spectrogram.png" alt="نمای طیف‌نگاره آوالب با محور فرکانس و نوار رنگ" loading="eager" decoding="async">
+              </figure>
+              <span class="playhead-line" aria-hidden="true"></span>
+            </div>
+          </div>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">مقایسهٔ قبل/بعد در هر ابزار؛ محورها همیشه LTR.</span><span class="foot-id mono" dir="ltr">F02 · VIEWS</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F08 — تبدیل فوریه" data-kicker="F08 · فرکانس">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F08</span><span class="eyebrow__line"></span><span>تبدیل فوریه</span></div>
+          <h2 data-reveal style="--i:1">FFT فقط یک تابع کتابخانه‌ای نیست</h2>
+          <p class="lead" data-reveal style="--i:2">هم تعریف O(N²) را نشان می‌دهیم، هم مسیر O(N log N) را؛ و هر دو را با مرجع بیرونی می‌سنجیم.</p>
+        </header>
+        <div class="slide-grid slide-grid--visual">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>برای آموزش، «چه چیزی» و «چگونه» جدایی‌ناپذیرند. برای اعتماد، خروجی باید با NumPy/SciPy مقایسه شود.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>DFT ساده برای تدریس؛ radix-2 Cooley–Tukey؛ Bluestein برای طول غیرتوان‌دو؛ Float64 در هسته؛ مقایسه با کتابخانه و نمایش پروانه‌های N=8/16.</p>
+            </article>
+            <div class="formula-chip" dir="ltr" data-reveal style="--i:5">
+              <span class="formula">X[k] = Σ<sub>n=0</sub><sup>N−1</sup> x[n] · e<sup>−j2πkn/N</sup></span>
+            </div>
+          </div>
+          <div class="visual" data-reveal style="--i:6">
+            <figure class="shot">
+              <div class="shot__bar"><span class="shot__dot"></span><span class="mono ltr">FFT / MAGNITUDE + PHASE</span><span class="shot__zoom">پنجره و ماسک فاز</span></div>
+              <img src="assets/images/fft.png" alt="نمای تبدیل فوریه آوالب با دامنه و فاز" loading="lazy" decoding="async">
+            </figure>
+            <div class="chip-row chip-row--tight">
+              <span class="chip chip--accent">مقایسه با fft.js</span><span class="chip">پروانه‌های N=8</span><span class="chip">Bluestein</span>
+            </div>
+          </div>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">۰ dB یعنی سینوس تمام‌مقیاس؛ فاز با آستانهٔ دامنه پوشانده می‌شود.</span><span class="foot-id mono" dir="ltr">F08 · FOURIER</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature slide--demo" data-demo="aliasing" data-title="F03 — نمونه‌برداری و کوانتیزاسیون" data-kicker="F03 · نمونه و بیت">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F03</span><span class="eyebrow__line"></span><span>نمونه‌برداری و کوانتیزاسیون</span></div>
+          <h2 data-reveal style="--i:1">نایکوئیست را بشکن و ببین</h2>
+          <p class="lead" data-reveal style="--i:2">بسامد را از نایکوئیست عبور بده: عدد دگرسانی را پیش‌بینی کن و همان را روی بوم ببین.</p>
+        </header>
+        <div class="slide-grid slide-grid--demo">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>دگرسانی و نویز کوانتیزاسیون تا وقتی شنیده و دیده نشوند، در ذهن نمی‌مانند. پارامتر باید اثر داشته باشد، نه فقط مقدار.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>بازنمونه‌برداری گویا با فیلتر Kaiser–Sinc؛ مسیر بدون فیلتر برای نمایش دگرسانی؛ کوانتیزاسیون mid-tread و TPDF؛ مقایسهٔ SNR با ۶٫۰۲N+۱٫۷۶.</p>
+            </article>
+            <div class="formula-chip" dir="ltr" data-reveal style="--i:5">
+              <span class="formula">f<sub>alias</sub> = | f − f<sub>s</sub> · round(f / f<sub>s</sub>) |</span>
+            </div>
+          </div>
+          <div class="visual" data-reveal style="--i:6">
+            <div class="demo-card">
+              <div class="demo-card__head">
+                <div><span class="demo-card__k">آزمایش زنده</span><span class="demo-card__title">دگرسانی در حوزهٔ زمان</span></div>
+                <output class="readout mono" id="aliasReadout" dir="ltr">—</output>
+              </div>
+              <canvas id="aliasCanvas" width="720" height="320" aria-label="نمودار دگرسانی: سینوس پیوسته و نمونه‌های نرخ هدف"></canvas>
+              <div class="demo-card__controls">
+                <label class="control">نرخ هدف <output id="aliasRateOut" class="mono" dir="ltr">8.0 kHz</output>
+                  <input id="aliasRate" type="range" min="1000" max="16000" step="500" value="8000">
+                </label>
+                <label class="control">بسامد ورودی <output id="aliasFreqOut" class="mono" dir="ltr">6.0 kHz</output>
+                  <input id="aliasFreq" type="range" min="500" max="10000" step="100" value="6000">
+                </label>
+                <button id="aliasFilter" class="toggle" type="button" aria-pressed="false">فیلتر ضد دگرسانی: خاموش</button>
+              </div>
+            </div>
+            <p class="visual-note">اگر بسامد از نصف نرخ نمونه‌برداری بیشتر شود، خط‌چین، بسامد تاشده را نشان می‌دهد.</p>
+          </div>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">این کارت بدون فایل کار می‌کند؛ عدد پیش‌بینی و قلهٔ اندازه‌گیری هر دو نمایش داده می‌شوند.</span><span class="foot-id mono" dir="ltr">F03 · SAMPLING</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F07 — گستردگی سیگنال در زمان" data-kicker="F07 · زمان">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F07</span><span class="eyebrow__line"></span><span>گستردگی سیگنال در زمان</span></div>
+          <h2 data-reveal style="--i:1">پنجره، تکیه‌گاه، عدم‌قطعیت</h2>
+          <p class="lead" data-reveal style="--i:2">مدت، تکیه‌گاه، انرژی و قدرت؛ و اینکه بریدن و صفرافزودن چه بلایی بر طیف می‌آورد.</p>
+        </header>
+        <div class="slide-grid slide-grid--visual">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>«گستردگی» فقط طول نیست: تکیه‌گاه غیرصفر، انرژی و قدرت متوسط، سیگنال را به انرژی‌ای یا قدرتی طبقه‌بندی می‌کنند.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>برش، صفرافزایی، شیفت، مقیاس زمانی، معکوس و گسترش متناوب؛ سپس تحلیل support و طیف با همان پنجره برای مقایسهٔ منصفانه.</p>
+            </article>
+            <div class="formula-chip" dir="ltr" data-reveal style="--i:5">
+              <span class="formula">Δf = f<sub>s</sub> / N</span>
+            </div>
+          </div>
+          <div class="visual" data-reveal style="--i:6">
+            <figure class="shot">
+              <div class="shot__bar"><span class="shot__dot"></span><span class="mono ltr">EXTENT / SUPPORT</span><span class="shot__zoom">قبل و بعد</span></div>
+              <img src="assets/images/extent.png" alt="نمای گستردگی سیگنال آوالب با نمایش support و انرژی" loading="lazy" decoding="async">
+            </figure>
+            <div class="stat-strip">
+              <div><strong>مدت</strong><span>ثانیه</span></div><div><strong>نمونه</strong><span>تعداد</span></div><div><strong>انرژی</strong><span>جمع مربع‌ها</span></div><div><strong>قدرت</strong><span>میانگین</span></div>
+            </div>
+          </div>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">صفرافزایی درون‌یابی است، نه اطلاعات تازه؛ کوتاه‌تر در زمان، پهن‌تر در فرکانس.</span><span class="foot-id mono" dir="ltr">F07 · EXTENT</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F06 — سرعت و جهت پخش" data-kicker="F06 · زمان و گام">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F06</span><span class="eyebrow__line"></span><span>سرعت و جهت پخش</span></div>
+          <h2 data-reveal style="--i:1">سریع‌تر، بدون اینکه گام را از دست بدهی</h2>
+          <p class="lead" data-reveal style="--i:2">دو حالت را کنار هم بگذار: تغییر سرعت با تغییر گام، و تغییر سرعت با حفظ گام.</p>
+        </header>
+        <div class="slide-grid slide-grid--visual">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>«سرعت ۲×» یک چیز نیست. resampling مانند نوار کاست گام را هم عوض می‌کند؛ phase vocoder فقط زمان را تغییر می‌دهد.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>resample: نرخ خروجی = fs/speed؛ time-stretch: STFT، انتشار فاز و WOLA؛ pitch-shift = کشش + بازنمونه‌برداری برای برگرداندن طول.</p>
+            </article>
+            <div class="formula-chip" dir="ltr" data-reveal style="--i:5">
+              <span class="formula">q = 2<sup>semitones / 12</sup></span>
+            </div>
+          </div>
+          <div class="visual" data-reveal style="--i:6">
+            <figure class="shot">
+              <div class="shot__bar"><span class="shot__dot"></span><span class="mono ltr">SPEED / TIME-STRETCH</span><span class="shot__zoom">طیف‌نگارهٔ نتیجه</span></div>
+              <img src="assets/images/speed.png" alt="نمای سرعت و کشش زمانی آوالب با طیف‌نگارهٔ نتیجه" loading="lazy" decoding="async">
+            </figure>
+            <div class="chip-row chip-row--tight"><span class="chip chip--accent">۰٫۲۵×–۴×</span><span class="chip">معکوس</span><span class="chip">±۵ / ±۱۰ ثانیه</span></div>
+          </div>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">گام ±۱۲ نیم‌پرده؛ طول خروجی دقیقاً حفظ می‌شود.</span><span class="foot-id mono" dir="ltr">F06 · SPEED</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature slide--demo" data-demo="convolution" data-title="F10 — معکوس و پژواک" data-kicker="F10 · سیستم‌ها">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F10</span><span class="eyebrow__line"></span><span>معکوس و پژواک</span></div>
+          <h2 data-reveal style="--i:1">پژواک، پیچش با پاسخ ضربه است</h2>
+          <p class="lead" data-reveal style="--i:2">h برعکس می‌شود، روی x می‌لغزد و هر لغزش یک نمونه از خروجی را می‌سازد.</p>
+        </header>
+        <div class="slide-grid slide-grid--demo">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>نمایش LTI بدون دیدن پاسخ ضربه ناقص است؛ و «معکوس زمانی» با «پژواک» یکی نیست. هزینهٔ هم‌گشت مستقیم هم باید دیده شود.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>IR مصنوعی با RT60 و بازتاب‌های اولیه؛ هم‌گشت FFT با overlap-add؛ true-stereo با چهار هم‌گشت؛ مستقیم فقط برای مقایسه و آموزش.</p>
+            </article>
+            <div class="formula-chip" dir="ltr" data-reveal style="--i:5">
+              <span class="formula">y[n] = Σ<sub>k</sub> x[k] · h[n − k]</span>
+            </div>
+          </div>
+          <div class="visual" data-reveal style="--i:6">
+            <div class="demo-card">
+              <div class="demo-card__head">
+                <div><span class="demo-card__k">آزمایش زنده</span><span class="demo-card__title">هم‌گشت: برگردان و لغزش</span></div>
+                <output class="readout mono" id="convReadout" dir="ltr">n = 0</output>
+              </div>
+              <canvas id="convCanvas" width="720" height="340" aria-label="نمایش گام‌به‌گام هم‌گشت: سیگنال، پاسخ ضربه و خروجی"></canvas>
+              <div class="demo-card__controls demo-card__controls--conv">
+                <label class="control">جای پنجره <input id="convPos" type="range" min="0" max="100" value="28"></label>
+                <button id="convPlay" class="toggle" type="button" aria-pressed="true">توقف</button>
+              </div>
+            </div>
+            <p class="visual-note">خروجی، مجموع سهم هر لغزش است؛ این همان تعریف هم‌گشت است.</p>
+          </div>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">wet/dry، pre-delay و IR آپلودی؛ واژه‌ها در UI و مستندات از هم جدا شده‌اند.</span><span class="foot-id mono" dir="ltr">F10 · CONVOLUTION</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F11 — طراحی فیلتر" data-kicker="F11 · فیلتر">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F11</span><span class="eyebrow__line"></span><span>طراحی فیلتر و صفحهٔ Z</span></div>
+          <h2 data-reveal style="--i:1">فیلتر را طراحی کن، پاسخش را ببین</h2>
+          <p class="lead" data-reveal style="--i:2">دامنه کافی نیست: فاز، تأخیر گروهی و قطب–صفر تعیین می‌کنند که فیلتر در عمل چه می‌کند.</p>
+        </header>
+        <div class="slide-grid slide-grid--visual">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>دانشجو باید ببیند FIR خطی‌فاز چه هزینه‌ای دارد و IIR کارآمد چه ریسکی. پایداری نباید یک ادعا باشد؛ باید روی صفحهٔ Z دیده شود.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>FIR با پنجرهٔ Kaiser؛ IIR باترورث/چبیشف I و biquadهای RBJ؛ پاسخ دامنه، فاز، تأخیر گروهی، ضربه و پله؛ اعمال در Worker.</p>
+            </article>
+            <div class="formula-chip" dir="ltr" data-reveal style="--i:5">
+              <span class="formula">H(z) = Σ b<sub>k</sub> z<sup>−k</sup> / (1 + Σ a<sub>k</sub> z<sup>−k</sup>)</span>
+            </div>
+          </div>
+          <div class="visual" data-reveal style="--i:6">
+            <figure class="shot">
+              <div class="shot__bar"><span class="shot__dot"></span><span class="mono ltr">FILTER LAB / Z-PLANE</span><span class="shot__zoom">پاسخ و پایداری</span></div>
+              <img src="assets/images/filters.png" alt="نمای طراحی فیلتر آوالب با پاسخ فرکانسی و صفحهٔ قطب–صفر" loading="lazy" decoding="async">
+            </figure>
+            <div class="chip-row chip-row--tight"><span class="chip chip--accent">پایدار / ناپایدار</span><span class="chip">خطی‌فاز</span><span class="chip">قطب–صفر</span></div>
+          </div>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">ضرایب برای پنهان‌کردن ناپایداری دست‌کاری نمی‌شوند؛ محدودیت‌ها مستند می‌شوند.</span><span class="foot-id mono" dir="ltr">F11 · FILTERS</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F04 — آزمایشگاه فشرده‌سازی" data-kicker="F04 · فشرده‌سازی">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F04</span><span class="eyebrow__line"></span><span>آزمایشگاه فشرده‌سازی</span></div>
+          <h2 data-reveal style="--i:1">فشرده‌سازی را از داخل ببین</h2>
+          <p class="lead" data-reveal style="--i:2">از RLE و هافمن تا MDCT دست‌نویس؛ و از FLAC و MP3 تا Opus واقعی.</p>
+        </header>
+        <div class="slide-grid slide-grid--visual">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>برای فهم فشرده‌سازی باید درون کدک را دید؛ اما برای کار واقعی نباید چرخ کدک را دوباره اختراع کرد.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>RLE، هافمن متعارف، delta+هافمن، µ-law/A-law و MDCT در مرورگر؛ FLAC/MP3/AAC/Opus/Vorbis با ffmpeg در سرور؛ مقایسهٔ یک‌جدولی.</p>
+            </article>
+            <div class="formula-chip" dir="ltr" data-reveal style="--i:5">
+              <span class="formula">H = −Σ p<sub>s</sub> log<sub>2</sub> p<sub>s</sub></span>
+            </div>
+          </div>
+          <div class="visual visual--stack" data-reveal style="--i:6">
+            <figure class="shot">
+              <div class="shot__bar"><span class="shot__dot"></span><span class="mono ltr">CODEC LAB / COMPARE</span><span class="shot__zoom">بیت‌به‌بیت ✓</span></div>
+              <img src="assets/images/codec.png" alt="نمای آزمایشگاه کدک آوالب با جدول مقایسه و آمار" loading="lazy" decoding="async">
+            </figure>
+            <div class="meter-block">
+              <div class="meter-block__head"><span>بودجهٔ بیت</span><span class="mono ltr">8 → 512 kbps</span></div>
+              <div class="meter"><span style="--w: 64%"></span></div>
+              <div class="meter-block__foot"><span>MDCT</span><span>هافمن</span><span>هافمن متعارف</span></div>
+            </div>
+          </div>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">MDCT در محتوای تونال محدودیت شناخته‌شده دارد؛ در ALGORITHMS ثبت شده است.</span><span class="foot-id mono" dir="ltr">F04 · CODECS</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F05 — سنجش کیفیت" data-kicker="F05 · متریک">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F05</span><span class="eyebrow__line"></span><span>سنجش کیفیت</span></div>
+          <h2 data-reveal style="--i:1">کیفیت را عدد بده، اما منصفانه</h2>
+          <p class="lead" data-reveal style="--i:2">کدک تأخیر دارد؛ مقایسهٔ نمونه‌به‌نمونهٔ ناهم‌تراز، عدد بی‌معنا می‌سازد.</p>
+        </header>
+        <div class="slide-grid">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>MSE و SNR فقط وقتی معنا دارند که دو سیگنال به یک مرجع زمانی برگردند. PSNR هم بدون تعریف peak قابل‌تکرار نیست.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>همبستگی متقابل نرمال‌شده برای یافتن lag؛ یک trim برای همهٔ کانال‌ها؛ PSNR با peak = 1.0؛ نمایش ∞ برای تطابق کامل.</p>
+            </article>
+            <div class="formula-chip" dir="ltr" data-reveal style="--i:5">
+              <span class="formula">PSNR = 10 log<sub>10</sub>(peak<sup>2</sup> / MSE), peak = 1.0</span>
+            </div>
+          </div>
+          <div class="visual" data-reveal style="--i:6">
+            <div class="align-card">
+              <div class="align-card__head"><span class="mono ltr">REFERENCE</span><span class="mono ltr">DECODED</span></div>
+              <div class="align-row"><span class="align-label">مرجع</span><div class="align-track"><span class="align-wave align-wave--a"></span></div></div>
+              <div class="align-row align-row--offset"><span class="align-label">کدک</span><div class="align-track"><span class="align-wave align-wave--b"></span></div></div>
+              <div class="align-arrow"><span>cross-correlation → trim</span></div>
+              <div class="align-row"><span class="align-label">تراز</span><div class="align-track"><span class="align-wave align-wave--a"></span></div></div>
+              <div class="align-row"><span class="align-label">تراز</span><div class="align-track"><span class="align-wave align-wave--b"></span></div></div>
+            </div>
+            <div class="metric-chips"><span>MSE</span><span>SNR</span><span>segSNR</span><span>PSNR</span><span>CR</span><span>bitrate</span><span>entropy</span></div>
+          </div>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">نرخ–اعوجاج از همین متریک‌ها ساخته می‌شود؛ ردیف‌های بی‌اتلاف با ∞ در جدول می‌مانند.</span><span class="foot-id mono" dir="ltr">F05 · METRICS</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F09 — ویرایش طیف" data-kicker="F09 · طیف">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F09</span><span class="eyebrow__line"></span><span>ویرایش Re/Im و دامنه/فاز</span></div>
+          <h2 data-reveal style="--i:1">طیف را مثل یک بوم ویرایش کن</h2>
+          <p class="lead" data-reveal style="--i:2">دامنه، فاز، بخش حقیقی و موهومی را دست‌کاری کن؛ بعد به زمان برگرد و بشنو.</p>
+        </header>
+        <div class="slide-grid slide-grid--visual">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>تقارن هرمیتی، معنی فاز و پیامد ماسک آجری را نمی‌توان فقط با فرمول فهمید. ویرایش دستی، IFFT را به تجربه تبدیل می‌کند.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>ویرایش باندی و منحنی آزاد؛ حداکثر ۸ منحنی و ۲۵۶ نقطه؛ اعمال پیش از هرمیتی؛ IFFT در Worker؛ پخش بخش حقیقی وقتی هرمیتی خاموش است.</p>
+            </article>
+            <div class="formula-chip" dir="ltr" data-reveal style="--i:5">
+              <span class="formula">x[n] = (1/N) Σ<sub>k</sub> X[k] e<sup>j2πkn/N</sup></span>
+            </div>
+          </div>
+          <div class="visual" data-reveal style="--i:6">
+            <figure class="shot">
+              <div class="shot__bar"><span class="shot__dot"></span><span class="mono ltr">SPECTRUM EDIT / IFFT</span><span class="shot__zoom">Hermitian toggle</span></div>
+              <img src="assets/images/spectrum-edit.png" alt="نمای ویرایش طیف آوالب با منحنی‌های دامنه و فاز" loading="lazy" decoding="async">
+            </figure>
+            <div class="chip-row chip-row--tight"><span class="chip chip--accent">۸ منحنی</span><span class="chip">Zero Im</span><span class="chip">Magnitude only</span></div>
+          </div>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">ماسک آجری، ringing گیبس را قابل‌دیدن می‌کند؛ حالت غیرهرمیتی یک حالت آموزشی است.</span><span class="foot-id mono" dir="ltr">F09 · SPECTRUM</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F12 — مولد سیگنال و سری فوریه" data-kicker="F12 · ساخت سیگنال">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F12</span><span class="eyebrow__line"></span><span>مولد سیگنال و سری فوریه</span></div>
+          <h2 data-reveal style="--i:1">سیگنال را از صفر بساز</h2>
+          <p class="lead" data-reveal style="--i:2">بدون فایل هم باید آزمایش کرد؛ و سری فوریه باید شنیدنی باشد، نه فقط نوشتنی.</p>
+        </header>
+        <div class="slide-grid slide-grid--visual">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>بسیاری از آزمایش‌ها به یک ورودی کنترل‌شده نیاز دارند. مولد قطعی، آزمایش را قابل‌تکرار می‌کند و گیبس را از نزدیک نشان می‌دهد.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>سینوس، مربع، اره‌ای، مثلث، ضربه، پله، نویز سفید/صورتی، chirp، دو تُن و AM/FM؛ بازسازی با هارمونیک‌های ۱ تا ۲۱؛ نویز با seed.</p>
+            </article>
+            <div class="chip-row" data-reveal style="--i:5"><span class="chip">قطعی</span><span class="chip">seed</span><span class="chip">هارمونیک ۱–۲۱</span><span class="chip">Gibbs</span></div>
+          </div>
+          <div class="visual" data-reveal style="--i:6">
+            <figure class="shot">
+              <div class="shot__bar"><span class="shot__dot"></span><span class="mono ltr">GENERATOR / FOURIER SERIES</span><span class="shot__zoom">پیش‌نمایش زنده</span></div>
+              <img src="assets/images/generator.png" alt="نمای مولد سیگنال و بازسازی سری فوریه آوالب" loading="lazy" decoding="async">
+            </figure>
+            <div class="note-strip"><span class="dot"></span> خروجی مولد می‌تواند ورودی هر ابزار دیگر باشد.</div>
+          </div>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">AM/FM در DSP و رابط؛ فاز chirp به‌صورت بسته محاسبه می‌شود.</span><span class="foot-id mono" dir="ltr">F12 · GENERATOR</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F13 — روان‌آکوستیک" data-kicker="F13 · ادراک">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F13</span><span class="eyebrow__line"></span><span>روان‌آکوستیک و ماسک</span></div>
+          <h2 data-reveal style="--i:1">آنچه گوش نمی‌شنود، شاید لازم نیست ذخیره شود</h2>
+          <p class="lead" data-reveal style="--i:2">کدک ادراکی به‌جای وفاداری نمونه‌ای، وفاداری شنیداری می‌فروشد.</p>
+        </header>
+        <div class="slide-grid slide-grid--visual">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>ماسک فرکانسی توضیح می‌دهد چرا می‌توان بیت کم کرد بدون اینکه تفاوت شنیده شود؛ و چرا «کیفیت» به محتوا وابسته است.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>۲۵ باند Bark؛ آستانهٔ Terhardt؛ پخش‌شدگی Schroeder؛ SMR؛ گام کوانتیزاسیون هر باند؛ و کدک MDCT ادراکی با side-info ثابت.</p>
+            </article>
+            <div class="formula-chip" dir="ltr" data-reveal style="--i:5">
+              <span class="formula">SMR<sub>i</sub> = L<sub>i</sub> − T<sub>i</sub></span>
+            </div>
+          </div>
+          <div class="visual" data-reveal style="--i:6">
+            <figure class="shot">
+              <div class="shot__bar"><span class="shot__dot"></span><span class="mono ltr">PSYCHOACOUSTICS / BARK</span><span class="shot__zoom">ATH + masking</span></div>
+              <img src="assets/images/psychoacoustics.png" alt="نمای روان‌آکوستیک آوالب با باندهای Bark و آستانهٔ ماسک" loading="lazy" decoding="async">
+            </figure>
+            <div class="chip-row chip-row--tight"><span class="chip chip--accent">۲۵ باند</span><span class="chip">ATH</span><span class="chip">Spreading</span><span class="chip">SMR</span></div>
+          </div>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">مدل ایستا و آموزشی است؛ ماسک زمانی و تفکیک تونال/نویزی ندارد و ادعای MP3/AAC نیست.</span><span class="foot-id mono" dir="ltr">F13 · MASKING</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--section slide--ai-intro" data-title="F14 — ابزارهای هوش مصنوعی" data-kicker="F14 · هوش مصنوعی">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F14</span><span class="eyebrow__line"></span><span>ابزارهای هوش مصنوعی</span></div>
+          <h2 data-reveal style="--i:1">شش وظیفه، شش مدل، یک قاعده</h2>
+          <p class="lead" data-reveal style="--i:2">مدل‌ها سنگین‌اند؛ پس lazy، pin‌شده، آفلاین و پشت یک رابط واحد زندگی می‌کنند.</p>
+        </header>
+        <div class="model-grid">
+          <article class="model-card" data-reveal style="--i:3">
+            <div class="model-card__head"><span class="model-card__task">حذف نویز</span><span class="model-card__size mono" dir="ltr">10.5 MB</span></div>
+            <h3>DPDFNet</h3>
+            <p>گفتار ۴۸ کیلوهرتز؛ ONNX؛ اجرای CPU.</p>
+            <div class="model-card__foot"><span class="chip chip--soft">MIT</span><span>سبک‌ترین</span></div>
+          </article>
+          <article class="model-card" data-reveal style="--i:4">
+            <div class="model-card__head"><span class="model-card__task">ابربازسازی</span><span class="model-card__size mono" dir="ltr">57.1 MB</span></div>
+            <h3>LavaSR</h3>
+            <p>گسترش پهنای‌باند گفتار؛ ONNX؛ همراه fallback.</p>
+            <div class="model-card__foot"><span class="chip chip--soft">Apache-2.0</span><span>گفتار</span></div>
+          </article>
+          <article class="model-card" data-reveal style="--i:5">
+            <div class="model-card__head"><span class="model-card__task">جداسازی منابع</span><span class="model-card__size mono" dir="ltr">84.0 MB</span></div>
+            <h3>HTDemucs</h3>
+            <p>چهار Stem؛ ۴۴٫۱ کیلوهرتز؛ قطعهٔ پیش‌فرض ۱۵ ثانیه.</p>
+            <div class="model-card__foot"><span class="chip chip--soft">MIT</span><span>سنگین‌ترین محاسبه</span></div>
+          </article>
+          <article class="model-card model-card--featured" data-reveal style="--i:6">
+            <div class="model-card__head"><span class="model-card__task">تبدیل گفتار به متن</span><span class="model-card__size mono" dir="ltr">1.53 GB</span></div>
+            <h3>faster-whisper medium</h3>
+            <p>فارسی و انگلیسی؛ int8 روی CPU؛ قطعهٔ ۳۰ ثانیه.</p>
+            <div class="model-card__foot"><span class="chip chip--soft">MIT</span><span class="chip chip--accent">D-058</span></div>
+          </article>
+          <article class="model-card" data-reveal style="--i:7">
+            <div class="model-card__head"><span class="model-card__task">کدک عصبی</span><span class="model-card__size mono" dir="ltr">76.3 MB</span></div>
+            <h3>EnCodec 48 kHz</h3>
+            <p>۱٫۵–۲۴ kbps؛ استریو؛ اندازهٔ تخمینی، نه بیت‌استریم واقعی.</p>
+            <div class="model-card__foot"><span class="chip chip--soft">MIT</span><span>مقایسهٔ نرخ–اعوجاج</span></div>
+          </article>
+          <article class="model-card" data-reveal style="--i:8">
+            <div class="model-card__head"><span class="model-card__task">طبقه‌بندی صدا</span><span class="model-card__size mono" dir="ltr">346.4 MB</span></div>
+            <h3>AST AudioSet</h3>
+            <p>چندبرچسبی؛ پنجرهٔ ۱۰ ثانیه؛ تا سه پنجره.</p>
+            <div class="model-card__foot"><span class="chip chip--soft">BSD-3</span><span>P3</span></div>
+          </article>
+        </div>
+        <div class="model-total" data-reveal style="--i:9">
+          <span>جمع مدل‌ها، حجم تازه:</span><strong class="mono" dir="ltr">2,104,958,472 B ≈ 2.1 GB</strong>
+          <span class="model-total__sep"></span>
+          <span>بودجهٔ ۲ GB با تصمیم صریح مالک برای ASR کنار گذاشته شد.</span>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">همهٔ مدل‌ها lazy، pin‌شده و پس از prefetch با <span class="mono ltr">HF_HUB_OFFLINE=1</span> اجرا می‌شوند.</span><span class="foot-id mono" dir="ltr">F14 · MODELS</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F14 — حذف نویز و ابربازسازی" data-kicker="F14 · پاک‌سازی و گسترش">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F14</span><span class="eyebrow__line"></span><span>پاک‌سازی و گسترش پهنای‌باند</span></div>
+          <h2 data-reveal style="--i:1">نویز را کم کن؛ پهنای‌باند را برگردان</h2>
+          <p class="lead" data-reveal style="--i:2">هر دو مدل گفتارمحورند؛ و هر دو باید با برچسب «تقریب هوش مصنوعی» نمایش داده شوند.</p>
+        </header>
+        <div class="slide-grid slide-grid--visual">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>حذف نویز می‌تواند دقت ASR را کم کند؛ این یک نکتهٔ آموزشی است، نه باگ. ابربازسازی هم دادهٔ ازدست‌رفته را «حدس» می‌زند.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>DPDFNet روی نمونهٔ گفتار ۴۸ کیلوهرتز؛ LavaSR با ورودی باندمحدود و خروجی گسترش‌یافته؛ resample صریح و بازگرداندن نرخ به UI.</p>
+            </article>
+            <div class="chip-row" data-reveal style="--i:5"><span class="chip chip--accent">ONNX</span><span class="chip">CPU</span><span class="chip">fallback</span><span class="chip">برچسب تقریب</span></div>
+          </div>
+          <div class="visual" data-reveal style="--i:6">
+            <div class="ab-compare">
+              <figure class="ab-panel">
+                <div class="ab-panel__head"><span>حذف نویز</span><span class="mono ltr">DPDFNet</span></div>
+                <img src="assets/images/ai/denoise.png" alt="نمای حذف نویز هوش مصنوعی آوالب" loading="lazy" decoding="async">
+              </figure>
+              <figure class="ab-panel">
+                <div class="ab-panel__head"><span>ابربازسازی</span><span class="mono ltr">LavaSR</span></div>
+                <img src="assets/images/ai/superres.png" alt="نمای ابربازسازی گفتار آوالب" loading="lazy" decoding="async">
+              </figure>
+            </div>
+            <div class="note-strip"><span class="dot dot--rose"></span> ورودی کند و پهنای‌باند محدود، بهترین نمایش آموزشی است.</div>
+          </div>
+        </div>
+        <div class="insight-band" data-reveal style="--i:7">
+          <article class="insight"><span class="insight__k">حذف نویز</span><p>می‌تواند دقت ASR را کم کند؛ مقایسهٔ قبل/بعد بخشی از درس است، نه یک باگ.</p></article>
+          <article class="insight"><span class="insight__k">ابربازسازی</span><p>باند ازدست‌رفته «حدس» زده می‌شود؛ خروجی شنیدنی و آموزشی است، نه بازسازی وفادار.</p></article>
+          <article class="insight"><span class="insight__k">زمینه</span><p>هر دو مدل گفتارمحورند؛ روی موسیقی یا نویز شدید ادعای کیفیت نمی‌شود.</p></article>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">کارت LavaSR در HF فیلد مجوز ندارد؛ مجوز از مخزن بالادست و فهرست وابستگی‌ها ثبت شده است.</span><span class="foot-id mono" dir="ltr">F14 · DENOISE / SR</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F14 — جداسازی منابع" data-kicker="F14 · جداسازی">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F14</span><span class="eyebrow__line"></span><span>جداسازی منابع</span></div>
+          <h2 data-reveal style="--i:1">یک میکس، چهار Stem</h2>
+          <p class="lead" data-reveal style="--i:2">آواز، درام، بیس و سایر؛ با قطعهٔ پیش‌فرض کوتاه تا CPU قابل‌تحمل بماند.</p>
+        </header>
+        <div class="slide-grid slide-grid--visual">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>جداسازی، مرز میان «تحلیل» و «تولید محتوا» را نشان می‌دهد؛ و هزینهٔ محاسباتی مدل‌های عصبی را واقعی می‌کند.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>HTDemucs چهار-Stem روی ۴۴٫۱ کیلوهرتز؛ پیش‌فرض ۱۵ ثانیه؛ گزینهٔ کل فایل با هشدار زمان؛ SSE و لغو.</p>
+            </article>
+            <div class="formula-chip" dir="ltr" data-reveal style="--i:5">
+              <span class="formula">x(t) ≈ x<sub>vocals</sub> + x<sub>drums</sub> + x<sub>bass</sub> + x<sub>other</sub></span>
+            </div>
+          </div>
+          <div class="visual" data-reveal style="--i:6">
+            <div class="stem-visual">
+              <div class="stem-visual__head"><span class="mono ltr">STEMS / 4-WAY</span><span>پیش‌فرض ۱۵ s</span></div>
+              <div class="stem-bars">
+                <div class="stem-bar stem-bar--vocals"><span class="stem-bar__label">آواز</span><div class="stem-bar__wave"><span></span></div><span class="stem-bar__pct">0.86</span></div>
+                <div class="stem-bar stem-bar--drums"><span class="stem-bar__label">درام</span><div class="stem-bar__wave"><span></span></div><span class="stem-bar__pct">0.72</span></div>
+                <div class="stem-bar stem-bar--bass"><span class="stem-bar__label">بیس</span><div class="stem-bar__wave"><span></span></div><span class="stem-bar__pct">0.64</span></div>
+                <div class="stem-bar stem-bar--other"><span class="stem-bar__label">سایر</span><div class="stem-bar__wave"><span></span></div><span class="stem-bar__pct">0.58</span></div>
+              </div>
+              <div class="stem-mix"><span class="mono ltr">MIX</span><span class="stem-mix__line"></span><span>چهار خروجی هم‌زمان، قابل پخش جداگانه</span></div>
+            </div>
+            <p class="visual-note">اندازه‌گیری موردی: ۱۵ ثانیه موسیقی در ۱۴٫۴ ثانیه روی CPU؛ یک مشاهده، نه بنچمارک.</p>
+          </div>
+        </div>
+        <div class="insight-band" data-reveal style="--i:7">
+          <article class="insight"><span class="insight__k">نشت بین Stemها</span><p>آواز ممکن است در درام یا «سایر» شنیده شود؛ این محدودیت مدل است، نه باگ. مقایسه با میکس اصلی همیشه لازم است.</p></article>
+          <article class="insight"><span class="insight__k">هزینهٔ CPU</span><p>۱۵ ثانیه موسیقی حدود ۱۴٫۴ ثانیه طول می‌کشد؛ برای کل فایل هشدار زمان، پیشرفت و لغو نمایش داده می‌شود.</p></article>
+          <article class="insight"><span class="insight__k">ارزیابی</span><p>SDR مرجع ندارد و ادعا نمی‌شود؛ داوری با گوش، مقایسهٔ A/B و توجه به فاز و گذراها انجام می‌شود.</p></article>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">کارت مدل HTDemucs فیلد مجوز ندارد؛ MIT از مخزن بالادست ثبت شده و باید پیش از انتشار دوباره بررسی شود.</span><span class="foot-id mono" dir="ltr">F14 · SEPARATION</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F14 — تبدیل گفتار به متن" data-kicker="F14 · ASR">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F14</span><span class="eyebrow__line"></span><span>تبدیل گفتار به متن</span></div>
+          <h2 data-reveal style="--i:1">متن، زبان و زمان‌بندی</h2>
+          <p class="lead" data-reveal style="--i:2">Whisper متوسط، انتخاب صریح مالک برای فارسی؛ با آستانهٔ ۳۰ ثانیه و اجرای آفلاین.</p>
+        </header>
+        <div class="slide-grid">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>مدل کوچک برای فارسی ضعیف است. دقت، بخشی از هدف آموزشی است؛ پس مدل متوسط با هزینهٔ حجم و زمان انتخاب شد.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>faster-whisper؛ int8 روی CPU؛ VAD؛ قطعهٔ ۳۰ ثانیه؛ شناسایی زبان؛ قطعه‌بندی و timestamp؛ نمایش زمان پردازش و زبان.</p>
+            </article>
+            <div class="formula-chip" dir="ltr" data-reveal style="--i:5">
+              <span class="formula">WER = (S + D + I) / N</span>
+            </div>
+          </div>
+          <div class="visual" data-reveal style="--i:6">
+            <div class="transcript-card">
+              <div class="transcript-card__head"><span class="mono ltr">ASR / MEDIUM</span><span class="lang-pill">fa</span></div>
+              <p class="transcript-card__text">«آوالب یک آزمایشگاه صوتی برای درس سیگنال‌ها و سیستم‌ها است.»</p>
+              <div class="transcript-seg"><span class="mono ltr">0.00–4.80 s</span><span>قطعهٔ اول</span></div>
+              <div class="transcript-seg"><span class="mono ltr">4.80–9.20 s</span><span>قطعهٔ دوم</span></div>
+              <div class="transcript-stats"><span><b>RTF</b> ۰٫۶۲</span><span><b>زبان</b> خودکار</span><span><b>حالت</b> آفلاین</span></div>
+            </div>
+            <div class="chip-row chip-row--tight"><span class="chip chip--accent">30 s</span><span class="chip">beam=5</span><span class="chip">VAD</span></div>
+          </div>
+        </div>
+        <div class="data-band" data-reveal style="--i:7">
+          <div><strong>12.43 s</strong><span>smoke روی میزبان</span><p>اجرای آفلاین، بدون Docker.</p></div>
+          <div><strong>0.53</strong><span>RTF · انگلیسی</span><p>۱۹٫۶ ثانیه صدا؛ ۱۰٫۳۵ ثانیه پردازش.</p></div>
+          <div><strong>0.62</strong><span>RTF · فارسی</span><p>۳۰ ثانیه صدا؛ ۱۸٫۶ ثانیه پردازش.</p></div>
+          <div><strong>20.8 s</strong><span>Docker + SSE</span><p>کار زنده، با پیشرفت و پایان.</p></div>
+        </div>
+        <p class="data-band__note" data-reveal style="--i:8">RTF = زمان پردازش ÷ طول صدا؛ WER بدون مرجع انسانی گزارش نمی‌شود.</p>
+        <footer class="slide-foot"><span class="foot-note">D-058: استثنای صریح بودجهٔ ۴۰۰ مگابایت/۲ گیگابایت؛ نمونهٔ انگلیسی و فارسی هر دو با Docker آفلاین تأیید شد.</span><span class="foot-id mono" dir="ltr">F14 · ASR</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F14 — کدک عصبی، گام و طبقه‌بندی" data-kicker="F14 · سه ابزار مکمل">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F14</span><span class="eyebrow__line"></span><span>سه ابزار مکمل</span></div>
+          <h2 data-reveal style="--i:1">از بیت‌ریت عصبی تا گام و برچسب</h2>
+          <p class="lead" data-reveal style="--i:2">یک مدل برای مقایسهٔ نرخ–اعوجاج؛ دو ابزار سبک بدون وزن عصبی جدید برای گام و ضرب.</p>
+        </header>
+        <div class="triptych">
+          <article class="triptych__col" data-reveal style="--i:3">
+            <div class="triptych__head"><span class="mono ltr">ENCODEC</span><span class="chip chip--accent">کدک عصبی</span></div>
+            <h3>۱٫۵–۲۴ kbps</h3>
+            <p>استریو ۴۸ کیلوهرتز؛ اندازهٔ تخمینی و برش/پر کردن دقیق طول؛ روی نمودار نرخ–اعوجاج کنار MP3/AAC/Opus.</p>
+            <div class="triptych__foot"><span>۷۶٫۳ MB</span><span>MIT</span></div>
+          </article>
+          <article class="triptych__col" data-reveal style="--i:4">
+            <div class="triptych__head"><span class="mono ltr">LIBROSA</span><span class="chip chip--soft">بدون مدل</span></div>
+            <h3>گام و ضرب</h3>
+            <p><code>pyin</code> برای F0 و <code>beat_track</code> برای ضرب؛ بدون وزن اضافه، مناسب نمایش زمان–فرکانس.</p>
+            <div class="triptych__foot"><span>CPU</span><span>ISC</span></div>
+          </article>
+          <article class="triptych__col" data-reveal style="--i:5">
+            <div class="triptych__head"><span class="mono ltr">AST</span><span class="chip chip--soft">P3</span></div>
+            <h3>طبقه‌بندی AudioSet</h3>
+            <p>چندبرچسبی با sigmoid؛ پنجرهٔ ۱۰ ثانیه و سقف ۳۰ ثانیه؛ تاکسونومی انگلیسی؛ قطعهٔ سکوت خطاست.</p>
+            <div class="triptych__foot"><span>۳۴۶٫۴ MB</span><span>BSD-3</span></div>
+          </article>
+        </div>
+        <div class="model-note" data-reveal style="--i:6">
+          <span class="model-note__k">قاعدهٔ مشترک</span>
+          <p>نرخ نمونهٔ مدل صریحاً اعمال می‌شود؛ نتیجه به نرخ کاربر برمی‌گردد؛ UI می‌گوید چه اتفاقی افتاده و خروجی «تقریب هوش مصنوعی» است.</p>
+        </div>
+        <div class="rd-band" data-reveal style="--i:7">
+          <div class="rd-copy">
+            <span class="mono ltr">RATE–DISTORTION</span>
+            <h3>EnCodec روی همان محور</h3>
+            <div class="rd-legend">
+              <span><i class="rd-dot rd-dot--neural"></i>EnCodec</span>
+              <span><i class="rd-dot rd-dot--mp3"></i>MP3</span>
+              <span><i class="rd-dot rd-dot--aac"></i>AAC</span>
+              <span><i class="rd-dot rd-dot--opus"></i>Opus</span>
+            </div>
+            <p>کدک عصبی در بازهٔ ۱٫۵–۲۴ kbps با MP3/AAC/Opus مقایسه می‌شود؛ اندازهٔ تخمینی است، نه بیت‌استریم واقعی.</p>
+          </div>
+          <svg class="rd-chart" viewBox="0 0 620 170" role="img" aria-label="نمودار مفهومی نرخ–اعوجاج برای EnCodec و کدک‌های سنتی">
+            <path class="axis" d="M32 18 V146 H602"/>
+            <path class="curve curve--mp3" d="M70 128 C 150 112, 250 78, 360 62 S 520 46, 584 40"/>
+            <path class="curve curve--aac" d="M64 132 C 150 106, 250 70, 360 54 S 520 38, 584 32"/>
+            <path class="curve curve--opus" d="M48 137 C 140 116, 240 84, 350 68 S 520 50, 584 44"/>
+            <path class="curve curve--neural" d="M88 124 C 160 92, 245 62, 330 48 S 500 34, 570 30"/>
+            <text x="602" y="15" text-anchor="end">QUALITY</text>
+            <text x="31" y="162">BITRATE</text>
+          </svg>
+        </div>
+        <p class="data-band__note" data-reveal style="--i:8">شکل مفهومی است و دادهٔ اندازه‌گیری‌شده نیست؛ فقط جایگاه کیفی مدل‌ها را نشان می‌دهد.</p>
+        <footer class="slide-foot"><span class="foot-note">AST و EnCodec هر دو pin‌شده‌اند؛ هیچ مدلی در زمان درخواست دانلود نمی‌شود.</span><span class="foot-id mono" dir="ltr">F14 · NEURAL</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F15 — خط لولهٔ پردازش" data-kicker="F15 · خط لوله">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F15</span><span class="eyebrow__line"></span><span>خط لولهٔ پردازش</span></div>
+          <h2 data-reveal style="--i:1">مراحل را زنجیر کن</h2>
+          <p class="lead" data-reveal style="--i:2">هر مرحله یک تابع خالص است؛ خروجی هر مرحله ورودی مرحلهٔ بعد.</p>
+        </header>
+        <div class="slide-grid slide-grid--visual">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>در عمل، ابزارها تنها نیستند: بازنمونه‌برداری، فیلتر، کوانتیزاسیون و فشرده‌سازی پشت سر هم می‌آیند. خط لوله این زنجیره را قابل‌مشاهده می‌کند.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>زنجیرهٔ ترتیبی با حداکثر ۸ مرحله؛ پیش‌نمایش هر مرحله، شکل‌موج و متریک؛ ذخیره/بارگذاری JSON؛ اجرا در Worker و گزارش پیشرفت.</p>
+            </article>
+            <div class="chip-row" data-reveal style="--i:5"><span class="chip">۸ مرحله</span><span class="chip">JSON</span><span class="chip">قابل‌تکرار</span></div>
+          </div>
+          <div class="visual" data-reveal style="--i:6">
+            <div class="pipeline">
+              <div class="pipeline__node"><span class="mono ltr">01</span><strong>resample</strong><small>48k → 22.05k</small></div>
+              <div class="pipeline__arrow"><span></span></div>
+              <div class="pipeline__node"><span class="mono ltr">02</span><strong>filter</strong><small>low-pass</small></div>
+              <div class="pipeline__arrow"><span></span></div>
+              <div class="pipeline__node"><span class="mono ltr">03</span><strong>quantize</strong><small>16 → 8 bit</small></div>
+              <div class="pipeline__arrow"><span></span></div>
+              <div class="pipeline__node pipeline__node--accent"><span class="mono ltr">04</span><strong>codec</strong><small>MP3 128k</small></div>
+            </div>
+            <figure class="shot shot--small">
+              <div class="shot__bar"><span class="shot__dot"></span><span class="mono ltr">PIPELINE / PER-STAGE</span><span class="shot__zoom">متریک هر گام</span></div>
+              <img src="assets/images/pipeline.png" alt="نمای خط لولهٔ پردازش آوالب با مراحل زنجیره‌ای" loading="lazy" decoding="async">
+            </figure>
+          </div>
+        </div>
+        <div class="code-band" data-reveal style="--i:7">
+          <div class="code-band__head"><span class="mono ltr">pipeline.json</span><span>نمونهٔ شماتیک از زنجیرهٔ چهارمرحله‌ای</span></div>
+          <pre><code>{
+  "stages": [
+    { "op": "resample", "to_hz": 22050 },
+    { "op": "lowpass", "cutoff_hz": 9000 },
+    { "op": "quantize", "bits": 8 },
+    { "op": "codec", "name": "mp3", "bitrate_kbps": 128 }
+  ]
+}</code></pre>
+          <p class="code-band__note">هر مرحله خالص است؛ خروجی هر گام ورودی گام بعد و کل زنجیره با (ورودی، پارامترها) کش می‌شود.</p>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">مراحل خالص‌اند؛ هر نتیجه با (ورودی، پارامترها) کش می‌شود و تکرارپذیر است.</span><span class="foot-id mono" dir="ltr">F15 · PIPELINE</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F16 — لایهٔ آموزش" data-kicker="F16 · آموزش">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F16</span><span class="eyebrow__line"></span><span>نظریه، آزمایش، اشتراک</span></div>
+          <h2 data-reveal style="--i:1">هر ابزار، یک درس کوچک</h2>
+          <p class="lead" data-reveal style="--i:2">فرمول، مشاهدهٔ موردانتظار و دام‌های رایج؛ کنار خود ابزار، نه در فایل جدا.</p>
+        </header>
+        <div class="three-col">
+          <article class="feature-card" data-reveal style="--i:3">
+            <span class="feature-card__num mono" dir="ltr">14</span>
+            <h3>پنل نظریه</h3>
+            <p>فرمول‌های KaTeX، توضیح کوتاه و «چه چیزی را ببین». برای هر ابزار غیرهوش‌مصنوعی.</p>
+          </article>
+          <article class="feature-card" data-reveal style="--i:4">
+            <span class="feature-card__num mono" dir="ltr">19</span>
+            <h3>آزمایش هدایت‌شده</h3>
+            <p>۵ تا ۸ گام کوتاه با مشاهدهٔ موردانتظار؛ قابل‌اجرا در کلاس و بدون آماده‌سازی.</p>
+          </article>
+          <article class="feature-card" data-reveal style="--i:5">
+            <span class="feature-card__num mono" dir="ltr">URL</span>
+            <h3>اشتراک و گزارش</h3>
+            <p>ابزار و پارامترها در URL؛ هرگز صدای کاربر. خروجی WAV، تصویر نمودار و گزارش HTML/PDF.</p>
+          </article>
+        </div>
+        <div class="report-strip" data-reveal style="--i:6">
+          <div class="report-strip__item"><span class="report-strip__k">مسیر</span><span>درس ← آزمایش ← مشاهده ← گزارش</span></div>
+          <div class="report-strip__item"><span class="report-strip__k">زبان</span><span>فارسی طبیعی + اصطلاح انگلیسی در اولین استفاده</span></div>
+          <div class="report-strip__item"><span class="report-strip__k">صداقت</span><span>هر ادعا با عدد یا خروجی همین نسخه پشتیبانی می‌شود</span></div>
+        </div>
+        <div class="process-band" data-reveal style="--i:7">
+          <div class="process-band__head"><span class="mono ltr">GUIDED / ALIASING</span><span>یک آزمایش، پنج گام</span></div>
+          <div class="flow flow--h flow--compact">
+            <div class="flow__node"><strong>کلیپ</strong><small>۱۰ ثانیه، مونو</small></div>
+            <div class="flow__link flow__link--h"><span></span></div>
+            <div class="flow__node"><strong>نرخ</strong><small>۸ kHz · فیلتر خاموش</small></div>
+            <div class="flow__link flow__link--h"><span></span></div>
+            <div class="flow__node"><strong>طیف‌نگاره</strong><small>تاشدگی را پیدا کن</small></div>
+            <div class="flow__link flow__link--h"><span></span></div>
+            <div class="flow__node"><strong>فیلتر</strong><small>روشن کن، مقایسه کن</small></div>
+            <div class="flow__link flow__link--h"><span></span></div>
+            <div class="flow__node flow__node--accent"><strong>گزارش</strong><small>پارامتر + مشاهده</small></div>
+          </div>
+          <p class="process-band__note">مشاهدهٔ موردانتظار: مؤلفه‌های بالای Nyquist به فرکانس پایین‌تر تاشده‌اند؛ فیلتر آنتی‌آلیاس آن‌ها را حذف می‌کند.</p>
+        </div>
+        <div class="insight-band" data-reveal style="--i:8">
+          <article class="insight"><span class="insight__k">ثبت</span><p>هر گزارش پارامترها و متریک‌های همان اجرا را نگه می‌دارد؛ خروجی تزئینی نیست.</p></article>
+          <article class="insight"><span class="insight__k">زبان</span><p>فارسی طبیعی و اصطلاح انگلیسی در اولین استفاده؛ نمودارها همیشه LTR می‌مانند.</p></article>
+          <article class="insight"><span class="insight__k">صداقت</span><p>خروجی هوش مصنوعی با برچسب تقریب می‌آید؛ داده یا مشاهدهٔ ساختگی نداریم.</p></article>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">گزارش، پارامترها و متریک‌های همان اجرا را ثبت می‌کند؛ نه یک خروجی تزئینی.</span><span class="foot-id mono" dir="ltr">F16 · EDUCATION</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F17 — دوزبانگی و RTL" data-kicker="F17 · زبان">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F17</span><span class="eyebrow__line"></span><span>دوزبانگی و RTL</span></div>
+          <h2 data-reveal style="--i:1">فارسی پیش‌فرض، انگلیسی کامل</h2>
+          <p class="lead" data-reveal style="--i:2">راست‌به‌چپ برای رابط؛ چپ‌به‌راست برای ریاضیات، نمودار و زمان.</p>
+        </header>
+        <div class="slide-grid slide-grid--visual">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>ترجمهٔ ماشینی و چیدمان آینه‌ای، اعتماد کلاس را از بین می‌برد. اصطلاحات باید یکدست و آکادمیک باشند.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>i18next و فایل‌های fa/en با کلید یکسان؛ بررسی کلید گم‌شده و بلااستفاده در CI؛ CSS منطقی؛ Vazirmatn خودمیزبان؛ اعداد لاتین در خوانش‌های فنی.</p>
+            </article>
+            <div class="chip-row" data-reveal style="--i:5"><span class="chip">fa RTL</span><span class="chip">en LTR</span><span class="chip">Vazirmatn</span><span class="chip">OFL-1.1</span></div>
+          </div>
+          <div class="visual" data-reveal style="--i:6">
+            <div class="bidi-card">
+              <div class="bidi-row bidi-row--rtl"><span class="bidi-tag">fa</span><p>نرخ نمونه‌برداری (Sampling Rate) را از ۴۸ به ۱۶ کیلوهرتز کاهش بده.</p></div>
+              <div class="bidi-row bidi-row--ltr"><span class="bidi-tag">en</span><p>Reduce the sampling rate from 48 to 16 kHz.</p></div>
+              <div class="bidi-mix"><span>نمودار همیشه LTR:</span><span class="mono ltr">0 s → 5 s</span></div>
+            </div>
+            <p class="visual-note">هیچ متن قابل‌مشاهده‌ای سخت‌کد نمی‌شود؛ هر کلید در هر دو زبان وجود دارد.</p>
+          </div>
+        </div>
+        <div class="term-matrix term-matrix--2" data-reveal style="--i:7">
+          <div class="term-row"><span>اصطلاح فارسی</span><span class="term-row__en">English</span></div>
+          <div class="term-row"><span>نرخ نمونه‌برداری</span><span class="term-row__en">Sampling Rate</span></div>
+          <div class="term-row"><span>طیف‌نگاره</span><span class="term-row__en">Spectrogram</span></div>
+          <div class="term-row"><span>کشش زمانی</span><span class="term-row__en">Time Stretch</span></div>
+          <div class="term-row"><span>کوانتیزه‌سازی</span><span class="term-row__en">Quantization</span></div>
+          <div class="term-row"><span>بلندی صدا</span><span class="term-row__en">Loudness</span></div>
+          <div class="term-row"><span>تغییر زیر و بمی</span><span class="term-row__en">Pitch Shift</span></div>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">ترجمهٔ فارسی برای بازبینی انسانی علامت‌گذاری می‌شود؛ ارائهٔ نهایی باید همین‌طور بماند.</span><span class="foot-id mono" dir="ltr">F17 · I18N</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="F18 — کیفیت زندگی" data-kicker="F18 · تجربهٔ کاربر">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="feat">F18</span><span class="eyebrow__line"></span><span>کیفیت زندگی</span></div>
+          <h2 data-reveal style="--i:1">مقایسهٔ منصفانه، بدون قطع صدا</h2>
+          <p class="lead" data-reveal style="--i:2">A/B در همان playhead؛ هم‌ترازی بلندی فقط برای پخش، نه برای فایل خروجی.</p>
+        </header>
+        <div class="slide-grid slide-grid--visual">
+          <div class="stack">
+            <article class="panel" data-reveal style="--i:3">
+              <div class="panel__k">چرا</div>
+              <p>مقایسهٔ A/B با اختلاف بلندی، همیشه به نفع بلندتر است. برای قضاوت درست، باید بلندی هم‌تراز شود.</p>
+            </article>
+            <article class="panel" data-reveal style="--i:4">
+              <div class="panel__k">چگونه</div>
+              <p>BS.1770 برای اندازه‌گیری بلندی؛ هم‌ترازی فقط در پخش و محدود به ±۲۴ dB؛ خروجی WAV و بافر پردازش‌شده دست‌نخورده می‌ماند؛ کلیدهای میان‌بر و آخرین تنظیمات.</p>
+            </article>
+            <div class="chip-row" data-reveal style="--i:5"><span class="chip">BS.1770</span><span class="chip">±24 dB</span><span class="chip">A/B</span><span class="chip">localStorage</span></div>
+          </div>
+          <div class="visual" data-reveal style="--i:6">
+            <div class="ab-player">
+              <div class="ab-player__head"><span class="mono ltr">A / ORIGINAL</span><span class="ab-player__vs">در برابر</span><span class="mono ltr">B / PROCESSED</span></div>
+              <div class="ab-player__track"><span class="ab-player__progress"></span><span class="ab-player__head-dot"></span></div>
+              <div class="ab-player__controls"><span>پخش هم‌زمان</span><span>تغییر فوری</span><span>هم‌ترازی بلندی</span></div>
+              <div class="loudness-gauge">
+                <div class="loudness-gauge__head"><span class="mono ltr">BS.1770 / PLAYBACK GAIN</span><span>فقط برای گوش</span></div>
+                <div class="loudness-row"><span>A · اصلی</span><div class="loudness-row__bar"><span style="--w: 58%"></span></div><b>مرجع</b></div>
+                <div class="loudness-row loudness-row--b"><span>B · پردازش</span><div class="loudness-row__bar"><span style="--w: 86%"></span></div><b>بلندتر</b></div>
+                <p class="loudness-gauge__note">هم‌ترازی، بهرهٔ پخش را در بازهٔ ±۲۴ dB تنظیم می‌کند؛ فایل WAV و بافر پردازش‌شده تغییر نمی‌کنند.</p>
+              </div>
+            </div>
+            <div class="note-strip"><span class="dot"></span> خروجی «هم‌ترازی‌شده» نیست؛ فقط گوش شما در لحظه مقایسه منصفانه می‌شود.</div>
+          </div>
+        </div>
+        <div class="insight-band" data-reveal style="--i:7">
+          <article class="insight"><span class="insight__k">پخش</span><p>جابه‌جایی A/B در همان playhead و بدون وقفه؛ مقایسه به حافظهٔ شنیداری کوتاه‌مدت تکیه نمی‌کند.</p></article>
+          <article class="insight"><span class="insight__k">خروجی</span><p>WAV و بافر پردازش‌شده دست‌نخورده می‌مانند؛ بهرهٔ هم‌ترازی فقط روی مسیر پخش اثر دارد.</p></article>
+          <article class="insight"><span class="insight__k">حریم</span><p>تنظیمات در localStorage می‌ماند؛ صدا هرگز در URL، حساب یا گزارش سرور ثبت نمی‌شود.</p></article>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">وضعیت در URL و localStorage؛ صدا هرگز در URL قرار نمی‌گیرد.</span><span class="foot-id mono" dir="ltr">F18 · UX</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature slide--decision" data-title="D-056 — پخش استریو، تحلیل مونو" data-kicker="تصمیم · D-056">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="dec">D-056</span><span class="eyebrow__line"></span><span>استریو و مونو</span></div>
+          <h2 data-reveal style="--i:1">شنیدن استریو، سنجش با یک مرجع</h2>
+          <p class="lead" data-reveal style="--i:2">پخش و خروجی استریو می‌مانند؛ تحلیل همچنان مونو است تا اعداد قابل‌مقایسه بمانند.</p>
+        </header>
+        <div class="decision-grid">
+          <article class="decision-card" data-reveal style="--i:3">
+            <span class="decision-card__k">قبل</span>
+            <p>سند اولیه می‌گفت استریو حفظ می‌شود؛ اما پیاده‌سازی تحلیل را به یک کانال محدود می‌کرد. این دو با هم ناسازگار بودند.</p>
+          </article>
+          <article class="decision-card decision-card--accent" data-reveal style="--i:4">
+            <span class="decision-card__k">تصمیم</span>
+            <p>پخش، خروجی و ویرایش استریو؛ تحلیل، متریک و شکل‌موج پیش‌فرض مونو (میانگین کانال‌ها). انتخاب کانال برای مقایسه باقی می‌ماند.</p>
+          </article>
+          <article class="decision-card" data-reveal style="--i:5">
+            <span class="decision-card__k">دلیل</span>
+            <p>متریک کیفیت بدون مرجع تک‌کاناله بین فایل‌های استریو و مونو گمراه‌کننده است؛ و پخش استریو برای ارزیابی ادراکی لازم است.</p>
+          </article>
+        </div>
+        <div class="flow flow--h flow--compact" data-reveal style="--i:6">
+          <div class="flow__node"><strong>ورودی استریو</strong><small>حفظ کانال‌ها</small></div><div class="flow__link flow__link--h"><span></span></div>
+          <div class="flow__node"><strong>پخش / خروجی</strong><small>استریو</small></div><div class="flow__link flow__link--h"><span></span></div>
+          <div class="flow__node flow__node--accent"><strong>تحلیل</strong><small>downmix مونو</small></div>
+        </div>
+        <div class="split-table" data-reveal style="--i:7">
+          <div class="split-row"><span>خروجی</span><span>کانال</span><span>چه چیزی می‌بیند</span></div>
+          <div class="split-row"><span>پخش</span><strong>استریو</strong><span>هر دو کانال، هم‌زمان</span></div>
+          <div class="split-row"><span>WAV</span><strong>استریو</strong><span>بدون تغییر کانال‌ها</span></div>
+          <div class="split-row"><span>تحلیل</span><strong>مونو</strong><span>میانگین دو کانال</span></div>
+          <div class="split-row"><span>متریک</span><strong>مونو</strong><span>مرجع قابل‌مقایسه</span></div>
+        </div>
+        <div class="insight-band" data-reveal style="--i:8">
+          <article class="insight"><span class="insight__k">پخش</span><p>هر دو کانال، همان‌طور که ضبط شده؛ تصمیم شنیداری روی خروجی کامل گرفته می‌شود.</p></article>
+          <article class="insight"><span class="insight__k">تحلیل</span><p>downmix فقط برای محاسبه است؛ میانگین ساده، مرجع مشترک همهٔ ابزارها و متریک‌ها می‌سازد.</p></article>
+          <article class="insight"><span class="insight__k">صداقت</span><p>هیچ کانالی بی‌صدا دور ریخته نمی‌شود و هیچ تحلیلی ادعای استریو نمی‌کند.</p></article>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">این تصمیم در UI و مستندات صریح است؛ نه یک رفتار پنهان.</span><span class="foot-id mono" dir="ltr">D-056 · STEREO</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--perf" data-title="کارایی: بودجه و واقعیت" data-kicker="کارایی">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="eyebrow__dot"></span><span>کارایی</span><span class="eyebrow__line"></span><span>۵ دقیقه · ۴۴٫۱ کیلوهرتز</span></div>
+          <h2 data-reveal style="--i:1">اعداد، از اجرای واقعی</h2>
+          <p class="lead" data-reveal style="--i:2">میانهٔ سه اجرا روی فایل پنج‌دقیقه‌ای؛ نه وعده، نه عدد آرمانی.</p>
+        </header>
+        <div class="perf-layout">
+          <div class="perf-bars" data-reveal style="--i:3">
+            <div class="perf-row"><span>شکل‌موج</span><div class="bar"><span style="--w: 21.7%"></span></div><b class="mono" dir="ltr">304 ms</b></div>
+            <div class="perf-row"><span>طیف‌نگاره</span><div class="bar"><span style="--w: 12.5%"></span></div><b class="mono" dir="ltr">175 ms</b></div>
+            <div class="perf-row"><span>FFT</span><div class="bar"><span style="--w: 12.4%"></span></div><b class="mono" dir="ltr">173 ms</b></div>
+            <div class="perf-row"><span>FIR</span><div class="bar"><span style="--w: 10.1%"></span></div><b class="mono" dir="ltr">141 ms</b></div>
+            <div class="perf-row"><span>خط لوله</span><div class="bar"><span style="--w: 18.1%"></span></div><b class="mono" dir="ltr">253 ms</b></div>
+            <div class="perf-row"><span>بلندی</span><div class="bar"><span style="--w: 26.3%"></span></div><b class="mono" dir="ltr">368 ms</b></div>
+            <div class="perf-row perf-row--slow"><span>MDCT</span><div class="bar"><span style="--w: 98.6%"></span></div><b class="mono" dir="ltr">≈1380 ms</b></div>
+            <div class="perf-row perf-row--slow"><span>پژواک</span><div class="bar"><span style="--w: 100%"></span></div><b class="mono" dir="ltr">≈1404 ms</b></div>
+          </div>
+          <aside class="perf-side" data-reveal style="--i:4">
+            <div class="perf-stat"><strong class="mono" dir="ltr">&lt; 1 s</strong><span>نمای اولیهٔ شکل‌موج</span></div>
+            <div class="perf-stat"><strong class="mono" dir="ltr">&lt; 3 s</strong><span>طیف‌نگارهٔ اولیه، تدریجی</span></div>
+            <div class="perf-stat"><strong class="mono" dir="ltr">0</strong><span>DSP روی رشتهٔ اصلی</span></div>
+            <p>هر عملیات طولانی: پیشرفت، لغو و خطای قابل‌فهم. برای پیش‌نمایش، قطعهٔ انتخابی (پیش‌فرض ≤۳۰ ثانیه) پردازش می‌شود.</p>
+          </aside>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">MDCT و پژواک آگاهانه کندترند؛ برای آموزش و مقایسه، نه برای پردازش بی‌درنگ کل فایل.</span><span class="foot-id mono" dir="ltr">PERFORMANCE</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="آزمون و صحت" data-kicker="کیفیت">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="eyebrow__dot"></span><span>صحت</span><span class="eyebrow__line"></span><span>مرجع بیرونی</span></div>
+          <h2 data-reveal style="--i:1">هر الگوریتم، یک شاهد</h2>
+          <p class="lead" data-reveal style="--i:2">Golden vector از NumPy/SciPy/librosa؛ و property test برای قواعدی که باید همیشه برقرار باشند.</p>
+        </header>
+        <div class="test-layout">
+          <div class="test-counts" data-reveal style="--i:3">
+            <div><strong class="mono" dir="ltr">254</strong><span>پس‌شدهٔ API</span></div>
+            <div><strong class="mono" dir="ltr">734</strong><span>آزمون وب</span></div>
+            <div><strong class="mono" dir="ltr">1066</strong><span>آزمون DSP</span></div>
+            <div><strong class="mono" dir="ltr">106/106</strong><span>E2E</span></div>
+          </div>
+          <div class="test-grid">
+            <article class="test-card" data-reveal style="--i:4"><span class="test-card__icon">∿</span><h3>تبدیل‌ها</h3><p>FFT∘IFFT = همانی؛ Parseval؛ هم‌گشت در برابر مستقیم؛ خطی‌بودن و شیفت.</p></article>
+            <article class="test-card" data-reveal style="--i:5"><span class="test-card__icon">⌁</span><h3>کدک‌ها</h3><p>رفت‌وبرگشت بیت‌به‌بیت برای بی‌اتلاف؛ تطابق طول و تأخیر برای کدک واقعی.</p></article>
+            <article class="test-card" data-reveal style="--i:6"><span class="test-card__icon">◌</span><h3>لبه‌ها</h3><p>ورودی خالی، طول ۱، طول فرد، غیرتوان‌دو، DC، کلیپ، NaN و نرخ‌های حدی.</p></article>
+            <article class="test-card" data-reveal style="--i:7"><span class="test-card__icon">▤</span><h3>رابط</h3><p>هر ابزار یک smoke E2E با دموی امن و بدون خطای کنسول؛ i18n و RTL.</p></article>
+          </div>
+        </div>
+        <div class="code-band" data-reveal style="--i:8">
+          <div class="code-band__head"><span class="mono ltr">property test / identity</span><span>نمونهٔ شماتیک، نه فایل واقعی</span></div>
+          <pre><code>const x = seededSignal(1024);
+const y = ifft(fft(x));
+const error = maxAbs(y - x);
+expect(error).toBeLessThan(1e-9);</code></pre>
+          <p class="code-band__note">Float64: خطای نسبی ≤ 1e-9 · Float32: ≤ 1e-5 · هر الگوریتم یک مورد مرزی و یک قاعدهٔ ساختاری دارد.</p>
+        </div>
+        <div class="golden-strip" data-reveal style="--i:9">
+          <span class="mono ltr">tools/golden</span><span>→</span><span class="mono ltr">packages/dsp</span><span>→</span><span class="mono ltr">Vitest</span>
+          <span class="golden-strip__note">تلورانس‌ها مستند؛ Float64 سخت‌گیرتر از Float32.</span>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">هیچ الگوریتمی «کار می‌کند» بدون آزمونی که با خرابی‌اش شکست بخورد.</span><span class="foot-id mono" dir="ltr">TESTING</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--feature" data-title="استقرار، حریم خصوصی و مجوز" data-kicker="استقرار">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="eyebrow__dot"></span><span>استقرار</span><span class="eyebrow__line"></span><span>عمومی و آفلاین</span></div>
+          <h2 data-reveal style="--i:1">یک compose، دو سرویس، بدون دیتابیس</h2>
+          <p class="lead" data-reveal style="--i:2">Caddy برای فایل ایستا و پروکسی؛ FastAPI برای کدک و مدل؛ TTL برای فایل‌ها.</p>
+        </header>
+        <div class="deploy-layout">
+          <div class="deploy-diagram" data-reveal style="--i:3">
+            <div class="deploy-node"><span class="mono ltr">:443</span><strong>Caddy</strong><small>static + reverse proxy</small></div>
+            <div class="deploy-link"><span></span></div>
+            <div class="deploy-row">
+              <div class="deploy-node"><strong>Web</strong><small>SPA built</small></div>
+              <div class="deploy-node deploy-node--accent"><strong>API</strong><small>FastAPI + Uvicorn</small></div>
+            </div>
+            <div class="deploy-link"><span></span></div>
+            <div class="deploy-row">
+              <div class="deploy-node"><strong>ffmpeg</strong><small>process, not linked</small></div>
+              <div class="deploy-node"><strong>Model cache</strong><small>volume, lazy</small></div>
+            </div>
+          </div>
+          <div class="deploy-facts" data-reveal style="--i:4">
+            <div class="fact"><span class="fact__k">حریم خصوصی</span><p>بدون حساب، بدون تحلیل هویتی، بدون لاگ صدا یا نام فایل؛ UUID و TTL ۶۰ دقیقه؛ حذف صریح.</p></div>
+            <div class="fact"><span class="fact__k">آفلاین</span><p>prefetch مدل‌ها، سپس <span class="mono ltr">HF_HUB_OFFLINE=1</span>؛ اجرای CPU پیش‌فرض، GPU اختیاری.</p></div>
+            <div class="fact"><span class="fact__k">مجوز</span><p>GPL-3.0 برای پروژه؛ ffmpeg جدا؛ Vazirmatn با OFL-1.1؛ فهرست وابستگی‌ها و مدل‌ها به‌روز.</p></div>
+          </div>
+        </div>
+        <div class="config-band" data-reveal style="--i:5">
+          <div>
+            <span class="mono ltr">ENV / LIMITS</span>
+            <h3>محدودیت‌ها از محیط</h3>
+            <p>همهٔ سقف‌ها پیش از کار سنگین اعمال می‌شوند؛ ترکیب Compose و API از یک فایل.env می‌خواند.</p>
+          </div>
+          <pre>AVALAB_MAX_UPLOAD_BYTES=209715200
+AVALAB_MAX_DURATION_SECONDS=300
+AVALAB_TTL_MINUTES=60
+AVALAB_ML_DEVICE=cpu
+HF_HUB_OFFLINE=1</pre>
+        </div>
+        <div class="deploy-tags" data-reveal style="--i:6"><span>Docker Compose</span><span>SSE</span><span>TTL</span><span>no DB</span><span>no secrets</span><span>GPL-3.0</span></div>
+        <footer class="slide-foot"><span class="foot-note">همه‌چیز برای انتشار عمومی آماده است؛ مدل‌های غیرآزاد استفاده نمی‌شوند.</span><span class="foot-id mono" dir="ltr">DEPLOYMENT</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--limits" data-title="محدودیت‌ها و مسیر بعدی" data-kicker="صداقت">
+      <div class="slide__inner">
+        <header class="slide-head">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="eyebrow__dot"></span><span>محدودیت‌ها</span><span class="eyebrow__line"></span><span>مسیر بعدی</span></div>
+          <h2 data-reveal style="--i:1">آنچه هنوز کامل نیست</h2>
+          <p class="lead" data-reveal style="--i:2">ابزار آموزشی باید محدودیت خودش را هم نشان بدهد؛ وگرنه اعتماد می‌سازد بدون پشتوانه.</p>
+        </header>
+        <div class="limits-grid">
+          <article class="limit-card" data-reveal style="--i:3"><span class="limit-card__k">کیفیت</span><h3>MDCT آموزشی است</h3><p>مدل ادراکی ایستا؛ ماسک زمانی و تفکیک تونال/نویزی ندارد. ادعای رقابت با MP3/AAC نمی‌کند.</p></article>
+          <article class="limit-card" data-reveal style="--i:4"><span class="limit-card__k">زمان</span><h3>پردازش کامل، کند است</h3><p>MDCT و پژواک روی فایل پنج‌دقیقه‌ای بیش از یک ثانیه‌اند؛ برای کل فایل باید منتظر ماند.</p></article>
+          <article class="limit-card" data-reveal style="--i:5"><span class="limit-card__k">هوش مصنوعی</span><h3>تقریب، نه حقیقت</h3><p>حذف نویز و ابربازسازی گفتارمحورند؛ خروجی برچسب «تقریب هوش مصنوعی» دارد.</p></article>
+          <article class="limit-card" data-reveal style="--i:6"><span class="limit-card__k">مجوز</span><h3>دو فیلد ناقص در کارت مدل</h3><p>LavaSR و HTDemucs در HF فیلد مجوز ندارند؛ مجوز از مخزن بالادست ثبت شده و باید پیش از انتشار دوباره بررسی شود.</p></article>
+          <article class="limit-card" data-reveal style="--i:7"><span class="limit-card__k">زبان</span><h3>بازبینی فارسی انسانی</h3><p>متن‌های تولیدشده باید توسط مالک بازبینی شوند؛ اصطلاحات یکدست‌اند اما نهایی نیستند.</p></article>
+          <article class="limit-card" data-reveal style="--i:8"><span class="limit-card__k">بعدی</span><h3>P3 و پرداخت</h3><p>AST و خط لوله در اولویت پایین؛ بهینه‌سازی WebGL فقط پس از بنچمارک؛ بدون افزودن وابستگی بی‌دلیل.</p></article>
+        </div>
+        <div class="status-band" data-reveal style="--i:9">
+          <article class="status-card"><span class="status-card__k">تحویل‌شده</span><h3>M0–M5 · هستهٔ P0</h3><p>F01–F18 در نسخهٔ v0.2.0؛ آزمون‌ها و Docker سبز.</p></article>
+          <article class="status-card"><span class="status-card__k">اختیاری</span><h3>P2 / P3</h3><p>AST، F15 و بخشی از F13؛ بدون ادعای تکمیل کامل.</p></article>
+          <article class="status-card"><span class="status-card__k">آگاهانه بیرون</span><h3>غیرهدف</h3><p>حساب کاربری، DAW، موبایل‌فرست و دیتابیس؛ نه فراموش‌شده.</p></article>
+        </div>
+        <div class="roadmap" data-reveal style="--i:10">
+          <span class="roadmap__dot"></span><span>اکنون: v0.2.0</span><span class="roadmap__line"></span><span>بعد: بازبینی فارسی، بنچمارک WebGL، گسترش آزمایش‌ها</span>
+        </div>
+        <footer class="slide-foot"><span class="foot-note">M0–M5 تحویل شد؛ P3 و موارد اختیاری صادقانه «انجام‌نشده» می‌مانند.</span><span class="foot-id mono" dir="ltr">LIMITS</span></footer>
+      </div>
+    </section>
+
+    <section class="slide slide--close" data-title="پایان" data-kicker="جمع‌بندی">
+      <div class="close-layout">
+        <div class="close__copy">
+          <div class="eyebrow" data-reveal style="--i:0"><span class="eyebrow__dot"></span><span>پایان</span><span class="eyebrow__line"></span><span class="mono ltr">AVALAB</span></div>
+          <h2 data-reveal style="--i:1">ببین. بشنو. بفهم.</h2>
+          <p class="close__lead" data-reveal style="--i:2">آوالب یک نمایش نیست؛ یک آزمایشگاه است.</p>
+          <div class="close__links" data-reveal style="--i:3">
+            <span><b>سورس</b> <span class="mono ltr">github.com/Al4AMD/AvaLab</span></span>
+            <span><b>نسخه</b> <span class="mono ltr">v0.2.0</span></span>
+            <span><b>مجوز</b> <span class="mono ltr">GPL-3.0</span></span>
+          </div>
+        </div>
+        <div class="close__mark" data-reveal style="--i:2">
+          <div class="close__mark-ring"></div>
+          <span class="close__mark-glyph">آ</span>
+          <span class="close__mark-caption mono" dir="ltr">LISTEN · SEE · UNDERSTAND</span>
+        </div>
+      </div>
+      <footer class="slide-foot"><span class="foot-note">برای بازگشت به ابتدا، <kbd>Home</kbd> را بزنید.</span><span class="foot-id mono" dir="ltr">AVALAB · 32 / 32</span></footer>
+    </section>
+  </main>
+
+  <header class="hud" aria-label="کنترل ارائه">
+    <div class="hud__brand">
+      <span class="brand-mark">آ</span>
+      <div class="hud__brand-text"><strong>آوالب</strong><span class="mono ltr">AVALAB · v0.2.0</span></div>
+    </div>
+    <div class="hud__center">
+      <button class="icon-btn" id="prevBtn" type="button" aria-label="اسلاید قبل" title="اسلاید قبل (→)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+      <div class="hud__count" aria-live="polite"><span id="currentSlide">1</span><span class="hud__slash">/</span><span id="totalSlides">32</span></div>
+      <button class="icon-btn" id="nextBtn" type="button" aria-label="اسلاید بعد" title="اسلاید بعد (←)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+    </div>
+    <div class="hud__actions">
+      <button class="hud-btn" id="overviewBtn" type="button" aria-label="فهرست اسلایدها" title="فهرست (O)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>
+        <span>فهرست</span>
+      </button>
+      <button class="hud-btn" id="helpBtn" type="button" aria-label="راهنمای کلیدها" title="راهنما (?)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4.2 1.8c-.8.7-1.7 1.2-1.7 2.7"/><path d="M12 17.5h.01"/></svg>
+        <span>راهنما</span>
+      </button>
+      <button class="hud-btn" id="fullscreenBtn" type="button" aria-label="تمام‌صفحه" title="تمام‌صفحه (F)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5"/><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M16 21h5v-5"/></svg>
+        <span>تمام‌صفحه</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="nav-hint" id="navHint" aria-hidden="true"><span class="mono ltr">←</span> بعدی <span class="nav-hint__sep"></span> <span class="mono ltr">→</span> قبلی <span class="nav-hint__sep"></span> <span class="mono ltr">O</span> فهرست</div>
+
+  <div class="overlay" id="overviewOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="overviewTitle">
+    <div class="overlay__panel overlay__panel--wide">
+      <div class="overlay__head">
+        <div><p class="overlay__kicker">فهرست</p><h2 id="overviewTitle">همهٔ اسلایدها</h2></div>
+        <button class="icon-btn" type="button" data-close aria-label="بستن فهرست">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="overview-grid" id="overviewGrid"></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="helpOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <div class="overlay__panel">
+      <div class="overlay__head">
+        <div><p class="overlay__kicker">راهنما</p><h2 id="helpTitle">کلیدهای ارائه</h2></div>
+        <button class="icon-btn" type="button" data-close aria-label="بستن راهنما">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="help-grid">
+        <div class="help-row"><kbd>←</kbd><kbd>Space</kbd><span>اسلاید بعد</span></div>
+        <div class="help-row"><kbd>→</kbd><span>اسلاید قبل</span></div>
+        <div class="help-row"><kbd>Home</kbd><kbd>End</kbd><span>اول / آخر</span></div>
+        <div class="help-row"><kbd>O</kbd><span>فهرست</span></div>
+        <div class="help-row"><kbd>F</kbd><span>تمام‌صفحه</span></div>
+        <div class="help-row"><kbd>?</kbd><span>این راهنما</span></div>
+        <div class="help-row"><kbd>Esc</kbd><span>بستن لایه</span></div>
+        <div class="help-row"><kbd>swipe</kbd><span>جابه‌جایی با لمس</span></div>
+      </div>
+      <p class="overlay__note">در فیلدهای ورودی و اسلایدرها، کلیدهای جهت به کنترل خودشان می‌رسند.</p>
+    </div>
+  </div>
+
+  <div class="orientation-hint" id="orientationHint" hidden>برای نمایش کامل، دستگاه را افقی بگیرید.</div>
+
+  <script src="app.js"></script>
+</body>
+</html>

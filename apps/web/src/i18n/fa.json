@@ -163,6 +163,8 @@
     "panRight": "جابه‌جایی به راست",
     "hint": "برای انتخاب بکشید · [ / ] بزرگ‌نمایی · کلیدهای جهت انتخاب را جابه‌جا می‌کنند",
     "selectionReadout": "انتخاب {{start}} – {{end}}",
+    "hoverValue": "مقدار نمونه",
+    "scale": "مقیاس ±{{peak}}",
     "theory": {
       "title": "خواندن شکل موج و نمونه‌برداری",
       "sampling": {
@@ -676,8 +678,9 @@
       "amplitude": "دامنه",
       "frequency": "فرکانس (Hz)",
       "dutyCycle": "چرخهٔ کار",
-      "impulseIndex": "اندیس ضربه (نمونه)",
-      "stepIndex": "اندیس پله (نمونه)",
+      "eventStart": "زمان رویداد (ثانیه)",
+      "eventCount": "تعداد تکرار",
+      "eventInterval": "فاصلهٔ تکرار (ثانیه)",
       "chirpFrom": "فرکانس شروع (Hz)",
       "chirpTo": "فرکانس پایان (Hz)",
       "chirpLog": "جاروب لگاریتمی",
@@ -893,6 +896,8 @@
       "mode": "حالت سرعت",
       "customSpeed": "ضریب سرعت",
       "semitones": "تغییر زیر و بمی (نیم‌پرده)",
+      "direction": "جهت",
+      "forward": "عادی",
       "reverse": "معکوس"
     },
     "lane": {

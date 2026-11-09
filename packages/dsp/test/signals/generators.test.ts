@@ -90,6 +90,11 @@ function paramNumber(goldenCase: GoldenCase, key: string): number {
   return asNumber(goldenCase.params[key], `params.${key} of ${goldenCase.name}`);
 }
 
+function paramOptionalNumber(goldenCase: GoldenCase, key: string): number | undefined {
+  const value = goldenCase.params[key];
+  return value === undefined ? undefined : asNumber(value, `params.${key} of ${goldenCase.name}`);
+}
+
 function paramSweep(goldenCase: GoldenCase): "linear" | "logarithmic" {
   const value = goldenCase.params.sweep;
   if (value === "linear" || value === "logarithmic") {
@@ -148,19 +153,29 @@ function generateFromGolden(goldenCase: GoldenCase): Float64Array {
         frequencyHz: paramNumber(goldenCase, "frequencyHz"),
         amplitude: paramNumber(goldenCase, "amplitude"),
       });
-    case "impulse":
+    case "impulse": {
+      const repeatCount = paramOptionalNumber(goldenCase, "repeatCount");
+      const repeatIntervalSamples = paramOptionalNumber(goldenCase, "repeatIntervalSamples");
       return generateImpulse({
         ...spec,
         impulseSampleIndex: paramNumber(goldenCase, "impulseSampleIndex"),
         amplitude: paramNumber(goldenCase, "amplitude"),
+        ...(repeatCount === undefined ? {} : { repeatCount }),
+        ...(repeatIntervalSamples === undefined ? {} : { repeatIntervalSamples }),
       });
-    case "step":
+    }
+    case "step": {
+      const repeatCount = paramOptionalNumber(goldenCase, "repeatCount");
+      const repeatIntervalSamples = paramOptionalNumber(goldenCase, "repeatIntervalSamples");
       return generateStep({
         ...spec,
         stepSampleIndex: paramNumber(goldenCase, "stepSampleIndex"),
         amplitudeBefore: paramNumber(goldenCase, "amplitudeBefore"),
         amplitudeAfter: paramNumber(goldenCase, "amplitudeAfter"),
+        ...(repeatCount === undefined ? {} : { repeatCount }),
+        ...(repeatIntervalSamples === undefined ? {} : { repeatIntervalSamples }),
       });
+    }
     case "chirp":
       return generateChirp({
         ...spec,
@@ -204,7 +219,9 @@ describe("generators fixture", () => {
       "sawtooth_100hz_amplitude0.5",
       "triangle_100hz_amplitude0.5",
       "impulse_index3_amplitude0.75",
+      "impulse_train_index1_count3_interval3",
       "step_index4_before-0.25_after0.5",
+      "step_train_index1_count3_interval3",
       "chirp_linear_100to400hz",
       "chirp_logarithmic_100to400hz",
       "two_tone_100_250hz_amplitude0.5",
@@ -319,6 +336,28 @@ describe("generator boundary samples", () => {
     expect(Array.from(impulse)).toEqual([0, 0, 0, 0.75, 0, 0, 0, 0, 0, 0]);
   });
 
+  it("impulse repeats at the requested interval and stops at the end", () => {
+    const impulseTrain = generateImpulse({
+      durationSeconds: 0.01,
+      sampleRateHz: 1000,
+      impulseSampleIndex: 1,
+      amplitude: 0.75,
+      repeatCount: 3,
+      repeatIntervalSamples: 3,
+    });
+    expect(Array.from(impulseTrain)).toEqual([0, 0.75, 0, 0, 0.75, 0, 0, 0.75, 0, 0]);
+
+    const pastEnd = generateImpulse({
+      durationSeconds: 0.01,
+      sampleRateHz: 1000,
+      impulseSampleIndex: 1,
+      amplitude: 0.75,
+      repeatCount: 4,
+      repeatIntervalSamples: 3,
+    });
+    expect(Array.from(pastEnd)).toEqual([0, 0.75, 0, 0, 0.75, 0, 0, 0.75, 0, 0]);
+  });
+
   it("step uses amplitudeBefore up to the index and amplitudeAfter from it", () => {
     const step = generateStep({
       durationSeconds: 0.01,
@@ -337,6 +376,21 @@ describe("generator boundary samples", () => {
       amplitudeAfter: 0.5,
     });
     expect(Array.from(leadingStep)).toEqual([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]);
+  });
+
+  it("repeated step events toggle between the two levels", () => {
+    const stepTrain = generateStep({
+      durationSeconds: 0.01,
+      sampleRateHz: 1000,
+      stepSampleIndex: 1,
+      amplitudeBefore: -0.25,
+      amplitudeAfter: 0.5,
+      repeatCount: 3,
+      repeatIntervalSamples: 3,
+    });
+    expect(Array.from(stepTrain)).toEqual([
+      -0.25, 0.5, 0.5, 0.5, -0.25, -0.25, -0.25, 0.5, 0.5, 0.5,
+    ]);
   });
 
   it("chirp sweeps between the requested endpoint frequencies (linear)", () => {
@@ -501,6 +555,47 @@ describe("generator guards", () => {
     [
       "impulse index = 10 (out of range)",
       () => generateImpulse({ ...base, impulseSampleIndex: 10, amplitude: 1 }),
+    ],
+    [
+      "impulse repeatCount = 0",
+      () =>
+        generateImpulse({
+          ...base,
+          impulseSampleIndex: 1,
+          amplitude: 1,
+          repeatCount: 0,
+        }),
+    ],
+    [
+      "impulse repeatCount > N",
+      () =>
+        generateImpulse({
+          ...base,
+          impulseSampleIndex: 1,
+          amplitude: 1,
+          repeatCount: 11,
+        }),
+    ],
+    [
+      "impulse repeatIntervalSamples = -1",
+      () =>
+        generateImpulse({
+          ...base,
+          impulseSampleIndex: 1,
+          amplitude: 1,
+          repeatIntervalSamples: -1,
+        }),
+    ],
+    [
+      "step repeatIntervalSamples = 1.5",
+      () =>
+        generateStep({
+          ...base,
+          stepSampleIndex: 1,
+          amplitudeBefore: 0,
+          amplitudeAfter: 1,
+          repeatIntervalSamples: 1.5,
+        }),
     ],
     [
       "step index = 10 (out of range)",

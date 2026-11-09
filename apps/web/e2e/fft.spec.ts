@@ -32,7 +32,9 @@ test("Persian (default): the spectrum charts paint, controls update, and the URL
   await expect(page.getByTestId("fftview.meta.bins")).not.toHaveText("0");
   // The chirp demo is longer than the 65 536-sample analysis cap.
   await expect(page.getByTestId("fftview.capNotice")).toBeVisible();
-  // Measured Hann side lobe is the textbook ≈ −31.5 dB.
+  // Measured Hann side lobe is the textbook ≈ −31.5 dB, visible in the
+  // persistent table (not only in the uPlot hover legend).
+  await expect(page.getByTestId("fftview.windowCompare.table")).toBeVisible();
   await expect(page.getByTestId("fftview.windowCompare.hann")).toContainText("dB");
 
   await page.getByTestId("fftview.magnitude.linear").click();

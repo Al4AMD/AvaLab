@@ -8,8 +8,9 @@ the NumPy transcription of the TypeScript implementation:
     square    phase = frac(f*n/fs); x[n] = +a if phase <= duty else -a
     sawtooth  x[n] = a * (2*frac(f*n/fs) - 1)
     triangle  piecewise-linear triangle of the cycle phase (see generators.ts)
-    impulse   x[n] = a at n = impulseSampleIndex
-    step      x[n] = before for n < index, after for n >= index
+    impulse   x[n] = a at n = index + k*intervalSamples for k = 0..count-1
+    step      starts at before; every event at index + k*intervalSamples
+              toggles between before and after (count = 1 is the classic step)
     chirp     phase = 2*pi * integral_0^t f(tau) dtau, closed form:
                 linear      phase(t) = 2*pi*(f0*t + (f1-f0)*t^2/(2*T))
                 logarithmic phase(t) = 2*pi*f0*T*expm1(alpha*t/T)/alpha
@@ -135,6 +136,27 @@ def _impulse_case() -> GoldenCase:
     )
 
 
+def _impulse_train_case() -> GoldenCase:
+    impulse_index = 1
+    amplitude = 0.75
+    repeat_count = 3
+    repeat_interval = 3
+    values = np.zeros(SAMPLE_COUNT, dtype=np.float64)
+    for event in range(repeat_count):
+        values[impulse_index + event * repeat_interval] = amplitude
+    return _case(
+        "impulse",
+        "impulse_train_index1_count3_interval3",
+        {
+            "impulseSampleIndex": impulse_index,
+            "amplitude": amplitude,
+            "repeatCount": repeat_count,
+            "repeatIntervalSamples": repeat_interval,
+        },
+        values,
+    )
+
+
 def _step_case() -> GoldenCase:
     step_index = 4
     amplitude_before = -0.25
@@ -151,6 +173,35 @@ def _step_case() -> GoldenCase:
             "stepSampleIndex": step_index,
             "amplitudeBefore": amplitude_before,
             "amplitudeAfter": amplitude_after,
+        },
+        values,
+    )
+
+
+def _repeated_step_case() -> GoldenCase:
+    step_index = 1
+    amplitude_before = -0.25
+    amplitude_after = 0.5
+    repeat_count = 3
+    repeat_interval = 3
+    values = np.empty(SAMPLE_COUNT, dtype=np.float64)
+    level = amplitude_before
+    cursor = 0
+    for event in range(repeat_count):
+        event_index = step_index + event * repeat_interval
+        values[cursor:event_index] = level
+        cursor = event_index
+        level = amplitude_after if level == amplitude_before else amplitude_before
+    values[cursor:] = level
+    return _case(
+        "step",
+        "step_train_index1_count3_interval3",
+        {
+            "stepSampleIndex": step_index,
+            "amplitudeBefore": amplitude_before,
+            "amplitudeAfter": amplitude_after,
+            "repeatCount": repeat_count,
+            "repeatIntervalSamples": repeat_interval,
         },
         values,
     )
@@ -269,7 +320,9 @@ def cases() -> list[GoldenCase]:
         _sawtooth_case(),
         _triangle_case(),
         _impulse_case(),
+        _impulse_train_case(),
         _step_case(),
+        _repeated_step_case(),
         _linear_chirp_case(),
         _logarithmic_chirp_case(),
         _two_tone_case(),

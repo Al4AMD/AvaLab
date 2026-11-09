@@ -1,20 +1,23 @@
 /**
  * A/B compare slot (F02, Wave 2 Plan 03 Task 4; processed pane in Wave 3
- * Plan 01 Task 5). The right pane renders the current processed lane through
- * the worker's `waveformOverview` op (bucket count 200); the left pane keeps
- * its honest dash until a later plan gives the original its own readout.
+ * Plan 01 Task 5; original pane in the Wave 4 hotfix). Both panes render the
+ * worker's `waveformOverview` op: the original reuses the waveform view's
+ * 1200-bucket cache entry, and the processed lane uses its own 200-bucket
+ * standalone key because it is not a session source.
  *
- * R23: the derivation goes through the session store, never the rpc module.
- * The payload is a COPY of `processed.samples`; the transfer neuters only
- * that copy, so playback keeps the store-owned buffer intact.
+ * R23: every derivation goes through the session store, never the rpc module.
+ * Payloads are COPIES; the transfer neuters only the copy, so playback keeps
+ * the store-owned buffers intact.
  */
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { WaveformOverviewResult } from "../../session/ops";
 import { useSessionStore } from "../../session/store";
 import { paintWaveform } from "./paintWaveform";
 
 const COMPARE_BUCKETS = 200;
+const ORIGINAL_BUCKETS = 1200;
 const COMPARE_HEIGHT_PX = 64;
 
 function ComparePane({ label, testId }: { readonly label: string; readonly testId: string }) {
@@ -32,30 +35,36 @@ function ComparePane({ label, testId }: { readonly label: string; readonly testI
   );
 }
 
-function ProcessedComparePane({ label }: { readonly label: string }) {
-  const processed = useSessionStore((state) => state.processed);
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [minMax, setMinMax] = useState<Float32Array | null>(null);
-  const [widthPx, setWidthPx] = useState(640);
+function useOriginalMinMax(): Float32Array | null {
+  const original = useSessionStore((state) => state.original);
+  const derived = useSessionStore((state) => state.derived);
+  const [key, setKey] = useState<string | null>(null);
 
   useEffect(() => {
-    const host = hostRef.current;
-    if (host === null) {
+    if (original === null) {
+      setKey(null);
       return;
     }
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry !== undefined) {
-        setWidthPx(Math.max(1, Math.round(entry.contentRect.width)));
-      }
+    const ticket = useSessionStore.getState().deriveWithSource("waveformOverview", {
+      bucketCount: ORIGINAL_BUCKETS,
+      sampleRateHz: original.sampleRateHz,
     });
-    observer.observe(host);
-    setWidthPx(Math.max(1, Math.round(host.getBoundingClientRect().width)));
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
+    setKey(ticket.key);
+    ticket.outcome.catch(() => undefined);
+  }, [original]);
+
+  const entry = key === null ? undefined : derived.get(key);
+  const result = entry?.result as WaveformOverviewResult | undefined;
+  const payload = result?.payload;
+  if (payload === undefined) {
+    return null;
+  }
+  return new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+}
+
+function useProcessedMinMax(): Float32Array | null {
+  const processed = useSessionStore((state) => state.processed);
+  const [minMax, setMinMax] = useState<Float32Array | null>(null);
 
   useEffect(() => {
     if (processed === null) {
@@ -94,6 +103,40 @@ function ProcessedComparePane({ label }: { readonly label: string }) {
     };
   }, [processed]);
 
+  return minMax;
+}
+
+function WaveformComparePane({
+  label,
+  testId,
+  minMax,
+}: {
+  readonly label: string;
+  readonly testId: string;
+  readonly minMax: Float32Array | null;
+}) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [widthPx, setWidthPx] = useState(640);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (host === null) {
+      return;
+    }
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry !== undefined) {
+        setWidthPx(Math.max(1, Math.round(entry.contentRect.width)));
+      }
+    });
+    observer.observe(host);
+    setWidthPx(Math.max(1, Math.round(host.getBoundingClientRect().width)));
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas === null || minMax === null) {
@@ -115,8 +158,8 @@ function ProcessedComparePane({ label }: { readonly label: string }) {
     });
   }, [minMax, widthPx]);
 
-  if (processed === null) {
-    return <ComparePane label={label} testId="compare.derived.slot" />;
+  if (minMax === null) {
+    return <ComparePane label={label} testId={testId} />;
   }
   return (
     <figure className="flex flex-col gap-1">
@@ -125,7 +168,7 @@ function ProcessedComparePane({ label }: { readonly label: string }) {
           ref={canvasRef}
           role="img"
           aria-label={label}
-          data-testid="compare.derived.slot"
+          data-testid={testId}
           style={{ height: `${COMPARE_HEIGHT_PX}px` }}
           className="block w-full rounded border border-surface bg-bg"
         />
@@ -139,6 +182,8 @@ export function CompareSlot() {
   const { t } = useTranslation();
   const original = useSessionStore((state) => state.original);
   const processed = useSessionStore((state) => state.processed);
+  const originalMinMax = useOriginalMinMax();
+  const processedMinMax = useProcessedMinMax();
   if (original === null) {
     return null;
   }
@@ -146,8 +191,16 @@ export function CompareSlot() {
     <section data-testid="compare.slot" className="flex flex-col gap-2">
       <h3 className="text-sm font-medium">{t("compare.title")}</h3>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <ComparePane label={t("compare.original")} testId="compare.original.slot" />
-        <ProcessedComparePane label={t("compare.derived")} />
+        <WaveformComparePane
+          label={t("compare.original")}
+          testId="compare.original.slot"
+          minMax={originalMinMax}
+        />
+        <WaveformComparePane
+          label={t("compare.derived")}
+          testId="compare.derived.slot"
+          minMax={processedMinMax}
+        />
       </div>
       {processed === null && (
         <p data-testid="compare.pending" className="text-xs text-muted">

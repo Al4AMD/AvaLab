@@ -14,6 +14,8 @@ type WaveformCanvasProps = {
   readonly minMax: Float32Array;
   readonly sampleRange: SampleRange;
   readonly selectionRange: SampleRange;
+  readonly viewportRange?: SampleRange;
+  readonly verticalScale?: number;
   readonly heightPx: number;
   readonly testId: string;
   readonly label: string;
@@ -34,14 +36,22 @@ function palette(
   element: HTMLElement,
 ): Omit<
   WaveformPaintOptions,
-  "widthPx" | "heightPx" | "dpr" | "sampleRange" | "playheadSample" | "selectionRange"
+  | "widthPx"
+  | "heightPx"
+  | "dpr"
+  | "sampleRange"
+  | "playheadSample"
+  | "selectionRange"
+  | "viewportRange"
+  | "verticalScale"
 > {
   return {
     background: cssColor(element, "--color-bg", "#0b1016"),
     wave: cssColor(element, "--color-accent", "#59d8e6"),
     center: cssColor(element, "--color-surface", "#25303a"),
     playhead: cssColor(element, "--color-text", "#f1eee4"),
-    selection: "rgba(89, 216, 230, 0.18)",
+    selection: "rgba(89, 216, 230, 0.28)",
+    selectionBorder: cssColor(element, "--color-text", "#f1eee4"),
   };
 }
 
@@ -97,6 +107,8 @@ export function WaveformCanvas(props: WaveformCanvasProps) {
         dpr: window.devicePixelRatio || 1,
         sampleRange: props.sampleRange,
         selectionRange: props.selectionRange,
+        viewportRange: props.viewportRange,
+        verticalScale: props.verticalScale,
         playheadSample,
       });
     };
@@ -112,6 +124,8 @@ export function WaveformCanvas(props: WaveformCanvasProps) {
     props.minMax,
     props.sampleRange,
     props.selectionRange,
+    props.viewportRange,
+    props.verticalScale,
     props.heightPx,
     widthPx,
     originalRateHz,

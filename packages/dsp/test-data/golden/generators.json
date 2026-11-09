@@ -165,6 +165,40 @@
     {
       "expected": {
         "samples": [
+          0.0,
+          0.75,
+          0.0,
+          0.0,
+          0.75,
+          0.0,
+          0.0,
+          0.75,
+          0.0,
+          0.0
+        ]
+      },
+      "input": {
+        "sample_rate_hz": 1000,
+        "samples": []
+      },
+      "name": "impulse_train_index1_count3_interval3",
+      "params": {
+        "amplitude": 0.75,
+        "durationSeconds": 0.01,
+        "generator": "impulse",
+        "impulseSampleIndex": 1,
+        "repeatCount": 3,
+        "repeatIntervalSamples": 3,
+        "sampleRateHz": 1000
+      },
+      "tolerance": {
+        "atol": 1e-12,
+        "rtol": 1e-09
+      }
+    },
+    {
+      "expected": {
+        "samples": [
           -0.25,
           -0.25,
           -0.25,
@@ -189,6 +223,41 @@
         "generator": "step",
         "sampleRateHz": 1000,
         "stepSampleIndex": 4
+      },
+      "tolerance": {
+        "atol": 1e-12,
+        "rtol": 1e-09
+      }
+    },
+    {
+      "expected": {
+        "samples": [
+          -0.25,
+          0.5,
+          0.5,
+          0.5,
+          -0.25,
+          -0.25,
+          -0.25,
+          0.5,
+          0.5,
+          0.5
+        ]
+      },
+      "input": {
+        "sample_rate_hz": 1000,
+        "samples": []
+      },
+      "name": "step_train_index1_count3_interval3",
+      "params": {
+        "amplitudeAfter": 0.5,
+        "amplitudeBefore": -0.25,
+        "durationSeconds": 0.01,
+        "generator": "step",
+        "repeatCount": 3,
+        "repeatIntervalSamples": 3,
+        "sampleRateHz": 1000,
+        "stepSampleIndex": 1
       },
       "tolerance": {
         "atol": 1e-12,

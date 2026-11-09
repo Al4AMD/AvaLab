@@ -14,8 +14,9 @@ export type GeneratorSettings = {
   readonly amplitude: number;
   readonly frequencyHz: number;
   readonly dutyCycle: number;
-  readonly impulseIndex: number;
-  readonly stepIndex: number;
+  readonly eventStartSeconds: number;
+  readonly eventCount: number;
+  readonly eventIntervalSeconds: number;
   readonly chirpFromHz: number;
   readonly chirpToHz: number;
   readonly chirpLog: boolean;
@@ -71,8 +72,9 @@ export const GENERATOR_DEFAULT_SETTINGS: GeneratorSettings = {
   amplitude: 0.8,
   frequencyHz: 440,
   dutyCycle: 0.5,
-  impulseIndex: 0,
-  stepIndex: 0,
+  eventStartSeconds: 0,
+  eventCount: 1,
+  eventIntervalSeconds: 0.5,
   chirpFromHz: 100,
   chirpToHz: 8000,
   chirpLog: true,
@@ -106,12 +108,13 @@ export function generatorSettingsToSearch(settings: GeneratorSettings): string {
     f2: settings.tone2Hz,
     fh: settings.fourierHarmonics,
     fk: settings.fourierKind,
-    imp: settings.impulseIndex,
+    evg: settings.eventIntervalSeconds,
+    evn: settings.eventCount,
+    evt: settings.eventStartSeconds,
     mh: settings.modulationHz,
     mi: settings.modulationIndex,
     seed: settings.seed,
     sr: settings.sampleRateHz,
-    step: settings.stepIndex,
     w: settings.waveform,
   });
 }
@@ -143,8 +146,19 @@ export function generatorSettingsFromSearch(search: string): GeneratorSettings {
     amplitude: finiteIn(Number(scalar("a")), 0, 1, defaults.amplitude),
     frequencyHz: finiteIn(Number(scalar("f")), 1, 48000, defaults.frequencyHz),
     dutyCycle: finiteIn(Number(scalar("duty")), 0.01, 1, defaults.dutyCycle),
-    impulseIndex: integerIn(Number(scalar("imp")), 0, 1e9, defaults.impulseIndex),
-    stepIndex: integerIn(Number(scalar("step")), 0, 1e9, defaults.stepIndex),
+    eventStartSeconds: finiteIn(
+      Number(scalar("evt")),
+      0,
+      GENERATOR_MAX_DURATION_S,
+      defaults.eventStartSeconds,
+    ),
+    eventCount: integerIn(Number(scalar("evn")), 1, 1000, defaults.eventCount),
+    eventIntervalSeconds: finiteIn(
+      Number(scalar("evg")),
+      0,
+      GENERATOR_MAX_DURATION_S,
+      defaults.eventIntervalSeconds,
+    ),
     chirpFromHz: finiteIn(Number(scalar("cf")), 1, 48000, defaults.chirpFromHz),
     chirpToHz: finiteIn(Number(scalar("ct")), 1, 48000, defaults.chirpToHz),
     chirpLog: scalar("cl") !== "0",

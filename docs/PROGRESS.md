@@ -2,6 +2,17 @@
 
 > Living log. Agents update every session: what changed, what is next, known issues, items needing owner review.
 
+## 2026-11-10 — Owner review fixes (F02/F03/F06/F08/F12)
+
+- Waveform: the selection now paints as a band with clear borders, the detail pane follows the zoom viewport, exact-sample rendering uses a polyline plus Y auto-fit, and the hover readout carries the sample value label. The original/processed comparison shows two real waveform panes and reuses the cached 1200-bucket overview instead of a second decode.
+- FFT window comparison: the table now sits above the chart, keeps its own test id, adds window color swatches and a screen-reader caption.
+- Speed: reverse is a forward/reverse segmented control with `aria-pressed`; the URL parameter is unchanged.
+- Generator: impulse/step now share `eventStartSeconds`, `eventCount`, and `eventIntervalSeconds` controls (URL keys `evt`, `evn`, `evg`). DSP supports `repeatCount`/`repeatIntervalSamples` with NumPy golden trains; repeated step events toggle between the two levels, so count 1 remains the classic step. The op rejects invalid timing, clamps the start to the last sample, and caps the count at the sample count.
+- Sampling: `samplingProcess` now rejects a selection shorter than one output sample with `badParams` instead of returning an empty result. The e2e flow covers 8-bit theory SNR (49.9 dB) and TPDF dither.
+- `biome.json` excludes the self-contained `docs/presentation` artifact; it remains validated by `node --check` and `deck-check.mjs`. `pnpm check` is green (web 85 files / 740 tests, dsp 46 / 1,074, scripts 13, i18n OK); full Playwright is 107/107 in 3.3 min.
+- Known issue: the performance spec's reverb gate is close to its documented 2 s fallback ceiling. Two loaded runs measured 2.42 s; the final full run passed at 1.92 s. Not changed in this branch.
+- Code committed as `3f56e92`. **Next step:** push `hotfix` and open the PR to `main`; owner reviews the four tool flows.
+
 ## 2026-11-09 — ASR replaced with faster-whisper medium
 
 - Replaced `openai/whisper-tiny` with `Systran/faster-whisper-medium` pinned at `08e178d48790749d25932bbc082711ddcfdfbc4f` (MIT). The adapter now loads the pinned CTranslate2 model through `faster-whisper` 1.2.1, uses int8 on CPU and float16 on CUDA, and keeps the 30 s excerpt, job, SSE and UI contracts. No model selector; this is a replacement. Recorded as D-058.
@@ -777,3 +788,12 @@ classification, F16 student report) are unchanged.
 - Needs owner review: Phase 3 behavior, stereo listening on the demo, and the new Persian strings (`sampling.lane.*`, `speed.lane.*`, `extent.lane.*`, the per-lane table labels, and the three theory lane sections) join the Persian review backlog.
 - Known limits: no joint stereo; sampling/speed grid parameters remain shared by design; pipeline, AI, and full-file stereo codec jobs remain mono; true-stereo convolution is the next phase.
 - **Next step:** owner review of the Phase 3 diff and e2e evidence; then plan Phase 4 — true-stereo 4-path reverb.
+
+## 2026-11-09 — Presentation deck polish (`docs/presentation`)
+
+- Status: 32-slide Persian RTL deck built; sparse-slide content pass added. No commit requested.
+- Added: feature-map descriptions and three curriculum tracks; architecture request lifecycle; separation limitations; ASR evidence band; conceptual rate–distortion chart with legend; pipeline JSON schematic; guided aliasing experiment; Persian/English term matrix; playback-only loudness gauge; D-056 channel table; property-test code sample; env-limit band; delivered/optional/out-of-scope status cards; ingest and denoise/super-resolution limitation bands.
+- Fixed: architecture 8 px overflow; rate–distortion SVG label clipping caused by inherited RTL direction; RTL flow order for A/B insights; spacing on sparse slides via centered `slide-grid` rows.
+- Validation: `node --check docs/presentation/app.js`; `deck-check.mjs` reports 32 slides, zero overflow and zero console errors; interaction smoke covers deep links, arrow navigation, overview (32 items), help, and Escape; mobile 390×844 has no horizontal overflow; print media reports all 32 slides visible and deck height 25,920 px (32 × 810).
+- Known gaps: final human Persian proofread; slides 5/19/26 still carry deliberate lower whitespace above their insight bands; demo canvases were not re-timed during this pass.
+- **Next step:** owner reviews the deck and confirms final Persian copy; then commit `docs/presentation` if requested.
