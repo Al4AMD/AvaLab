@@ -174,7 +174,31 @@
       "pitfalls": {
         "heading": "What the picture can hide",
         "body": "A dense waveform can hide clipping, DC offset, and short dropouts. Zoom to individual samples and check the numeric selection readout before you trust the overview."
+      },
+      "entropy": {
+        "heading": "Amplitude entropy",
+        "body": "Quantize each selected sample to N bits, then estimate the symbol probabilities pₖ from the histogram. Shannon entropy H measures the average information per sample. Its maximum is N bits/sample and occurs only for a uniform distribution; a strongly peaked histogram has low entropy. Entropy is not a perceptual quality score: it depends on the chosen bit depth and on the analyzed range."
       }
+    },
+    "entropy": {
+      "title": "Amplitude entropy",
+      "description": "Shannon entropy of the selected waveform, quantized to a finite bit depth.",
+      "bits": {
+        "label": "Bit depth",
+        "option": "{{bits}}-bit"
+      },
+      "empty": "Select a non-empty range in the detail waveform to measure entropy.",
+      "loading": "Computing entropy…",
+      "error": "Entropy could not be computed for this selection.",
+      "histogramAria": "Quantized amplitude histogram of the selected waveform",
+      "samples": "Samples",
+      "entropy": "Entropy H",
+      "maxEntropy": "Maximum Hmax",
+      "ratio": "H / Hmax",
+      "formula": "H = −Σ pₖ log₂ pₖ",
+      "caveat": "Entropy uses the mono downmix and the exact 2^N symbol counts. The histogram aggregates those counts into 256 bars for display.",
+      "binsNote": "Chart bins: {{bins}}. Changing the bit depth changes the alphabet, so compare entropy only at the same bit depth.",
+      "unit": "bit/sample"
     }
   },
   "tool": {

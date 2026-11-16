@@ -22,6 +22,35 @@
  * input is only read, never mutated.
  */
 
+function entropyFromCounts(counts: Iterable<number>, symbolCount: number): number {
+  if (symbolCount === 0) {
+    return 0;
+  }
+
+  let entropy = 0;
+  for (const count of counts) {
+    const probability = count / symbolCount;
+    if (probability > 0) {
+      entropy -= probability * Math.log2(probability);
+    }
+  }
+  // A single distinct symbol gives -0; normalize so callers observe +0.
+  return entropy === 0 ? 0 : entropy;
+}
+
+/**
+ * Shannon entropy from a histogram of symbol counts. Useful when the caller
+ * already produces a dense histogram (e.g. quantized amplitude bins) and
+ * should not allocate a symbol array. Empty or all-zero histograms -> 0.
+ */
+export function entropyFromHistogram(histogram: Uint32Array): number {
+  let symbolCount = 0;
+  for (let index = 0; index < histogram.length; index += 1) {
+    symbolCount += histogram[index] ?? 0;
+  }
+  return entropyFromCounts(histogram, symbolCount);
+}
+
 export function entropyBitsPerSymbol(symbols: Uint8Array | Int32Array): number {
   if (symbols.length === 0) {
     return 0;
@@ -36,12 +65,5 @@ export function entropyBitsPerSymbol(symbols: Uint8Array | Int32Array): number {
     counts.set(symbol, (counts.get(symbol) ?? 0) + 1);
   }
 
-  const symbolCount = symbols.length;
-  let entropy = 0;
-  for (const count of counts.values()) {
-    const probability = count / symbolCount;
-    entropy -= probability * Math.log2(probability);
-  }
-  // A single distinct symbol gives -0; normalize so callers observe +0.
-  return entropy === 0 ? 0 : entropy;
+  return entropyFromCounts(counts.values(), symbols.length);
 }

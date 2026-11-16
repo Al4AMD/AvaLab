@@ -160,3 +160,43 @@ test("Persian: drag selection, zoom controls, and the keyboard surface all work"
 
   expect(errors).toEqual([]);
 });
+
+test("Persian: amplitude entropy follows the selection and bit depth", async ({ page }) => {
+  const errors = watchForErrors(page);
+  await page.goto("/");
+  await page.getByTestId("input.demo.load.pinkNoise").click();
+  await expect(page.getByTestId("waveform.entropy")).toBeVisible();
+
+  await expectCanvasPainted(page, "waveform.entropy.histogram");
+  await expect(page.getByTestId("waveform.entropy.samples")).toHaveText(/^[0-9,]+$/);
+  await expect(page.getByTestId("waveform.entropy.entropy")).toHaveText(
+    /^[0-9]+\.[0-9]{2} bit\/sample$/,
+  );
+  await expect(page.getByTestId("waveform.entropy.maxEntropy")).toHaveText(/^8 bit\/sample$/);
+  await expect(page.getByTestId("waveform.entropy.ratio")).toHaveText(/^[0-9]+\.[0-9]%$/);
+
+  await page.getByTestId("waveform.entropy.bits").selectOption("12");
+  await expect(page.getByTestId("waveform.entropy.maxEntropy")).toHaveText(/^12 bit\/sample$/);
+  await expect(page.getByTestId("waveform.entropy.entropy")).toHaveText(
+    /^[0-9]+\.[0-9]{2} bit\/sample$/,
+  );
+
+  const samplesBefore = await page.getByTestId("waveform.entropy.samples").textContent();
+  const detail = page.getByTestId(DETAIL);
+  await detail.click({ position: { x: 10, y: 10 } });
+  await expect(page.getByTestId("waveform.entropy.empty")).toBeVisible();
+  await expect(page.getByTestId("waveform.entropy.samples")).toHaveCount(0);
+
+  const box = await detail.boundingBox();
+  if (box === null) {
+    throw new Error("detail canvas has no box");
+  }
+  await page.mouse.move(box.x + box.width * 0.2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.6, box.y + box.height / 2, { steps: 5 });
+  await page.mouse.up();
+  await expect(page.getByTestId("waveform.entropy.samples")).toBeVisible();
+  await expect(page.getByTestId("waveform.entropy.samples")).not.toHaveText(samplesBefore ?? "");
+
+  expect(errors).toEqual([]);
+});

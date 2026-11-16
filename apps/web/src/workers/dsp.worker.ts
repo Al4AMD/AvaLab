@@ -53,6 +53,7 @@ import {
   speedTransform,
   stftBenchmark,
   superresBaseline,
+  waveformEntropy,
   waveformEnvelope,
   waveformOverview,
   waveformRange,
@@ -103,6 +104,7 @@ const dspHandlers = {
   superresBaseline,
   spectrogramTiles,
   waveformEnvelope,
+  waveformEntropy,
   waveformOverview,
   waveformRange,
   windowProfiles,
@@ -187,6 +189,10 @@ function runDspOp(request: DspOpRequest): DspOpResponse {
       }
       case "waveformEnvelope": {
         const result = dspHandlers.waveformEnvelope(request.params, request.payload);
+        return { id: request.id, ok: true, result };
+      }
+      case "waveformEntropy": {
+        const result = dspHandlers.waveformEntropy(request.params, request.payload);
         return { id: request.id, ok: true, result };
       }
       case "qualityMetrics": {

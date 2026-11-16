@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 import type { HealthResponse } from "../../api/client";
 import { api } from "../../api/client";
+import { Histogram } from "../../components/Histogram";
 import { ToolHeader } from "../../components/ToolHeader";
 import { Button } from "../../components/ui/button";
 import type { ChannelMode } from "../../lib/channel";
@@ -82,8 +83,6 @@ import { RateDistortionChart } from "./rateDistortionChart";
 const CONTROL_FOCUS_CLASSES =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const INPUT_CLASSES = `rounded border border-surface bg-bg px-2 py-1 text-sm ${CONTROL_FOCUS_CLASSES}`;
-const HISTOGRAM_HEIGHT_PX = 96;
-const MAX_DEVICE_PIXEL_RATIO = 2;
 
 type LaneCodecResult = {
   readonly id: "mono" | "left" | "right";
@@ -191,53 +190,6 @@ function formatBytes(bytes: number): string {
 
 function formatNumber(value: number, digits = 2): string {
   return Number.isFinite(value) ? value.toFixed(digits) : "∞";
-}
-
-function Histogram({
-  histogram,
-  ariaLabel,
-}: {
-  readonly histogram: readonly number[];
-  readonly ariaLabel: string;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas === null) {
-      return;
-    }
-    const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), MAX_DEVICE_PIXEL_RATIO);
-    const widthDevicePx = Math.max(1, Math.round(canvas.clientWidth * dpr));
-    const heightDevicePx = Math.max(1, Math.round(HISTOGRAM_HEIGHT_PX * dpr));
-    canvas.width = widthDevicePx;
-    canvas.height = heightDevicePx;
-    const ctx = canvas.getContext("2d");
-    if (ctx === null) {
-      return;
-    }
-    ctx.clearRect(0, 0, widthDevicePx, heightDevicePx);
-    const max = Math.max(1, ...histogram);
-    const barWidth = widthDevicePx / Math.max(1, histogram.length);
-    ctx.fillStyle = "#8bd3c7";
-    for (let index = 0; index < histogram.length; index += 1) {
-      const count = histogram[index] ?? 0;
-      const height = (count / max) * heightDevicePx;
-      if (height > 0) {
-        ctx.fillRect(index * barWidth, heightDevicePx - height, Math.max(1, barWidth), height);
-      }
-    }
-  }, [histogram]);
-  return (
-    <canvas
-      ref={canvasRef}
-      role="img"
-      aria-label={ariaLabel}
-      data-testid="codecLab.histogram"
-      dir="ltr"
-      style={{ height: `${HISTOGRAM_HEIGHT_PX}px` }}
-      className="block w-full rounded bg-bg ring-1 ring-surface"
-    />
-  );
 }
 
 const BAND_CHART_WIDTH = 240;
@@ -1499,7 +1451,11 @@ export function CodecLabView(): React.ReactElement {
               {t("codecLab.histogram.title")}
               {result.mode === "both" ? ` — ${laneLabels[effectiveLane]}` : ""}
             </figcaption>
-            <Histogram histogram={displayMeta.histogram} ariaLabel={t("codecLab.histogram.aria")} />
+            <Histogram
+              histogram={displayMeta.histogram}
+              ariaLabel={t("codecLab.histogram.aria")}
+              testId="codecLab.histogram"
+            />
           </figure>
 
           {nonZeroCodeLengths.length > 0 ? (

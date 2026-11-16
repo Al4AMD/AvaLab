@@ -147,6 +147,8 @@ export { istft, stft } from "./fourier/stft.js";
 export { fft, ifft } from "./fourier/transform.js";
 export type { WindowKind } from "./fourier/windows.js";
 export { i0, kaiser, window, windowSymmetric } from "./fourier/windows.js";
+export type { QuantizedAmplitudeEntropyResult } from "./metrics/amplitudeEntropy.js";
+export { quantizedAmplitudeEntropy } from "./metrics/amplitudeEntropy.js";
 export type { PsnrOptions, SegmentalSnrOptions } from "./metrics/basic.js";
 export {
   bitrateKbps,
@@ -158,7 +160,7 @@ export {
 } from "./metrics/basic.js";
 export type { CompandingOptions } from "./metrics/companding.js";
 export { alawDecode, alawEncode, mulawDecode, mulawEncode } from "./metrics/companding.js";
-export { entropyBitsPerSymbol } from "./metrics/entropy.js";
+export { entropyBitsPerSymbol, entropyFromHistogram } from "./metrics/entropy.js";
 export type {
   LoudnessBlock,
   LoudnessParams,

@@ -2,6 +2,18 @@
 
 > Living log. Agents update every session: what changed, what is next, known issues, items needing owner review.
 
+## 2026-11-16 — Waveform amplitude entropy (F02)
+
+- Status: implemented in the working tree on `hotfix`; no commit requested. Baseline `origin/main` is `22ea0ed` (PR #17 merge, released as `v0.2.1`); local `hotfix` is at `b91a72d` and does not contain the merge commit. No backend changes.
+- DSP: added `quantizedAmplitudeEntropy(samples, bits)` (signed 8/12/16-bit PCM alphabet, dense `2^N` histogram, Shannon entropy) and `entropyFromHistogram(counts)`; `waveformEntropy` validates the mono selection payload, computes entropy on the exact alphabet, and aggregates counts into 256 display bins. Entropy is never recomputed from the coarse bins.
+- UI: waveform view now has an amplitude-entropy panel below the selection readout: 8/12/16-bit selector, samples, `H`, `Hmax`, `H/Hmax`, histogram, formula, and caveat; follows the current selection (default whole file), debounces selection changes by 150 ms, and shows empty/loading/error states. The codec-lab histogram canvas was extracted to `apps/web/src/components/Histogram.tsx`; its `codecLab.histogram` test id is preserved.
+- Content: fa/en strings and a waveform theory subsection explain quantization, `Hmax = N`, and why entropy is not a perceptual score.
+- Tests: new DSP helper and op tests cover exact histogram counts, 8/12/16-bit behavior, empty selections, entropy values, display-bin aggregation, and rejection paths; waveform e2e covers painted histogram, bit-depth switching, selection updates, and the empty-selection message.
+- Gates: `pnpm check` exit 0 (biome 381 files; dsp 47 files / 1,086 tests; web 86 files / 746 tests; scripts 13/13; i18n OK); full `pnpm e2e` 108/108 in 2.7 min, including the new waveform entropy flow and the reverb performance gate; no backend changes.
+- Needs owner review: the new Persian entropy panel and waveform theory copy join the Persian review backlog.
+- Known limits: entropy is measured on the mono downmix; the histogram shows 256 display bins while `H` uses exact symbol counts; compare entropy only at the same bit depth; no spectral entropy or per-channel histogram.
+- **Next step:** owner reviews the Persian copy and UI; commit/PR only when requested.
+
 ## 2026-11-10 — Phase chart mask feedback and wrapped label (F08)
 
 - Clarified the Persian phase toggle: `پیچیده` → `پیچیده‌شده (Wrapped)`, `بازشده` → `بازشده (Unwrapped)`. "Wrapped" means phase folded to (−π, π], not a complex-valued spectrum; the old label read as "complex".

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { entropyBitsPerSymbol } from "../../src/index.js";
+import { entropyBitsPerSymbol, entropyFromHistogram } from "../../src/index.js";
 import { asNumber, asNumberArray, type GoldenCase, loadGolden } from "../fixtures.js";
 
 const golden = loadGolden("metrics");
@@ -41,6 +41,22 @@ describe("entropyBitsPerSymbol (golden)", () => {
   it("pins the same skewed histogram through Uint8Array", () => {
     const symbols = Uint8Array.from(asNumberArray(entropyCase().input.samples, "input.samples"));
     expect(entropyBitsPerSymbol(symbols)).toBeCloseTo(1.610577243331642, 12);
+  });
+});
+
+describe("entropyFromHistogram", () => {
+  it("matches the skewed histogram golden value", () => {
+    expect(entropyFromHistogram(Uint32Array.from([8, 3, 2, 1]))).toBeCloseTo(1.610577243331642, 12);
+  });
+
+  it("returns 0 for empty and all-zero histograms", () => {
+    expect(entropyFromHistogram(new Uint32Array(0))).toBe(0);
+    expect(entropyFromHistogram(new Uint32Array(8))).toBe(0);
+  });
+
+  it("is invariant to the histogram length", () => {
+    expect(entropyFromHistogram(Uint32Array.from([4, 4]))).toBe(1);
+    expect(entropyFromHistogram(Uint32Array.from([4, 0, 4, 0]))).toBe(1);
   });
 });
 

@@ -42,6 +42,7 @@ import {
   speedTransform,
   stftBenchmark,
   superresBaseline,
+  waveformEntropy,
   waveformOverview,
   waveformRange,
   windowProfiles,
@@ -1179,6 +1180,7 @@ describe("op table wiring", () => {
     expect(dspOps.sessionPing.handler).toBe(sessionPing);
     expect(dspOps.waveformOverview.handler).toBe(waveformOverview);
     expect(dspOps.waveformRange.handler).toBe(waveformRange);
+    expect(dspOps.waveformEntropy.handler).toBe(waveformEntropy);
     expect(dspOps.spectrogramTiles.handler).toBe(spectrogramTiles);
     expect(dspOps.fftSelection.handler).toBe(fftSelection);
     expect(dspOps.fftBenchmark.handler).toBe(fftBenchmark);
@@ -1208,6 +1210,7 @@ describe("op table wiring", () => {
       | "waveformOverview"
       | "waveformRange"
       | "waveformEnvelope"
+      | "waveformEntropy"
       | "qualityMetrics"
       | "fftSelection"
       | "fftBenchmark"

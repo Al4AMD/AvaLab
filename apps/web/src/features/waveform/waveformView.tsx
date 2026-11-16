@@ -19,6 +19,7 @@ import { TheoryPanel } from "../theory/TheoryPanel";
 import { TOOL_THEORY } from "../theory/theoryContent";
 import { WaveformCanvas } from "./canvasWaveform";
 import { CompareSlot } from "./compareSlot";
+import { EntropyPanel } from "./entropyPanel";
 import {
   clampWindow,
   panWindow,
@@ -416,6 +417,8 @@ export function WaveformView() {
           end: formatS(selectionEndSeconds),
         })}
       </p>
+
+      <EntropyPanel />
 
       <TheoryPanel
         titleKey={TOOL_THEORY.waveform.titleKey}

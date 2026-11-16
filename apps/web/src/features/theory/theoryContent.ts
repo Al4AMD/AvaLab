@@ -42,6 +42,11 @@ export const TOOL_THEORY: Record<TheoryToolId, ToolTheoryEntry> = {
         formula: "x[n]=x(nT_s),\\qquad T_s=\\frac{1}{f_s}",
       },
       {
+        headingKey: "waveform.theory.entropy.heading",
+        bodyKey: "waveform.theory.entropy.body",
+        formula: "H=-\\sum_{k=0}^{2^N-1} p_k \\log_2 p_k,\\qquad H_{\\max}=N",
+      },
+      {
         headingKey: "waveform.theory.pitfalls.heading",
         bodyKey: "waveform.theory.pitfalls.body",
       },

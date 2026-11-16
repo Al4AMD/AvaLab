@@ -104,6 +104,7 @@ import {
   polesZeros,
   psnrDb,
   quantizationError,
+  quantizedAmplitudeEntropy,
   quantizeUniform,
   quantizeWithTpdfDither,
   type ReverbIrParams,
@@ -332,6 +333,95 @@ export function waveformRange(
       endSample: params.endSample,
     },
     payload: { buffer: minMax.buffer, byteOffset: 0, byteLength: minMax.byteLength },
+  };
+}
+
+export type WaveformEntropyParams = {
+  bitsPerSample: 8 | 12 | 16;
+  startSample: number;
+  endSample: number;
+};
+export type WaveformEntropyResult = {
+  meta: {
+    sampleCount: number;
+    startSample: number;
+    endSample: number;
+    bitsPerSample: number;
+    entropyBitsPerSample: number;
+    maxEntropyBitsPerSample: number;
+    displayBinCount: number;
+  };
+  payload?: TransferablePayload;
+};
+
+/** Display resolution of the amplitude histogram; the entropy is always
+ * computed on the full 2^bits symbol alphabet before this aggregation. */
+export const WAVEFORM_ENTROPY_DISPLAY_BINS = 256;
+
+/**
+ * Quantized amplitude histogram and Shannon entropy of the transferred
+ * selection. The store sends the mono selection slice; this handler quantizes
+ * it to 8/12/16-bit PCM, computes entropy on the exact symbol alphabet, then
+ * aggregates those counts into 256 display bins so the UI transfer stays
+ * small. Entropy in the meta is never recomputed from the coarse bins.
+ */
+export function waveformEntropy(
+  params: WaveformEntropyParams,
+  payload?: TransferablePayload,
+): WaveformEntropyResult {
+  if (
+    params === undefined ||
+    params === null ||
+    (params.bitsPerSample !== 8 && params.bitsPerSample !== 12 && params.bitsPerSample !== 16) ||
+    !Number.isInteger(params.startSample) ||
+    !Number.isInteger(params.endSample) ||
+    params.startSample < 0 ||
+    params.endSample < params.startSample
+  ) {
+    throw new DspOpError("badParams", `waveformEntropy: invalid params ${String(params)}`);
+  }
+  if (payload === undefined) {
+    throw new DspOpError("badPayload", "waveformEntropy: a Float32 source payload is required");
+  }
+  if (payload.byteOffset % 4 !== 0 || payload.byteLength % 4 !== 0) {
+    throw new DspOpError(
+      "badPayload",
+      `waveformEntropy: payload must be Float32-aligned, got byteOffset ${String(payload.byteOffset)}/byteLength ${String(payload.byteLength)}`,
+    );
+  }
+  const samples = new Float32Array(payload.buffer, payload.byteOffset, payload.byteLength / 4);
+  let quantized: ReturnType<typeof quantizedAmplitudeEntropy>;
+  try {
+    quantized = quantizedAmplitudeEntropy(samples, params.bitsPerSample);
+  } catch (error) {
+    throw new DspOpError(
+      "badPayload",
+      error instanceof Error ? error.message : "waveformEntropy: invalid samples",
+    );
+  }
+
+  const display = new Uint32Array(WAVEFORM_ENTROPY_DISPLAY_BINS);
+  const symbolsPerBin = quantized.histogram.length / WAVEFORM_ENTROPY_DISPLAY_BINS;
+  for (let symbol = 0; symbol < quantized.histogram.length; symbol += 1) {
+    const count = quantized.histogram[symbol] ?? 0;
+    if (count === 0) {
+      continue;
+    }
+    const bin = Math.min(WAVEFORM_ENTROPY_DISPLAY_BINS - 1, Math.floor(symbol / symbolsPerBin));
+    display[bin] = (display[bin] ?? 0) + count;
+  }
+
+  return {
+    meta: {
+      sampleCount: quantized.sampleCount,
+      startSample: params.startSample,
+      endSample: params.endSample,
+      bitsPerSample: quantized.bitsPerSymbol,
+      entropyBitsPerSample: quantized.entropyBitsPerSample,
+      maxEntropyBitsPerSample: quantized.bitsPerSymbol,
+      displayBinCount: WAVEFORM_ENTROPY_DISPLAY_BINS,
+    },
+    payload: { buffer: display.buffer, byteOffset: 0, byteLength: display.byteLength },
   };
 }
 
@@ -3356,6 +3446,13 @@ export const dspOps = {
     params: { bucketCount: 0 },
     result: undefined as unknown as WaveformEnvelopeResult,
     handler: waveformEnvelope,
+  },
+  waveformEntropy: {
+    // Type lenses only — the table is read for types (DspOpParams/Result);
+    // runtime code dispatches through the worker switch.
+    params: { bitsPerSample: 8, startSample: 0, endSample: 0 } as WaveformEntropyParams,
+    result: undefined as unknown as WaveformEntropyResult,
+    handler: waveformEntropy,
   },
   qualityMetrics: {
     // Type lenses only — the table is read for types (DspOpParams/Result);
